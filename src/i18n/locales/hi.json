@@ -1,0 +1,130 @@
+{
+    "common": {
+        "loading": "लोड हो रहा है...",
+        "save": "सहेजें",
+        "cancel": "रद्द करें",
+        "confirm": "पुष्टि करें",
+        "delete": "हटाएं",
+        "edit": "संपादित करें",
+        "add": "जोड़ें",
+        "search": "खोजें",
+        "filter": "फ़िल्टर",
+        "refresh": "रीफ्रेश",
+        "back": "वापस",
+        "next": "अगला",
+        "previous": "पिछला",
+        "close": "बंद करें",
+        "submit": "जमा करें",
+        "yes": "हां",
+        "no": "नहीं",
+        "success": "सफलता",
+        "error": "त्रुटि",
+        "warning": "चेतावनी",
+        "info": "जानकारी",
+        "noData": "कोई डेटा नहीं",
+        "all": "सभी"
+    },
+    "auth": {
+        "login": "लॉग इन",
+        "logout": "लॉग आउट",
+        "enterPin": "अपना पिन दर्ज करें",
+        "invalidPin": "गलत पिन",
+        "welcome": "स्वागत है",
+        "biometric": "फिंगरप्रिंट से लॉगिन",
+        "rememberMe": "मुझे याद रखें"
+    },
+    "roles": {
+        "owner": "मालिक",
+        "manager": "प्रबंधक",
+        "employee": "कर्मचारी"
+    },
+    "departments": {
+        "reception": "रिसेप्शन",
+        "housekeeping": "हाउसकीपिंग",
+        "bellman": "बेलमैन",
+        "maintenance": "रखरखाव",
+        "procurement": "खरीद",
+        "admin": "प्रशासन"
+    },
+    "requests": {
+        "new": "नया अनुरोध",
+        "pending": "लंबित",
+        "confirmed": "पुष्टि हुई",
+        "inProgress": "प्रगति में",
+        "completed": "पूर्ण",
+        "cancelled": "रद्द",
+        "room": "कमरा",
+        "guest": "मेहमान",
+        "type": "प्रकार",
+        "priority": "प्राथमिकता",
+        "urgent": "जरूरी",
+        "normal": "सामान्य",
+        "notes": "नोट्स"
+    },
+    "services": {
+        "cleaning": "सफाई",
+        "maintenance": "रखरखाव",
+        "bellman": "बेलमैन सेवा",
+        "coffee": "कॉफी शॉप",
+        "minibar": "मिनीबार",
+        "extension": "ठहरने का विस्तार"
+    },
+    "cleaning": {
+        "occupied": "रहने वाले की सफाई",
+        "checkout": "चेकआउट सफाई",
+        "immediate": "तुरंत",
+        "scheduled": "निर्धारित",
+        "start": "सफाई शुरू करें",
+        "complete": "सफाई पूर्ण करें"
+    },
+    "maintenance": {
+        "electrical": "बिजली",
+        "plumbing": "प्लंबिंग",
+        "ac": "एसी",
+        "furniture": "फर्नीचर",
+        "other": "अन्य",
+        "beforePhoto": "पहले की फोटो",
+        "afterPhoto": "बाद की फोटो"
+    },
+    "bellman": {
+        "checkIn": "चेक इन",
+        "checkOut": "चेक आउट",
+        "luggage": "सामान",
+        "cart": "गाड़ी"
+    },
+    "points": {
+        "points": "अंक",
+        "total": "कुल अंक",
+        "earned": "अर्जित अंक",
+        "deducted": "घटाए गए अंक",
+        "history": "अंक इतिहास"
+    },
+    "dashboard": {
+        "overview": "अवलोकन",
+        "today": "आज",
+        "thisWeek": "इस सप्ताह",
+        "thisMonth": "इस महीने",
+        "newRequests": "नए अनुरोध",
+        "inProgress": "प्रगति में",
+        "completedToday": "आज पूर्ण",
+        "delayed": "विलंबित"
+    },
+    "settings": {
+        "settings": "सेटिंग्स",
+        "general": "सामान्य",
+        "points": "अंक",
+        "times": "समय",
+        "products": "उत्पाद",
+        "design": "डिज़ाइन",
+        "branchName": "शाखा का नाम",
+        "language": "भाषा"
+    },
+    "guest": {
+        "welcome": "स्वागत है",
+        "selectService": "सेवा चुनें",
+        "submitRequest": "अनुरोध जमा करें",
+        "trackRequest": "अनुरोध ट्रैक करें",
+        "rate": "सेवा रेट करें",
+        "dnd": "परेशान न करें"
+    }
+}

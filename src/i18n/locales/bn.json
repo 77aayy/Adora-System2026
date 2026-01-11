@@ -1,0 +1,130 @@
+{
+    "common": {
+        "loading": "লোড হচ্ছে...",
+        "save": "সংরক্ষণ করুন",
+        "cancel": "বাতিল",
+        "confirm": "নিশ্চিত করুন",
+        "delete": "মুছুন",
+        "edit": "সম্পাদনা",
+        "add": "যোগ করুন",
+        "search": "অনুসন্ধান",
+        "filter": "ফিল্টার",
+        "refresh": "রিফ্রেশ",
+        "back": "পেছনে",
+        "next": "পরবর্তী",
+        "previous": "পূর্ববর্তী",
+        "close": "বন্ধ করুন",
+        "submit": "জমা দিন",
+        "yes": "হ্যাঁ",
+        "no": "না",
+        "success": "সফল",
+        "error": "ত্রুটি",
+        "warning": "সতর্কতা",
+        "info": "তথ্য",
+        "noData": "কোনো ডেটা নেই",
+        "all": "সব"
+    },
+    "auth": {
+        "login": "লগইন",
+        "logout": "লগআউট",
+        "enterPin": "আপনার পিন দিন",
+        "invalidPin": "ভুল পিন",
+        "welcome": "স্বাগতম",
+        "biometric": "আঙুলের ছাপ দিয়ে লগইন",
+        "rememberMe": "আমাকে মনে রাখুন"
+    },
+    "roles": {
+        "owner": "মালিক",
+        "manager": "ম্যানেজার",
+        "employee": "কর্মচারী"
+    },
+    "departments": {
+        "reception": "রিসেপশন",
+        "housekeeping": "হাউসকিপিং",
+        "bellman": "বেলম্যান",
+        "maintenance": "রক্ষণাবেক্ষণ",
+        "procurement": "ক্রয়",
+        "admin": "প্রশাসন"
+    },
+    "requests": {
+        "new": "নতুন অনুরোধ",
+        "pending": "মুলতুবি",
+        "confirmed": "নিশ্চিত",
+        "inProgress": "চলমান",
+        "completed": "সম্পন্ন",
+        "cancelled": "বাতিল",
+        "room": "রুম",
+        "guest": "অতিথি",
+        "type": "ধরন",
+        "priority": "অগ্রাধিকার",
+        "urgent": "জরুরি",
+        "normal": "সাধারণ",
+        "notes": "নোট"
+    },
+    "services": {
+        "cleaning": "পরিষ্কার",
+        "maintenance": "রক্ষণাবেক্ষণ",
+        "bellman": "বেলম্যান সেবা",
+        "coffee": "কফি শপ",
+        "minibar": "মিনিবার",
+        "extension": "থাকার বর্ধিতকরণ"
+    },
+    "cleaning": {
+        "occupied": "অকুপাইড পরিষ্কার",
+        "checkout": "চেকআউট পরিষ্কার",
+        "immediate": "তাৎক্ষণিক",
+        "scheduled": "নির্ধারিত",
+        "start": "পরিষ্কার শুরু",
+        "complete": "পরিষ্কার সম্পন্ন"
+    },
+    "maintenance": {
+        "electrical": "বৈদ্যুতিক",
+        "plumbing": "প্লাম্বিং",
+        "ac": "এসি",
+        "furniture": "আসবাবপত্র",
+        "other": "অন্যান্য",
+        "beforePhoto": "আগের ছবি",
+        "afterPhoto": "পরের ছবি"
+    },
+    "bellman": {
+        "checkIn": "চেক ইন",
+        "checkOut": "চেক আউট",
+        "luggage": "লাগেজ",
+        "cart": "কার্ট"
+    },
+    "points": {
+        "points": "পয়েন্ট",
+        "total": "মোট পয়েন্ট",
+        "earned": "অর্জিত পয়েন্ট",
+        "deducted": "কর্তিত পয়েন্ট",
+        "history": "পয়েন্ট ইতিহাস"
+    },
+    "dashboard": {
+        "overview": "সারসংক্ষেপ",
+        "today": "আজ",
+        "thisWeek": "এই সপ্তাহ",
+        "thisMonth": "এই মাস",
+        "newRequests": "নতুন অনুরোধ",
+        "inProgress": "চলমান",
+        "completedToday": "আজ সম্পন্ন",
+        "delayed": "বিলম্বিত"
+    },
+    "settings": {
+        "settings": "সেটিংস",
+        "general": "সাধারণ",
+        "points": "পয়েন্ট",
+        "times": "সময়",
+        "products": "পণ্য",
+        "design": "ডিজাইন",
+        "branchName": "শাখার নাম",
+        "language": "ভাষা"
+    },
+    "guest": {
+        "welcome": "স্বাগতম",
+        "selectService": "সেবা নির্বাচন করুন",
+        "submitRequest": "অনুরোধ জমা দিন",
+        "trackRequest": "অনুরোধ ট্র্যাক করুন",
+        "rate": "সেবা রেট করুন",
+        "dnd": "বিরক্ত করবেন না"
+    }
+}

@@ -1,0 +1,1320 @@
+/**
+ * ============================================================
+ * ADORA HOTEL MANAGEMENT SYSTEM - PROFESSIONAL THEME SYSTEM
+ * ============================================================
+ * 
+ * Light/Dark Mode Support
+ * Inspired by modern SaaS dashboards (CarePilot, Fintech Apps)
+ * 
+ * Usage:
+ * - Add data-theme="light" to <html> for Light Mode
+ * - Add data-theme="dark" to <html> for Dark Mode
+ * - Default is Light Mode
+ */
+
+/* ============================================================
+   LIGHT THEME (DEFAULT) - Clean, Professional, Modern
+   ============================================================ */
+:root,
+[data-theme="light"] {
+  /* ─────────────────────────────────────────────────────────
+     BACKGROUND COLORS
+     ───────────────────────────────────────────────────────── */
+  --theme-bg-primary: #f8fafc;        /* Page background - Light gray */
+  --theme-bg-secondary: #ffffff;       /* Card background - Pure white */
+  --theme-bg-tertiary: #f8fafc;        /* Hover/Secondary areas - Lighter */
+  --theme-bg-elevated: #ffffff;        /* Elevated cards */
+  --theme-bg-overlay: rgba(0, 0, 0, 0.4);
+  
+  /* ─────────────────────────────────────────────────────────
+     OVERRIDE DESIGN-SYSTEM COLORS FOR LIGHT MODE
+     ───────────────────────────────────────────────────────── */
+  --text-primary: #1e293b;             /* Override for dark text */
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-disabled: #94a3b8;
+  --bg-card: #ffffff;
+  --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: #e2e8f0;
+  
+  /* ─────────────────────────────────────────────────────────
+     TEXT COLORS
+     ───────────────────────────────────────────────────────── */
+  --theme-text-primary: #1e293b;       /* Main text - Dark slate */
+  --theme-text-secondary: #475569;     /* Secondary text */
+  --theme-text-tertiary: #64748b;      /* Muted text */
+  --theme-text-disabled: #94a3b8;      /* Disabled text */
+  --theme-text-inverse: #ffffff;       /* Text on dark backgrounds */
+  
+  /* ─────────────────────────────────────────────────────────
+     BORDER COLORS
+     ───────────────────────────────────────────────────────── */
+  --theme-border-primary: #e2e8f0;     /* Main borders */
+  --theme-border-secondary: #f1f5f9;   /* Light borders */
+  --theme-border-hover: #cbd5e1;       /* Hover state borders */
+  --theme-border-focus: #0d9488;       /* Focus state borders */
+  
+  /* ─────────────────────────────────────────────────────────
+     PRIMARY COLORS (TEAL - Brand Color)
+     ───────────────────────────────────────────────────────── */
+  --theme-primary-50: #f0fdfa;
+  --theme-primary-100: #ccfbf1;
+  --theme-primary-200: #99f6e4;
+  --theme-primary-300: #5eead4;
+  --theme-primary-400: #2dd4bf;
+  --theme-primary-500: #14b8a6;
+  --theme-primary-600: #0d9488;        /* Main brand color */
+  --theme-primary-700: #0f766e;
+  --theme-primary-800: #115e59;
+  --theme-primary-900: #134e4a;
+  
+  /* ─────────────────────────────────────────────────────────
+     ACCENT COLORS (For variety - inspired by reference images)
+     ───────────────────────────────────────────────────────── */
+  /* Blue Accent */
+  --theme-accent-blue-light: #eff6ff;
+  --theme-accent-blue: #3b82f6;
+  --theme-accent-blue-dark: #1d4ed8;
+  
+  /* Green Accent */
+  --theme-accent-green-light: #f0fdf4;
+  --theme-accent-green: #22c55e;
+  --theme-accent-green-dark: #16a34a;
+  
+  /* Orange Accent */
+  --theme-accent-orange-light: #fff7ed;
+  --theme-accent-orange: #f97316;
+  --theme-accent-orange-dark: #ea580c;
+  
+  /* Red Accent */
+  --theme-accent-red-light: #fef2f2;
+  --theme-accent-red: #ef4444;
+  --theme-accent-red-dark: #dc2626;
+  
+  /* Purple Accent */
+  --theme-accent-purple-light: #faf5ff;
+  --theme-accent-purple: #8b5cf6;
+  --theme-accent-purple-dark: #7c3aed;
+  
+  /* Yellow Accent */
+  --theme-accent-yellow-light: #fefce8;
+  --theme-accent-yellow: #eab308;
+  --theme-accent-yellow-dark: #ca8a04;
+  
+  /* ─────────────────────────────────────────────────────────
+     SHADOWS (Professional Floating Effect - Like Reference Images)
+     ───────────────────────────────────────────────────────── */
+  --theme-shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --theme-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --theme-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --theme-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.10);
+  --theme-shadow-xl: 0 15px 50px rgba(0, 0, 0, 0.12);
+  --theme-shadow-2xl: 0 25px 60px rgba(0, 0, 0, 0.15);
+  --theme-shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.03);
+  
+  /* ✨ Card-specific shadow - Floating Effect like Apple/Modern UI */
+  --theme-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.05);
+  --theme-shadow-card-hover: 0 20px 50px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.08);
+  
+  /* 🎨 Colored shadows for stat cards */
+  --theme-shadow-blue: 0 8px 30px rgba(59, 130, 246, 0.25);
+  --theme-shadow-green: 0 8px 30px rgba(34, 197, 94, 0.25);
+  --theme-shadow-orange: 0 8px 30px rgba(249, 115, 22, 0.25);
+  --theme-shadow-red: 0 8px 30px rgba(239, 68, 68, 0.25);
+  --theme-shadow-purple: 0 8px 30px rgba(139, 92, 246, 0.25);
+  --theme-shadow-teal: 0 8px 30px rgba(20, 184, 166, 0.25);
+  
+  /* ─────────────────────────────────────────────────────────
+     GRADIENTS
+     ───────────────────────────────────────────────────────── */
+  --theme-gradient-primary: linear-gradient(135deg, #2DD4BF 0%, #14B8A6 100%);
+  --theme-gradient-page: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  --theme-gradient-card: none;
+  
+  /* ─────────────────────────────────────────────────────────
+     SCROLLBAR
+     ───────────────────────────────────────────────────────── */
+  --theme-scrollbar-bg: #f1f5f9;
+  --theme-scrollbar-thumb: #cbd5e1;
+  --theme-scrollbar-thumb-hover: #94a3b8;
+  
+  /* ─────────────────────────────────────────────────────────
+     INPUT STYLES
+     ───────────────────────────────────────────────────────── */
+  --theme-input-bg: #ffffff;
+  --theme-input-border: #e2e8f0;
+  --theme-input-placeholder: #94a3b8;
+  --theme-input-focus-ring: rgba(13, 148, 136, 0.2);
+  
+  /* ─────────────────────────────────────────────────────────
+     NAVIGATION
+     ───────────────────────────────────────────────────────── */
+  --theme-nav-bg: #ffffff;
+  --theme-nav-border: #e2e8f0;
+  --theme-nav-item-hover: #f1f5f9;
+  --theme-nav-item-active: #f0fdfa;
+  
+  /* ─────────────────────────────────────────────────────────
+     LOGO FILTER (Light mode shows original, Dark inverts)
+     ───────────────────────────────────────────────────────── */
+  --logo-filter: none;
+}
+
+/* ============================================================
+   DARK THEME - Elegant, Modern, Eye-friendly
+   ============================================================ */
+[data-theme="dark"] {
+  /* ─────────────────────────────────────────────────────────
+     BACKGROUND COLORS
+     ───────────────────────────────────────────────────────── */
+  --theme-bg-primary: #0f172a;         /* Page background */
+  --theme-bg-secondary: #1e293b;       /* Card background */
+  --theme-bg-tertiary: #334155;        /* Hover/Secondary areas */
+  --theme-bg-elevated: #1e293b;        /* Elevated cards */
+  --theme-bg-overlay: rgba(0, 0, 0, 0.6);
+  
+  /* ─────────────────────────────────────────────────────────
+     TEXT COLORS
+     ───────────────────────────────────────────────────────── */
+  --theme-text-primary: #f8fafc;       /* Main text */
+  --theme-text-secondary: #e2e8f0;     /* Secondary text */
+  --theme-text-tertiary: #94a3b8;      /* Muted text */
+  --theme-text-disabled: #64748b;      /* Disabled text */
+  --theme-text-inverse: #1e293b;       /* Text on light backgrounds */
+  
+  /* ─────────────────────────────────────────────────────────
+     BORDER COLORS
+     ───────────────────────────────────────────────────────── */
+  --theme-border-primary: rgba(255, 255, 255, 0.1);
+  --theme-border-secondary: rgba(255, 255, 255, 0.05);
+  --theme-border-hover: rgba(255, 255, 255, 0.2);
+  --theme-border-focus: #14b8a6;
+  
+  /* ─────────────────────────────────────────────────────────
+     PRIMARY COLORS (Same as Light - Brand consistency)
+     ───────────────────────────────────────────────────────── */
+  --theme-primary-50: #f0fdfa;
+  --theme-primary-100: #ccfbf1;
+  --theme-primary-200: #99f6e4;
+  --theme-primary-300: #5eead4;
+  --theme-primary-400: #2dd4bf;
+  --theme-primary-500: #14b8a6;
+  --theme-primary-600: #0d9488;
+  --theme-primary-700: #0f766e;
+  --theme-primary-800: #115e59;
+  --theme-primary-900: #134e4a;
+  
+  /* ─────────────────────────────────────────────────────────
+     ACCENT COLORS (Slightly brighter for dark mode)
+     ───────────────────────────────────────────────────────── */
+  /* Blue Accent */
+  --theme-accent-blue-light: rgba(59, 130, 246, 0.15);
+  --theme-accent-blue: #60a5fa;
+  --theme-accent-blue-dark: #3b82f6;
+  
+  /* Green Accent */
+  --theme-accent-green-light: rgba(34, 197, 94, 0.15);
+  --theme-accent-green: #4ade80;
+  --theme-accent-green-dark: #22c55e;
+  
+  /* Orange Accent */
+  --theme-accent-orange-light: rgba(249, 115, 22, 0.15);
+  --theme-accent-orange: #fb923c;
+  --theme-accent-orange-dark: #f97316;
+  
+  /* Red Accent */
+  --theme-accent-red-light: rgba(239, 68, 68, 0.15);
+  --theme-accent-red: #f87171;
+  --theme-accent-red-dark: #ef4444;
+  
+  /* Purple Accent */
+  --theme-accent-purple-light: rgba(139, 92, 246, 0.15);
+  --theme-accent-purple: #a78bfa;
+  --theme-accent-purple-dark: #8b5cf6;
+  
+  /* Yellow Accent */
+  --theme-accent-yellow-light: rgba(234, 179, 8, 0.15);
+  --theme-accent-yellow: #facc15;
+  --theme-accent-yellow-dark: #eab308;
+  
+  /* ─────────────────────────────────────────────────────────
+     SHADOWS (Deeper for dark mode)
+     ───────────────────────────────────────────────────────── */
+  --theme-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --theme-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+  --theme-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --theme-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+  --theme-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --theme-shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  --theme-shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3);
+  
+  /* Card-specific shadow */
+  --theme-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --theme-shadow-card-hover: 0 15px 40px -10px rgba(0, 0, 0, 0.5);
+  
+  /* ─────────────────────────────────────────────────────────
+     GRADIENTS
+     ───────────────────────────────────────────────────────── */
+  --theme-gradient-primary: linear-gradient(135deg, #2DD4BF 0%, #14B8A6 100%);
+  --theme-gradient-page: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  --theme-gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  
+  /* ─────────────────────────────────────────────────────────
+     SCROLLBAR
+     ───────────────────────────────────────────────────────── */
+  --theme-scrollbar-bg: #1e293b;
+  --theme-scrollbar-thumb: #475569;
+  --theme-scrollbar-thumb-hover: #64748b;
+  
+  /* ─────────────────────────────────────────────────────────
+     INPUT STYLES
+     ───────────────────────────────────────────────────────── */
+  --theme-input-bg: rgba(255, 255, 255, 0.05);
+  --theme-input-border: rgba(255, 255, 255, 0.1);
+  --theme-input-placeholder: #64748b;
+  --theme-input-focus-ring: rgba(20, 184, 166, 0.3);
+  
+  /* ─────────────────────────────────────────────────────────
+     NAVIGATION
+     ───────────────────────────────────────────────────────── */
+  --theme-nav-bg: #1e293b;
+  --theme-nav-border: rgba(255, 255, 255, 0.1);
+  --theme-nav-item-hover: rgba(255, 255, 255, 0.05);
+  --theme-nav-item-active: rgba(13, 148, 136, 0.15);
+  
+  /* ─────────────────────────────────────────────────────────
+     LOGO FILTER (Dark mode inverts logo)
+     ───────────────────────────────────────────────────────── */
+  --logo-filter: brightness(0) invert(1);
+}
+
+/* ============================================================
+   THEME-AWARE COMPONENT CLASSES
+   ============================================================ */
+
+/* ─────────────────────────────────────────────────────────
+   PAGE BACKGROUND
+   ───────────────────────────────────────────────────────── */
+.theme-page {
+  background: var(--theme-bg-primary);
+  background-image: var(--theme-gradient-page);
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: var(--theme-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ─────────────────────────────────────────────────────────
+   CARDS (Main component - Professional look)
+   ───────────────────────────────────────────────────────── */
+.theme-card {
+  background: var(--theme-bg-secondary);
+  border: 1px solid var(--theme-border-primary);
+  border-radius: 1rem;
+  box-shadow: var(--theme-shadow-card);
+  transition: all 0.2s ease;
+}
+
+.theme-card:hover {
+  box-shadow: var(--theme-shadow-card-hover);
+  border-color: var(--theme-border-hover);
+}
+
+.theme-card-elevated {
+  background: var(--theme-bg-elevated);
+  border: 1px solid var(--theme-border-primary);
+  border-radius: 1.25rem;
+  box-shadow: var(--theme-shadow-lg);
+}
+
+/* ─────────────────────────────────────────────────────────
+   STAT CARDS (Dashboard stats)
+   ───────────────────────────────────────────────────────── */
+.theme-stat-card {
+  background: var(--theme-bg-secondary);
+  border: 1px solid var(--theme-border-primary);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: var(--theme-shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.theme-stat-card:hover {
+  box-shadow: var(--theme-shadow-md);
+  transform: translateY(-2px);
+}
+
+.theme-stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--theme-text-primary);
+  line-height: 1.2;
+}
+
+.theme-stat-label {
+  font-size: 0.875rem;
+  color: var(--theme-text-tertiary);
+  margin-top: 0.25rem;
+}
+
+/* Colored stat icons */
+.theme-stat-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-stat-icon-blue {
+  background: var(--theme-accent-blue-light);
+  color: var(--theme-accent-blue);
+}
+
+.theme-stat-icon-green {
+  background: var(--theme-accent-green-light);
+  color: var(--theme-accent-green);
+}
+
+.theme-stat-icon-orange {
+  background: var(--theme-accent-orange-light);
+  color: var(--theme-accent-orange);
+}
+
+.theme-stat-icon-red {
+  background: var(--theme-accent-red-light);
+  color: var(--theme-accent-red);
+}
+
+.theme-stat-icon-purple {
+  background: var(--theme-accent-purple-light);
+  color: var(--theme-accent-purple);
+}
+
+.theme-stat-icon-teal {
+  background: var(--theme-primary-100);
+  color: var(--theme-primary-600);
+}
+
+[data-theme="dark"] .theme-stat-icon-teal {
+  background: rgba(13, 148, 136, 0.15);
+  color: var(--theme-primary-400);
+}
+
+/* ─────────────────────────────────────────────────────────
+   BUTTONS
+   ───────────────────────────────────────────────────────── */
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.theme-btn-primary {
+  background: var(--theme-gradient-primary);
+  color: white;
+  box-shadow: var(--theme-shadow-sm);
+}
+
+.theme-btn-primary:hover {
+  box-shadow: var(--theme-shadow-md);
+  transform: translateY(-1px);
+}
+
+.theme-btn-secondary {
+  background: var(--theme-bg-tertiary);
+  color: var(--theme-text-primary);
+  border: 1px solid var(--theme-border-primary);
+}
+
+.theme-btn-secondary:hover {
+  background: var(--theme-border-hover);
+}
+
+.theme-btn-ghost {
+  background: transparent;
+  color: var(--theme-text-secondary);
+}
+
+.theme-btn-ghost:hover {
+  background: var(--theme-bg-tertiary);
+  color: var(--theme-text-primary);
+}
+
+.theme-btn-danger {
+  background: var(--theme-accent-red-light);
+  color: var(--theme-accent-red);
+  border: 1px solid var(--theme-accent-red);
+}
+
+.theme-btn-danger:hover {
+  background: var(--theme-accent-red);
+  color: white;
+}
+
+.theme-btn-success {
+  background: var(--theme-accent-green-light);
+  color: var(--theme-accent-green);
+  border: 1px solid var(--theme-accent-green);
+}
+
+.theme-btn-success:hover {
+  background: var(--theme-accent-green);
+  color: white;
+}
+
+/* ─────────────────────────────────────────────────────────
+   INPUTS
+   ───────────────────────────────────────────────────────── */
+.theme-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--theme-input-bg);
+  border: 1px solid var(--theme-input-border);
+  border-radius: 0.75rem;
+  color: var(--theme-text-primary);
+  font-size: 0.9375rem;
+  transition: all 0.2s ease;
+}
+
+.theme-input::placeholder {
+  color: var(--theme-input-placeholder);
+}
+
+.theme-input:focus {
+  outline: none;
+  border-color: var(--theme-border-focus);
+  box-shadow: 0 0 0 3px var(--theme-input-focus-ring);
+}
+
+.theme-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─────────────────────────────────────────────────────────
+   BADGES
+   ───────────────────────────────────────────────────────── */
+.theme-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.theme-badge-blue {
+  background: var(--theme-accent-blue-light);
+  color: var(--theme-accent-blue);
+}
+
+.theme-badge-green {
+  background: var(--theme-accent-green-light);
+  color: var(--theme-accent-green);
+}
+
+.theme-badge-orange {
+  background: var(--theme-accent-orange-light);
+  color: var(--theme-accent-orange);
+}
+
+.theme-badge-red {
+  background: var(--theme-accent-red-light);
+  color: var(--theme-accent-red);
+}
+
+.theme-badge-purple {
+  background: var(--theme-accent-purple-light);
+  color: var(--theme-accent-purple);
+}
+
+.theme-badge-yellow {
+  background: var(--theme-accent-yellow-light);
+  color: var(--theme-accent-yellow);
+}
+
+.theme-badge-teal {
+  background: var(--theme-primary-100);
+  color: var(--theme-primary-600);
+}
+
+[data-theme="dark"] .theme-badge-teal {
+  background: rgba(13, 148, 136, 0.15);
+  color: var(--theme-primary-400);
+}
+
+/* ─────────────────────────────────────────────────────────
+   NAVIGATION
+   ───────────────────────────────────────────────────────── */
+.theme-nav {
+  background: var(--theme-nav-bg);
+  border-bottom: 1px solid var(--theme-nav-border);
+  box-shadow: var(--theme-shadow-sm);
+}
+
+.theme-nav-item {
+  padding: 0.75rem 1rem;
+  color: var(--theme-text-secondary);
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.theme-nav-item:hover {
+  background: var(--theme-nav-item-hover);
+  color: var(--theme-text-primary);
+}
+
+.theme-nav-item.active {
+  background: var(--theme-nav-item-active);
+  color: var(--theme-primary-600);
+}
+
+/* ─────────────────────────────────────────────────────────
+   SIDEBAR
+   ───────────────────────────────────────────────────────── */
+.theme-sidebar {
+  background: var(--theme-bg-secondary);
+  border-right: 1px solid var(--theme-border-primary);
+}
+
+[dir="rtl"] .theme-sidebar {
+  border-right: none;
+  border-left: 1px solid var(--theme-border-primary);
+}
+
+/* ─────────────────────────────────────────────────────────
+   MODALS
+   ───────────────────────────────────────────────────────── */
+.theme-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  z-index: 50;
+}
+
+.theme-modal {
+  background: var(--theme-bg-secondary);
+  border: 1px solid var(--theme-border-primary);
+  border-radius: 1.25rem;
+  box-shadow: var(--theme-shadow-2xl);
+}
+
+.theme-modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--theme-border-primary);
+}
+
+.theme-modal-body {
+  padding: 1.5rem;
+}
+
+.theme-modal-footer {
+  padding: 1.5rem;
+  border-top: 1px solid var(--theme-border-primary);
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+/* ─────────────────────────────────────────────────────────
+   TABLES
+   ───────────────────────────────────────────────────────── */
+.theme-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.theme-table th {
+  background: var(--theme-bg-tertiary);
+  color: var(--theme-text-tertiary);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1rem;
+  text-align: right;
+  border-bottom: 1px solid var(--theme-border-primary);
+}
+
+.theme-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--theme-border-secondary);
+  color: var(--theme-text-primary);
+}
+
+.theme-table tr:hover td {
+  background: var(--theme-bg-tertiary);
+}
+
+/* ─────────────────────────────────────────────────────────
+   SCROLLBAR (Theme-aware)
+   ───────────────────────────────────────────────────────── */
+.theme-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.theme-scrollbar::-webkit-scrollbar-track {
+  background: var(--theme-scrollbar-bg);
+  border-radius: 4px;
+}
+
+.theme-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--theme-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+.theme-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-scrollbar-thumb-hover);
+}
+
+/* ─────────────────────────────────────────────────────────
+   DIVIDERS
+   ───────────────────────────────────────────────────────── */
+.theme-divider {
+  border: none;
+  border-top: 1px solid var(--theme-border-primary);
+  margin: 1rem 0;
+}
+
+/* ─────────────────────────────────────────────────────────
+   TEXT UTILITIES
+   ───────────────────────────────────────────────────────── */
+.theme-text-primary { color: var(--theme-text-primary); }
+.theme-text-secondary { color: var(--theme-text-secondary); }
+.theme-text-tertiary { color: var(--theme-text-tertiary); }
+.theme-text-disabled { color: var(--theme-text-disabled); }
+
+/* ─────────────────────────────────────────────────────────
+   BACKGROUND UTILITIES
+   ───────────────────────────────────────────────────────── */
+.theme-bg-primary { background: var(--theme-bg-primary); }
+.theme-bg-secondary { background: var(--theme-bg-secondary); }
+.theme-bg-tertiary { background: var(--theme-bg-tertiary); }
+
+/* ─────────────────────────────────────────────────────────
+   BORDER UTILITIES
+   ───────────────────────────────────────────────────────── */
+.theme-border { border: 1px solid var(--theme-border-primary); }
+.theme-border-t { border-top: 1px solid var(--theme-border-primary); }
+.theme-border-b { border-bottom: 1px solid var(--theme-border-primary); }
+
+/* ─────────────────────────────────────────────────────────
+   SKELETON LOADING
+   ───────────────────────────────────────────────────────── */
+.theme-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--theme-bg-tertiary) 0%,
+    var(--theme-border-hover) 50%,
+    var(--theme-bg-tertiary) 100%
+  );
+  background-size: 200% 100%;
+  animation: theme-shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+@keyframes theme-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ─────────────────────────────────────────────────────────
+   FOCUS RING
+   ───────────────────────────────────────────────────────── */
+.theme-focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--theme-input-focus-ring);
+}
+
+/* ─────────────────────────────────────────────────────────
+   TRANSITIONS
+   ───────────────────────────────────────────────────────── */
+.theme-transition {
+  transition: all 0.2s ease;
+}
+
+.theme-transition-colors {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* ============================================================
+   🎨 PREMIUM STAT CARDS - Modern Floating Design
+   Inspired by Apple, Stripe, and reference images
+   ============================================================ */
+
+/* Base Premium Card - Light Mode */
+html[data-theme="light"] .stat-card-premium,
+html.light .stat-card-premium {
+  background: #ffffff;
+  border: none;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+html[data-theme="light"] .stat-card-premium:hover,
+html.light .stat-card-premium:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+/* Premium Stat Card Value - Large & Bold */
+html[data-theme="light"] .stat-card-premium .stat-value,
+html.light .stat-card-premium .stat-value {
+  font-size: 3rem;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+
+/* Premium Stat Card Label */
+html[data-theme="light"] .stat-card-premium .stat-label,
+html.light .stat-card-premium .stat-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: none;
+}
+
+/* ─────────────────────────────────────────────────────────
+   COLORED ICON BACKGROUNDS (Like Reference Images)
+   ───────────────────────────────────────────────────────── */
+
+.stat-icon-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+/* Blue Icon */
+.stat-icon-blue {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+/* Green Icon */
+.stat-icon-green {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  color: #22c55e;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+}
+
+/* Orange Icon */
+.stat-icon-orange {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  color: #f97316;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+/* Red Icon */
+.stat-icon-red {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  color: #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+/* Purple Icon */
+.stat-icon-purple {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+  color: #8b5cf6;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+/* Teal Icon (Brand) */
+.stat-icon-teal {
+  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+  color: #14b8a6;
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.2);
+}
+
+/* Yellow Icon */
+.stat-icon-yellow {
+  background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+  color: #eab308;
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
+}
+
+/* ─────────────────────────────────────────────────────────
+   MODERN PROGRESS BAR (Like Reference Images)
+   ───────────────────────────────────────────────────────── */
+
+.progress-bar-modern {
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-modern .progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.5s ease-out;
+}
+
+.progress-fill-gradient {
+  background: linear-gradient(90deg, #3b82f6 0%, #22c55e 50%, #f97316 100%);
+}
+
+.progress-fill-blue {
+  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+}
+
+.progress-fill-green {
+  background: linear-gradient(90deg, #22c55e 0%, #4ade80 100%);
+}
+
+.progress-fill-orange {
+  background: linear-gradient(90deg, #f97316 0%, #fb923c 100%);
+}
+
+/* ─────────────────────────────────────────────────────────
+   MODERN BUTTONS (Like "More Details" in Reference)
+   ───────────────────────────────────────────────────────── */
+
+.btn-modern-dark {
+  background: #1e293b;
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-modern-dark:hover {
+  background: #0f172a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn-modern-outline {
+  background: #ffffff;
+  color: #1e293b;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-modern-outline:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+/* ─────────────────────────────────────────────────────────
+   AVATAR GROUP (Like Reference Images)
+   ───────────────────────────────────────────────────────── */
+
+.avatar-group {
+  display: flex;
+  align-items: center;
+}
+
+.avatar-group .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  margin-left: -12px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-group .avatar:first-child {
+  margin-left: 0;
+}
+
+.avatar-group .avatar-more {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 3px solid #ffffff;
+  margin-left: -12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+/* ============================================================
+   🎨 LIGHT MODE GLOBAL OVERRIDES
+   Using html[data-theme] for maximum specificity
+   ============================================================ */
+
+/* ─────────────────────────────────────────────────────────
+   SOLID CARDS - Light Mode (NO GLASSMORPHISM)
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .glass,
+html.light .glass {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+}
+
+html[data-theme="light"] .glass:hover,
+html.light .glass:hover {
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   TEXT COLORS - Light Mode
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .text-white,
+html.light .text-white {
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] .text-white\/70,
+html[data-theme="light"] .text-white\/60,
+html[data-theme="light"] .text-white\/50,
+html.light .text-white\/70,
+html.light .text-white\/60,
+html.light .text-white\/50 {
+  color: #475569 !important;
+}
+
+html[data-theme="light"] .text-white\/40,
+html[data-theme="light"] .text-white\/30,
+html[data-theme="light"] .text-white\/20,
+html.light .text-white\/40,
+html.light .text-white\/30,
+html.light .text-white\/20 {
+  color: #64748b !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   BACKGROUND COLORS - Light Mode
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .bg-white\/5,
+html.light .bg-white\/5 {
+  background: #f1f5f9 !important;
+}
+
+html[data-theme="light"] .bg-white\/10,
+html.light .bg-white\/10 {
+  background: #e2e8f0 !important;
+}
+
+html[data-theme="light"] .bg-white\/20,
+html.light .bg-white\/20 {
+  background: #cbd5e1 !important;
+}
+
+/* Slate backgrounds */
+html[data-theme="light"] .bg-slate-900,
+html[data-theme="light"] .bg-slate-800,
+html[data-theme="light"] .bg-slate-900\/95,
+html.light .bg-slate-900,
+html.light .bg-slate-800,
+html.light .bg-slate-900\/95 {
+  background: #ffffff !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   BORDER COLORS - Light Mode
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .border-white\/5,
+html[data-theme="light"] .border-white\/10,
+html.light .border-white\/5,
+html.light .border-white\/10 {
+  border-color: #e2e8f0 !important;
+}
+
+html[data-theme="light"] .border-white\/20,
+html[data-theme="light"] .border-white\/30,
+html.light .border-white\/20,
+html.light .border-white\/30 {
+  border-color: #cbd5e1 !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   HOVER STATES - Light Mode
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .hover\:bg-white\/5:hover,
+html.light .hover\:bg-white\/5:hover {
+  background: #f1f5f9 !important;
+}
+
+html[data-theme="light"] .hover\:bg-white\/10:hover,
+html.light .hover\:bg-white\/10:hover {
+  background: #e2e8f0 !important;
+}
+
+html[data-theme="light"] .hover\:bg-white\/20:hover,
+html.light .hover\:bg-white\/20:hover {
+  background: #cbd5e1 !important;
+}
+
+html[data-theme="light"] .hover\:text-white:hover,
+html.light .hover\:text-white:hover {
+  color: #1e293b !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   STAT CARDS - Light Mode
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .stat-card-pro-compact,
+html.light .stat-card-pro-compact {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+}
+
+html[data-theme="light"] .stat-card-pro-compact:hover,
+html.light .stat-card-pro-compact:hover {
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  transform: translateY(-2px);
+}
+
+/* ─────────────────────────────────────────────────────────
+   INPUTS - Light Mode
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .placeholder-white\/40::placeholder,
+html.light .placeholder-white\/40::placeholder {
+  color: #94a3b8 !important;
+}
+
+html[data-theme="light"] input.bg-white\/5,
+html[data-theme="light"] textarea.bg-white\/5,
+html.light input.bg-white\/5,
+html.light textarea.bg-white\/5 {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   BUTTONS - Light Mode (Modern, Lighter Colors)
+   ───────────────────────────────────────────────────────── */
+
+/* ✨ Primary Teal Buttons - Lighter & More Vibrant */
+html[data-theme="light"] .bg-teal-500,
+html.light .bg-teal-500 {
+  background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%) !important;
+  box-shadow: 0 4px 14px rgba(20, 184, 166, 0.35) !important;
+}
+
+html[data-theme="light"] .bg-teal-500:hover,
+html.light .bg-teal-500:hover {
+  background: linear-gradient(135deg, #5eead4 0%, #2dd4bf 100%) !important;
+  box-shadow: 0 6px 20px rgba(20, 184, 166, 0.45) !important;
+  transform: translateY(-1px);
+}
+
+/* Gradient Teal Buttons */
+html[data-theme="light"] .from-teal-500,
+html[data-theme="light"] .from-teal-400,
+html.light .from-teal-500,
+html.light .from-teal-400 {
+  --tw-gradient-from: #2dd4bf !important;
+}
+
+html[data-theme="light"] .to-teal-600,
+html[data-theme="light"] .to-teal-700,
+html.light .to-teal-600,
+html.light .to-teal-700 {
+  --tw-gradient-to: #14b8a6 !important;
+}
+
+/* ✨ Emerald/Green Buttons - Lighter */
+html[data-theme="light"] .bg-emerald-500,
+html[data-theme="light"] .bg-green-500,
+html.light .bg-emerald-500,
+html.light .bg-green-500 {
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%) !important;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35) !important;
+}
+
+html[data-theme="light"] .bg-emerald-500:hover,
+html[data-theme="light"] .bg-green-500:hover,
+html.light .bg-emerald-500:hover,
+html.light .bg-green-500:hover {
+  background: linear-gradient(135deg, #86efac 0%, #4ade80 100%) !important;
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.45) !important;
+}
+
+/* Gradient Green Buttons */
+html[data-theme="light"] .from-green-400,
+html[data-theme="light"] .from-emerald-400,
+html.light .from-green-400,
+html.light .from-emerald-400 {
+  --tw-gradient-from: #4ade80 !important;
+}
+
+html[data-theme="light"] .to-green-500,
+html[data-theme="light"] .to-emerald-500,
+html[data-theme="light"] .to-emerald-600,
+html.light .to-green-500,
+html.light .to-emerald-500,
+html.light .to-emerald-600 {
+  --tw-gradient-to: #22c55e !important;
+}
+
+/* ✨ Blue Buttons - Lighter */
+html[data-theme="light"] .bg-blue-500,
+html.light .bg-blue-500 {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35) !important;
+}
+
+html[data-theme="light"] .bg-blue-500:hover,
+html.light .bg-blue-500:hover {
+  background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%) !important;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45) !important;
+}
+
+/* ✨ Orange/Yellow Buttons - Lighter */
+html[data-theme="light"] .bg-orange-500,
+html[data-theme="light"] .bg-yellow-500,
+html.light .bg-orange-500,
+html.light .bg-yellow-500 {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35) !important;
+}
+
+html[data-theme="light"] .from-yellow-400,
+html[data-theme="light"] .from-orange-400,
+html.light .from-yellow-400,
+html.light .from-orange-400 {
+  --tw-gradient-from: #fbbf24 !important;
+}
+
+html[data-theme="light"] .to-orange-500,
+html[data-theme="light"] .to-orange-600,
+html.light .to-orange-500,
+html.light .to-orange-600 {
+  --tw-gradient-to: #f59e0b !important;
+}
+
+/* ✨ Purple Buttons - Lighter */
+html[data-theme="light"] .bg-purple-500,
+html.light .bg-purple-500 {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%) !important;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35) !important;
+}
+
+/* Button Shadow Classes */
+html[data-theme="light"] .shadow-teal-500\/25,
+html[data-theme="light"] .shadow-teal-500\/20,
+html.light .shadow-teal-500\/25,
+html.light .shadow-teal-500\/20 {
+  --tw-shadow-color: rgba(20, 184, 166, 0.35) !important;
+  box-shadow: 0 4px 14px var(--tw-shadow-color) !important;
+}
+
+html[data-theme="light"] .shadow-green-500\/25,
+html[data-theme="light"] .shadow-emerald-500\/25,
+html.light .shadow-green-500\/25,
+html.light .shadow-emerald-500\/25 {
+  --tw-shadow-color: rgba(34, 197, 94, 0.35) !important;
+  box-shadow: 0 4px 14px var(--tw-shadow-color) !important;
+}
+
+html[data-theme="light"] .shadow-blue-500\/25,
+html.light .shadow-blue-500\/25 {
+  --tw-shadow-color: rgba(59, 130, 246, 0.35) !important;
+  box-shadow: 0 4px 14px var(--tw-shadow-color) !important;
+}
+
+html[data-theme="light"] .shadow-orange-500\/25,
+html[data-theme="light"] .shadow-orange-500\/20,
+html.light .shadow-orange-500\/25,
+html.light .shadow-orange-500\/20 {
+  --tw-shadow-color: rgba(249, 115, 22, 0.35) !important;
+  box-shadow: 0 4px 14px var(--tw-shadow-color) !important;
+}
+
+html[data-theme="light"] .shadow-purple-500\/25,
+html.light .shadow-purple-500\/25 {
+  --tw-shadow-color: rgba(139, 92, 246, 0.35) !important;
+  box-shadow: 0 4px 14px var(--tw-shadow-color) !important;
+}
+
+html[data-theme="light"] .bg-teal-500\/20,
+html.light .bg-teal-500\/20 {
+  background: #f0fdfa !important;
+}
+
+html[data-theme="light"] .bg-blue-500\/20,
+html.light .bg-blue-500\/20 {
+  background: #eff6ff !important;
+}
+
+html[data-theme="light"] .bg-green-500\/20,
+html.light .bg-green-500\/20 {
+  background: #f0fdf4 !important;
+}
+
+html[data-theme="light"] .bg-red-500\/20,
+html.light .bg-red-500\/20 {
+  background: #fef2f2 !important;
+}
+
+html[data-theme="light"] .bg-yellow-500\/20,
+html[data-theme="light"] .bg-yellow-500\/10,
+html.light .bg-yellow-500\/20,
+html.light .bg-yellow-500\/10 {
+  background: #fefce8 !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   DROPDOWNS/MODALS - Light Mode
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] [class*="bg-slate-900"],
+html.light [class*="bg-slate-900"] {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   GRADIENT BACKGROUNDS - Light Mode
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .from-slate-900,
+html[data-theme="light"] .via-indigo-900\/20,
+html[data-theme="light"] .to-slate-900,
+html.light .from-slate-900,
+html.light .via-indigo-900\/20,
+html.light .to-slate-900 {
+  --tw-gradient-from: #f8fafc !important;
+  --tw-gradient-via: #f1f5f9 !important;
+  --tw-gradient-to: #f8fafc !important;
+}

@@ -1,0 +1,130 @@
+{
+    "common": {
+        "loading": "Loading...",
+        "save": "Save",
+        "cancel": "Cancel",
+        "confirm": "Confirm",
+        "delete": "Delete",
+        "edit": "Edit",
+        "add": "Add",
+        "search": "Search",
+        "filter": "Filter",
+        "refresh": "Refresh",
+        "back": "Back",
+        "next": "Next",
+        "previous": "Previous",
+        "close": "Close",
+        "submit": "Submit",
+        "yes": "Yes",
+        "no": "No",
+        "success": "Success",
+        "error": "Error",
+        "warning": "Warning",
+        "info": "Info",
+        "noData": "No data available",
+        "all": "All"
+    },
+    "auth": {
+        "login": "Login",
+        "logout": "Logout",
+        "enterPin": "Enter your PIN",
+        "invalidPin": "Invalid PIN",
+        "welcome": "Welcome",
+        "biometric": "Login with fingerprint",
+        "rememberMe": "Remember me"
+    },
+    "roles": {
+        "owner": "Owner",
+        "manager": "Manager",
+        "employee": "Employee"
+    },
+    "departments": {
+        "reception": "Reception",
+        "housekeeping": "Housekeeping",
+        "bellman": "Bellman",
+        "maintenance": "Maintenance",
+        "procurement": "Procurement",
+        "admin": "Administration"
+    },
+    "requests": {
+        "new": "New Request",
+        "pending": "Pending",
+        "confirmed": "Confirmed",
+        "inProgress": "In Progress",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "room": "Room",
+        "guest": "Guest",
+        "type": "Type",
+        "priority": "Priority",
+        "urgent": "Urgent",
+        "normal": "Normal",
+        "notes": "Notes"
+    },
+    "services": {
+        "cleaning": "Cleaning",
+        "maintenance": "Maintenance",
+        "bellman": "Bellman Service",
+        "coffee": "Coffee Shop",
+        "minibar": "Minibar",
+        "extension": "Stay Extension"
+    },
+    "cleaning": {
+        "occupied": "Occupied Cleaning",
+        "checkout": "Checkout Cleaning",
+        "immediate": "Immediate",
+        "scheduled": "Scheduled",
+        "start": "Start Cleaning",
+        "complete": "Complete Cleaning"
+    },
+    "maintenance": {
+        "electrical": "Electrical",
+        "plumbing": "Plumbing",
+        "ac": "AC",
+        "furniture": "Furniture",
+        "other": "Other",
+        "beforePhoto": "Before Photo",
+        "afterPhoto": "After Photo"
+    },
+    "bellman": {
+        "checkIn": "Check In",
+        "checkOut": "Check Out",
+        "luggage": "Luggage",
+        "cart": "Cart"
+    },
+    "points": {
+        "points": "Points",
+        "total": "Total Points",
+        "earned": "Earned Points",
+        "deducted": "Deducted Points",
+        "history": "Points History"
+    },
+    "dashboard": {
+        "overview": "Overview",
+        "today": "Today",
+        "thisWeek": "This Week",
+        "thisMonth": "This Month",
+        "newRequests": "New Requests",
+        "inProgress": "In Progress",
+        "completedToday": "Completed Today",
+        "delayed": "Delayed"
+    },
+    "settings": {
+        "settings": "Settings",
+        "general": "General",
+        "points": "Points",
+        "times": "Times",
+        "products": "Products",
+        "design": "Design",
+        "branchName": "Branch Name",
+        "language": "Language"
+    },
+    "guest": {
+        "welcome": "Welcome",
+        "selectService": "Select a service",
+        "submitRequest": "Submit Request",
+        "trackRequest": "Track Request",
+        "rate": "Rate Service",
+        "dnd": "Do Not Disturb"
+    }
+}

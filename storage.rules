@@ -1,0 +1,176 @@
+/**
+ * Firebase Storage Security Rules - SECURED
+ * Adora Hotel Management System V3
+ * Updated: 2026-01-02
+ */
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isValidImage() {
+      return request.resource.contentType.matches('image/(jpeg|jpg|png|gif|webp)')
+             && request.resource.size < 5 * 1024 * 1024; // Max 5MB
+    }
+    
+    function isValidDocument() {
+      return request.resource.contentType.matches('application/(pdf|msword|vnd.openxmlformats-officedocument.*)')
+             && request.resource.size < 10 * 1024 * 1024; // Max 10MB
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isFileOwner() {
+      return isAuthenticated() && resource != null && (
+        (resource.metadata.customMetadata != null && resource.metadata.customMetadata.owner == request.auth.uid) ||
+        (resource.metadata.owner == request.auth.uid)
+      );
+    }
+    
+    // ✅ SaaS: Check if tenantId in path matches tenantId in metadata
+    // Note: Storage Rules cannot access Firestore directly, so we rely on metadata
+    // The upload code must set tenantId in metadata.customMetadata.tenantId
+    function isTenantMatch(pathTenantId) {
+      // For read: Check if resource metadata has tenantId matching path
+      if (resource != null && resource.metadata != null && 
+          resource.metadata.customMetadata != null) {
+        let metadataTenantId = resource.metadata.customMetadata.tenantId;
+        return metadataTenantId == pathTenantId;
+      }
+      // For write: Check if request metadata has tenantId matching path
+      if (request.resource != null && request.resource.metadata != null && 
+          request.resource.metadata.customMetadata != null) {
+        let metadataTenantId = request.resource.metadata.customMetadata.tenantId;
+        return metadataTenantId == pathTenantId;
+      }
+      // Fallback: If no metadata, allow (for backward compatibility)
+      // In production, this should be false for strict security
+      return true;
+    }
+    
+    // ============================================
+    // MAINTENANCE PHOTOS
+    // ============================================
+    match /maintenance/{tenantId}/{requestId}/{fileName} {
+      // ✅ SaaS: Verify tenantId in path matches tenantId in metadata
+      allow read: if isAuthenticated() && isTenantMatch(tenantId);
+      allow write: if isAuthenticated() && isValidImage() &&
+                   isTenantMatch(tenantId) &&
+                   request.resource.metadata.customMetadata.owner == request.auth.uid &&
+                   request.resource.metadata.customMetadata.tenantId == tenantId;
+      allow delete: if isFileOwner() && isTenantMatch(tenantId);
+    }
+    
+    // ============================================
+    // INSPECTION PHOTOS (damage reports)
+    // ============================================
+    match /inspections/{tenantId}/{requestId}/{fileName} {
+      // ✅ SaaS: Verify tenantId in path matches tenantId in metadata
+      allow read: if isAuthenticated() && isTenantMatch(tenantId);
+      allow write: if isAuthenticated() && isValidImage() &&
+                   isTenantMatch(tenantId) &&
+                   request.resource.metadata.customMetadata.owner == request.auth.uid &&
+                   request.resource.metadata.customMetadata.tenantId == tenantId;
+      allow delete: if isFileOwner() && isTenantMatch(tenantId);
+    }
+    
+    // ============================================
+    // HOUSEKEEPING PHOTOS
+    // ============================================
+    match /housekeeping/{tenantId}/{requestId}/{fileName} {
+      // ✅ SaaS: Verify tenantId in path matches tenantId in metadata
+      allow read: if isAuthenticated() && isTenantMatch(tenantId);
+      allow write: if isAuthenticated() && isValidImage() &&
+                   isTenantMatch(tenantId) &&
+                   request.resource.metadata.customMetadata.owner == request.auth.uid &&
+                   request.resource.metadata.customMetadata.tenantId == tenantId;
+      allow delete: if isFileOwner() && isTenantMatch(tenantId);
+    }
+
+    // ============================================
+    // LOST & FOUND PHOTOS
+    // ============================================
+    match /lost_found/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidImage() &&
+                   request.resource.metadata.customMetadata.owner == request.auth.uid;
+      allow delete: if isFileOwner();
+    }
+    
+    // ============================================
+    // EMPLOYEE AVATARS
+    // ============================================
+    match /avatars/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && isValidImage() &&
+                   request.resource.metadata.customMetadata.owner == request.auth.uid;
+      allow delete: if isFileOwner();
+    }
+    
+    // ============================================
+    // TENANT LOGOS & BRANDING
+    // ============================================
+    match /tenants/{tenantId}/branding/{fileName} {
+      // ✅ SaaS: Verify tenantId in path matches tenantId in metadata
+      allow read: if isAuthenticated() && isTenantMatch(tenantId);
+      allow write: if isAuthenticated() && isValidImage() &&
+                   isTenantMatch(tenantId) &&
+                   request.resource.metadata.customMetadata.owner == request.auth.uid &&
+                   request.resource.metadata.customMetadata.tenantId == tenantId;
+      allow delete: if isFileOwner() && isTenantMatch(tenantId);
+    }
+    
+    // ============================================
+    // DOCUMENTS & REPORTS
+    // ============================================
+    match /documents/{tenantId}/{documentType}/{fileName} {
+      // ✅ SaaS: Verify tenantId in path matches user's tenantId
+      allow read: if isAuthenticated() && isTenantMatch(tenantId);
+      allow write: if isAuthenticated() && (isValidImage() || isValidDocument()) &&
+                   isTenantMatch(tenantId) &&
+                   isMetadataTenantMatch() &&
+                   request.resource.metadata.customMetadata.owner == request.auth.uid;
+      allow delete: if isFileOwner() && isTenantMatch(tenantId);
+    }
+    
+    // ============================================
+    // TEMPORARY UPLOADS (auto-cleanup recommended)
+    // ============================================
+    match /temp/{userId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isValidImage() &&
+                   request.resource.metadata.customMetadata.owner == request.auth.uid;
+      allow delete: if isFileOwner();
+    }
+    
+    // ============================================
+    // GENERAL UPLOADS (restricted)
+    // ============================================
+    match /uploads/{tenantId}/{allPaths=**} {
+      // ✅ SaaS: Verify tenantId in path matches tenantId in metadata
+      allow read: if isAuthenticated() && isTenantMatch(tenantId);
+      allow write: if isAuthenticated() && isValidImage() &&
+                   isTenantMatch(tenantId) &&
+                   request.resource.metadata.customMetadata.owner == request.auth.uid &&
+                   request.resource.metadata.customMetadata.tenantId == tenantId;
+      allow delete: if isFileOwner() && isTenantMatch(tenantId);
+    }
+    
+    // ============================================
+    // DENY ALL OTHER ACCESS
+    // ============================================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

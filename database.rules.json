@@ -1,0 +1,45 @@
+{
+    "rules": {
+        ".read": false,
+        ".write": false,
+        "tenants": {
+            "$tenantId": {
+                ".read": "auth != null",
+                ".write": "auth != null && (
+          root.child('superAdmins').child(auth.uid).exists() ||
+          data.child('ownerId').val() === auth.uid
+        )","employees": {
+                    "$employeeId": {
+                        ".read": "auth != null",
+                        ".write": "auth != null && (
+              root.child('superAdmins').child(auth.uid).exists() ||
+              root.child('tenants').child($tenantId).child('ownerId').val() === auth.uid
+            )"
+                    }
+                },
+                "rooms": {
+                    "$roomId": {
+                        ".read": "auth != null",
+                        ".write": "auth != null"
+                    }
+                },
+                "requests": {
+                    "$requestId": {
+                        ".read": "auth != null",
+                        ".write": "auth != null"
+                    }
+                }
+            }
+        },
+        "superAdmins": {
+            "$uid": {
+                ".read": "auth.uid === $uid",
+                ".write": false
+            }
+        },
+        "globalCodes": {
+            ".read": "auth != null",
+            ".write": "auth != null && root.child('superAdmins').child(auth.uid).exists()"
+        }
+    }
+}

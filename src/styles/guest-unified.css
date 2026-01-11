@@ -1,0 +1,456 @@
+/**
+ * Unified Guest Experience Design System
+ * Matches LoginScreen.tsx Premium Theme
+ * Adora Hotel Management System V3
+ */
+
+/* ============================================================
+   GUEST PAGE - PREMIUM BACKGROUND (Matching LoginScreen)
+   ============================================================ */
+
+.guest-page-bg {
+  background: linear-gradient(135deg, 
+    rgba(240, 253, 250, 1) 0%, 
+    rgba(207, 250, 254, 0.8) 50%, 
+    rgba(209, 250, 229, 0.9) 100%
+  );
+  min-height: 100vh;
+}
+
+.guest-page-bg-dark {
+  background: linear-gradient(180deg, 
+    #0f172a 0%, 
+    #1e293b 50%, 
+    #0f172a 100%
+  );
+  min-height: 100vh;
+}
+
+/* Aurora Effect (Matching LoginScreen) */
+.guest-aurora {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.guest-aurora::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(20, 184, 166, 0.15) 0%,
+    rgba(6, 182, 212, 0.1) 30%,
+    transparent 70%
+  );
+  animation: aurora-rotate 30s linear infinite;
+}
+
+@keyframes aurora-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================
+   GUEST CARDS - SOLID BACKGROUND (Per Memory: No Glass)
+   ============================================================ */
+
+.guest-card {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.guest-card-dark {
+  background: #1e293b;
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   GUEST MODALS - SOLID BACKGROUND (Per Memory: No Blur)
+   ============================================================ */
+
+.guest-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* NO backdrop-filter per memory */
+}
+
+.guest-modal-backdrop-center {
+  align-items: center;
+  padding: 1rem;
+}
+
+.guest-modal {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 1.5rem 1.5rem 0 0;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: guest-modal-slide-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.guest-modal-center {
+  border-radius: 1.5rem;
+  max-width: 28rem;
+}
+
+.guest-modal-dark {
+  background: #1e293b;
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes guest-modal-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes guest-modal-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ============================================================
+   GUEST BUTTONS - PRIMARY TEAL GRADIENT
+   ============================================================ */
+
+.guest-btn-primary {
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  color: white;
+  padding: 0.875rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(20, 184, 166, 0.3);
+}
+
+.guest-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+}
+
+.guest-btn-primary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.guest-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.guest-btn-secondary {
+  background: transparent;
+  color: #475569;
+  padding: 0.875rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 1rem;
+  border: 2px solid #e2e8f0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.guest-btn-secondary:hover {
+  background: rgba(241, 245, 249, 0.8);
+  border-color: #cbd5e1;
+}
+
+.guest-btn-secondary-dark {
+  color: #94a3b8;
+  border-color: #475569;
+}
+
+.guest-btn-secondary-dark:hover {
+  background: rgba(51, 65, 85, 0.5);
+  border-color: #64748b;
+}
+
+/* ============================================================
+   GUEST INPUTS - SOLID BACKGROUNDS
+   ============================================================ */
+
+.guest-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  color: #1e293b;
+  transition: all 0.2s;
+}
+
+.guest-input:focus {
+  outline: none;
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+.guest-input-dark {
+  background: #334155;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+.guest-input-dark:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
+}
+
+/* ============================================================
+   GUEST SERVICE CARDS
+   ============================================================ */
+
+.guest-service-card {
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.guest-service-card:hover {
+  transform: translateY(-4px);
+  border-color: #14b8a6;
+  box-shadow: 0 8px 30px rgba(20, 184, 166, 0.15);
+}
+
+.guest-service-card:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+.guest-service-card-dark {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.guest-service-card-dark:hover {
+  border-color: #14b8a6;
+  box-shadow: 0 8px 30px rgba(20, 184, 166, 0.2);
+}
+
+/* ============================================================
+   GUEST STATUS BADGES
+   ============================================================ */
+
+.guest-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.guest-badge-success {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.guest-badge-warning {
+  background: rgba(234, 179, 8, 0.1);
+  color: #ca8a04;
+  border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+.guest-badge-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.guest-badge-info {
+  background: rgba(20, 184, 166, 0.1);
+  color: #0d9488;
+  border: 1px solid rgba(20, 184, 166, 0.2);
+}
+
+/* ============================================================
+   GUEST HEADER
+   ============================================================ */
+
+.guest-header {
+  background: linear-gradient(135deg, 
+    rgba(20, 184, 166, 0.95) 0%, 
+    rgba(6, 182, 212, 0.9) 100%
+  );
+  padding: 1.25rem 1rem;
+  border-radius: 0 0 1.5rem 1.5rem;
+  color: white;
+  box-shadow: 0 4px 20px rgba(20, 184, 166, 0.3);
+}
+
+/* ============================================================
+   GUEST NAVIGATION BAR
+   ============================================================ */
+
+.guest-nav-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-top: 1px solid rgba(226, 232, 240, 0.8);
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 50;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.guest-nav-bar-dark {
+  background: #1e293b;
+  border-top-color: rgba(51, 65, 85, 0.5);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.guest-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.guest-nav-item.active {
+  color: #14b8a6;
+  background: rgba(20, 184, 166, 0.1);
+}
+
+/* ============================================================
+   DEVELOPER SIGNATURE (Matching LoginScreen)
+   ============================================================ */
+
+.guest-dev-signature {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  padding: 0.5rem;
+  text-align: center;
+  background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.95) 50%);
+  font-family: 'Inter', 'SF Pro Display', system-ui, sans-serif;
+}
+
+.guest-dev-signature-dark {
+  background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.95) 50%);
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+.guest-fade-in {
+  animation: guest-fade-in 0.3s ease-out;
+}
+
+@keyframes guest-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.guest-slide-up {
+  animation: guest-slide-up 0.4s ease-out;
+}
+
+@keyframes guest-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================
+   GUEST GLASS-CARD REPLACEMENT (SOLID)
+   Per memory: No glass/blur for modals
+   ============================================================ */
+
+.guest-glass-card {
+  background: #1e293b; /* Solid slate-800 */
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-radius: 1.5rem;
+}
+
+.guest-glass-card-light {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 1.5rem;
+}
+
+/* Override glass-card in guest pages to be solid */
+.guest-dashboard .glass-card {
+  background: #1e293b !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.guest-dashboard-light .glass-card {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (min-width: 640px) {
+  .guest-modal {
+    border-radius: 1.5rem;
+  }
+}

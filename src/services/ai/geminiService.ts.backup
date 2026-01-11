@@ -1,0 +1,47 @@
+/**
+ * Gemini AI Service - MINIMAL SAFE VERSION
+ * Adora Hotel Management System V2
+ */
+
+// Simplified exports that don't crash on load
+export interface AICommandResponse {
+    action: string;
+    params: Record<string, any>;
+    missingInfo?: string;
+    confirmation?: string;
+}
+
+export interface StreamCallbacks {
+    onChunk: (text: string, accumulated: string) => void;
+    onComplete: (fullText: string) => void;
+    onError: (error: Error) => void;
+}
+
+export const processAICommand = async (
+    userInput: string,
+    context: string,
+    schema: Record<string, any>,
+    dynamicData?: Record<string, any>,
+    meta?: { tenantId: string; branchId: string; userRole: string },
+    conversationHistory?: { role: 'user' | 'assistant'; content: string }[]
+): Promise<AICommandResponse> => {
+    console.warn('⚠️ AI features disabled - geminiService in safe mode');
+    return {
+        action: 'error',
+        params: {},
+        confirmation: 'المساعد الذكي غير متاح حالياً'
+    };
+};
+
+export const generateAIContent = async (prompt: string): Promise<string> => {
+    console.warn('⚠️ AI features disabled - geminiService in safe mode');
+    throw new Error('AI features temporarily disabled');
+};
+
+export const streamGenerateContent = async (
+    prompt: string,
+    callbacks: StreamCallbacks
+): Promise<void> => {
+    console.warn('⚠️ AI features disabled - geminiService in safe mode');
+    callbacks.onError(new Error('AI features temporarily disabled'));
+};

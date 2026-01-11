@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0D9488" />
+    <meta name="description" content="Adora Hotel Management System - نظام إدارة الفنادق الذكي" />
+    
+    <!-- ✅ Content Security Policy (CSP) for Security -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://www.gstatic.com https://*.firebaseio.com https://*.googleapis.com;
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        font-src 'self' https://fonts.gstatic.com;
+        img-src 'self' data: https: blob:;
+        connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.cloudfunctions.net wss://*.firebaseio.com https://i.ibb.co https://imgbb.com;
+        frame-src 'self' https://*.firebaseapp.com;
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+        frame-ancestors 'none';
+        upgrade-insecure-requests;
+    " />
+
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Adora" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/icon-192x192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
+
+    <title>Adora | نظام إدارة الفنادق</title>
+</head>
+
+<body class="font-cairo antialiased">
+    <!-- 🎨 شاشة التحميل الأولية - تظهر قبل React -->
+    <div id="root">
+        <div id="initial-loader" style="
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #020617 100%);
+        ">
+            <img 
+                src="/adora-logo.png" 
+                alt="Adora" 
+                style="
+                    width: 120px;
+                    height: 120px;
+                    object-fit: contain;
+                    margin-bottom: 24px;
+                    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+                    filter: drop-shadow(0 0 20px rgba(45, 212, 191, 0.4));
+                "
+            />
+            <div style="display: flex; gap: 6px;">
+                <div style="
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    background: #14b8a6;
+                    animation: bounce 1s infinite;
+                    animation-delay: 0ms;
+                "></div>
+                <div style="
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    background: #14b8a6;
+                    animation: bounce 1s infinite;
+                    animation-delay: 150ms;
+                "></div>
+                <div style="
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    background: #14b8a6;
+                    animation: bounce 1s infinite;
+                    animation-delay: 300ms;
+                "></div>
+            </div>
+        </div>
+        <style>
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+            @keyframes bounce {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-10px); }
+            }
+        </style>
+    </div>
+
+    <!-- 📋 زر نسخ الأخطاء - Adora Theme -->
+    <script>
+        (function () {
+            // إنشاء الأنماط
+            var style = document.createElement('style');
+            style.textContent = `
+            #copy-error-btn {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 2147483647;
+                padding: 12px 20px;
+                background: linear-gradient(135deg, #0D9488 0%, #0F766E 100%);
+                color: white;
+                border: none;
+                border-radius: 14px;
+                cursor: pointer;
+                font-family: 'Cairo', sans-serif;
+                font-size: 14px;
+                font-weight: 700;
+                box-shadow: 0 4px 20px rgba(13, 148, 136, 0.4), 0 0 0 1px rgba(255,255,255,0.1);
+                display: none;
+                backdrop-filter: blur(10px);
+                transition: all 0.3s ease;
+            }
+            #copy-error-btn:hover {
+                transform: translateY(-2px) scale(1.02);
+                box-shadow: 0 8px 30px rgba(13, 148, 136, 0.5);
+            }
+            #copy-error-btn:active {
+                transform: scale(0.98);
+            }
+            #copy-error-btn.copied {
+                background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            }
+        `;
+            document.head.appendChild(style);
+
+            // إنشاء الزر
+            var btn = document.createElement('button');
+            btn.id = 'copy-error-btn';
+            btn.innerHTML = '📋 نسخ تفاصيل الخطأ';
+
+            btn.onclick = function () {
+                var errorText = '';
+                var overlay = document.querySelector('vite-error-overlay');
+                if (overlay && overlay.shadowRoot) {
+                    var msg = overlay.shadowRoot.querySelector('.message-body');
+                    var file = overlay.shadowRoot.querySelector('.file');
+                    var stack = overlay.shadowRoot.querySelector('.stack');
+                    var frame = overlay.shadowRoot.querySelector('.frame');
+                    // نسخ النص الأصلي كما هو بالضبط
+                    errorText = (msg ? msg.textContent : '') + '\n\n';
+                    errorText += (file ? file.textContent : '') + '\n\n';
+                    errorText += (stack ? stack.textContent : (frame ? frame.textContent : ''));
+                }
+                if (!errorText) {
+                    errorText = document.body.innerText;
+                }
+
+                navigator.clipboard.writeText(errorText).then(function () {
+                    btn.innerHTML = '✅ تم النسخ بنجاح!';
+                    btn.classList.add('copied');
+                    setTimeout(function () {
+                        btn.innerHTML = '📋 نسخ تفاصيل الخطأ';
+                        btn.classList.remove('copied');
+                    }, 2500);
+                });
+            };
+
+            document.body.appendChild(btn);
+
+            function checkError() {
+                var hasError = document.querySelector('vite-error-overlay');
+                btn.style.display = hasError ? 'block' : 'none';
+            }
+
+            setInterval(checkError, 300);
+            new MutationObserver(checkError).observe(document.documentElement, { childList: true, subtree: true });
+        })();
+    </script>
+
+    <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>

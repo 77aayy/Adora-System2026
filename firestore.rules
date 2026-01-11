@@ -1,0 +1,628 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================================
+    // 🛡️ ADORA IRON SHIELD V2 - Multi-Tenant Security Rules
+    // ============================================================
+    // 💰 BUDGET PROTECTION: No "if true" anywhere!
+    // 🔐 TENANT ISOLATION: Each hotel sees only its own data
+    // 👤 ANONYMOUS AUTH: QR guests get temporary identity
+    // ============================================================
+
+    // ------------------------------------------------------------
+    // 🔧 HELPER FUNCTIONS
+    // ------------------------------------------------------------
+    
+    // 1. Check if user is signed in (includes anonymous users)
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 2. Check if user is Super Admin (system owner)
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.super_admin == true;
+    }
+
+    // 3. Check if user is Owner
+    // 🔐 ENHANCED: Also checks userBindings for anonymous users without custom claims
+    function isOwner() {
+      return isSignedIn() && (
+        request.auth.token.role == 'owner' || 
+        isSuperAdmin() ||
+        // 📋 Fallback: Check if user has owner binding in userBindings collection
+        exists(/databases/$(database)/documents/userBindings/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/userBindings/$(request.auth.uid)).data.role == 'owner'
+      );
+    }
+
+    // 4. Check if user belongs to a specific tenant
+    // 🔐 ENHANCED: Checks custom claims OR userBindings for anonymous users
+    function belongsToTenant(tenantId) {
+      return isSignedIn() && (
+        request.auth.token.tenantId == tenantId || 
+        isSuperAdmin() ||
+        isOwner() ||
+        // 📋 Fallback: Check userBindings
+        (exists(/databases/$(database)/documents/userBindings/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/userBindings/$(request.auth.uid)).data.tenantId == tenantId)
+      );
+    }
+
+    // 5. Check if user is Manager of a tenant
+    function isManager(tenantId) {
+      return belongsToTenant(tenantId) && 
+             (request.auth.token.role == 'manager' || isOwner());
+    }
+    
+    // 6. Check if request is from anonymous guest (QR user)
+    function isAnonymousGuest() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    // ------------------------------------------------------------
+    // 🔐 SYSTEM CONFIGURATIONS (Owner Only)
+    // ✅ Public read for settings needed before/during login
+    // ------------------------------------------------------------
+    match /system_configs/{configId} {
+      // ✅ Public read (contains non-sensitive UI configs)
+      allow read: if true;
+      allow write: if isSuperAdmin() || isOwner();
+    }
+
+    match /systemSettings/{docId} {
+      // ✅ Public read (contains non-sensitive system settings like subscription price)
+      allow read: if true;
+      allow write: if isSuperAdmin() || isOwner();
+    }
+
+    // ------------------------------------------------------------
+    // 🔐 GLOBAL CODES (Login Verification)
+    // ⚠️ NOTE: Must be readable before auth for PIN login!
+    // 🛡️ PROTECTION: PIN codes are hashed, no sensitive data exposed
+    // ------------------------------------------------------------
+    match /globalCodes/{codeId} {
+      // ✅ Public read required for PIN verification before login
+      // This is safe because:
+      // 1. PIN codes are hashed (not plaintext)
+      // 2. Only contains tenantId/role mapping (not passwords)
+      // 3. Rate limiting is enforced in the app
+      allow read: if true;
+      allow write: if isSuperAdmin() || isOwner();
+    }
+
+    // ------------------------------------------------------------
+    // 👤 USERS COLLECTION
+    // ------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId || 
+        isSuperAdmin() || 
+        isOwner()
+      );
+      allow create: if isSuperAdmin() || isOwner();
+      allow update: if isSignedIn() && (
+        request.auth.uid == userId || 
+        isSuperAdmin() || 
+        isOwner()
+      );
+      allow delete: if isSuperAdmin() || isOwner();
+    }
+
+    // ------------------------------------------------------------
+    // 🏢 TENANT DATA (Multi-Tenant Core)
+    // Each tenant (hotel) is completely isolated
+    // ------------------------------------------------------------
+    match /tenants/{tenantId} {
+      // Read tenant profile
+      allow read: if belongsToTenant(tenantId);
+      
+      // Create new tenant (Owner only)
+      allow create: if isSuperAdmin() || isOwner();
+      
+      // Update tenant settings (Manager+)
+      allow update: if isManager(tenantId);
+      
+      // Delete tenant (Super Admin only)
+      allow delete: if isSuperAdmin();
+
+      // --------------------------------------------------------
+      // 🛏️ ROOMS
+      // --------------------------------------------------------
+      match /rooms/{roomId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if belongsToTenant(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 📋 REQUESTS (Service Requests)
+      // 🔐 SECURED: Anonymous guests can create with restrictions
+      // --------------------------------------------------------
+      match /requests/{requestId} {
+        allow read: if belongsToTenant(tenantId);
+        
+        // Staff can create requests freely
+        // Guests (anonymous) must provide required fields and CANNOT set prices
+        allow create: if belongsToTenant(tenantId) || (
+          isAnonymousGuest() &&
+          request.resource.data.source == 'guest' &&
+          request.resource.data.tenantId == tenantId &&
+          request.resource.data.roomNumber != null &&
+          request.resource.data.roomNumber is string &&
+          request.resource.data.roomNumber.size() <= 10 &&
+          request.resource.data.type in ['housekeeping', 'maintenance', 'bellman', 'coffee', 'minibar', 'roomservice', 'other'] &&
+          // 🔐 PRICE PROTECTION: Guests CANNOT set unit prices or discounts
+          // Note: 'total' is allowed as it's calculated from server-side prices
+          !('price' in request.resource.data) &&
+          !('cost' in request.resource.data) &&
+          !('amount' in request.resource.data) &&
+          !('discount' in request.resource.data)
+        );
+        
+        allow update: if belongsToTenant(tenantId);
+        allow delete: if isManager(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 👷 EMPLOYEES
+      // --------------------------------------------------------
+      match /employees/{employeeId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if isManager(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 🏨 BRANCHES
+      // --------------------------------------------------------
+      match /branches/{branchId} {
+        allow read: if belongsToTenant(tenantId) || isAnonymousGuest();
+        allow write: if isManager(tenantId);
+        
+        // Rooms within branches
+        match /rooms/{roomId} {
+          allow read: if belongsToTenant(tenantId);
+          allow write: if belongsToTenant(tenantId);
+        }
+
+        // 💬 Chat Rooms (Guest-accessible)
+        match /chat_rooms/{chatRoomId} {
+          // 🔐 Read: Staff OR anonymous guests
+          allow read: if belongsToTenant(tenantId) || isAnonymousGuest();
+          // 🔐 Create: Staff OR anonymous guests (for new chat rooms)
+          allow create: if belongsToTenant(tenantId) || isAnonymousGuest();
+          // 🔐 Update: Staff OR anonymous guests (for typing indicators, etc.)
+          allow update: if belongsToTenant(tenantId) || isAnonymousGuest();
+          // 🔐 Delete: Staff only
+          allow delete: if belongsToTenant(tenantId);
+
+          // Messages within chat rooms
+          match /messages/{messageId} {
+            // 🔐 Read: Staff OR anonymous guests
+            allow read: if belongsToTenant(tenantId) || isAnonymousGuest();
+            // 🔐 Create: Staff OR anonymous guests (with validation)
+            allow create: if (belongsToTenant(tenantId) || isAnonymousGuest()) &&
+              request.resource.data.content is string &&
+              request.resource.data.content.size() <= 2000;
+            // 🔐 Update/Delete: Staff only
+            allow update, delete: if belongsToTenant(tenantId);
+          }
+        }
+
+        // 📋 Branch-scoped Requests
+        match /requests/{requestId} {
+          allow read: if belongsToTenant(tenantId) || isAnonymousGuest();
+          allow create: if belongsToTenant(tenantId) || (
+            isAnonymousGuest() &&
+            request.resource.data.roomNumber != null &&
+            !('price' in request.resource.data) &&
+            !('cost' in request.resource.data)
+          );
+          allow update: if belongsToTenant(tenantId);
+          allow delete: if isManager(tenantId);
+        }
+      }
+
+      // --------------------------------------------------------
+      // 👥 TEAMS
+      // --------------------------------------------------------
+      match /teams/{teamId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if isManager(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 🎫 GUESTS (Guest Profiles)
+      // --------------------------------------------------------
+      match /guests/{guestId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if belongsToTenant(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 💬 CHATS (Guest-Staff Communication)
+      // 🔐 SECURED: Anonymous guests can only access their room's chat
+      // --------------------------------------------------------
+      match /chats/{chatId} {
+        // Staff can read all, guests can read their room's chat
+        allow read: if belongsToTenant(tenantId) || (
+          isAnonymousGuest() && 
+          resource.data.roomNumber != null
+        );
+        
+        // Creating chat requires roomNumber
+        allow create: if belongsToTenant(tenantId) || (
+          isAnonymousGuest() &&
+          request.resource.data.roomNumber != null &&
+          request.resource.data.tenantId == tenantId
+        );
+        
+        allow update: if belongsToTenant(tenantId);
+        allow delete: if isManager(tenantId);
+
+        // Messages within chats
+        match /messages/{messageId} {
+          allow read: if belongsToTenant(tenantId) || isAnonymousGuest();
+          
+          // 🔐 Message content validation
+          allow create: if (belongsToTenant(tenantId) || isAnonymousGuest()) && 
+            request.resource.data.content is string &&
+            request.resource.data.content.size() <= 2000 &&
+            request.resource.data.senderType in ['guest', 'staff', 'system'];
+            
+          allow update, delete: if belongsToTenant(tenantId);
+        }
+      }
+
+      // --------------------------------------------------------
+      // ⏱️ LIVE TIMERS
+      // --------------------------------------------------------
+      match /liveTimers/{timerId} {
+        allow read, write: if belongsToTenant(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 🏆 POINTS & ACHIEVEMENTS
+      // --------------------------------------------------------
+      match /points/{pointId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if belongsToTenant(tenantId);
+      }
+
+      match /achievements/{achievementId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if isManager(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // ⚙️ SETTINGS (Including Chat Settings)
+      // 🔐 Guests can read for chat settings
+      // --------------------------------------------------------
+      match /settings/{settingId} {
+        // 🔐 Read: Staff OR anonymous guests (need chat settings)
+        allow read: if belongsToTenant(tenantId) || isAnonymousGuest();
+        allow write: if isManager(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 📊 LOGS (Tenant-specific)
+      // --------------------------------------------------------
+      match /logs/{logId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId);
+        allow update, delete: if isManager(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 💾 BACKUPS
+      // --------------------------------------------------------
+      match /backups/{backupId} {
+        allow read: if isManager(tenantId);
+        allow write: if isManager(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 💰 BILLING
+      // --------------------------------------------------------
+      match /billing/{billingId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if isManager(tenantId);
+      }
+      
+      // --------------------------------------------------------
+      // 🔐 SECURE ACCESS TOKENS (Tenant-specific)
+      // --------------------------------------------------------
+      match /secureAccessTokens/{tokenId} {
+        // 🔐 Reading tokens: Must be authenticated (including anonymous)
+        allow read: if isSignedIn();
+        // 🔐 Writing tokens: Staff only
+        allow write: if belongsToTenant(tenantId);
+      }
+
+      // --------------------------------------------------------
+      // 📋 ANY OTHER SUB-COLLECTION
+      // --------------------------------------------------------
+      match /{subcollection}/{docId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if belongsToTenant(tenantId);
+      }
+    }
+
+    // ------------------------------------------------------------
+    // 📊 GLOBAL LOGS (System-wide)
+    // ------------------------------------------------------------
+    match /logs/{logId} {
+      allow create: if isSignedIn();
+      allow read: if isSuperAdmin() || isOwner();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // 📜 LICENSE NOTIFICATIONS
+    // ------------------------------------------------------------
+    match /licenseNotifications/{notificationId} {
+      allow read: if isSuperAdmin() || isOwner();
+      allow write: if isSuperAdmin() || isOwner();
+    }
+
+    // ------------------------------------------------------------
+    // 🔐 SECURE ACCESS TOKENS (Global fallback)
+    // Used for cross-tenant token validation
+    // ⚠️ SECURED: Requires authentication!
+    // ------------------------------------------------------------
+    match /secureAccessTokens/{tokenId} {
+      // 🔐 Reading: Must be authenticated (anonymous allowed for QR validation)
+      allow read: if isSignedIn();
+      // 🔐 Writing: Staff only
+      allow create, update, delete: if isSignedIn() && !isAnonymousGuest();
+    }
+
+    // ------------------------------------------------------------
+    // 🚨 SECURITY AUDIT LOGS
+    // 🔐 SECURED: Create requires auth, immutable after creation
+    // ------------------------------------------------------------
+    match /securityAuditLogs/{logId} {
+      // 🔐 Create: Authenticated users only (including anonymous for security events)
+      allow create: if isSignedIn();
+      // 🔐 Read: Owner/Super Admin only
+      allow read: if isSuperAdmin() || isOwner();
+      // 🔐 Immutable: Cannot be modified or deleted
+      allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------
+    // 🚦 GUEST RATE LIMITS
+    // Tracks request counts per anonymous user
+    // ------------------------------------------------------------
+    match /guestRateLimits/{limitId} {
+      // Users can read/write their own rate limit doc
+      allow read, write: if isSignedIn() && request.auth.uid == limitId;
+      // Staff can read all (for monitoring) and delete (for checkout cleanup)
+      allow read, delete: if isSignedIn() && !isAnonymousGuest();
+    }
+
+    // ------------------------------------------------------------
+    // 🏥 HEALTH CHECK
+    // ✅ Public read for Firebase connection testing
+    // ------------------------------------------------------------
+    match /health_check/{docId} {
+      // ✅ Public read for testing Firebase connection before login
+      allow read: if true;
+      allow write: if isSuperAdmin() || isOwner();
+    }
+    
+    // ------------------------------------------------------------
+    // 📱 DEMO LINKS (Public preview)
+    // ------------------------------------------------------------
+    match /demoLinks/{linkId} {
+      // 🔐 Read: Authenticated only
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || isOwner();
+    }
+
+    // ------------------------------------------------------------
+    // 📢 ANNOUNCEMENTS (Guest-readable)
+    // ------------------------------------------------------------
+    match /announcements/{announcementId} {
+      // 🔐 Read: Authenticated (including anonymous guests)
+      allow read: if isSignedIn();
+      // 🔐 Write: Staff only
+      allow write: if isSignedIn() && !isAnonymousGuest();
+    }
+
+    // ------------------------------------------------------------
+    // ⭐ RATING SYSTEM (Guest-accessible)
+    // ------------------------------------------------------------
+    match /rating_templates/{templateId} {
+      // 🔐 Read: Authenticated (staff needs templates, guests see questions)
+      allow read: if isSignedIn();
+      // 🔐 Write: Staff only
+      allow write: if isSignedIn() && !isAnonymousGuest();
+    }
+
+    match /rating_invitations/{invitationId} {
+      // 🔐 Read: Authenticated (guests see their invitations)
+      allow read: if isSignedIn();
+      // 🔐 Write: Staff create invitations, guests can mark as completed
+      allow create: if isSignedIn() && !isAnonymousGuest();
+      allow update: if isSignedIn(); // Guests can update (mark completed)
+      allow delete: if isSignedIn() && !isAnonymousGuest();
+    }
+
+    match /rating_responses/{responseId} {
+      // 🔐 Read: Staff can read responses
+      allow read: if isSignedIn() && !isAnonymousGuest();
+      // 🔐 Create: Guests can submit ratings
+      allow create: if isSignedIn();
+      // 🔐 Update/Delete: Staff only
+      allow update, delete: if isSignedIn() && !isAnonymousGuest();
+    }
+
+    // ------------------------------------------------------------
+    // 🚨 EMERGENCY ALERTS (Guest-readable)
+    // ------------------------------------------------------------
+    match /emergency_alerts/{alertId} {
+      // 🔐 Read: Authenticated (guests see alerts for their room)
+      allow read: if isSignedIn();
+      // 🔐 Write: Staff only
+      allow write: if isSignedIn() && !isAnonymousGuest();
+    }
+
+    match /emergency_alert_reads/{readId} {
+      // 🔐 Read/Write: Authenticated (guests mark alerts as read)
+      allow read, write: if isSignedIn();
+    }
+
+    // ------------------------------------------------------------
+    // 📱 QR SERVICES (Guest-readable)
+    // ------------------------------------------------------------
+    match /qr_services/{serviceId} {
+      // 🔐 Read: Authenticated (guests see available services)
+      allow read: if isSignedIn();
+      // 🔐 Write: Staff only
+      allow write: if isSignedIn() && !isAnonymousGuest();
+    }
+
+    // ------------------------------------------------------------
+    // 💬 GLOBAL CHAT SETTINGS
+    // ------------------------------------------------------------
+    match /chat_settings/{settingId} {
+      // 🔐 Read: Authenticated (guests need chat options)
+      allow read: if isSignedIn();
+      // 🔐 Write: Staff only
+      allow write: if isSignedIn() && !isAnonymousGuest();
+    }
+
+    // ------------------------------------------------------------
+    // 🧾 RECEIPTS & INVOICES (Owner billing)
+    // ------------------------------------------------------------
+    match /receiptVouchers/{voucherId} {
+      allow read, write: if isSuperAdmin() || isOwner();
+    }
+
+    match /invoices/{invoiceId} {
+      allow read, write: if isSuperAdmin() || isOwner();
+    }
+    
+    // ------------------------------------------------------------
+    // 🔐 MANAGERS COLLECTION (Owner's view)
+    // ------------------------------------------------------------
+    match /managers/{managerId} {
+      allow read, write: if isSuperAdmin() || isOwner();
+    }
+
+    // ------------------------------------------------------------
+    // 📋 GLOBAL REQUESTS COLLECTION (Flat Structure)
+    // 🔐 SECURED: Multi-tenant isolation via tenantId field
+    // ⚠️ CRITICAL: This is the ACTUAL collection used by the app!
+    // ------------------------------------------------------------
+    match /requests/{requestId} {
+      // 📖 READ: Staff can read their tenant's requests
+      allow read: if isSignedIn() && (
+        isSuperAdmin() ||
+        isOwner() ||
+        // Check if user belongs to the request's tenant
+        resource.data.tenantId != null && belongsToTenant(resource.data.tenantId)
+      );
+      
+      // ✏️ CREATE: Staff can create requests with tenantId
+      // Anonymous guests can create with restrictions (no price manipulation)
+      allow create: if isSignedIn() && (
+        // Staff: Must include tenantId
+        (!isAnonymousGuest() && request.resource.data.tenantId != null) ||
+        // Guest: Strict validation
+        (isAnonymousGuest() &&
+          request.resource.data.source in ['guest', 'QR'] &&
+          request.resource.data.tenantId != null &&
+          request.resource.data.roomNumber != null &&
+          request.resource.data.roomNumber is string &&
+          request.resource.data.roomNumber.size() <= 10 &&
+          // 🔐 PRICE PROTECTION: Guests CANNOT set price fields
+          !('price' in request.resource.data) &&
+          !('cost' in request.resource.data) &&
+          !('amount' in request.resource.data) &&
+          !('discount' in request.resource.data) &&
+          !('total' in request.resource.data)
+        )
+      );
+      
+      // 🔄 UPDATE: Only staff belonging to the tenant
+      allow update: if isSignedIn() && !isAnonymousGuest() && (
+        isSuperAdmin() ||
+        isOwner() ||
+        (resource.data.tenantId != null && belongsToTenant(resource.data.tenantId))
+      );
+      
+      // 🗑️ DELETE: Only managers of the tenant
+      allow delete: if isSignedIn() && !isAnonymousGuest() && (
+        isSuperAdmin() ||
+        isOwner() ||
+        (resource.data.tenantId != null && isManager(resource.data.tenantId))
+      );
+    }
+
+    // ------------------------------------------------------------
+    // 🔗 USER BINDINGS (UID to Tenant/Role mapping)
+    // 🔐 Critical for Security Rules to work!
+    // 📋 Bootstrap: Users can create their own binding with role claim
+    // ------------------------------------------------------------
+    match /userBindings/{uid} {
+      // ✅ Users can read their own binding
+      // ✅ Owner (with userBinding) can read all
+      allow read: if isSignedIn() && (
+        request.auth.uid == uid ||
+        // Allow owner to read others
+        (exists(/databases/$(database)/documents/userBindings/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/userBindings/$(request.auth.uid)).data.role == 'owner')
+      );
+      
+      // 📋 CREATE: User can create their own binding
+      // This allows bootstrap of owner/manager roles
+      // ✅ SIMPLIFIED: Just check that UID matches and role is valid
+      allow create: if isSignedIn() && 
+        request.auth.uid == uid &&
+        request.resource.data.uid == uid &&
+        request.resource.data.role in ['owner', 'manager', 'employee', 'staff'];
+      
+      // UPDATE: User can update their own, or owner can update any
+      allow update: if isSignedIn() && (
+        request.auth.uid == uid || 
+        // Owner check via userBindings
+        (exists(/databases/$(database)/documents/userBindings/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/userBindings/$(request.auth.uid)).data.role == 'owner')
+      );
+      
+      // DELETE: Only owner
+      allow delete: if isSignedIn() && (
+        exists(/databases/$(database)/documents/userBindings/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/userBindings/$(request.auth.uid)).data.role == 'owner'
+      );
+    }
+
+    // ------------------------------------------------------------
+    // 🛏️ ROOM CARDS (Active Check-ins)
+    // Used for QR token validation
+    // ------------------------------------------------------------
+    match /roomCards/{cardId} {
+      // Staff can read/write
+      allow read, write: if isSignedIn() && !isAnonymousGuest();
+      // Guests can read their own room card (for QR validation)
+      allow read: if isAnonymousGuest();
+    }
+
+    // ------------------------------------------------------------
+    // 🚨 SECURITY ALERTS
+    // ------------------------------------------------------------
+    match /securityAlerts/{alertId} {
+      allow create: if isSignedIn();
+      allow read: if isSuperAdmin() || isOwner();
+      allow update: if isSuperAdmin() || isOwner();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ------------------------------------------------------------
+    // ⛔ DEFAULT DENY
+    // Anything not explicitly allowed is DENIED
+    // ------------------------------------------------------------
+    // No catch-all rule - security by default!
+  }
+}

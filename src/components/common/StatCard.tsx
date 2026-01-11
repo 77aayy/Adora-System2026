@@ -1,0 +1,239 @@
+/**
+ * StatCard - Compact Premium Status Card
+ * Redesigned for elegance and space efficiency
+ * Adora Hotel Management System V3
+ * 
+ * ✅ Compact design - saves space
+ * ✅ Glass gradient effect
+ * ✅ Subtle hover animations
+ * ✅ Dark mode optimized
+ */
+
+import React, { memo } from 'react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
+
+// Icon color variants
+type IconColorVariant = 'teal' | 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'yellow' | 'pink';
+
+interface StatCardProps {
+    count?: number;
+    value?: number | string;
+    label: string | React.ReactNode;
+    icon: React.ReactNode | React.ComponentType<any>;
+    bgColor?: string;
+    color?: string;
+    iconColor?: IconColorVariant;
+    lastUpdate?: string;
+    trend?: string;
+    status?: 'normal' | 'warning' | 'success' | 'error';
+    compact?: boolean; // New: even more compact mode
+    pulse?: boolean; // ✅ Premium heartbeat animation
+    urgency?: 'low' | 'medium' | 'high' | 'critical'; // ✅ Visual urgency indicator
+}
+
+// Gradient configurations for glass effect
+const gradientConfigs: Record<IconColorVariant, { gradient: string; border: string; shadow: string; iconBg: string }> = {
+    teal: { 
+        gradient: 'from-teal-500/10 to-teal-500/5',
+        border: 'border-teal-500/20',
+        shadow: 'shadow-teal-500/10',
+        iconBg: 'bg-teal-500/15'
+    },
+    blue: { 
+        gradient: 'from-blue-500/10 to-blue-500/5',
+        border: 'border-blue-500/20',
+        shadow: 'shadow-blue-500/10',
+        iconBg: 'bg-blue-500/15'
+    },
+    green: { 
+        gradient: 'from-green-500/10 to-green-500/5',
+        border: 'border-green-500/20',
+        shadow: 'shadow-green-500/10',
+        iconBg: 'bg-green-500/15'
+    },
+    orange: { 
+        gradient: 'from-orange-500/10 to-orange-500/5',
+        border: 'border-orange-500/20',
+        shadow: 'shadow-orange-500/10',
+        iconBg: 'bg-orange-500/15'
+    },
+    red: { 
+        gradient: 'from-red-500/10 to-red-500/5',
+        border: 'border-red-500/20',
+        shadow: 'shadow-red-500/10',
+        iconBg: 'bg-red-500/15'
+    },
+    purple: { 
+        gradient: 'from-purple-500/10 to-purple-500/5',
+        border: 'border-purple-500/20',
+        shadow: 'shadow-purple-500/10',
+        iconBg: 'bg-purple-500/15'
+    },
+    yellow: { 
+        gradient: 'from-yellow-500/10 to-yellow-500/5',
+        border: 'border-yellow-500/20',
+        shadow: 'shadow-yellow-500/10',
+        iconBg: 'bg-yellow-500/15'
+    },
+    pink: { 
+        gradient: 'from-pink-500/10 to-pink-500/5',
+        border: 'border-pink-500/20',
+        shadow: 'shadow-pink-500/10',
+        iconBg: 'bg-pink-500/15'
+    },
+};
+
+// Icon text colors
+const iconTextColors: Record<IconColorVariant, string> = {
+    teal: 'text-teal-400',
+    blue: 'text-blue-400',
+    green: 'text-green-400',
+    orange: 'text-orange-400',
+    red: 'text-red-400',
+    purple: 'text-purple-400',
+    yellow: 'text-yellow-400',
+    pink: 'text-pink-400',
+};
+
+export const StatCard: React.FC<StatCardProps> = ({ 
+    count, 
+    value,
+    label, 
+    icon, 
+    iconColor = 'teal',
+    lastUpdate,
+    trend,
+    status = 'normal',
+    compact = false,
+    pulse = false,
+    urgency
+}) => {
+    const displayValue = count !== undefined ? count : (value !== undefined ? value : 0);
+    const isStringValue = typeof displayValue === 'string';
+    
+    const config = gradientConfigs[iconColor];
+    const textColor = iconTextColors[iconColor];
+    
+    // Status override for icon color
+    const effectiveTextColor = status === 'success' ? 'text-green-400' :
+                               status === 'warning' ? 'text-yellow-400' :
+                               status === 'error' ? 'text-red-400' :
+                               textColor;
+    
+    // ✅ Urgency-based pulse colors (premium visual feedback)
+    const urgencyConfig = {
+        low: { ring: 'ring-green-500/30', pulse: 'animate-pulse-slow' },
+        medium: { ring: 'ring-yellow-500/40', pulse: 'animate-pulse' },
+        high: { ring: 'ring-orange-500/50', pulse: 'animate-pulse-fast' },
+        critical: { ring: 'ring-red-500/60', pulse: 'animate-heartbeat' }
+    };
+    const urgencyStyle = urgency ? urgencyConfig[urgency] : null;
+    
+    // Handle icon rendering
+    let iconElement: React.ReactNode = null;
+    if (icon) {
+        if (React.isValidElement(icon)) {
+            iconElement = React.cloneElement(icon as React.ReactElement<any>, {
+                className: compact ? 'w-4 h-4' : 'w-5 h-5'
+            });
+        } else if (typeof icon === 'function' || typeof icon === 'object') {
+            const IconComponent = icon as React.ComponentType<{ className?: string }>;
+            iconElement = <IconComponent className={compact ? 'w-4 h-4' : 'w-5 h-5'} />;
+        }
+    }
+
+    // Parse trend
+    const isPositiveTrend = trend?.startsWith('+');
+    const hasTrend = trend && trend.replace(/[+%]/g, '');
+    
+    return (
+        <div 
+            className={`
+                group relative overflow-hidden rounded-xl
+                bg-gradient-to-br ${config.gradient}
+                border ${config.border}
+                backdrop-blur-sm
+                transition-all duration-300
+                hover:scale-[1.02] hover:shadow-lg hover:${config.shadow}
+                ${compact ? 'p-3' : 'p-4'}
+                ${pulse || urgencyStyle ? 'ring-2 ' + (urgencyStyle?.ring || 'ring-teal-500/30') : ''}
+                ${urgencyStyle?.pulse || (pulse ? 'animate-pulse-subtle' : '')}
+            `}
+        >
+            {/* Subtle shine effect on hover */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            </div>
+            
+            <div className="relative flex items-center gap-3">
+                {/* Icon - Compact circle */}
+                {iconElement && (
+                    <div className={`
+                        ${compact ? 'w-9 h-9' : 'w-10 h-10'} 
+                        rounded-lg ${config.iconBg}
+                        flex items-center justify-center
+                        transition-transform duration-300 group-hover:scale-110
+                    `}>
+                        <span className={effectiveTextColor}>
+                            {iconElement}
+                        </span>
+                    </div>
+                )}
+                
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                    {/* Value - Hero number */}
+                    <div className={`
+                        ${isStringValue 
+                            ? (compact ? 'text-sm' : 'text-base') 
+                            : (compact ? 'text-xl' : 'text-2xl')
+                        } 
+                        font-bold text-white tracking-tight truncate
+                    `}>
+                        {typeof displayValue === 'number' 
+                            ? displayValue.toLocaleString() 
+                            : displayValue
+                        }
+                    </div>
+                    
+                    {/* Label */}
+                    <div className={`
+                        ${compact ? 'text-[10px]' : 'text-xs'} 
+                        text-slate-400 truncate
+                    `}>
+                        {label}
+                    </div>
+                </div>
+                
+                {/* Trend indicator */}
+                {hasTrend && (
+                    <div className={`
+                        flex items-center gap-0.5 text-xs font-semibold
+                        ${isPositiveTrend ? 'text-green-400' : 'text-red-400'}
+                    `}>
+                        {isPositiveTrend ? (
+                            <TrendingUp className="w-3 h-3" />
+                        ) : (
+                            <TrendingDown className="w-3 h-3" />
+                        )}
+                        <span>{trend}</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// Memoize to prevent unnecessary re-renders
+export default memo(StatCard, (prevProps, nextProps) => {
+    const prevValue = prevProps.count !== undefined ? prevProps.count : prevProps.value;
+    const nextValue = nextProps.count !== undefined ? nextProps.count : nextProps.value;
+    
+    return (
+        prevValue === nextValue &&
+        prevProps.status === nextProps.status &&
+        prevProps.trend === nextProps.trend &&
+        prevProps.iconColor === nextProps.iconColor &&
+        prevProps.compact === nextProps.compact
+    );
+});

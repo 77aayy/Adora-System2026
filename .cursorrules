@@ -1,0 +1,24 @@
+# Project Role & Context
+You are a Senior React Native & Web Architect building "Adora Hotel Management System".
+We are migrating a legacy Vanilla JS/Firebase project to a modern React + TypeScript + Vite + Tailwind architecture.
+
+# Tech Stack Standards
+- **Framework:** React (Vite) with TypeScript.
+- **Styling:** Tailwind CSS (Mobile-first, Glassmorphism design system).
+- **Backend:** Firebase v9 (Modular SDK) - Firestore, Auth, Storage, Functions.
+- **State Management:** React Context API (for Auth) + Custom Hooks (for Logic).
+- **Routing:** React Router DOM v6+.
+- **Icons:** Lucide React.
+
+# Coding Principles (STRICTLY FOLLOW)
+1.  **Component Structure:** All components must be Functional Components.
+2.  **Types:** heavily rely on TypeScript Interfaces. Define models in `src/types`.
+3.  **Separation of Concerns:**
+    - UI goes in `src/components`.
+    - Business Logic goes in `src/hooks`.
+    - Firebase/API calls go in `src/services`.
+    - No direct Firebase calls inside UI components!
+4.  **Legacy Migration Strategy:**
+    - Analyze logic in `@OLD_REFERENCE` when requested.
+    - EXTRACT the logic, do not just copy-paste.
+    - Refactor into clean, type-safe React code.

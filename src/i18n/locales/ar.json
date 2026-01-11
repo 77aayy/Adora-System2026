@@ -1,0 +1,130 @@
+{
+    "common": {
+        "loading": "جاري التحميل...",
+        "save": "حفظ",
+        "cancel": "إلغاء",
+        "confirm": "تأكيد",
+        "delete": "حذف",
+        "edit": "تعديل",
+        "add": "إضافة",
+        "search": "بحث",
+        "filter": "فلترة",
+        "refresh": "تحديث",
+        "back": "رجوع",
+        "next": "التالي",
+        "previous": "السابق",
+        "close": "إغلاق",
+        "submit": "إرسال",
+        "yes": "نعم",
+        "no": "لا",
+        "success": "نجاح",
+        "error": "خطأ",
+        "warning": "تحذير",
+        "info": "معلومات",
+        "noData": "لا توجد بيانات",
+        "all": "الكل"
+    },
+    "auth": {
+        "login": "تسجيل الدخول",
+        "logout": "تسجيل الخروج",
+        "enterPin": "أدخل رمز الدخول",
+        "invalidPin": "رمز الدخول غير صحيح",
+        "welcome": "مرحباً",
+        "biometric": "الدخول بالبصمة",
+        "rememberMe": "تذكرني"
+    },
+    "roles": {
+        "owner": "المالك",
+        "manager": "المدير",
+        "employee": "الموظف"
+    },
+    "departments": {
+        "reception": "الاستقبال",
+        "housekeeping": "التدبير المنزلي",
+        "bellman": "البيلمان",
+        "maintenance": "الصيانة",
+        "procurement": "المشتريات",
+        "admin": "الإدارة"
+    },
+    "requests": {
+        "new": "طلب جديد",
+        "pending": "قيد الانتظار",
+        "confirmed": "مؤكد",
+        "inProgress": "قيد التنفيذ",
+        "completed": "مكتمل",
+        "cancelled": "ملغي",
+        "room": "الغرفة",
+        "guest": "النزيل",
+        "type": "النوع",
+        "priority": "الأولوية",
+        "urgent": "عاجل",
+        "normal": "عادي",
+        "notes": "ملاحظات"
+    },
+    "services": {
+        "cleaning": "تنظيف",
+        "maintenance": "صيانة",
+        "bellman": "خدمة أمتعة",
+        "coffee": "كوفي شوب",
+        "minibar": "ميني بار",
+        "extension": "تمديد إقامة"
+    },
+    "cleaning": {
+        "occupied": "تنظيف ساكن",
+        "checkout": "تنظيف مغادرة",
+        "immediate": "فوري",
+        "scheduled": "مجدول",
+        "start": "بدء التنظيف",
+        "complete": "إتمام التنظيف"
+    },
+    "maintenance": {
+        "electrical": "كهرباء",
+        "plumbing": "سباكة",
+        "ac": "تكييف",
+        "furniture": "أثاث",
+        "other": "أخرى",
+        "beforePhoto": "صورة قبل",
+        "afterPhoto": "صورة بعد"
+    },
+    "bellman": {
+        "checkIn": "تسجيل دخول",
+        "checkOut": "تسجيل خروج",
+        "luggage": "أمتعة",
+        "cart": "عربة"
+    },
+    "points": {
+        "points": "النقاط",
+        "total": "إجمالي النقاط",
+        "earned": "نقاط مكتسبة",
+        "deducted": "نقاط مخصومة",
+        "history": "سجل النقاط"
+    },
+    "dashboard": {
+        "overview": "نظرة عامة",
+        "today": "اليوم",
+        "thisWeek": "هذا الأسبوع",
+        "thisMonth": "هذا الشهر",
+        "newRequests": "طلبات جديدة",
+        "inProgress": "قيد التنفيذ",
+        "completedToday": "مكتمل اليوم",
+        "delayed": "متأخر"
+    },
+    "settings": {
+        "settings": "الإعدادات",
+        "general": "عام",
+        "points": "النقاط",
+        "times": "الأوقات",
+        "products": "المنتجات",
+        "design": "التصميم",
+        "branchName": "اسم الفرع",
+        "language": "اللغة"
+    },
+    "guest": {
+        "welcome": "مرحباً بك",
+        "selectService": "اختر الخدمة",
+        "submitRequest": "إرسال الطلب",
+        "trackRequest": "تتبع الطلب",
+        "rate": "قيم الخدمة",
+        "dnd": "عدم الإزعاج"
+    }
+}

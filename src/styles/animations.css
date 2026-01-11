@@ -1,0 +1,642 @@
+/**
+ * Custom Animations & Micro-interactions
+ * Enhanced UX with smooth transitions and feedback
+ * Adora Hotel Management System V2
+ */
+
+/* ============================================================
+   SMOOTH TRANSITIONS
+   ============================================================ */
+
+* {
+    transition-property: transform, opacity, background-color, border-color, color, box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+}
+
+/* ============================================================
+   BUTTON INTERACTIONS
+   ============================================================ */
+
+button {
+    position: relative;
+    overflow: hidden;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+button:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+button:active {
+    transform: scale(0.95);
+}
+
+/* ============================================================
+   CARD INTERACTIONS
+   ============================================================ */
+
+.card-interactive {
+    cursor: pointer;
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+.card-interactive:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.card-interactive:active {
+    transform: translateY(0) scale(0.98);
+    transition-duration: 100ms;
+}
+
+/* ============================================================
+   INPUT FOCUS ANIMATIONS
+   ============================================================ */
+
+input:focus,
+textarea:focus,
+select:focus {
+    transform: scale(1.01);
+    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.1);
+}
+
+/* ============================================================
+   MODAL ANIMATIONS
+   ============================================================ */
+
+@keyframes modalEnter {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes modalExit {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+}
+
+.modal-enter {
+    animation: modalEnter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-exit {
+    animation: modalExit 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+   LIST ITEM ANIMATIONS
+   ============================================================ */
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.list-item-enter {
+    animation: slideInRight 0.3s ease-out;
+}
+
+.list-item-enter-delayed {
+    animation: slideInRight 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+/* ============================================================
+   NOTIFICATION ANIMATIONS
+   ============================================================ */
+
+@keyframes notificationSlide {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.notification-enter {
+    animation: notificationSlide 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* ============================================================
+   PULSE & GLOW EFFECTS
+   ============================================================ */
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(45, 212, 191, 0);
+    }
+}
+
+.pulse-glow {
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+.shimmer {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+}
+
+/* ============================================================
+   BOUNCE & SHAKE
+   ============================================================ */
+
+@keyframes bounce {
+    0%, 20%, 53%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40%, 43% {
+        transform: translateY(-10px);
+    }
+    70% {
+        transform: translateY(-5px);
+    }
+    90% {
+        transform: translateY(-2px);
+    }
+}
+
+.bounce-animation {
+    animation: bounce 1s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.shake-animation {
+    animation: shake 0.5s;
+}
+
+/* ============================================================
+   FADE IN/OUT
+   ============================================================ */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+.fade-out {
+    animation: fadeOut 0.3s ease-out;
+}
+
+/* ============================================================
+   SCALE ANIMATIONS
+   ============================================================ */
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.scale-in {
+    animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+   LOADING SPINNER
+   ============================================================ */
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+/* ============================================================
+   RIPPLE EFFECT
+   ============================================================ */
+
+.ripple {
+    position: relative;
+    overflow: hidden;
+}
+
+.ripple::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.ripple:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* ============================================================
+   SLIDE ANIMATIONS
+   ============================================================ */
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.slide-down {
+    animation: slideDown 0.3s ease-out;
+}
+
+/* ============================================================
+   SUCCESS ANIMATION
+   ============================================================ */
+
+@keyframes successPop {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.success-pop {
+    animation: successPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+   TAB TRANSITIONS
+   ============================================================ */
+
+.tab-content {
+    animation: fadeIn 0.2s ease-in;
+}
+
+.tab-button-active {
+    position: relative;
+}
+
+.tab-button-active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(to right, #10b981, #14b8a6);
+    animation: slideInRight 0.3s ease-out;
+}
+
+/* ============================================================
+   GLASS MORPHISM ENHANCEMENT
+   ============================================================ */
+
+.glass-hover {
+    transition: all 0.3s ease;
+}
+
+.glass-hover:hover {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================
+   TOUCH OPTIMIZATION
+   ============================================================ */
+
+@media (hover: none) and (pointer: coarse) {
+    button:active,
+    .card-interactive:active {
+        transform: scale(0.95);
+        transition-duration: 100ms;
+    }
+}
+
+/* ============================================================
+   SMOOTH SCROLLING
+   ============================================================ */
+
+html {
+    scroll-behavior: smooth;
+}
+
+/* ============================================================
+   LOADING SKELETON
+   ============================================================ */
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: -200px 0;
+    }
+    100% {
+        background-position: calc(200px + 100%) 0;
+    }
+}
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0.05) 100%
+    );
+    background-size: 200px 100%;
+    animation: skeleton-loading 1.5s infinite;
+}
+
+/* ============================================================
+   BADGE PULSE
+   ============================================================ */
+
+@keyframes badge-pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+}
+
+.badge-pulse {
+    animation: badge-pulse 2s infinite;
+}
+
+/* ============================================================
+   ZOOM ON HOVER
+   ============================================================ */
+
+.zoom-on-hover {
+    transition: transform 0.3s ease;
+}
+
+.zoom-on-hover:hover {
+    transform: scale(1.05);
+}
+
+.zoom-on-hover:active {
+    transform: scale(0.95);
+}
+
+/* ============================================================
+   FLOATING ANIMATION
+   ============================================================ */
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.float-animation {
+    animation: float 3s ease-in-out infinite;
+}
+
+/* ============================================================
+   SUCCESS CHECKMARK
+   ============================================================ */
+
+@keyframes checkmark {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.checkmark {
+    animation: checkmark 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+   ENHANCED INTERACTIONS
+   ============================================================ */
+
+/* Card Hover Effect */
+.card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.card-hover:active {
+    transform: translateY(-2px) scale(1);
+}
+
+/* Button Press Effect */
+.btn-press:active {
+    transform: scale(0.95);
+    transition-duration: 100ms;
+}
+
+/* Input Focus Glow */
+.input-glow:focus {
+    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.2);
+    transform: scale(1.01);
+}
+
+/* Ripple Effect */
+.ripple-effect {
+    position: relative;
+    overflow: hidden;
+}
+
+.ripple-effect::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.ripple-effect:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* Smooth Appear */
+@keyframes smoothAppear {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.smooth-appear {
+    animation: smoothAppear 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Gentle Pulse */
+@keyframes gentlePulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.02);
+    }
+}
+
+.gentle-pulse {
+    animation: gentlePulse 2s ease-in-out infinite;
+}
+
+/* Slide In From Right (RTL) */
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.slide-in-right {
+    animation: slideInFromRight 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Slide In From Left (RTL) */
+@keyframes slideInFromLeft {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.slide-in-left {
+    animation: slideInFromLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
