@@ -280,6 +280,7 @@ export function useAllBranchesForOwner() {
                     const managerStatus = managerData.status || 'active';
                     const isDeleted = managerData.isDeleted === true;
                     const deletedAt = managerData.deletedAt;
+                    const isDemo = managerData.isDemo === true; // ✅ Check if manager is demo
                     
                     // ✅ FIX: Skip deleted, suspended, or inactive managers for accurate stats
                     // Only count ACTIVE managers with valid licenses
@@ -288,6 +289,10 @@ export function useAllBranchesForOwner() {
                     }
                     if (managerStatus === 'suspended' || managerStatus === 'inactive' || managerStatus === 'expired') {
                         return; // Skip suspended/inactive/expired managers
+                    }
+                    // ✅ Skip demo managers - their branches shouldn't be counted
+                    if (isDemo) {
+                        return; // Skip demo managers
                     }
                     
                     // ✅ Only include managers with valid tenantId
@@ -409,6 +414,11 @@ export function useAllBranchesForOwner() {
                         // ✅ Filter out deleted/scheduled branches
                         if (branchData.status === 'scheduled_for_deletion' || branchData.status === 'deleted') {
                             return;
+                        }
+                        
+                        // ✅ Filter out demo branches
+                        if (branchData.isDemo === true) {
+                            return; // Skip demo branches
                         }
 
                         // ✅ Build branch with manager context

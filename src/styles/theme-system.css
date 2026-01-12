@@ -20,22 +20,22 @@
   /* ─────────────────────────────────────────────────────────
      BACKGROUND COLORS
      ───────────────────────────────────────────────────────── */
-  --theme-bg-primary: #f8fafc;        /* Page background - Light gray */
+  --theme-bg-primary: #f1f5f9;        /* Page background - Slightly darker gray */
   --theme-bg-secondary: #ffffff;       /* Card background - Pure white */
-  --theme-bg-tertiary: #f8fafc;        /* Hover/Secondary areas - Lighter */
+  --theme-bg-tertiary: #e2e8f0;        /* Hover/Secondary areas - More visible */
   --theme-bg-elevated: #ffffff;        /* Elevated cards */
-  --theme-bg-overlay: rgba(0, 0, 0, 0.4);
+  --theme-bg-overlay: rgba(0, 0, 0, 0.5);
   
   /* ─────────────────────────────────────────────────────────
      OVERRIDE DESIGN-SYSTEM COLORS FOR LIGHT MODE
      ───────────────────────────────────────────────────────── */
-  --text-primary: #1e293b;             /* Override for dark text */
-  --text-secondary: #475569;
-  --text-tertiary: #64748b;
-  --text-disabled: #94a3b8;
+  --text-primary: #0f172a;             /* Override for dark text - DARKER */
+  --text-secondary: #334155;
+  --text-tertiary: #475569;
+  --text-disabled: #64748b;
   --bg-card: #ffffff;
-  --glass-bg: rgba(255, 255, 255, 0.95);
-  --glass-border: #e2e8f0;
+  --glass-bg: rgba(255, 255, 255, 0.98);
+  --glass-border: #cbd5e1;
   
   /* ─────────────────────────────────────────────────────────
      TEXT COLORS
@@ -47,11 +47,11 @@
   --theme-text-inverse: #ffffff;       /* Text on dark backgrounds */
   
   /* ─────────────────────────────────────────────────────────
-     BORDER COLORS
+     BORDER COLORS - MORE VISIBLE
      ───────────────────────────────────────────────────────── */
-  --theme-border-primary: #e2e8f0;     /* Main borders */
-  --theme-border-secondary: #f1f5f9;   /* Light borders */
-  --theme-border-hover: #cbd5e1;       /* Hover state borders */
+  --theme-border-primary: #cbd5e1;     /* Main borders - DARKER */
+  --theme-border-secondary: #e2e8f0;   /* Light borders */
+  --theme-border-hover: #94a3b8;       /* Hover state borders - DARKER */
   --theme-border-focus: #0d9488;       /* Focus state borders */
   
   /* ─────────────────────────────────────────────────────────
@@ -102,19 +102,19 @@
   --theme-accent-yellow-dark: #ca8a04;
   
   /* ─────────────────────────────────────────────────────────
-     SHADOWS (Professional Floating Effect - Like Reference Images)
+     SHADOWS (Professional Floating Effect - MORE VISIBLE)
      ───────────────────────────────────────────────────────── */
-  --theme-shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --theme-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --theme-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --theme-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.10);
-  --theme-shadow-xl: 0 15px 50px rgba(0, 0, 0, 0.12);
-  --theme-shadow-2xl: 0 25px 60px rgba(0, 0, 0, 0.15);
-  --theme-shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.03);
+  --theme-shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --theme-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --theme-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.10);
+  --theme-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.12);
+  --theme-shadow-xl: 0 15px 50px rgba(0, 0, 0, 0.20), 0 8px 20px rgba(0, 0, 0, 0.15);
+  --theme-shadow-2xl: 0 25px 60px rgba(0, 0, 0, 0.25);
+  --theme-shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
   
-  /* ✨ Card-specific shadow - Floating Effect like Apple/Modern UI */
-  --theme-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.05);
-  --theme-shadow-card-hover: 0 20px 50px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.08);
+  /* ✨ Card-specific shadow - Floating Effect - MORE VISIBLE */
+  --theme-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.10);
+  --theme-shadow-card-hover: 0 20px 50px rgba(0, 0, 0, 0.20), 0 8px 20px rgba(0, 0, 0, 0.12);
   
   /* 🎨 Colored shadows for stat cards */
   --theme-shadow-blue: 0 8px 30px rgba(59, 130, 246, 0.25);
@@ -758,14 +758,14 @@
    Inspired by Apple, Stripe, and reference images
    ============================================================ */
 
-/* Base Premium Card - Light Mode */
+/* Base Premium Card - Light Mode - HIGH CONTRAST */
 html[data-theme="light"] .stat-card-premium,
 html.light .stat-card-premium {
   background: #ffffff;
-  border: none;
+  border: 1px solid #cbd5e1;
   border-radius: 24px;
   padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.12), 0 3px 10px rgba(0, 0, 0, 0.08);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -774,7 +774,8 @@ html.light .stat-card-premium {
 html[data-theme="light"] .stat-card-premium:hover,
 html.light .stat-card-premium:hover {
   transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.20), 0 10px 25px rgba(0, 0, 0, 0.12);
+  border-color: #94a3b8;
 }
 
 /* Premium Stat Card Value - Large & Bold */
@@ -978,20 +979,21 @@ html.light .stat-card-premium .stat-label {
    ============================================================ */
 
 /* ─────────────────────────────────────────────────────────
-   SOLID CARDS - Light Mode (NO GLASSMORPHISM)
+   SOLID CARDS - Light Mode (NO GLASSMORPHISM) - HIGH CONTRAST
    ───────────────────────────────────────────────────────── */
 html[data-theme="light"] .glass,
 html.light .glass {
   background: #ffffff !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.10) !important;
 }
 
 html[data-theme="light"] .glass:hover,
 html.light .glass:hover {
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15), 0 6px 15px rgba(0, 0, 0, 0.10) !important;
+  border-color: #94a3b8 !important;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -1049,20 +1051,20 @@ html.light .bg-slate-900\/95 {
 }
 
 /* ─────────────────────────────────────────────────────────
-   BORDER COLORS - Light Mode
+   BORDER COLORS - Light Mode - MORE VISIBLE
    ───────────────────────────────────────────────────────── */
 html[data-theme="light"] .border-white\/5,
 html[data-theme="light"] .border-white\/10,
 html.light .border-white\/5,
 html.light .border-white\/10 {
-  border-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
 }
 
 html[data-theme="light"] .border-white\/20,
 html[data-theme="light"] .border-white\/30,
 html.light .border-white\/20,
 html.light .border-white\/30 {
-  border-color: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -1089,19 +1091,20 @@ html.light .hover\:text-white:hover {
 }
 
 /* ─────────────────────────────────────────────────────────
-   STAT CARDS - Light Mode
+   STAT CARDS - Light Mode - HIGH CONTRAST
    ───────────────────────────────────────────────────────── */
 html[data-theme="light"] .stat-card-pro-compact,
 html.light .stat-card-pro-compact {
   background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid #cbd5e1 !important;
   border-radius: 0.75rem !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.06) !important;
 }
 
 html[data-theme="light"] .stat-card-pro-compact:hover,
 html.light .stat-card-pro-compact:hover {
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15), 0 6px 15px rgba(0, 0, 0, 0.10) !important;
+  border-color: #94a3b8 !important;
   transform: translateY(-2px);
 }
 
@@ -1314,7 +1317,156 @@ html[data-theme="light"] .to-slate-900,
 html.light .from-slate-900,
 html.light .via-indigo-900\/20,
 html.light .to-slate-900 {
-  --tw-gradient-from: #f8fafc !important;
-  --tw-gradient-via: #f1f5f9 !important;
-  --tw-gradient-to: #f8fafc !important;
+  --tw-gradient-from: #f1f5f9 !important;
+  --tw-gradient-via: #e2e8f0 !important;
+  --tw-gradient-to: #f1f5f9 !important;
+}
+
+/* ============================================================
+   🌟 LIGHT MODE ENHANCEMENT - HIGH CONTRAST OVERRIDES
+   Applied globally to ensure all elements are visible
+   ============================================================ */
+
+/* Force visible borders on ALL cards in light mode */
+html[data-theme="light"] [class*="rounded-xl"],
+html[data-theme="light"] [class*="rounded-2xl"],
+html[data-theme="light"] [class*="rounded-3xl"],
+html.light [class*="rounded-xl"],
+html.light [class*="rounded-2xl"],
+html.light [class*="rounded-3xl"] {
+  border-color: #cbd5e1 !important;
+}
+
+/* Ensure all card-like elements have visible shadows */
+html[data-theme="light"] .bg-white,
+html.light .bg-white {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* Navigation bar high contrast */
+html[data-theme="light"] nav,
+html[data-theme="light"] header,
+html.light nav,
+html.light header {
+  border-bottom: 1px solid #cbd5e1 !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Sidebar high contrast */
+html[data-theme="light"] aside,
+html.light aside {
+  border-right: 1px solid #cbd5e1 !important;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05) !important;
+}
+
+html[dir="rtl"][data-theme="light"] aside,
+html[dir="rtl"].light aside {
+  border-right: none !important;
+  border-left: 1px solid #cbd5e1 !important;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Buttons more visible in light mode */
+html[data-theme="light"] button[class*="bg-white"],
+html.light button[class*="bg-white"] {
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+}
+
+html[data-theme="light"] button[class*="bg-white"]:hover,
+html.light button[class*="bg-white"]:hover {
+  border-color: #94a3b8 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Icon buttons in light mode */
+html[data-theme="light"] button[class*="bg-slate"],
+html[data-theme="light"] button[class*="bg-gray"],
+html.light button[class*="bg-slate"],
+html.light button[class*="bg-gray"] {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html[data-theme="light"] button[class*="bg-slate"]:hover,
+html[data-theme="light"] button[class*="bg-gray"]:hover,
+html.light button[class*="bg-slate"]:hover,
+html.light button[class*="bg-gray"]:hover {
+  background: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+}
+
+/* Tabs in light mode */
+html[data-theme="light"] [role="tab"],
+html.light [role="tab"] {
+  border: 1px solid transparent;
+}
+
+html[data-theme="light"] [role="tab"][aria-selected="true"],
+html.light [role="tab"][aria-selected="true"] {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Inputs high contrast */
+html[data-theme="light"] input,
+html[data-theme="light"] textarea,
+html[data-theme="light"] select,
+html.light input,
+html.light textarea,
+html.light select {
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+}
+
+html[data-theme="light"] input:focus,
+html[data-theme="light"] textarea:focus,
+html[data-theme="light"] select:focus,
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+}
+
+/* Tables in light mode */
+html[data-theme="light"] table,
+html.light table {
+  border: 1px solid #e2e8f0 !important;
+}
+
+html[data-theme="light"] th,
+html.light th {
+  background: #f8fafc !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+html[data-theme="light"] td,
+html.light td {
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+html[data-theme="light"] tr:hover td,
+html.light tr:hover td {
+  background: #f8fafc !important;
+}
+
+/* Dividers visible */
+html[data-theme="light"] hr,
+html[data-theme="light"] [class*="divide-"],
+html.light hr,
+html.light [class*="divide-"] {
+  border-color: #cbd5e1 !important;
+}
+
+/* Badge/Tag contrast */
+html[data-theme="light"] [class*="badge"],
+html[data-theme="light"] [class*="tag"],
+html.light [class*="badge"],
+html.light [class*="tag"] {
+  border: 1px solid currentColor !important;
 }

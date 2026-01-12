@@ -2810,7 +2810,7 @@ export const SettingsManager: React.FC = () => {
                                     onChange={(e) => setManagerFilter(e.target.value)}
                                     className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:border-primary-500/50 focus:outline-none transition-all"
                                 >
-                                    <option value="">جميع المديرين</option>
+                                    <option value="">جميع المشتركين</option>
                                     {uniqueManagers.map(manager => (
                                         <option key={manager} value={manager}>{manager}</option>
                                     ))}

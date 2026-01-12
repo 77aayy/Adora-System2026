@@ -360,7 +360,7 @@ export const OwnerAnnouncementsManager: React.FC = () => {
                                     </span>
                                     <span className="flex items-center gap-1">
                                         <Users className="w-3 h-3" />
-                                        {announcement.targetAudience === 'all_managers' ? 'جميع المديرين' :
+                                        {announcement.targetAudience === 'all_managers' ? 'جميع المشتركين' :
                                          announcement.targetAudience === 'specific_branches' ? `${announcement.targetBranches?.length || 0} فرع` :
                                          `${announcement.targetTenants?.length || 0} مشترك`}
                                     </span>
@@ -551,7 +551,7 @@ const AnnouncementModal: React.FC<{
                                 }}
                                 className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white focus:border-amber-500/50 focus:outline-none transition-all"
                             >
-                                <option value="all_managers">جميع المديرين</option>
+                                <option value="all_managers">جميع المشتركين</option>
                                 <option value="specific_branches">فروع محددة</option>
                             </select>
                         </div>

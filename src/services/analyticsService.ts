@@ -451,8 +451,30 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
             // ✅ QUOTA SAVER: Use cached stats from manager/tenant instead of live queries
             // These stats are updated when data changes, not on every read
             const cachedStats = manager?.cachedStats || info?.cachedStats || {};
-            const totalEmployees = cachedStats.totalUsers || cachedStats.totalEmployees || manager?.maxBranches || 1;
-            const totalBranches = cachedStats.totalBranches || manager?.branchCodes?.length || manager?.maxBranches || 1;
+            
+            // ✅ Calculate totalEmployees: Use cached stats if available, otherwise calculate from database
+            let totalEmployees = cachedStats.totalUsers || cachedStats.totalEmployees || 0;
+            if (totalEmployees === 0) {
+                // ✅ If no cached stats, calculate from database (only if needed)
+                try {
+                    const usersQuery = query(
+                        collection(db, 'users'),
+                        where('tenantId', '==', tenantId),
+                        where('role', '!=', 'manager') // Exclude manager from employee count
+                    );
+                    const usersSnapshot = await getDocs(usersQuery);
+                    totalEmployees = usersSnapshot.docs.filter(doc => {
+                        const data = doc.data();
+                        return data.role !== 'manager' && data.status !== 'deleted';
+                    }).length;
+                } catch (err) {
+                    console.warn('Error calculating totalEmployees for tenant:', tenantId, err);
+                    totalEmployees = 0; // Default to 0 if calculation fails
+                }
+            }
+            
+            // ✅ Calculate totalBranches: Use cached stats or branchCodes length
+            const totalBranches = cachedStats.totalBranches || manager?.branchCodes?.length || info?.branchCodes?.length || manager?.maxBranches || 1;
             
             // Calculate license expiry
             const licenseExpiry = toSafeDate(info.licenseExpiry, new Date(0));
@@ -465,6 +487,7 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
                 tenantName: info.name || 'Unknown',
                 managerName: info.ownerName || info.owner || manager?.name || undefined,
                 managerCode, // ✅ Add manager code
+                branchCodes: info.branchCodes || manager?.branchCodes || [], // ✅ Add branch codes
                 plan: info.plan || 'basic',
                 status: info.status || 'active',
                 totalEmployees,
@@ -482,7 +505,7 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
                 paymentStatus: info.paymentStatus || 'pending',
                 employeesGrowth: cachedStats.employeesGrowth || 0,
                 requestsGrowth: cachedStats.requestsGrowth || 0
-            });
+            } as TenantAnalytics & { branchCodes?: string[] });
         }
         
         return analytics;

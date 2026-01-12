@@ -55,7 +55,7 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
                             loadTenant(userTenantId);
                         }
                     } else if (user.role === 'owner' || userTenantId === 'system-owner') {
-                        // Owner case - set system tenant
+                        // Owner case - set system tenant immediately (no loading)
                         setTenantId('system-owner');
                         setTenantInfo({
                             name: 'النظام الرئيسي',
@@ -76,10 +76,12 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
                     setIsLoading(false);
                 }
             } else {
+                // ✅ No user logged in - set loading false immediately
                 setIsLoading(false);
             }
         };
 
+        // ✅ Load immediately (synchronous check)
         loadTenantFromStorage();
 
         // ✅ FIX: Listen for tenant updates after login
@@ -117,18 +119,19 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
                 return;
             }
 
-            // ✅ FIX: Sign in anonymously before reading tenant (required for Firestore rules)
+            // ✅ OPTIMIZED: Sign in anonymously and fetch tenant doc in parallel where possible
             const { signInAnonymously } = await import('firebase/auth');
             const { auth } = await import('../services/firebase');
             
-            try {
-                if (!auth.currentUser) {
-                    await signInAnonymously(auth);
-                }
-            } catch (authError: any) {
-                console.warn('Anonymous auth failed during tenant load (non-critical):', authError?.message);
-            }
+            // ⚡ Only wait for auth if needed, otherwise proceed immediately
+            const authPromise = auth.currentUser 
+                ? Promise.resolve() 
+                : signInAnonymously(auth).catch((authError: any) => {
+                    console.warn('Anonymous auth failed during tenant load (non-critical):', authError?.message);
+                });
 
+            // Wait for auth, then fetch tenant doc
+            await authPromise;
             const tenantDoc = await getDoc(doc(db, 'tenants', id));
 
             if (tenantDoc.exists()) {

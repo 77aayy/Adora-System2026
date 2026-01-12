@@ -135,6 +135,15 @@ service cloud.firestore {
       }
 
       // --------------------------------------------------------
+      // 🎫 ROOM CARDS (Active Check-ins)
+      // Used for QR token validation
+      // --------------------------------------------------------
+      match /roomCards/{cardId} {
+        allow read: if belongsToTenant(tenantId) || isAnonymousGuest();
+        allow write: if belongsToTenant(tenantId);
+      }
+
+      // --------------------------------------------------------
       // 📋 REQUESTS (Service Requests)
       // 🔐 SECURED: Anonymous guests can create with restrictions
       // --------------------------------------------------------
@@ -508,6 +517,32 @@ service cloud.firestore {
     // ------------------------------------------------------------
     match /managers/{managerId} {
       allow read, write: if isSuperAdmin() || isOwner();
+    }
+
+    // ------------------------------------------------------------
+    // 🗑️ DELETED MANAGERS (Soft Delete Archive)
+    // ✅ Required for softDeleteManager function
+    // ------------------------------------------------------------
+    match /deleted_managers/{managerId} {
+      allow read, write: if isSuperAdmin() || isOwner();
+    }
+
+    // ------------------------------------------------------------
+    // 💾 GLOBAL BACKUPS (System-wide)
+    // ✅ Required for backup before deletion
+    // ------------------------------------------------------------
+    match /backups/{backupId} {
+      allow read, write: if isSuperAdmin() || isOwner();
+    }
+
+    // ------------------------------------------------------------
+    // 📜 AUDIT LOGS (System-wide)
+    // ✅ Required for quickAudit function
+    // ------------------------------------------------------------
+    match /auditLogs/{logId} {
+      allow create: if isSignedIn();
+      allow read: if isSuperAdmin() || isOwner();
+      allow update, delete: if false; // Immutable
     }
 
     // ------------------------------------------------------------

@@ -346,8 +346,8 @@ export async function startDemoSession(
             }]
         });
         
-        // Seed demo data if needed
-        await seedDemoData();
+        // Seed demo data if needed (for demo link sessions)
+        await seedDemoData(link.tenantId);
         
         logger.info(`Demo session started: ${sessionId}`, { linkCode }, 'demoLinkService');
         

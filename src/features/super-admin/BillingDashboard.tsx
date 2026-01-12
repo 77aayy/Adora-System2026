@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import {
     DollarSign, CreditCard, FileText, AlertTriangle, CheckCircle,
     Clock, Calendar, RefreshCw, Plus, Eye, Download, ArrowLeft,
-    Printer, Filter, ChevronDown, X, Check, Trash2
+    Printer, Filter, ChevronDown, X, Check, Trash2, TrendingUp,
+    TrendingDown, Users, Building2, Activity, Percent, BarChart3
 } from 'lucide-react';
 import {
     getSubscription,
@@ -27,6 +28,8 @@ import {
     getAllExpenseVouchers,
     createExpenseVoucher,
     deleteExpenseVouchers,
+    calculateAnnualRecurringRevenue,
+    calculateMonthlyRenewalRevenue,
     type ExpenseVoucher
 } from '../../services/billingService';
 import { getAllManagers } from '../../services/ownerService';
@@ -78,6 +81,17 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
     // ✅ REAL DATA: Calculate total revenue from actual billing data - MOVED BEFORE EARLY RETURN
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [mrr, setMrr] = useState(0);
+    const [arr, setArr] = useState(0);
+    const [totalExpenses, setTotalExpenses] = useState(0);
+    const [netProfit, setNetProfit] = useState(0);
+    const [monthlyRenewalRevenue, setMonthlyRenewalRevenue] = useState(0);
+    const [newManagersThisMonth, setNewManagersThisMonth] = useState(0);
+    const [renewalsThisMonth, setRenewalsThisMonth] = useState(0);
+    const [collectionRate, setCollectionRate] = useState(0);
+    const [averageVoucherAmount, setAverageVoucherAmount] = useState(0);
+    const [todayRevenue, setTodayRevenue] = useState(0);
+    const [weekRevenue, setWeekRevenue] = useState(0);
+    const [monthRevenue, setMonthRevenue] = useState(0);
     const [systemSettings, setSystemSettings] = useState<any>(null);
     // ✅ State for filtered/selected vouchers (for stats)
     const [statsVouchers, setStatsVouchers] = useState<ReceiptVoucher[]>([]);
@@ -113,20 +127,112 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
     };
 
     useEffect(() => {
-        const loadRevenue = async () => {
+        const loadFinancialStats = async () => {
             try {
-                const [totalRev, monthlyRev] = await Promise.all([
+                const [
+                    totalRev,
+                    monthlyRev,
+                    annualRev,
+                    monthlyRenewalRev,
+                    expenses
+                ] = await Promise.all([
                     calculateTotalRevenue(),
-                    calculateMonthlyRecurringRevenue()
+                    calculateMonthlyRecurringRevenue(),
+                    calculateAnnualRecurringRevenue(),
+                    calculateMonthlyRenewalRevenue(),
+                    calculateTotalExpenses()
                 ]);
+                
                 setTotalRevenue(totalRev);
                 setMrr(monthlyRev);
+                setArr(annualRev);
+                setMonthlyRenewalRevenue(monthlyRenewalRev);
+                setTotalExpenses(expenses);
+                setNetProfit(totalRev - expenses);
             } catch (error) {
-                console.error('Error loading revenue:', error);
+                console.error('Error loading financial stats:', error);
             }
         };
-        loadRevenue();
+        loadFinancialStats();
     }, []);
+
+    // ✅ Calculate period-based revenue
+    useEffect(() => {
+        const calculatePeriodRevenue = () => {
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - 7);
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+            const todayVouchers = receiptVouchers.filter(v => {
+                const voucherDate = v.createdAt instanceof Date ? v.createdAt : v.createdAt?.toDate?.() || new Date();
+                return voucherDate >= todayStart && !v.isDeleted;
+            });
+            const weekVouchers = receiptVouchers.filter(v => {
+                const voucherDate = v.createdAt instanceof Date ? v.createdAt : v.createdAt?.toDate?.() || new Date();
+                return voucherDate >= weekStart && !v.isDeleted;
+            });
+            const monthVouchers = receiptVouchers.filter(v => {
+                const voucherDate = v.createdAt instanceof Date ? v.createdAt : v.createdAt?.toDate?.() || new Date();
+                return voucherDate >= monthStart && !v.isDeleted;
+            });
+
+            setTodayRevenue(todayVouchers.reduce((sum, v) => sum + v.totalAmount, 0));
+            setWeekRevenue(weekVouchers.reduce((sum, v) => sum + v.totalAmount, 0));
+            setMonthRevenue(monthVouchers.reduce((sum, v) => sum + v.totalAmount, 0));
+        };
+
+        if (receiptVouchers.length > 0) {
+            calculatePeriodRevenue();
+        }
+    }, [receiptVouchers]);
+
+    // ✅ Calculate additional stats
+    useEffect(() => {
+        const calculateAdditionalStats = async () => {
+            try {
+                // Count new managers this month
+                const now = new Date();
+                const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                const managers = await getAllManagers();
+                const newManagers = managers.filter(m => {
+                    const createdDate = m.createdAt instanceof Date ? m.createdAt : m.createdAt?.toDate?.() || new Date();
+                    return createdDate >= monthStart;
+                });
+                setNewManagersThisMonth(newManagers.length);
+
+                // Count renewals this month (from receipt vouchers with renewal notes)
+                const renewals = receiptVouchers.filter(v => {
+                    const voucherDate = v.createdAt instanceof Date ? v.createdAt : v.createdAt?.toDate?.() || new Date();
+                    const isRenewal = v.notes?.includes('تجديد') || v.notes?.includes('renewal');
+                    return voucherDate >= monthStart && isRenewal && !v.isDeleted;
+                });
+                setRenewalsThisMonth(renewals.length);
+
+                // Calculate collection rate (paid invoices / total invoices)
+                const allInvoices = await getAllInvoices();
+                const paidInvoices = allInvoices.filter(inv => inv.status === 'paid');
+                const collectionRateValue = allInvoices.length > 0 
+                    ? (paidInvoices.length / allInvoices.length) * 100 
+                    : 0;
+                setCollectionRate(collectionRateValue);
+
+                // Calculate average voucher amount
+                const activeVouchers = receiptVouchers.filter(v => !v.isDeleted);
+                const avgAmount = activeVouchers.length > 0
+                    ? activeVouchers.reduce((sum, v) => sum + v.totalAmount, 0) / activeVouchers.length
+                    : 0;
+                setAverageVoucherAmount(avgAmount);
+            } catch (error) {
+                console.error('Error calculating additional stats:', error);
+            }
+        };
+
+        if (receiptVouchers.length > 0) {
+            calculateAdditionalStats();
+        }
+    }, [receiptVouchers]);
 
     const loadData = async () => {
         setLoading(true);
@@ -142,6 +248,10 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             // ✅ Load expense vouchers (سندات الصرف)
             const expenseVouchersData = await getAllExpenseVouchers();
             setExpenseVouchers(expenseVouchersData);
+
+            // ✅ Load all invoices
+            const allInvs = await getAllInvoices();
+            setInvoices(allInvs);
 
             // Load expiring subscriptions
             const expiringSubs = await getExpiringSubscriptions(7);
@@ -177,9 +287,43 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
 
     const totalOverdue = overdue.reduce((sum, inv) => sum + inv.amount, 0);
 
+    // ✅ Helper function to calculate total expenses
+    const calculateTotalExpenses = async (): Promise<number> => {
+        try {
+            const allExpenseVouchers = await getAllExpenseVouchers();
+            return allExpenseVouchers
+                .filter(v => !v.isDeleted)
+                .reduce((sum, v) => sum + (v.amount || 0), 0);
+        } catch (error) {
+            console.error('Error calculating total expenses:', error);
+            return 0;
+        }
+    };
+
     // ✅ Main content - shared between embedded and standalone modes
     const mainContent = (
         <div className={embedded ? "space-y-4" : "max-w-7xl mx-auto p-6 space-y-6"}>
+            {/* ✅ Comprehensive Financial Overview Cards - Always Visible */}
+            <ComprehensiveFinancialStats
+                totalRevenue={totalRevenue}
+                totalExpenses={totalExpenses}
+                netProfit={netProfit}
+                mrr={mrr}
+                arr={arr}
+                receiptVouchers={receiptVouchers}
+                expenseVouchers={expenseVouchers}
+                invoices={invoices}
+                overdue={overdue}
+                monthlyRenewalRevenue={monthlyRenewalRevenue}
+                newManagersThisMonth={newManagersThisMonth}
+                renewalsThisMonth={renewalsThisMonth}
+                collectionRate={collectionRate}
+                averageVoucherAmount={averageVoucherAmount}
+                todayRevenue={todayRevenue}
+                weekRevenue={weekRevenue}
+                monthRevenue={monthRevenue}
+            />
+
             {/* ✅ Dynamic Stats - Based on active tab */}
             {activeTab === 'receiptVouchers' && (
                 <ReceiptVouchersStats 
@@ -267,21 +411,31 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
                         },
                         {
                             id: 'export-pdf',
-                            icon: <FileText className="w-5 h-5" />,
+                            icon: <FileText className="w-4 h-4" />,
                             label: 'PDF',
                             onClick: () => {
-                                exportToPDF({ subscriptions, invoices, payments }, 'billing-report.pdf');
-                                success('تم تصدير التقرير PDF بنجاح');
+                                try {
+                                    exportToPDF({ subscriptions, invoices, payments }, 'billing-report.pdf');
+                                    success('تم تصدير التقرير PDF بنجاح');
+                                } catch (err) {
+                                    console.error('PDF export failed:', err);
+                                    error('فشل تصدير PDF');
+                                }
                             },
                             variant: 'default' as const
                         },
                         {
                             id: 'export-excel',
-                            icon: <Download className="w-5 h-5" />,
+                            icon: <Download className="w-4 h-4" />,
                             label: 'Excel',
                             onClick: () => {
-                                exportToExcel({ subscriptions, invoices, payments }, 'billing-report.xlsx');
-                                success('تم تصدير التقرير Excel بنجاح');
+                                try {
+                                    exportToExcel({ subscriptions, invoices, payments }, 'billing-report.xlsx');
+                                    success('تم تصدير التقرير Excel بنجاح');
+                                } catch (err) {
+                                    console.error('Excel export failed:', err);
+                                    error('فشل تصدير Excel');
+                                }
                             },
                             variant: 'default' as const
                         }
@@ -297,6 +451,224 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
 // ============================================================
 // STATS COMPONENTS
 // ============================================================
+
+// ✅ Comprehensive Financial Stats Component
+const ComprehensiveFinancialStats: React.FC<{
+    totalRevenue: number;
+    totalExpenses: number;
+    netProfit: number;
+    mrr: number;
+    arr: number;
+    receiptVouchers: ReceiptVoucher[];
+    expenseVouchers: ExpenseVoucher[];
+    invoices: Invoice[];
+    overdue: Invoice[];
+    monthlyRenewalRevenue: number;
+    newManagersThisMonth: number;
+    renewalsThisMonth: number;
+    collectionRate: number;
+    averageVoucherAmount: number;
+    todayRevenue: number;
+    weekRevenue: number;
+    monthRevenue: number;
+}> = ({
+    totalRevenue,
+    totalExpenses,
+    netProfit,
+    mrr,
+    arr,
+    receiptVouchers,
+    expenseVouchers,
+    invoices,
+    overdue,
+    monthlyRenewalRevenue,
+    newManagersThisMonth,
+    renewalsThisMonth,
+    collectionRate,
+    averageVoucherAmount,
+    todayRevenue,
+    weekRevenue,
+    monthRevenue
+}) => {
+    const totalReceiptVouchers = receiptVouchers.filter(v => !v.isDeleted).length;
+    const totalExpenseVouchers = expenseVouchers.filter(v => !v.isDeleted).length;
+    const totalInvoices = invoices.length;
+    const totalOverdueAmount = overdue.reduce((sum, inv) => sum + inv.amount, 0);
+    const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100) : 0;
+
+    return (
+        <div className="space-y-4">
+            {/* ✅ Main Financial KPIs - Row 1 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30">
+                    <StatCard
+                        icon={TrendingUp}
+                        iconColor="green"
+                        label="💰 إجمالي الإيرادات"
+                        value={`${totalRevenue.toLocaleString()} ر.س`}
+                        lastUpdate="إجمالي كل السندات والفواتير"
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30">
+                    <StatCard
+                        icon={TrendingDown}
+                        iconColor="red"
+                        label="💸 إجمالي المصروفات"
+                        value={`${totalExpenses.toLocaleString()} ر.س`}
+                        lastUpdate="من سندات الصرف"
+                    />
+                </div>
+                <div className={`stat-card-pro-compact stat-card-billing bg-gradient-to-br ${netProfit >= 0 ? 'from-teal-500/20 to-teal-600/10 border-teal-500/30' : 'from-orange-500/20 to-orange-600/10 border-orange-500/30'}`}>
+                    <StatCard
+                        icon={netProfit >= 0 ? TrendingUp : TrendingDown}
+                        iconColor={netProfit >= 0 ? "teal" : "orange"}
+                        label="📊 صافي الربح"
+                        value={`${netProfit.toLocaleString()} ر.س`}
+                        lastUpdate={`هامش الربح: ${profitMargin.toFixed(1)}%`}
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500/30">
+                    <StatCard
+                        icon={BarChart3}
+                        iconColor="blue"
+                        label="📈 الإيرادات الشهرية (MRR)"
+                        value={`${mrr.toLocaleString()} ر.س`}
+                        lastUpdate="من الاشتراكات النشطة"
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-purple-500/30">
+                    <StatCard
+                        icon={BarChart3}
+                        iconColor="purple"
+                        label="📊 الإيرادات السنوية (ARR)"
+                        value={`${arr.toLocaleString()} ر.س`}
+                        lastUpdate="MRR × 12"
+                    />
+                </div>
+            </div>
+
+            {/* ✅ Period-Based Revenue - Row 2 */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500/30">
+                    <StatCard
+                        icon={Calendar}
+                        iconColor="blue"
+                        label="📅 إيرادات اليوم"
+                        value={`${todayRevenue.toLocaleString()} ر.س`}
+                        lastUpdate="من سندات اليوم"
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-purple-500/30">
+                    <StatCard
+                        icon={Calendar}
+                        iconColor="purple"
+                        label="📅 إيرادات الأسبوع"
+                        value={`${weekRevenue.toLocaleString()} ر.س`}
+                        lastUpdate="آخر 7 أيام"
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-pink-500/20 to-pink-600/10 border-pink-500/30">
+                    <StatCard
+                        icon={Calendar}
+                        iconColor="pink"
+                        label="📅 إيرادات الشهر"
+                        value={`${monthRevenue.toLocaleString()} ر.س`}
+                        lastUpdate="هذا الشهر"
+                    />
+                </div>
+            </div>
+
+            {/* ✅ Operational Stats - Row 3 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <div className="stat-card-pro-compact stat-card-billing">
+                    <StatCard
+                        icon={CreditCard}
+                        iconColor="green"
+                        label="📝 سندات القبض"
+                        count={totalReceiptVouchers}
+                        lastUpdate="إجمالي السندات"
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing">
+                    <StatCard
+                        icon={DollarSign}
+                        iconColor="red"
+                        label="📤 سندات الصرف"
+                        count={totalExpenseVouchers}
+                        lastUpdate="إجمالي السندات"
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing">
+                    <StatCard
+                        icon={FileText}
+                        iconColor="blue"
+                        label="🧾 الفواتير"
+                        count={totalInvoices}
+                        lastUpdate="إجمالي الفواتير"
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-orange-500/20 to-orange-600/10 border-orange-500/30">
+                    <StatCard
+                        icon={AlertTriangle}
+                        iconColor="orange"
+                        label="⚠️ مستحقات متأخرة"
+                        value={`${totalOverdueAmount.toLocaleString()} ر.س`}
+                        lastUpdate={`${overdue.length} فاتورة`}
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing">
+                    <StatCard
+                        icon={RefreshCw}
+                        iconColor="teal"
+                        label="🔄 تجديدات الشهر"
+                        count={renewalsThisMonth}
+                        lastUpdate={`${monthlyRenewalRevenue.toLocaleString()} ر.س`}
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing">
+                    <StatCard
+                        icon={Users}
+                        iconColor="purple"
+                        label="👥 مديرين جدد"
+                        count={newManagersThisMonth}
+                        lastUpdate="هذا الشهر"
+                    />
+                </div>
+            </div>
+
+            {/* ✅ Performance Metrics - Row 4 */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30">
+                    <StatCard
+                        icon={Percent}
+                        iconColor="green"
+                        label="✅ نسبة التحصيل"
+                        value={`${collectionRate.toFixed(1)}%`}
+                        lastUpdate={`${invoices.filter(inv => inv.status === 'paid').length} من ${totalInvoices} فاتورة`}
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing">
+                    <StatCard
+                        icon={DollarSign}
+                        iconColor="blue"
+                        label="📊 متوسط قيمة السند"
+                        value={`${averageVoucherAmount.toLocaleString()} ر.س`}
+                        lastUpdate="من سندات القبض"
+                    />
+                </div>
+                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-teal-500/20 to-teal-600/10 border-teal-500/30">
+                    <StatCard
+                        icon={Activity}
+                        iconColor="teal"
+                        label="📈 إيرادات التجديدات"
+                        value={`${monthlyRenewalRevenue.toLocaleString()} ر.س`}
+                        lastUpdate="هذا الشهر"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // ✅ Receipt Vouchers Stats (إحصائيات سندات القبض)
 // ✅ سندات القبض - المبلغ الإجمالي فقط بدون تفاصيل الضريبة
@@ -1326,28 +1698,28 @@ const ReceiptVouchersTab: React.FC<{
                             <button
                                 onClick={handleDelete}
                                 disabled={selectedVouchers.size === 0 || deleting}
-                                className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Trash2 className="w-4 h-4" />
                                 حذف ({selectedVouchers.size})
                             </button>
                             <button
                                 onClick={handlePrint}
-                                className="px-4 py-2 rounded-lg bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 border border-teal-500/30 transition-all text-sm flex items-center gap-2"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                             >
                                 <Printer className="w-4 h-4" />
                                 طباعة ({selectedVouchers.size > 0 ? selectedVouchers.size : filteredVouchers.filter(v => !v.isDeleted).length})
                             </button>
                             <button
                                 onClick={handleExportPDF}
-                                className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all text-sm flex items-center gap-2"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                             >
                                 <FileText className="w-4 h-4" />
                                 <span className="hidden lg:inline">PDF</span>
                             </button>
                             <button
                                 onClick={handleExportExcel}
-                                className="px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30 transition-all text-sm flex items-center gap-2"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                             >
                                 <Download className="w-4 h-4" />
                                 <span className="hidden lg:inline">Excel</span>
@@ -2481,7 +2853,7 @@ const ExpenseVouchersTab: React.FC<{
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="px-4 py-2 rounded-lg bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 border border-teal-500/30 transition-all text-sm flex items-center gap-2"
+                        className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                     >
                         <Plus className="w-4 h-4" />
                         إضافة سند صرف
@@ -2498,28 +2870,28 @@ const ExpenseVouchersTab: React.FC<{
                             <button
                                 onClick={handleDelete}
                                 disabled={selectedVouchers.size === 0 || deleting}
-                                className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Trash2 className="w-4 h-4" />
                                 حذف ({selectedVouchers.size})
                             </button>
                             <button
                                 onClick={handlePrint}
-                                className="px-4 py-2 rounded-lg bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 border border-teal-500/30 transition-all text-sm flex items-center gap-2"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                             >
                                 <Printer className="w-4 h-4" />
                                 طباعة ({selectedVouchers.size > 0 ? selectedVouchers.size : filteredVouchers.filter(v => !v.isDeleted).length})
                             </button>
                             <button
                                 onClick={handleExportPDF}
-                                className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all text-sm flex items-center gap-2"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                             >
                                 <FileText className="w-4 h-4" />
                                 <span className="hidden lg:inline">PDF</span>
                             </button>
                             <button
                                 onClick={handleExportExcel}
-                                className="px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30 transition-all text-sm flex items-center gap-2"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                             >
                                 <Download className="w-4 h-4" />
                                 <span className="hidden lg:inline">Excel</span>
@@ -2659,7 +3031,7 @@ const ExpenseVouchersTab: React.FC<{
                                 setPaidToFilter('');
                                 setDeletedFilter('not_deleted');
                             }}
-                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all text-sm flex items-center gap-2"
+                            className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                         >
                             <X className="w-4 h-4" />
                             مسح الفلاتر
@@ -3427,14 +3799,14 @@ const InvoicesTab: React.FC<{
                             <button
                                 onClick={handleDelete}
                                 disabled={selectedInvoices.size === 0 || deleting}
-                                className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Trash2 className="w-4 h-4" />
                                 حذف ({selectedInvoices.size})
                             </button>
                             <button
                                 onClick={handlePrint}
-                                className="px-4 py-2 rounded-lg bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 border border-teal-500/30 transition-all text-sm flex items-center gap-2"
+                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                             >
                                 <Printer className="w-4 h-4" />
                                 طباعة
@@ -3575,7 +3947,7 @@ const InvoicesTab: React.FC<{
                                     setDurationFilter('all');
                                     setDeletedFilter('not_deleted');
                                 }}
-                                className="w-full px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm shadow-red-500/10 hover:shadow-md hover:shadow-red-500/20"
+                                className="w-full px-4 py-2.5 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm shadow-red-500/10 hover:shadow-md hover:shadow-red-500/20"
                             >
                                 <X className="w-4 h-4" />
                                 مسح الفلاتر
@@ -3830,7 +4202,7 @@ const AddExpenseVoucherModal: React.FC<{
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 px-4 py-2 rounded-lg bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 border border-teal-500/30 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? 'جاري الحفظ...' : 'حفظ'}
                         </button>

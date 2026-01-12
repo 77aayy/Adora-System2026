@@ -32,7 +32,7 @@ import {
     getTenantAnalytics,
     TenantAnalytics
 } from '../../services/analyticsService';
-import { getAllManagers, createManager, isPinAvailable, toggleLicenseStatus, renewLicense, softDeleteManager, restoreManager, getDeletedManagers } from '../../services/ownerService';
+import { getAllManagers, createManager, isPinAvailable, toggleLicenseStatus, renewLicense, softDeleteManager, restoreManager, getDeletedManagers, getDemoStats } from '../../services/ownerService';
 import type { SystemSettings } from '../../services/systemSettingsService';
 import { PageTransition } from '../../components/common/PageTransition';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
@@ -80,8 +80,8 @@ import { FirebaseConfig } from '../../services/firebase';
 import { AdminSidebar } from '../../components/admin/AdminSidebar';
 import { CreateManagerHelp } from '../../components/common/ContextualHelp'; // ✅ Contextual Help
 // DeveloperSignature is now in GlobalFooter (App.tsx) - no need to import here
-import { seedDemoData, clearDemoData, hasDemoData } from '../../services/demoSeedingService';
-import { Sparkles, TestTube2, Share2 } from 'lucide-react';
+// ✅ Demo seeding is now handled automatically by demo links (demoLinkService.ts)
+import { Sparkles, Share2 } from 'lucide-react';
 // ✅ Demo Link Manager
 import { DemoLinkManager } from '../../components/owner/DemoLinkManager';
 
@@ -89,7 +89,7 @@ import { DemoLinkManager } from '../../components/owner/DemoLinkManager';
 // TYPES
 // ============================================================
 
-type TabType = 'overview' | 'tenants' | 'settings' | 'analytics' | 'updates' | 'broadcasts' | 'billing' | 'core-config' | 'demo';
+type TabType = 'overview' | 'tenants' | 'settings' | 'updates' | 'broadcasts' | 'billing' | 'core-config' | 'demo';
 
 // ============================================================
 // HELPER: Safe Date Conversion (handles Firestore Timestamps)
@@ -219,9 +219,16 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         total: number;
     }>({ active: 0, suspended: 0, deleted: 0, expired: 0, total: 0 });
     
-    // ✅ Live Activity Feed (Ultra-efficient polling)
+    // ✅ Live Activity Feed (On-demand updates only)
     const [activityLogs, setActivityLogs] = useState<AuditLog[]>([]);
     const [activityLoading, setActivityLoading] = useState(false);
+    
+    // ✅ Demo Stats (separate from main stats)
+    const [demoStats, setDemoStats] = useState<{
+        total: number;
+        nearestExpiry: Date | null;
+        farthestExpiry: Date | null;
+    }>({ total: 0, nearestExpiry: null, farthestExpiry: null });
     
     // ✅ Progressive Loading: Show "data updated" indicator
     const [dataJustUpdated, setDataJustUpdated] = useState(false);
@@ -269,16 +276,34 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         };
     }, []); // ✅ Empty deps - only run once
     
-    // ✅ Fetch activity ONCE when entering overview tab (ON-DEMAND, not polling)
-    // 🔥 ZERO automatic Firebase reads - saves quota for free tier
+    // ✅ Fetch activity when entering overview tab (ON-DEMAND only, no real-time)
+    // 🔥 SAVES FIREBASE QUOTA: Only fetches on page load/refresh, manual refresh button available
     useEffect(() => {
-        if (activeTab === 'overview' && activityLogs.length === 0) {
-            // Initial fetch only - no polling
-            fetchActivityLogs().then(({ logs }) => {
+        if (activeTab === 'overview') {
+            // ✅ Fetch once when opening overview tab (uses cache if available)
+            fetchActivityLogs(false).then(({ logs }) => {
                 setActivityLogs(logs);
+            }).catch(err => {
+                console.error('Failed to fetch activity logs:', err);
+                setActivityLogs([]);
             });
+            
+            // ✅ Load demo stats separately (doesn't affect main calculations)
+            loadDemoStats();
         }
     }, [activeTab]);
+    
+    // ✅ Load demo stats separately (doesn't affect main calculations)
+    // ✅ FIX: Uses service function - follows architecture rules
+    const loadDemoStats = async () => {
+        try {
+            const stats = await getDemoStats();
+            setDemoStats(stats);
+        } catch (err) {
+            console.error('Failed to load demo stats:', err);
+            setDemoStats({ total: 0, nearestExpiry: null, farthestExpiry: null });
+        }
+    };
 
     const loadData = async (forceRefresh: boolean = false) => {
         // ✅ Prevent multiple simultaneous loads
@@ -746,7 +771,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     actions={[
                         {
                             id: 'refresh',
-                            icon: saving ? <AdoraLoaderInline size={20} /> : <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />,
+                            icon: saving ? <AdoraLoaderInline size={20} /> : <RefreshCw className="w-4 h-4" />,
                             label: 'تحديث',
                             onClick: () => loadData(true), // ✅ Force refresh from Firebase
                             variant: 'primary' as const,
@@ -788,7 +813,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 {(() => {
                                     const tabs = [
                                         { id: 'overview', label: 'الرئيسية', icon: LayoutDashboard },
-                                        { id: 'tenants', label: 'المديرين', icon: Users },
+                                        { id: 'tenants', label: 'المشتركين', icon: Users },
                                         { id: 'billing', label: 'الفواتير', icon: CreditCard },
                                         { id: 'settings', label: 'الإعدادات', icon: Settings },
                                         // { id: 'analytics', label: 'التحليلات', icon: BarChart3 }, // ✅ دُمج في الرئيسية
@@ -817,7 +842,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 <div className="flex gap-1 sm:gap-2">
                                 {[
                                     { id: 'overview' as TabType, label: 'الرئيسية', icon: LayoutDashboard },
-                                    { id: 'tenants' as TabType, label: 'المديرين', icon: Users },
+                                    { id: 'tenants' as TabType, label: 'المشتركين', icon: Users },
                                     { id: 'billing' as TabType, label: 'الفواتير', icon: CreditCard },
                                     { id: 'settings' as TabType, label: 'الإعدادات', icon: Settings },
                                     // { id: 'analytics' as TabType, label: 'التحليلات', icon: BarChart3 }, // ✅ دُمج في الرئيسية
@@ -922,6 +947,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 managerStats={managerStats} // ✅ Manager status stats
                                 activityLogs={activityLogs} // ✅ Activity feed (on-demand)
                                 onActivityRefresh={setActivityLogs} // ✅ Callback for manual refresh
+                                demoStats={demoStats} // ✅ Demo stats (separate from main stats)
                             />
                         )}
                         
@@ -948,10 +974,6 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 features={effectiveSettings.features}
                                 onToggleFeature={handleToggleFeature}
                             />
-                        )}
-                        
-                        {activeTab === 'analytics' && (
-                            <AnalyticsTab analytics={analytics} systemSettings={effectiveSettings} />
                         )}
                         
                         {activeTab === 'updates' && (
@@ -1238,6 +1260,11 @@ const OverviewTab: React.FC<{
     };
     activityLogs?: AuditLog[]; // ✅ Activity feed (on-demand, no polling)
     onActivityRefresh?: (logs: AuditLog[]) => void; // ✅ Callback to update parent state
+    demoStats?: {
+        total: number;
+        nearestExpiry: Date | null;
+        farthestExpiry: Date | null;
+    }; // ✅ Demo stats (separate from main stats)
 }> = ({ 
     systemSettings, 
     analytics, 
@@ -1250,7 +1277,8 @@ const OverviewTab: React.FC<{
     multiBranchData = null,
     managerStats = { active: 0, suspended: 0, deleted: 0, expired: 0, total: 0 },
     activityLogs = [],
-    onActivityRefresh
+    onActivityRefresh,
+    demoStats = { total: 0, nearestExpiry: null, farthestExpiry: null }
 }) => {
     const { user } = useAuth(); // ✅ Get user for DataHealthReportCard
     const [isBranchesExpanded, setIsBranchesExpanded] = useState(false); // ✅ Collapsed by default, show 5 only
@@ -1272,21 +1300,35 @@ const OverviewTab: React.FC<{
     };
     return (
         <div className="space-y-4 sm:space-y-6">
-            {/* ✅ Export Buttons - Merged from Analytics Tab */}
-            <div className="flex flex-col sm:flex-row gap-2 justify-end">
+            {/* ✅ Export Buttons - Compact Design */}
+            <div className="flex gap-2 justify-end">
                 <button
-                    onClick={() => exportToPDF(analytics, 'dashboard-report.pdf')}
-                    className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg sm:rounded-xl hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2 text-sm"
+               onClick={() => {
+                   try {
+                       exportToPDF(analytics, 'dashboard-report.pdf');
+                   } catch (err) {
+                       console.error('PDF export failed:', err);
+                   }
+               }}
+               className="px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs"
+               title="تصدير PDF"
                 >
-                    <FileText className="w-4 h-4 flex-shrink-0" />
-                    <span>تصدير PDF</span>
+                    <FileText className="w-4 h-4" />
+                    <span className="hidden sm:inline text-xs">PDF</span>
                 </button>
                 <button
-                    onClick={() => exportToExcel(analytics, 'dashboard-report.xlsx')}
-                    className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-500/20 text-green-400 rounded-lg sm:rounded-xl hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2 text-sm"
+               onClick={() => {
+                   try {
+                       exportToExcel(analytics, 'dashboard-report.xlsx');
+                   } catch (err) {
+                       console.error('Excel export failed:', err);
+                   }
+               }}
+               className="px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs"
+               title="تصدير Excel"
                 >
-                    <Download className="w-4 h-4 flex-shrink-0" />
-                    <span>تصدير Excel</span>
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline text-xs">Excel</span>
                 </button>
             </div>
             
@@ -1339,6 +1381,39 @@ const OverviewTab: React.FC<{
                 />
             </div>
             
+            {/* ✅ Demo Stats Card - Separate from main stats */}
+            {demoStats.total > 0 && (
+                <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-purple-500/30 bg-purple-500/10">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-500/20 flex items-center justify-center shadow-lg shadow-purple-500/10 flex-shrink-0">
+                            <Sparkles className="w-4 h-4 text-purple-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-base sm:text-lg font-bold text-white mb-1">
+                                حسابات الديمو
+                            </h3>
+                            <p className="text-xl sm:text-2xl font-bold text-purple-400 mb-2">
+                                {demoStats.total} حساب
+                            </p>
+                            <div className="space-y-1 text-xs sm:text-sm text-white/60">
+                                {demoStats.nearestExpiry && (
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                                        <span>أقرب انتهاء: {demoStats.nearestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                    </div>
+                                )}
+                                {demoStats.farthestExpiry && demoStats.farthestExpiry.getTime() !== demoStats.nearestExpiry?.getTime() && (
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                                        <span>أبعد انتهاء: {demoStats.farthestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             {/* ✅ Manager Status Cards - Small badges for quick overview */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 <div className="glass rounded-xl p-3 sm:p-4 border border-green-500/30 bg-green-500/10">
@@ -1355,7 +1430,7 @@ const OverviewTab: React.FC<{
                 <div className="glass rounded-xl p-3 sm:p-4 border border-yellow-500/30 bg-yellow-500/10">
                     <div className="flex items-center gap-2 sm:gap-3">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-                            <Pause className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" />
+                            <Pause className="w-4 h-4 text-yellow-400" />
                         </div>
                         <div>
                             <p className="text-lg sm:text-xl font-bold text-yellow-400">{managerStats.suspended}</p>
@@ -1377,7 +1452,7 @@ const OverviewTab: React.FC<{
                 <div className="glass rounded-xl p-3 sm:p-4 border border-gray-500/30 bg-gray-500/10">
                     <div className="flex items-center gap-2 sm:gap-3">
                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-500/20 flex items-center justify-center">
-                            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                            <Trash2 className="w-4 h-4 text-gray-400" />
                         </div>
                         <div>
                             <p className="text-lg sm:text-xl font-bold text-gray-400">{managerStats.deleted}</p>
@@ -1473,7 +1548,7 @@ const OverviewTab: React.FC<{
                             <div className="min-w-0 flex-1">
                                 <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">جميع الفروع ({allBranches.length})</h3>
                                 <p className="text-xs sm:text-sm text-white/50 hidden sm:block">
-                                    عرض جميع فروع جميع المديرين في النظام
+                                    عرض جميع فروع جميع المشتركين في النظام
                                 </p>
                             </div>
                         </div>
@@ -1702,46 +1777,7 @@ const TenantsTab: React.FC<{
     const [deletedManagers, setDeletedManagers] = useState<any[]>([]);
     const [showDeleted, setShowDeleted] = useState(false);
     const [processing, setProcessing] = useState<string | null>(null);
-    const [seedingDemo, setSeedingDemo] = useState(false);
-    const [demoTenantId, setDemoTenantId] = useState<string | null>(null);
     const { success, error } = useUX();
-
-    // 🎭 Demo Seeding Handler
-    const handleSeedDemo = async (tenantId: string) => {
-        setSeedingDemo(true);
-        setDemoTenantId(tenantId);
-        try {
-            // Check if demo data already exists
-            const hasDemo = await hasDemoData(tenantId);
-            if (hasDemo) {
-                // Ask to clear first
-                const shouldClear = await customConfirm(
-                    'يوجد بيانات ديمو سابقة. هل تريد حذفها وإنشاء بيانات جديدة؟',
-                    'تأكيد'
-                );
-                if (shouldClear) {
-                    await clearDemoData(tenantId);
-                } else {
-                    setSeedingDemo(false);
-                    setDemoTenantId(null);
-                    return;
-                }
-            }
-
-            const result = await seedDemoData(tenantId);
-            if (result.success) {
-                success(`✨ تم إنشاء بيانات الديمو بنجاح!\n🏨 فرع تجريبي\n🚪 ${result.roomsCreated} غرفة\n👥 ${result.employeesCreated} موظف\n📝 ${result.requestsCreated} طلب`);
-                onRefresh(); // Refresh data
-            } else {
-                error(`فشل في إنشاء بيانات الديمو: ${result.error}`);
-            }
-        } catch (err: any) {
-            error(`حدث خطأ: ${err.message}`);
-        } finally {
-            setSeedingDemo(false);
-            setDemoTenantId(null);
-        }
-    };
     const { user } = useAuth();
 
     // Load deleted managers on mount
@@ -1995,7 +2031,7 @@ const TenantsTab: React.FC<{
                     <h3 className="text-lg sm:text-xl font-bold text-white">قائمة المستأجرين</h3>
                     <button
                         onClick={onAddManager}
-                        className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg sm:rounded-xl hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2 text-sm"
+                        className="w-full sm:w-auto px-3 sm:px-4 py-2 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg sm:rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm"
                     >
                         <Plus className="w-4 h-4 flex-shrink-0" />
                         <span>إضافة مدير جديد</span>
@@ -2202,36 +2238,25 @@ const TenantsTab: React.FC<{
                                                     }
                                                 }}
                                                 disabled={processing === tenant.tenantId}
-                                                className="p-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                                 title="استعادة المدير"
                                             >
                                                 {processing === tenant.tenantId ? (
                                                     <AdoraLoaderInline size={16} />
                                                 ) : (
-                                                    <Upload className="w-4 h-4" />
+                                                    <Upload className="w-4 h-4 transition-transform group-hover:scale-110" />
                                                 )}
+                                                <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">استعادة</span>
                                             </button>
                                         ) : (
                                             <>
                                         <button
                                             onClick={() => onViewDetails?.(tenant)}
-                                            className="p-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group"
                                             title="عرض التفاصيل الكاملة"
                                         >
-                                            <Eye className="w-4 h-4" />
-                                        </button>
-                                        {/* 🎭 زرار الديمو - Auto-Fill Demo */}
-                                        <button
-                                            onClick={() => handleSeedDemo(tenant.tenantId)}
-                                            disabled={seedingDemo}
-                                            className="p-2 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title="ملء بيانات ديمو تجريبية"
-                                        >
-                                            {seedingDemo && demoTenantId === tenant.tenantId ? (
-                                                <AdoraLoaderInline size={16} />
-                                            ) : (
-                                                <Sparkles className="w-4 h-4" />
-                                            )}
+                                            <Eye className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                            <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">عرض</span>
                                         </button>
                                                 {/* ✅ Check if manager is deleted before showing action buttons */}
                                                 {(() => {
@@ -2275,14 +2300,15 @@ const TenantsTab: React.FC<{
                                                                     }
                                                                 }}
                                                                 disabled={processing === tenant.tenantId}
-                                                                className="p-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                                                 title="استعادة المدير"
                                                             >
                                                                 {processing === tenant.tenantId ? (
                                                                     <AdoraLoaderInline size={16} />
                                                                 ) : (
-                                                                    <Upload className="w-4 h-4" />
+                                                                    <Upload className="w-4 h-4 transition-transform group-hover:scale-110" />
                                                                 )}
+                                                                <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">استعادة</span>
                                                             </button>
                                                         );
                                                     }
@@ -2311,18 +2337,17 @@ const TenantsTab: React.FC<{
                                                 }
                                             }}
                                             disabled={processing === tenant.tenantId}
-                                            className={`p-2 rounded-lg transition-colors ${
-                                                tenant.status === 'active'
-                                                    ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                                                    : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                                            }`}
+                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                             title={tenant.status === 'active' ? 'إيقاف مؤقت' : 'تفعيل'}
                                         >
                                             {tenant.status === 'active' ? (
-                                                <Pause className="w-4 h-4" />
+                                                <Pause className="w-4 h-4 transition-transform group-hover:scale-110" />
                                             ) : (
-                                                <Play className="w-4 h-4" />
+                                                <Play className="w-4 h-4 transition-transform group-hover:scale-110" />
                                             )}
+                                            <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">
+                                                {tenant.status === 'active' ? 'إيقاف' : 'تفعيل'}
+                                            </span>
                                         </button>
                                         <button
                                             onClick={async () => {
@@ -2403,10 +2428,15 @@ const TenantsTab: React.FC<{
                                                 }
                                             }}
                                             disabled={processing === tenant.tenantId}
-                                            className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                             title="تجديد الاشتراك (سنة)"
                                         >
-                                            {processing === tenant.tenantId ? <AdoraLoaderInline size={16} /> : <RefreshCw className="w-4 h-4" />}
+                                            {processing === tenant.tenantId ? (
+                                                <AdoraLoaderInline size={16} />
+                                            ) : (
+                                                <RefreshCw className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                            )}
+                                            <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">تجديد</span>
                                         </button>
                                         <button
                                             onClick={async () => {
@@ -2441,10 +2471,11 @@ const TenantsTab: React.FC<{
                                                 }
                                             }}
                                             disabled={processing === tenant.tenantId}
-                                            className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                             title="حذف نهائي"
                                         >
-                                            <Trash2 className="w-4 h-4" />
+                                            <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                            <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">حذف</span>
                                         </button>
                                                         </>
                                                     );
@@ -2713,7 +2744,7 @@ const SettingsTab: React.FC<{
                 >
                     <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                         <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-teal-500/20 flex items-center justify-center shadow-lg shadow-teal-500/10 flex-shrink-0">
-                            <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-teal-400" />
+                            <FileText className="w-4 h-4 text-teal-400" />
                         </div>
                         <div className="min-w-0 flex-1">
                             <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">معلومات الشركة (للمطبوعات)</h3>
@@ -3309,121 +3340,6 @@ const DeveloperBrandingSection: React.FC = () => {
     );
 };
 
-const AnalyticsTab: React.FC<{
-    analytics: any;
-    systemSettings?: any;
-}> = ({ analytics, systemSettings }) => {
-    // Prepare chart data
-    const revenueData = {
-        labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو'],
-        datasets: [{
-            label: 'الإيرادات (ر.س)',
-            data: [
-                (analytics?.monthlyRecurringRevenue || 0) * 0.8,
-                (analytics?.monthlyRecurringRevenue || 0) * 0.9,
-                (analytics?.monthlyRecurringRevenue || 0) * 0.85,
-                (analytics?.monthlyRecurringRevenue || 0) * 1.1,
-                (analytics?.monthlyRecurringRevenue || 0) * 1.05,
-                analytics?.monthlyRecurringRevenue || 0
-            ],
-            borderColor: 'rgb(20, 184, 166)',
-            backgroundColor: 'rgba(20, 184, 166, 0.1)'
-        }]
-    };
-
-    const tenantDistributionData = {
-        labels: ['Basic', 'Pro', 'Enterprise'],
-        datasets: [{
-            data: [
-                analytics?.planDistribution?.basic || 0,
-                analytics?.planDistribution?.pro || 0,
-                analytics?.planDistribution?.enterprise || 0
-            ],
-            backgroundColor: [
-                'rgba(59, 130, 246, 0.8)',
-                'rgba(20, 184, 166, 0.8)',
-                'rgba(251, 191, 36, 0.8)'
-            ]
-        }]
-    };
-
-    const usageData = {
-        labels: ['الطلبات', 'المستخدمين', 'الفروع', 'الغرف'],
-        datasets: [{
-            label: 'الاستخدام',
-            data: [
-                analytics?.totalRequests || 0,
-                analytics?.totalUsers || 0,
-                analytics?.totalBranches || 0,
-                analytics?.totalRooms || 0
-            ],
-            backgroundColor: [
-                'rgba(20, 184, 166, 0.8)',
-                'rgba(59, 130, 246, 0.8)',
-                'rgba(168, 85, 247, 0.8)',
-                'rgba(236, 72, 153, 0.8)'
-            ]
-        }]
-    };
-
-    return (
-        <div className="space-y-4 sm:space-y-6">
-            {/* Export Buttons - Mobile First */}
-            <div className="flex flex-col sm:flex-row gap-2 justify-end">
-                <button
-                    onClick={() => exportToPDF(analytics, 'analytics-report.pdf')}
-                    className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg sm:rounded-xl hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2 text-sm"
-                >
-                    <FileText className="w-4 h-4 flex-shrink-0" />
-                    <span>تصدير PDF</span>
-                </button>
-                <button
-                    onClick={() => exportToExcel(analytics, 'analytics-report.xlsx')}
-                    className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-500/20 text-green-400 rounded-lg sm:rounded-xl hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2 text-sm"
-                >
-                    <Download className="w-4 h-4 flex-shrink-0" />
-                    <span>تصدير Excel</span>
-                </button>
-            </div>
-
-            {/* Quick Stats - Focused on unique analytics metrics - Mobile First */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-                <StatCard icon={Building2} label="🏢 المستأجرون النشطون" value={analytics?.activeTenants || 0} iconColor="blue" />
-                <StatCard icon={Shield} label="🚫 المستأجرون الموقوفون" value={analytics?.suspendedTenants || 0} iconColor="red" />
-                <StatCard icon={TrendingUp} label="💰 متوسط الإيرادات الشهرية" value={`${(analytics?.monthlyRecurringRevenue || 0).toLocaleString()} ر.س`} iconColor="yellow" />
-                <StatCard icon={Database} label="🏨 إجمالي الفروع" value={analytics?.totalBranches || 0} iconColor="purple" />
-            </div>
-
-            {/* Charts - Mobile First */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
-                    <LineChart
-                        data={revenueData}
-                        title="الإيرادات الشهرية"
-                        height="250px"
-                    />
-                </div>
-
-                <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
-                    <DoughnutChart
-                        data={tenantDistributionData}
-                        title="توزيع الخطط"
-                        height="250px"
-                    />
-                </div>
-
-                <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:col-span-2">
-                    <BarChart
-                        data={usageData}
-                        title="مقارنة الاستخدام"
-                        height="250px"
-                    />
-                </div>
-            </div>
-        </div>
-    );
-};
-
 const UpdatesTab: React.FC<{
     updates: SystemSettings['updates'];
     onAddUpdate: () => void;
@@ -3497,7 +3413,7 @@ const UpdatesTab: React.FC<{
                 <div className="flex gap-2 w-full sm:w-auto">
                     <button
                         onClick={onAddUpdate}
-                        className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-lg sm:rounded-xl hover:bg-yellow-500/30 transition-colors flex items-center justify-center gap-2 text-sm"
+                        className="flex-1 sm:flex-none px-3 sm:px-4 py-2 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg sm:rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm"
                     >
                         <Plus className="w-4 h-4 flex-shrink-0" />
                         <span className="hidden sm:inline">إضافة</span>
@@ -3534,7 +3450,7 @@ const UpdatesTab: React.FC<{
                 <p className="text-purple-300 text-xs flex items-center gap-2">
                     <Bell className="w-4 h-4 flex-shrink-0" />
                     <span>
-                        زر "بث التحديث" يرسل إشعار فوري لجميع المديرين والموظفين في كل الفروع بخصوص آخر تحديث.
+                        زر "بث التحديث" يرسل إشعار فوري لجميع المشتركين والموظفين في كل الفروع بخصوص آخر تحديث.
                     </span>
                 </p>
             </div>
@@ -3590,7 +3506,7 @@ const BroadcastsTab: React.FC<{
                 </div>
                 <button
                     onClick={onAddBroadcast}
-                    className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg sm:rounded-xl hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2 text-sm"
+                    className="w-full sm:w-auto px-3 sm:px-4 py-2 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg sm:rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm"
                 >
                     <Plus className="w-4 h-4 flex-shrink-0" />
                     <span className="sm:hidden">إضافة رسالة</span>
@@ -4006,7 +3922,7 @@ const BroadcastModal: React.FC<{
                                                     className="w-4 h-4 rounded border-white/20 bg-white/5 text-blue-500"
                                                 />
                                                 <span className="text-xs text-white/80">
-                                                    {role === 'manager' ? 'المديرين' : role === 'employee' ? 'الموظفين' : 'الموظفين'}
+                                                    {role === 'manager' ? 'المشتركين' : role === 'employee' ? 'الموظفين' : 'الموظفين'}
                                                 </span>
                                             </label>
                                         ))}
@@ -4639,11 +4555,11 @@ const AddManagerModal: React.FC<{
                     </button>
                 </div>
                 <div className="p-4 space-y-4 overflow-y-auto">
-                    {/* ✅ One-Click Demo Mode Button */}
+                    {/* ✅ One-Click Auto-Fill Button - For quick form filling only */}
                     <button
                         type="button"
                         onClick={() => {
-                            // Generate random demo data
+                            // Generate random data for quick form filling
                             const demoNames = ['أحمد محمد', 'خالد العمري', 'سعد الغامدي', 'فهد السعيد', 'يوسف الحربي'];
                             const demoHotels = ['فندق النخيل الذهبي', 'منتجع الشاطئ الأزرق', 'فندق الواحة الخضراء', 'قصر الضيافة الملكي', 'برج السماء'];
                             const randomCode = String(Math.floor(1000 + Math.random() * 9000));
@@ -4659,8 +4575,11 @@ const AddManagerModal: React.FC<{
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-purple-300 hover:from-purple-500/30 hover:to-pink-500/30 transition-all flex items-center justify-center gap-2"
                     >
                         <Zap className="w-4 h-4" />
-                        <span className="text-sm font-medium">🎭 تعبئة بيانات تجريبية (Demo)</span>
+                        <span className="text-sm font-medium">⚡ تعبئة بيانات تلقائية (للتجربة السريعة)</span>
                     </button>
+                    <p className="text-xs text-white/50 text-center -mt-2">
+                        💡 لإنشاء روابط تجريبية للمشاركة، استخدم تبويب "روابط الديمو" في القائمة
+                    </p>
 
                     <div>
                         <label className="block text-sm text-white/60 mb-2">اسم المدير (اختياري)</label>

@@ -126,14 +126,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     return;
                 }
 
-                // 1. Wait for Firebase Auth to settle (Initial state)
+                // 1. Wait for Firebase Auth to settle (Initial state) - FASTER timeout
                 const firebaseUser = await new Promise<any>(resolve => {
                     const unsub = auth.onAuthStateChanged(user => {
                         unsub();
                         resolve(user);
                     });
-                    // Timeout safety
-                    setTimeout(() => resolve(auth.currentUser), 2000);
+                    // ⚡ Faster timeout - 500ms instead of 2000ms
+                    setTimeout(() => resolve(auth.currentUser), 500);
                 });
 
                 // 2. Load Local Storage User (Immediate UI Update)
@@ -151,21 +151,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     }
                 }
 
-                // 3. Sync Firebase Anonymously if needed
-                if (appUser && !firebaseUser) {
-                    try {
-                        const userCredential = await signInAnonymously(auth);
-
-                        // ✅ Re-bind UID to Tenant/Role for Security Rules
-                        if (userCredential.user && appUser.tenantId) {
-                            await saveUserBinding(userCredential.user.uid, appUser.tenantId, appUser.role || 'employee');
-                        }
-                    } catch (e) {
-                        console.error('Auto-login sync failed', e);
-                    }
-                }
-
-                // Load branch (but NOT for owner)
+                // Load branch (but NOT for owner) - Do this immediately, no await
                 const storedBranch = getStoredBranchId();
                 if (storedBranch && appUser?.role !== 'owner') {
                     setBranchIdState(storedBranch);
@@ -174,40 +160,67 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     setBranchIdState(null);
                 }
 
-                // 🛑 SECURITY CHECK (Kill Switch)
-                // Skip strict check for Owner or System accounts to prevent accidental lockouts
-                if (appUser && appUser.tenantId && appUser.role !== 'owner' && appUser.tenantId !== 'system-owner') {
-                    try {
-                        const tenantRef = doc(db, 'tenants', appUser.tenantId);
-                        const tenantSnap = await getDoc(tenantRef);
+                // Load last users immediately (synchronous)
+                setLastUsers(getLastUsers());
 
-                        if (tenantSnap.exists()) {
-                            const tenantData = tenantSnap.data();
-                            if (tenantData.status === 'suspended') {
-                                throw new Error('ACCOUNT_SUSPENDED');
+                // ⚡ OPTIMIZED: Run Firebase sync, security check, and biometric check in parallel
+                const [_, securityCheckResult, bioAvailable] = await Promise.allSettled([
+                    // 3. Sync Firebase Anonymously if needed (non-blocking)
+                    (async () => {
+                        if (appUser && !firebaseUser) {
+                            try {
+                                const userCredential = await signInAnonymously(auth);
+                                // ✅ Re-bind UID to Tenant/Role for Security Rules
+                                if (userCredential.user && appUser.tenantId) {
+                                    await saveUserBinding(userCredential.user.uid, appUser.tenantId, appUser.role || 'employee');
+                                }
+                            } catch (e) {
+                                console.error('Auto-login sync failed', e);
                             }
                         }
-                    } catch (securityError: any) {
-                        if (securityError.message === 'ACCOUNT_SUSPENDED') {
-                            console.error('🚫 Account Suspended');
-                            localStorage.removeItem(USER_STORAGE_KEY);
-                            setUser(null);
-                            setBranchIdState(null);
-                            return;
+                    })(),
+                    // 🛑 SECURITY CHECK (Kill Switch) - Run in parallel
+                    (async () => {
+                        if (appUser && appUser.tenantId && appUser.role !== 'owner' && appUser.tenantId !== 'system-owner') {
+                            try {
+                                const tenantRef = doc(db, 'tenants', appUser.tenantId);
+                                const tenantSnap = await getDoc(tenantRef);
+                                if (tenantSnap.exists()) {
+                                    const tenantData = tenantSnap.data();
+                                    if (tenantData.status === 'suspended') {
+                                        throw new Error('ACCOUNT_SUSPENDED');
+                                    }
+                                }
+                            } catch (securityError: any) {
+                                if (securityError.message === 'ACCOUNT_SUSPENDED') {
+                                    console.error('🚫 Account Suspended');
+                                    localStorage.removeItem(USER_STORAGE_KEY);
+                                    if (mounted) {
+                                        setUser(null);
+                                        setBranchIdState(null);
+                                    }
+                                    throw securityError; // Re-throw to stop execution
+                                }
+                                // Ignore permission errors or network errors during initial load
+                                console.warn('Non-fatal security check warning:', securityError.message);
+                            }
                         }
-                        // Ignore permission errors or network errors during initial load
-                        // This prevents "kicking out" due to minor race conditions
-                        console.warn('Non-fatal security check warning:', securityError.message);
+                    })(),
+                    // Check biometric availability (non-blocking)
+                    isBiometricAvailable().catch(() => false)
+                ]);
+
+                // Handle security check result
+                if (securityCheckResult.status === 'rejected') {
+                    const error = securityCheckResult.reason;
+                    if (error && typeof error === 'object' && 'message' in error && error.message === 'ACCOUNT_SUSPENDED') {
+                        return; // Stop execution if account is suspended
                     }
                 }
 
-                // Load last users
-                setLastUsers(getLastUsers());
-
-                // Check biometric availability
-                const bioAvailable = await isBiometricAvailable();
-                if (mounted) {
-                    setBiometricAvailable(bioAvailable);
+                // Set biometric availability
+                if (bioAvailable.status === 'fulfilled' && mounted) {
+                    setBiometricAvailable(bioAvailable.value);
                 }
             } catch (err) {
                 console.error('Auth Init Error:', err);

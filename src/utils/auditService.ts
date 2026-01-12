@@ -7,7 +7,7 @@
  * to minimize Firebase reads on free tier
  */
 
-import { collection, addDoc, Timestamp, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, query, where, orderBy, limit, getDocs, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
 // ============================================================
@@ -166,7 +166,7 @@ export const logAuditAdvanced = async (options: LogAuditOptions): Promise<void> 
 
 /**
  * Quick audit log (for common actions)
- * Automatically gets user from localStorage
+ * Automatically gets user from localStorage or uses system user
  */
 export const quickAudit = (
     action: AuditAction,
@@ -175,24 +175,44 @@ export const quickAudit = (
     details?: Record<string, unknown>,
     targetName?: string
 ): void => {
+    // ✅ Try to get user from localStorage first
     const storedUser = localStorage.getItem('adora_user');
+    let userId = 'system';
+    let userName = 'النظام';
+    let department = 'system';
+    let tenantId: string | undefined;
+    let branchId: string | undefined;
+    
     if (storedUser) {
-        const user = JSON.parse(storedUser);
-        logAudit(
-            action,
-            user.id,
-            user.name,
-            user.department || 'system',
-            targetType,
-            targetId,
-            details || {},
-            {
-                targetName,
-                tenantId: user.tenantId,
-                branchId: user.branchId
-            }
-        );
+        try {
+            const user = JSON.parse(storedUser);
+            userId = user.id || 'system';
+            userName = user.name || 'النظام';
+            department = user.department || 'system';
+            tenantId = user.tenantId;
+            branchId = user.branchId;
+        } catch (e) {
+            console.warn('Failed to parse stored user:', e);
+        }
     }
+    
+    // ✅ Always log audit, even if no user found (for owner actions)
+    logAudit(
+        action,
+        userId,
+        userName,
+        department,
+        targetType,
+        targetId,
+        details || {},
+        {
+            targetName,
+            tenantId,
+            branchId
+        }
+    ).catch(err => {
+        console.error('Failed to log audit:', err);
+    });
 };
 
 // ============================================================

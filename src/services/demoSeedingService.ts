@@ -86,7 +86,7 @@ const DEMO_REQUESTS = [
     {
         type: 'bellman',
         status: 'IN_PROGRESS',
-        priority: 'high',
+        priority: 'urgent',
         roomNumber: '101',
         guestName: 'أحمد محمد',
         title: 'نقل أمتعة',
@@ -119,7 +119,7 @@ const DEMO_REQUESTS = [
     {
         type: 'maintenance',
         status: 'COMPLETED',
-        priority: 'high',
+        priority: 'urgent',
         roomNumber: '103',
         guestName: 'فاطمة السعيد',
         title: 'إصلاح تكييف',
@@ -131,7 +131,7 @@ const DEMO_REQUESTS = [
     {
         type: 'amenities',
         status: 'COMPLETED',
-        priority: 'low',
+        priority: 'normal',
         roomNumber: '202',
         guestName: 'سارة الدوسري',
         title: 'مستلزمات إضافية',
@@ -313,7 +313,9 @@ export async function seedDemoData(tenantId: string): Promise<DemoSeedResult> {
                 details: { description: req.description },
                 currentDepartment: req.type === 'bellman' ? 'bellman' : 
                                    req.type === 'cleaning' ? 'housekeeping' :
-                                   req.type === 'maintenance' ? 'maintenance' : 'reception',
+                                   req.type === 'maintenance' ? 'maintenance' :
+                                   req.type === 'amenities' ? 'reception' :
+                                   req.type === 'coffee' ? 'coffeeshop' : 'reception',
                 isDemo: true
             };
             

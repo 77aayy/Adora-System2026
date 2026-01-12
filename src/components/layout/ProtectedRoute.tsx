@@ -23,16 +23,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     allowedDepartments,
     allowedRoles // ✅ Added to destructuring
 }) => {
-    const { user, isAuthenticated, isLoading } = useAuth();
+    const { user, isAuthenticated, isLoading, authReady } = useAuth();
     const location = useLocation();
 
-    // Show loading while checking auth
-    if (isLoading) {
-        return (
-            <div className="min-h-screen theme-page flex items-center justify-center">
-                <AdoraLoader size="lg" message="جاري التحميل..." />
-            </div>
-        );
+    // ✅ Show loading only if auth is not ready yet
+    // Once authReady is true, we can proceed immediately
+    if (!authReady || isLoading) {
+        // ✅ Minimal loading - return null to let Suspense handle it
+        // This prevents multiple loading screens from appearing
+        return null;
     }
 
     // 🔐 Firebase not configured -> redirect to setup

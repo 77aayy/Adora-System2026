@@ -218,10 +218,10 @@ export const MultiBranchDashboard: React.FC = () => {
         <PageTransition>
             <div className="min-h-screen transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
                 <FlexibleHeader
-                    title={isOwner ? "جميع الفروع (من جميع المديرين)" : "لوحة متعددة الفروع"}
+                    title={isOwner ? "جميع الفروع (من جميع المشتركين)" : "لوحة متعددة الفروع"}
                     titleIcon={<Building2 className="w-6 h-6" />}
                     subtitle={isOwner 
-                        ? `${branches.length} فرع نشط من جميع المديرين • نظرة شاملة`
+                        ? `${branches.length} فرع نشط من جميع المشتركين • نظرة شاملة`
                         : "مقارنة وإحصائيات جميع الفروع"
                     }
                     actions={[
@@ -280,7 +280,7 @@ export const MultiBranchDashboard: React.FC = () => {
                             <Building2 className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
                             <h3 className="text-lg font-bold text-white mb-2">لا توجد فروع بعد</h3>
                             <p className="text-white/60 mb-4">
-                                لم يتم إنشاء أي فروع من قبل المديرين بعد.
+                                لم يتم إنشاء أي فروع من قبل المشتركين بعد.
                                 <br />
                                 يرجى إنشاء مدير أولاً من صفحة <strong>إدارة الملاك</strong>.
                             </p>
@@ -347,7 +347,7 @@ export const MultiBranchDashboard: React.FC = () => {
                     {branches.length > 0 && (
                         <div className="glass rounded-2xl p-6 border border-white/5">
                             <h3 className="text-xl font-bold text-white mb-4">
-                                {isOwner ? 'جميع الفروع من جميع المديرين' : 'قائمة الفروع'}
+                                {isOwner ? 'جميع الفروع من جميع المشتركين' : 'قائمة الفروع'}
                             </h3>
                             <div className="space-y-3">
                                 {branches.map((branch: any) => (

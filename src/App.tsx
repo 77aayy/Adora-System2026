@@ -713,13 +713,22 @@ const App: React.FC = () => {
     }
 
     const [showSplash, setShowSplash] = useState(() => {
-        // Only show splash on first visit or refresh, not on navigation
-        const hasShownSplash = sessionStorage.getItem('adora_splash_shown');
+        // ✅ Only show splash on FIRST visit (not on refresh)
+        // Check if user is already logged in - if yes, skip splash completely
+        const isLoggedIn = localStorage.getItem('adora_user');
+        
+        // If user is logged in, skip splash (they're refreshing, not first visit)
+        if (isLoggedIn) {
+            return false;
+        }
+        
+        // Only show splash on first visit
+        const hasShownSplash = localStorage.getItem('adora_splash_shown');
         return !hasShownSplash;
     });
 
     const handleSplashComplete = () => {
-        sessionStorage.setItem('adora_splash_shown', 'true');
+        localStorage.setItem('adora_splash_shown', 'true');
         setShowSplash(false);
     };
 

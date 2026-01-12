@@ -19,42 +19,22 @@ export const HeaderButton: React.FC<HeaderButtonProps> = ({
     count,
     showLabel = false
 }) => {
-    // ✅ Theme-aware styles using CSS classes
+    // ✅ Theme-aware white icons design - adapts to light/dark mode
     const getVariantStyles = (): React.CSSProperties => {
-        switch (variant) {
-            case 'danger':
-                return {
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    color: '#ef4444',
-                    border: '1px solid rgba(239, 68, 68, 0.2)'
-                };
-            case 'primary':
-                return {
-                    background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%)',
-                    color: '#14b8a6',
-                    border: '1px solid rgba(20, 184, 166, 0.3)',
-                    boxShadow: '0 4px 6px -1px rgba(20, 184, 166, 0.1)'
-                };
-            case 'warning':
-                return {
-                    background: 'rgba(249, 115, 22, 0.1)',
-                    color: '#f97316',
-                    border: '1px solid rgba(249, 115, 22, 0.2)'
-                };
-            default:
-                return {
-                    background: 'var(--theme-bg-tertiary)',
-                    color: 'var(--theme-text-secondary)',
-                    border: '1px solid var(--theme-border-primary)'
-                };
-        }
+        // Use CSS variables that adapt to theme
+        return {
+            background: 'var(--theme-bg-tertiary)',
+            color: 'var(--theme-text-primary)',
+            border: '1px solid var(--theme-border-primary)',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)'
+        };
     };
 
     return (
         <div className="relative group">
             <button
                 onClick={onClick}
-                className={`${showLabel ? 'px-3 sm:px-4 gap-2' : 'w-9 h-9 sm:w-10 sm:h-10'} rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 hover:scale-105 ${className}`}
+                className={`${showLabel ? 'px-3 sm:px-4 gap-2' : 'w-9 h-9 sm:w-10 sm:h-10'} rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 hover:scale-105 hover:shadow-md ${className}`}
                 style={getVariantStyles()}
                 aria-label={label}
             >

@@ -114,27 +114,27 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
 
     return (
         <div className={`rounded-xl overflow-hidden ${compact ? 'mb-3' : 'mb-6'}`}>
-            {/* Quick Guide - Always Visible */}
-            <div className={`p-4 bg-gradient-to-r ${themeConfig.primary} border ${themeConfig.border}`}
+            {/* Quick Guide - Always Visible - ✅ تحسين التصميم */}
+            <div className={`p-3 sm:p-4 bg-gradient-to-r ${themeConfig.primary} border ${themeConfig.border}`}
                  style={{ borderRadius: isExpanded ? '12px 12px 0 0' : '12px' }}>
-                <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg ${themeConfig.bg} flex-shrink-0`}>
-                        {icon || <Info className={`w-5 h-5 ${themeConfig.text}`} />}
+                <div className="flex items-start gap-2 sm:gap-3">
+                    <div className={`p-1.5 sm:p-2 rounded-lg ${themeConfig.bg} flex-shrink-0`}>
+                        {icon || <Info className={`w-4 h-4 sm:w-5 sm:h-5 ${themeConfig.text}`} />}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h3 className={`font-bold ${themeConfig.text} mb-1 flex items-center gap-2`}>
-                            📍 {title}
+                        <h3 className={`font-bold text-sm sm:text-base ${themeConfig.text} mb-1.5 sm:mb-1 flex items-center gap-1.5 sm:gap-2`}>
+                            <span className="text-base sm:text-lg">📍</span> {title}
                         </h3>
-                        <p className="text-sm text-white/80 font-mono bg-slate-800/50 px-3 py-2 rounded-lg">
+                        <p className="text-xs sm:text-sm text-white/80 bg-slate-800/50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg leading-relaxed">
                             {quickGuide}
                         </p>
                     </div>
                     {(steps || tips || warnings || affects) && (
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
-                            className={`p-2 rounded-lg hover:bg-white/10 transition-colors ${themeConfig.text}`}
+                            className={`p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors ${themeConfig.text} flex-shrink-0`}
                         >
-                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                            {isExpanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />}
                         </button>
                     )}
                 </div>
@@ -249,10 +249,10 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
 export const CreateManagerHelp: React.FC = () => (
     <ContextualHelp
         title="إنشاء مدير فندق جديد"
-        quickGuide="أدخل البيانات → حدد الباقة → أنشئ الحساب → يصله PIN للدخول"
+        quickGuide="أكمل بيانات المدير واختر الباقة لإتمام إنشاء الحساب"
         theme="amber"
         affects={[
-            'عدد المديرين النشطين',
+            'عدد المشتركين النشطين',
             'إجمالي الإيرادات',
             'سجل الفواتير',
         ]}

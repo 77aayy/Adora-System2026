@@ -131,21 +131,31 @@ export const AnalyticsDashboard: React.FC = () => {
                         },
                         {
                             id: 'export-pdf',
-                            icon: <FileText className="w-5 h-5" />,
+                            icon: <FileText className="w-4 h-4" />,
                             label: 'PDF',
                             onClick: () => {
-                                exportToPDF(analytics);
-                                success('تم تصدير التقرير PDF بنجاح');
+                                try {
+                                    exportToPDF(analytics, 'analytics-report.pdf');
+                                    success('تم تصدير التقرير PDF بنجاح');
+                                } catch (err) {
+                                    console.error('PDF export failed:', err);
+                                    error('فشل تصدير PDF');
+                                }
                             },
                             variant: 'default' as const
                         },
                         {
                             id: 'export-excel',
-                            icon: <Download className="w-5 h-5" />,
+                            icon: <Download className="w-4 h-4" />,
                             label: 'Excel',
                             onClick: () => {
-                                exportToExcel(analytics);
-                                success('تم تصدير التقرير Excel بنجاح');
+                                try {
+                                    exportToExcel(analytics, 'analytics-report.xlsx');
+                                    success('تم تصدير التقرير Excel بنجاح');
+                                } catch (err) {
+                                    console.error('Excel export failed:', err);
+                                    error('فشل تصدير Excel');
+                                }
                             },
                             variant: 'default' as const
                         }

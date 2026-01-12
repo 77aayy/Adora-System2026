@@ -122,6 +122,8 @@ export const createManager = async (data: {
     maxBranches?: number; // ✅ License: Maximum number of branches allowed
     branchCodes?: string[]; // ✅ Branch codes assigned to this manager (e.g., ['6', '7', '88', '68'])
     branchNames?: Record<string, string>; // ✅ Branch names mapped by code (e.g., { '6': 'الكورنيش', '7': 'الأندلس' })
+    isDemo?: boolean; // ✅ Demo account flag (free, no payment required)
+    demoDuration?: 1 | 2 | 3; // ✅ Demo duration in months (1, 2, or 3 months)
     // ✅ Isolated Multi-Tenancy: Optional Firebase config for separate database
     firebaseConfig?: {
         apiKey: string;
@@ -145,10 +147,16 @@ export const createManager = async (data: {
     const tenantId = `tenant-${Date.now()}`;
     const hotelName = data.hotelName || `فندق ${data.name}`;
 
-    // ✅ Calculate license expiry (1 year from now)
+    // ✅ Calculate license expiry (1 year for normal, demo duration for demo accounts)
     const now = new Date();
-    const oneYearLater = new Date(now);
-    oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+    const expiryDate = new Date(now);
+    if (data.isDemo && data.demoDuration) {
+        // ✅ Demo accounts: duration based on demoDuration (1, 2, or 3 months)
+        expiryDate.setMonth(expiryDate.getMonth() + data.demoDuration);
+    } else {
+        // ✅ Normal accounts get 1 year
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    }
 
     // 1. Create tenant (isolated data space for this manager)
     const tenantRef = doc(db, 'tenants', tenantId);
@@ -165,11 +173,12 @@ export const createManager = async (data: {
             maxBranches: data.maxBranches || 1, // Default: 1 branch
             branchCodes: data.branchCodes || [], // Branch codes assigned to this manager
             // ✅ Annual License System
-            licenseExpiry: Timestamp.fromDate(oneYearLater), // Expires in 1 year
+            licenseExpiry: Timestamp.fromDate(expiryDate), // Expires in 1 year (normal) or 2 years (demo)
             licenseStatus: 'active', // 'active' | 'suspended' | 'expired'
-            autoRenew: true, // Auto-renew by default
+            autoRenew: !data.isDemo, // ✅ Demo accounts don't auto-renew
             lastRenewalDate: Timestamp.now(),
-            paymentStatus: 'pending', // 'paid' | 'pending' | 'overdue'
+            paymentStatus: data.isDemo ? 'paid' : 'pending', // ✅ Demo accounts are marked as paid
+            isDemo: data.isDemo || false, // ✅ Mark as demo account
 
             // ✅ Branch Names Map
             branchNames: data.branchNames || {},
@@ -238,8 +247,10 @@ export const createManager = async (data: {
         // createdBy: 'owner', // Not in interface but used for rules - pass as extended prop if needed or ensure interface allows
 
         // ✅ License information 
-        licenseExpiry: Timestamp.fromDate(oneYearLater),
+        licenseExpiry: Timestamp.fromDate(expiryDate),
         licenseStatus: 'active',
+        paymentStatus: data.isDemo ? 'paid' : 'pending', // ✅ Demo accounts are marked as paid
+        isDemo: data.isDemo || false, // ✅ Mark as demo account
 
         // ✅ Manager Specifics
         hotelName: hotelName,
@@ -451,18 +462,19 @@ export const toggleLicenseStatus = async (managerId: string, tenantId: string, s
     );
 };
 
-// ✅ Renew manager license (extend by 1 year)
+// ✅ Renew manager license (extend by 1 or 2 years)
 // Returns warning if price is below default
 export const renewLicense = async (
     managerId: string, 
     tenantId: string,
+    duration: 1 | 2 = 1, // ✅ مدة التجديد: 1 = سنة، 2 = سنتين
     currentPrice?: number,
     defaultPrice?: number
 ): Promise<{ warning?: string }> => {
     const batch = writeBatch(db);
     const now = new Date();
-    const oneYearLater = new Date(now);
-    oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+    const expiryDate = new Date(now);
+    expiryDate.setFullYear(expiryDate.getFullYear() + duration);
 
     // 1. Get manager data to find PIN code
     const managerRef = doc(db, 'users', managerId);
@@ -475,7 +487,7 @@ export const renewLicense = async (
 
     // 2. Update manager license
     batch.update(managerRef, {
-        licenseExpiry: Timestamp.fromDate(oneYearLater),
+        licenseExpiry: Timestamp.fromDate(expiryDate),
         licenseStatus: 'active',
         status: 'active',
         'paymentStatus': 'paid'
@@ -484,7 +496,7 @@ export const renewLicense = async (
     // 3. Update tenant license
     const tenantRef = doc(db, 'tenants', tenantId);
     batch.update(tenantRef, {
-        'info.licenseExpiry': Timestamp.fromDate(oneYearLater),
+        'info.licenseExpiry': Timestamp.fromDate(expiryDate),
         'info.licenseStatus': 'active',
         'info.status': 'active',
         'info.lastRenewalDate': Timestamp.now(),
@@ -495,7 +507,7 @@ export const renewLicense = async (
     if (managerPin) {
         const masterCodeRef = doc(db, 'globalCodes', managerPin);
         batch.update(masterCodeRef, {
-            licenseExpiry: Timestamp.fromDate(oneYearLater),
+            licenseExpiry: Timestamp.fromDate(expiryDate),
             licenseStatus: 'active',
             status: 'active'
         });
@@ -509,7 +521,7 @@ export const renewLicense = async (
                 if (bCode !== managerPin) {
                     const bCodeRef = doc(db, 'globalCodes', bCode);
                     batch.update(bCodeRef, {
-                        licenseExpiry: Timestamp.fromDate(oneYearLater),
+                        licenseExpiry: Timestamp.fromDate(expiryDate),
                         licenseStatus: 'active',
                         status: 'active'
                     });
@@ -523,7 +535,8 @@ export const renewLicense = async (
     // ✅ AUDIT: Log subscription renewal
     quickAudit('SUBSCRIPTION_RENEW', 'subscription', managerId, {
         tenantId,
-        newExpiryDate: oneYearLater.toISOString(),
+        newExpiryDate: expiryDate.toISOString(),
+        duration,
         price: currentPrice
     }, managerData?.name || 'مدير');
 };
@@ -571,19 +584,22 @@ export const checkLicenseExpiryNotifications = (expiryDate: Date | Timestamp | n
 
 // ✅ Soft delete manager (move to deleted_managers collection with automatic backup)
 export const softDeleteManager = async (managerId: string, tenantId?: string): Promise<void> => {
-    const batch = writeBatch(db);
-
-    // ✅ 1. Create automatic backup before deletion
+    // ✅ 1. Create automatic backup before deletion - REQUIRED
     let backupId: string | null = null;
     if (tenantId) {
         try {
             const { createTenantBackup } = await import('./backupService');
             backupId = await createTenantBackup(tenantId, 'before_delete');
-        } catch (err) {
-            console.warn('Failed to create backup before deletion:', err);
-            // Continue with deletion even if backup fails
+            if (!backupId || backupId === 'SKIPPED_NO_DB') {
+                throw new Error('فشل إنشاء النسخة الاحتياطية. تم إلغاء الحذف لحماية البيانات.');
+            }
+        } catch (err: any) {
+            console.error('Failed to create backup before deletion:', err);
+            throw new Error(err.message || 'فشل إنشاء النسخة الاحتياطية. تم إلغاء الحذف لحماية البيانات.');
         }
     }
+
+    const batch = writeBatch(db);
 
     // 2. Get original user data (if possible)
     const managerRef = doc(db, 'users', managerId);
@@ -600,12 +616,15 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
 
     // 3. Backup tenant info if exists
     let tenantData = null;
+    let branchCodes: string[] = [];
     if (tenantId) {
         try {
             const tenantRef = doc(db, 'tenants', tenantId);
             const tenantSnap = await getDoc(tenantRef);
             if (tenantSnap.exists()) {
                 tenantData = tenantSnap.data();
+                branchCodes = tenantData?.info?.branchCodes || [];
+                
                 // ✅ Suspend tenant
                 batch.set(tenantRef, {
                     info: {
@@ -632,17 +651,124 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
         createdBy: 'owner'
     });
 
-    // 4. Mark manager as deleted (Using SET MERGE for safety)
+    // 5. Mark manager as deleted (Using SET MERGE for safety)
     batch.set(managerRef, {
         status: 'deleted',
         deletedAt: serverTimestamp()
     }, { merge: true });
 
-    // 5. ✅ Free up the PIN Code (Delete from globalCodes)
-    const codeToDelete = managerData?.code;
-    if (codeToDelete) {
-        const codeRef = doc(db, 'globalCodes', codeToDelete);
-        batch.delete(codeRef);
+    // ✅ 6. Disable PIN Code (instead of delete) - for safe restoration
+    const managerCode = managerData?.code;
+    if (managerCode) {
+        const codeRef = doc(db, 'globalCodes', managerCode);
+        const codeSnap = await getDoc(codeRef);
+        if (codeSnap.exists()) {
+            // ✅ تعطيل بدلاً من حذف - للسماح بالاستعادة الآمنة
+            batch.update(codeRef, {
+                status: 'deleted',
+                deletedAt: serverTimestamp(),
+                originalTenantId: tenantId, // حفظ tenantId الأصلي للاستعادة
+                originalUserId: managerId
+            });
+        }
+    }
+
+    // ✅ 7. Disable all branch codes (instead of delete)
+    if (branchCodes.length > 0) {
+        for (const branchCode of branchCodes) {
+            if (branchCode && branchCode !== managerCode) {
+                const branchCodeRef = doc(db, 'globalCodes', branchCode);
+                const branchCodeSnap = await getDoc(branchCodeRef);
+                if (branchCodeSnap.exists()) {
+                    // ✅ تعطيل أكواد الفروع أيضاً
+                    batch.update(branchCodeRef, {
+                        status: 'deleted',
+                        deletedAt: serverTimestamp(),
+                        originalTenantId: tenantId,
+                        originalUserId: managerId
+                    });
+                }
+            }
+        }
+    }
+
+    // ✅ 8. Disable related data (employees, rooms, requests, invoices)
+    if (tenantId) {
+        try {
+            // 8.1. Disable employees
+            const employeesRef = collection(db, `tenants/${tenantId}/employees`);
+            const employeesSnap = await getDocs(employeesRef);
+            for (const empDoc of employeesSnap.docs) {
+                const empData = empDoc.data();
+                if (empData.status !== 'deleted') {
+                    batch.update(empDoc.ref, {
+                        status: 'deleted',
+                        deletedAt: serverTimestamp(),
+                        deletedBy: 'system',
+                        deletionReason: 'Manager deleted'
+                    });
+                }
+            }
+
+            // 8.2. Disable rooms
+            const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+            const roomsSnap = await getDocs(roomsRef);
+            for (const roomDoc of roomsSnap.docs) {
+                const roomData = roomDoc.data();
+                if (roomData.status !== 'deleted' && roomData.status !== 'unavailable') {
+                    batch.update(roomDoc.ref, {
+                        status: 'unavailable',
+                        deletedAt: serverTimestamp(),
+                        deletionReason: 'Manager deleted'
+                    });
+                }
+            }
+
+            // 8.3. Cancel active requests
+            const { collection: requestsCollection, query: requestsQuery, where: requestsWhere } = await import('firebase/firestore');
+            const requestsRef = requestsCollection(db, `tenants/${tenantId}/requests`);
+            const activeRequestsQuery = requestsQuery(
+                requestsRef,
+                requestsWhere('status', 'in', ['pending', 'in_progress', 'assigned'])
+            );
+            const requestsSnap = await getDocs(activeRequestsQuery);
+            for (const reqDoc of requestsSnap.docs) {
+                batch.update(reqDoc.ref, {
+                    status: 'cancelled',
+                    isCancelled: true,
+                    cancelReason: 'Manager deleted',
+                    cancelledAt: serverTimestamp()
+                });
+            }
+        } catch (err) {
+            console.warn(`Could not disable related data for tenant ${tenantId}:`, err);
+            // Continue - backup is already created
+        }
+    }
+
+    // ✅ 9. Mark invoices as deleted (soft delete)
+    if (tenantId) {
+        try {
+            const { collection: invoicesCollection, query: invoicesQuery, where: invoicesWhere } = await import('firebase/firestore');
+            const invoicesRef = invoicesCollection(db, 'invoices');
+            const tenantInvoicesQuery = invoicesQuery(
+                invoicesRef,
+                invoicesWhere('tenantId', '==', tenantId),
+                invoicesWhere('isDeleted', '!=', true)
+            );
+            const invoicesSnap = await getDocs(tenantInvoicesQuery);
+            for (const invDoc of invoicesSnap.docs) {
+                batch.update(invDoc.ref, {
+                    isDeleted: true,
+                    deletedAt: serverTimestamp(),
+                    deletedBy: 'system',
+                    deletionReason: 'Manager deleted'
+                });
+            }
+        } catch (err) {
+            console.warn(`Could not mark invoices as deleted for tenant ${tenantId}:`, err);
+            // Continue - backup is already created
+        }
     }
 
     await batch.commit();
@@ -651,7 +777,8 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
     quickAudit('MANAGER_DELETE', 'manager', managerId, {
         tenantId,
         backupId,
-        managerName: managerData?.name
+        managerName: managerData?.name,
+        branchCodesCount: branchCodes.length
     }, managerData?.name || 'مدير');
 };
 
@@ -717,19 +844,28 @@ export const restoreManager = async (managerId: string): Promise<void> => {
             tenantData = tenantBackup;
         }
 
-        // 4. ✅ Restore globalCodes (master PIN and branch codes)
+        // 4. ✅ Restore globalCodes (master PIN and branch codes) - with conflict check
         if (managerCode) {
             const masterCodeRef = doc(db, 'globalCodes', managerCode);
             const masterCodeSnap = await getDoc(masterCodeRef);
             
             if (masterCodeSnap.exists()) {
+                const codeData = masterCodeSnap.data();
+                // ✅ Check if code is used by another manager
+                if (codeData.status === 'active' && codeData.userId !== managerId && codeData.tenantId !== tenantId) {
+                    throw new Error(`الكود ${managerCode} مستخدم حالياً من قبل مدير آخر. لا يمكن الاستعادة.`);
+                }
+                
                 // Update if exists
                 batch.update(masterCodeRef, {
                     status: 'active',
                     licenseStatus: 'active',
                     userId: managerId,
                     tenantId: tenantId,
-                    role: 'manager'
+                    role: 'manager',
+                    deletedAt: null, // Remove deletion timestamp
+                    originalTenantId: null, // Clear backup fields
+                    originalUserId: null
                 });
             } else {
                 // Create if doesn't exist (was deleted)
@@ -744,7 +880,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
                 });
             }
 
-            // Restore branch codes if tenant data exists
+            // Restore branch codes if tenant data exists - with conflict check
             if (tenantData) {
                 const branchCodes = tenantData?.info?.branchCodes || [];
                 
@@ -754,9 +890,19 @@ export const restoreManager = async (managerId: string): Promise<void> => {
                         const bCodeSnap = await getDoc(bCodeRef);
                         
                         if (bCodeSnap.exists()) {
+                            const branchCodeData = bCodeSnap.data();
+                            // ✅ Check if branch code is used by another tenant
+                            if (branchCodeData.status === 'active' && branchCodeData.tenantId !== tenantId) {
+                                console.warn(`Branch code ${bCode} is used by another tenant. Skipping restoration.`);
+                                continue; // Skip this branch code
+                            }
+                            
                             batch.update(bCodeRef, {
                                 status: 'active',
-                                licenseStatus: 'active'
+                                licenseStatus: 'active',
+                                deletedAt: null,
+                                originalTenantId: null,
+                                originalUserId: null
                             });
                         } else {
                             // Create if doesn't exist
@@ -770,6 +916,47 @@ export const restoreManager = async (managerId: string): Promise<void> => {
                         }
                     }
                 }
+            }
+        }
+
+        // ✅ 5. Restore related data (employees, rooms, requests)
+        if (tenantId) {
+            try {
+                // 5.1. Restore employees (only those deleted by system due to manager deletion)
+                const employeesRef = collection(db, `tenants/${tenantId}/employees`);
+                const employeesSnap = await getDocs(employeesRef);
+                for (const empDoc of employeesSnap.docs) {
+                    const empData = empDoc.data();
+                    if (empData.status === 'deleted' && empData.deletionReason === 'Manager deleted') {
+                        batch.update(empDoc.ref, {
+                            status: 'active',
+                            deletedAt: null,
+                            deletedBy: null,
+                            deletionReason: null
+                        });
+                    }
+                }
+
+                // 5.2. Restore rooms (only those marked unavailable due to manager deletion)
+                const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+                const roomsSnap = await getDocs(roomsRef);
+                for (const roomDoc of roomsSnap.docs) {
+                    const roomData = roomDoc.data();
+                    if (roomData.status === 'unavailable' && roomData.deletionReason === 'Manager deleted') {
+                        // Restore to 'available' status
+                        batch.update(roomDoc.ref, {
+                            status: 'available',
+                            deletedAt: null,
+                            deletionReason: null
+                        });
+                    }
+                }
+
+                // Note: Requests and invoices are NOT restored automatically
+                // They remain cancelled/deleted for audit trail
+            } catch (err) {
+                console.warn(`Could not restore related data for tenant ${tenantId}:`, err);
+                // Continue - main restoration is more important
             }
         }
     }
@@ -902,5 +1089,64 @@ export const purgeAllSystemData = async (ownerId: string): Promise<{ success: bo
     } catch (error) {
         console.error('CRITICAL: Purge process failed at base level:', error);
         throw error;
+    }
+};
+
+// ============================================================
+// DEMO STATS
+// ============================================================
+
+/**
+ * Get demo managers statistics
+ * Returns total count, nearest expiry date, and farthest expiry date
+ * ✅ Separated from UI component - follows architecture rules
+ */
+export const getDemoStats = async (): Promise<{
+    total: number;
+    nearestExpiry: Date | null;
+    farthestExpiry: Date | null;
+}> => {
+    try {
+        if (!db) {
+            return { total: 0, nearestExpiry: null, farthestExpiry: null };
+        }
+        
+        const managers = await getAllManagers();
+        const demoManagers = managers.filter((m: any) => 
+            m.isDemo === true && 
+            m.status === 'active' && 
+            !m.isDeleted && 
+            !m.deletedAt
+        );
+        
+        if (demoManagers.length === 0) {
+            return { total: 0, nearestExpiry: null, farthestExpiry: null };
+        }
+        
+        const expiryDates: Date[] = [];
+        demoManagers.forEach((manager: any) => {
+            if (manager.licenseExpiry) {
+                const expiry = manager.licenseExpiry instanceof Timestamp 
+                    ? manager.licenseExpiry.toDate() 
+                    : new Date(manager.licenseExpiry);
+                if (!isNaN(expiry.getTime())) {
+                    expiryDates.push(expiry);
+                }
+            }
+        });
+        
+        if (expiryDates.length === 0) {
+            return { total: demoManagers.length, nearestExpiry: null, farthestExpiry: null };
+        }
+        
+        const sortedDates = expiryDates.sort((a, b) => a.getTime() - b.getTime());
+        return {
+            total: demoManagers.length,
+            nearestExpiry: sortedDates[0],
+            farthestExpiry: sortedDates[sortedDates.length - 1]
+        };
+    } catch (err) {
+        console.error('Failed to get demo stats:', err);
+        return { total: 0, nearestExpiry: null, farthestExpiry: null };
     }
 };

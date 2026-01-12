@@ -95,16 +95,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             icon: <Crown className="w-4 h-4" style={{ color: 'var(--theme-accent-yellow)' }} />,
             items: [
                 { to: '/owner-dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: 'الرئيسية', end: true },
-                { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: 'إدارة المديرين' },
+                { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: 'إدارة المشتركين' },
                 { to: '/owner-dashboard?tab=billing', icon: <DollarSign className="w-4 h-4" />, label: 'الفواتير' },
-            ]
-        },
-        {
-            id: 'analytics',
-            label: 'التحليلات والتقارير',
-            icon: <BarChart3 className="w-4 h-4" style={{ color: 'var(--theme-accent-green)' }} />,
-            items: [
-                { to: '/owner-dashboard?tab=analytics', icon: <BarChart3 className="w-4 h-4" />, label: 'التحليلات' },
                 { to: '/owner-dashboard?tab=broadcasts', icon: <Bell className="w-4 h-4" />, label: 'الرسائل والإعلانات' },
             ]
         },

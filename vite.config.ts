@@ -25,12 +25,12 @@ const fixModulePreloadOrder = () => {
             
             let html = fs.readFileSync(indexPath, 'utf-8');
             
-            // ✅ Find vendor-chartjs file in assets
-            let chartJsFileName: string | null = null;
+            // ✅ Find vendor-charts file in assets
+            let chartsFileName: string | null = null;
             if (fs.existsSync(assetsPath)) {
                 const files = fs.readdirSync(assetsPath);
-                const chartJsFile = files.find(f => f.includes('vendor-chartjs') && f.endsWith('.js'));
-                if (chartJsFile) chartJsFileName = chartJsFile;
+                const chartsFile = files.find(f => f.includes('vendor-charts') && f.endsWith('.js'));
+                if (chartsFile) chartsFileName = chartsFile;
             }
             
             // Extract all modulepreload links
@@ -42,23 +42,22 @@ const fixModulePreloadOrder = () => {
                 preloads.push(match[0]);
             }
             
-            // ✅ Add vendor-chartjs if found but not in preloads
-            if (chartJsFileName && !preloads.some(p => p.includes('vendor-chartjs'))) {
-                preloads.push(`<link rel="modulepreload" crossorigin href="/assets/${chartJsFileName}">`);
+            // ✅ Add vendor-charts if found but not in preloads
+            if (chartsFileName && !preloads.some(p => p.includes('vendor-charts'))) {
+                preloads.push(`<link rel="modulepreload" crossorigin href="/assets/${chartsFileName}">`);
             }
             
             if (preloads.length === 0) return;
             
-            // Sort preloads: vendor-react first, then vendor, then vendor-firebase, then others
+            // Sort preloads: vendor-react first, then vendor, then vendor-firebase, then charts, then others
             const sortOrder = (link: string): number => {
                 if (link.includes('vendor-react')) return 0;
-                if (link.includes('/vendor-') && !link.includes('vendor-firebase') && !link.includes('vendor-recharts') && !link.includes('vendor-chartjs')) return 1;
+                if (link.includes('/vendor-') && !link.includes('vendor-firebase') && !link.includes('vendor-charts')) return 1;
                 if (link.includes('vendor-firebase')) return 2;
-                if (link.includes('vendor-chartjs')) return 3;
-                if (link.includes('vendor-recharts')) return 4;
-                if (link.includes('service-')) return 5;
-                if (link.includes('feature-')) return 6;
-                return 7;
+                if (link.includes('vendor-charts')) return 3;
+                if (link.includes('service-')) return 4;
+                if (link.includes('feature-')) return 5;
+                return 6;
             };
             
             const sortedPreloads = [...preloads].sort((a, b) => sortOrder(a) - sortOrder(b));
@@ -250,12 +249,9 @@ export default defineConfig({
                         if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
                             return 'vendor-react';
                         }
-                        // ✅ Chart.js separate from Recharts
-                        if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
-                            return 'vendor-chartjs';
-                        }
-                        if (id.includes('recharts') || id.includes('recharts-scale')) {
-                            return 'vendor-recharts';
+                        // ✅ ALL Charts in ONE chunk (fixes circular dependency issues)
+                        if (id.includes('chart.js') || id.includes('react-chartjs-2') || id.includes('recharts') || id.includes('recharts-scale') || id.includes('d3-')) {
+                            return 'vendor-charts';
                         }
                         // ✅ Firebase (large)
                         if (id.includes('firebase')) {

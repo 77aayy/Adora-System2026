@@ -73,14 +73,13 @@ import { getDepartmentPath } from './services/userService';
 // Root Redirect (Smart SaaS Redirect)
 // ======================================================
 const RootRedirect: React.FC = () => {
-    const { user, isAuthenticated, isLoading } = useAuth();
+    const { user, isAuthenticated, isLoading, authReady } = useAuth();
 
-    if (isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center theme-page">
-                <AdoraLoader size="lg" message="جاري التحميل..." />
-            </div>
-        );
+    // ✅ Show minimal loading only if auth is not ready yet
+    // Once authReady is true, we can redirect immediately
+    if (!authReady || isLoading) {
+        // ✅ Minimal loading - no full screen loader to avoid UI jumps
+        return null; // Let Suspense handle loading
     }
 
     if (isAuthenticated && user) {

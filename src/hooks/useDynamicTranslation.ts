@@ -4,7 +4,7 @@
  * Adora Hotel Management System V3 - SaaS
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -255,7 +255,7 @@ export function withAutoTranslation<P extends object>(
     textProps: string[] // Props that contain Arabic text to translate
 ): React.FC<P> {
     return function AutoTranslatedComponent(props: P) {
-        const { t, language } = useDynamicTranslation();
+        const { t } = useDynamicTranslation();
         
         // Create translated props
         const translatedProps = useMemo(() => {
@@ -271,7 +271,7 @@ export function withAutoTranslation<P extends object>(
             return result;
         }, [props, t]);
         
-        return <WrappedComponent {...translatedProps} />;
+        return React.createElement(WrappedComponent, translatedProps);
     };
 }
 
