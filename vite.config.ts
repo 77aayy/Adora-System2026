@@ -139,9 +139,10 @@ export default defineConfig({
             'firebase/auth',
             'firebase/firestore',
             'lucide-react',
-            'recharts',
             'lodash'
         ],
+        // ✅ Exclude chart libraries from pre-bundling to avoid initialization conflicts
+        exclude: ['chart.js', 'react-chartjs-2', 'recharts'],
     },
     build: {
         outDir: 'dist',
@@ -156,11 +157,12 @@ export default defineConfig({
                 drop_console: true, // إزالة console.log في الإنتاج
                 drop_debugger: true,
                 pure_funcs: ['console.log', 'console.info', 'console.warn', 'console.debug'], // إزالة جميع console
-                passes: 3, // More passes for better compression
+                passes: 2, // ✅ Reduced from 3 to avoid initialization order issues
                 ecma: 2020,
-                unsafe: true,
-                unsafe_arrows: true,
-                unsafe_methods: true,
+                unsafe: false, // ✅ CRITICAL: Disabled to prevent 'ft' initialization errors
+                unsafe_arrows: false, // ✅ Disabled for chart libraries compatibility
+                unsafe_methods: false, // ✅ Disabled for chart libraries compatibility
+                keep_infinity: true, // ✅ Preserve Infinity for physics calculations
             },
             format: {
                 comments: false, // Remove comments
@@ -168,6 +170,9 @@ export default defineConfig({
             },
             mangle: {
                 safari10: true,
+                keep_classnames: false, // ✅ Allow class name mangling
+                keep_fnames: false, // ✅ Allow function name mangling
+                reserved: ['Chart', 'ChartJS'], // ✅ Preserve Chart.js class names
             },
         },
         // ✅ CSS code splitting
@@ -191,9 +196,13 @@ export default defineConfig({
                         if (id.includes('firebase')) {
                             return 'vendor-firebase';
                         }
-                        // Chart libraries
-                        if (id.includes('chart.js') || id.includes('recharts')) {
-                            return 'vendor-charts';
+                        // ✅ Chart libraries - separate chunks to avoid initialization conflicts
+                        // CRITICAL: Must be separate to prevent 'ft' initialization errors
+                        if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
+                            return 'vendor-chartjs';
+                        }
+                        if (id.includes('recharts') || id.includes('recharts-scale')) {
+                            return 'vendor-recharts';
                         }
                         // UI libraries
                         if (id.includes('lucide-react')) {

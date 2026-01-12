@@ -1,9 +1,10 @@
 /**
  * Chart Components for Analytics
  * Using Chart.js for interactive charts
+ * ✅ Fixed: Lazy registration to avoid initialization order issues
  */
 
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -19,19 +20,27 @@ import {
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 
-// Register Chart.js components
-ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    BarElement,
-    ArcElement,
-    Title,
-    Tooltip,
-    Legend,
-    Filler
-);
+// ✅ Lazy registration flag to prevent multiple registrations
+let chartRegistered = false;
+
+// ✅ Register Chart.js components lazily (only once)
+const registerChartJS = () => {
+    if (!chartRegistered) {
+        ChartJS.register(
+            CategoryScale,
+            LinearScale,
+            PointElement,
+            LineElement,
+            BarElement,
+            ArcElement,
+            Title,
+            Tooltip,
+            Legend,
+            Filler
+        );
+        chartRegistered = true;
+    }
+};
 
 // ============================================================
 // CHART OPTIONS
@@ -98,7 +107,13 @@ interface LineChartProps {
 }
 
 export const LineChart: React.FC<LineChartProps> = ({ data, title, height = '300px' }) => {
-    const chartData = {
+    // ✅ Ensure Chart.js is registered before rendering
+    useEffect(() => {
+        registerChartJS();
+    }, []);
+
+    // ✅ Performance: Memoize chart data to avoid recalculation on every render
+    const chartData = useMemo(() => ({
         labels: data.labels,
         datasets: data.datasets.map(dataset => ({
             ...dataset,
@@ -107,7 +122,7 @@ export const LineChart: React.FC<LineChartProps> = ({ data, title, height = '300
             fill: dataset.fill ?? true,
             tension: 0.4
         }))
-    };
+    }), [data.labels, data.datasets]);
 
     return (
         <div style={{ height }}>
@@ -137,7 +152,13 @@ interface BarChartProps {
 }
 
 export const BarChart: React.FC<BarChartProps> = ({ data, title, height = '300px' }) => {
-    const chartData = {
+    // ✅ Ensure Chart.js is registered before rendering
+    useEffect(() => {
+        registerChartJS();
+    }, []);
+
+    // ✅ Performance: Memoize chart data to avoid recalculation on every render
+    const chartData = useMemo(() => ({
         labels: data.labels,
         datasets: data.datasets.map(dataset => ({
             ...dataset,
@@ -149,7 +170,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, title, height = '300px
                 'rgba(251, 191, 36, 0.8)'
             ]
         }))
-    };
+    }), [data.labels, data.datasets]);
 
     return (
         <div style={{ height }}>
@@ -178,7 +199,13 @@ interface DoughnutChartProps {
 }
 
 export const DoughnutChart: React.FC<DoughnutChartProps> = ({ data, title, height = '300px' }) => {
-    const chartData = {
+    // ✅ Ensure Chart.js is registered before rendering
+    useEffect(() => {
+        registerChartJS();
+    }, []);
+
+    // ✅ Performance: Memoize chart data to avoid recalculation on every render
+    const chartData = useMemo(() => ({
         labels: data.labels,
         datasets: data.datasets.map(dataset => ({
             ...dataset,
@@ -190,7 +217,7 @@ export const DoughnutChart: React.FC<DoughnutChartProps> = ({ data, title, heigh
                 'rgba(251, 191, 36, 0.8)'
             ]
         }))
-    };
+    }), [data.labels, data.datasets]);
 
     return (
         <div style={{ height }}>
