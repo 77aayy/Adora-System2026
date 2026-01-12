@@ -25,14 +25,6 @@ const fixModulePreloadOrder = () => {
             
             let html = fs.readFileSync(indexPath, 'utf-8');
             
-            // ✅ Find vendor-charts file in assets
-            let chartsFileName: string | null = null;
-            if (fs.existsSync(assetsPath)) {
-                const files = fs.readdirSync(assetsPath);
-                const chartsFile = files.find(f => f.includes('vendor-charts') && f.endsWith('.js'));
-                if (chartsFile) chartsFileName = chartsFile;
-            }
-            
             // Extract all modulepreload links
             const preloadRegex = /<link rel="modulepreload"[^>]*href="([^"]+)"[^>]*>/g;
             const preloads: string[] = [];
@@ -42,22 +34,16 @@ const fixModulePreloadOrder = () => {
                 preloads.push(match[0]);
             }
             
-            // ✅ Add vendor-charts if found but not in preloads
-            if (chartsFileName && !preloads.some(p => p.includes('vendor-charts'))) {
-                preloads.push(`<link rel="modulepreload" crossorigin href="/assets/${chartsFileName}">`);
-            }
-            
             if (preloads.length === 0) return;
             
-            // Sort preloads: vendor-react first, then vendor, then vendor-firebase, then charts, then others
+            // Sort preloads: vendor-react first, then vendor, then vendor-firebase, then others
             const sortOrder = (link: string): number => {
                 if (link.includes('vendor-react')) return 0;
-                if (link.includes('/vendor-') && !link.includes('vendor-firebase') && !link.includes('vendor-charts')) return 1;
+                if (link.includes('/vendor-') && !link.includes('vendor-firebase')) return 1;
                 if (link.includes('vendor-firebase')) return 2;
-                if (link.includes('vendor-charts')) return 3;
-                if (link.includes('service-')) return 4;
-                if (link.includes('feature-')) return 5;
-                return 6;
+                if (link.includes('service-')) return 3;
+                if (link.includes('feature-')) return 4;
+                return 5;
             };
             
             const sortedPreloads = [...preloads].sort((a, b) => sortOrder(a) - sortOrder(b));
@@ -243,25 +229,20 @@ export default defineConfig({
             output: {
                 manualChunks: (id) => {
                     // ✅ ONLY split node_modules to avoid circular dependencies
-                    // Application code stays in main bundle for proper initialization order
                     if (id.includes('node_modules')) {
                         // ✅ React MUST be first and separate
                         if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
                             return 'vendor-react';
                         }
-                        // ✅ ALL Charts in ONE chunk (fixes circular dependency issues)
-                        if (id.includes('chart.js') || id.includes('react-chartjs-2') || id.includes('recharts') || id.includes('recharts-scale') || id.includes('d3-')) {
-                            return 'vendor-charts';
-                        }
-                        // ✅ Firebase (large)
+                        // ✅ Firebase (large) - separate chunk
                         if (id.includes('firebase')) {
                             return 'vendor-firebase';
                         }
-                        // ✅ All other node_modules
+                        // ✅ ALL OTHER node_modules (including charts) stay in ONE vendor chunk
+                        // This fixes circular dependency issues with chart.js/recharts/d3
                         return 'vendor';
                     }
-                    // ✅ NO feature/service splitting - keeps everything in main bundle
-                    // This prevents circular chunk dependencies
+                    // Application code stays in main bundle
                 },
                 // أسماء ملفات مُحسَّنة
                 chunkFileNames: 'assets/[name]-[hash].js',
