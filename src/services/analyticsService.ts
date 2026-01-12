@@ -6,6 +6,7 @@
 
 import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, limit, startAfter } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // HELPERS
@@ -171,7 +172,7 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         const tenants = tenantsSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        }));
+        })) as Array<{ id: string; info?: any; [key: string]: any }>;
         
         const activeTenants = tenants.filter(t => t.info?.status === 'active').length;
         const suspendedTenants = tenants.filter(t => t.info?.status === 'suspended').length;
@@ -432,11 +433,11 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
         const tenants = tenantsSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        }));
+        })) as Array<{ id: string; info?: any; [key: string]: any }>;
         
         // ✅ Get all managers to map codes and cached stats (also cached!)
         const { getAllManagers } = await import('./ownerService');
-        const managers = await getAllManagers();
+        const managers = await getAllManagers() as Array<any>; // ✅ Cast to any to allow dynamic properties
         
         const analytics: TenantAnalytics[] = [];
         

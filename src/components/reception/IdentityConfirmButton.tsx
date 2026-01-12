@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserCheck, Shield, AlertTriangle, Loader2, Eye, EyeOff, Phone, IdCard } from 'lucide-react';
 import { fetchGuestInfoForReception, confirmGuestIdentity } from '../../services/identityCheckService';
-import { useToast } from '../../hooks/useToast';
+import { useToast } from '../../context/ToastContext';
 
 // ============================================================
 // TYPES

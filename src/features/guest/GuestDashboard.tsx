@@ -1237,7 +1237,6 @@ export const GuestDashboard: React.FC = () => {
                 icon: icon || '/adora-logo.png',
                 badge: '/icon-192x192.png',
                 tag: 'adora-request-update',
-                renotify: true,
                 requireInteraction: false,
                 silent: false
             });

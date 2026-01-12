@@ -695,6 +695,32 @@ export async function awardPoints(
 }
 
 /**
+ * Get employee points (simple helper)
+ */
+export async function getEmployeePoints(
+    tenantId: string,
+    employeeId: string
+): Promise<number> {
+    try {
+        if (!db) return 0;
+        const employeeRef = doc(db, `tenants/${tenantId}/employees`, employeeId);
+        const employeeDoc = await getDoc(employeeRef);
+
+        if (!employeeDoc.exists()) {
+            // Try users collection as fallback
+            const userRef = doc(db, 'users', employeeId);
+            const userDoc = await getDoc(userRef);
+            return userDoc.exists() ? (userDoc.data().points || 0) : 0;
+        }
+
+        return employeeDoc.data().points || employeeDoc.data().personalPoints || 0;
+    } catch (error) {
+        console.error('Error getting employee points:', error);
+        return 0;
+    }
+}
+
+/**
  * Get employee points summary
  */
 export async function getPointsSummary(

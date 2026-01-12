@@ -2367,7 +2367,7 @@ const TenantsTab: React.FC<{
                                                     const currentPrice = subscription?.pricePerMonth || 0;
                                                     
                                                     // Renew license and check for price warning
-                                                    const result = await renewLicense(manager.id, tenant.tenantId, currentPrice, defaultPrice);
+                                                    const result = await renewLicense(manager.id, tenant.tenantId, 1, currentPrice, defaultPrice);
                                                     
                                                     // Show warning if price is below default
                                                     if (result.warning) {

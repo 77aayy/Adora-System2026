@@ -169,7 +169,7 @@ export interface Branch {
     code: string; // ✅ Mandatory for Login logic
     logoUrl?: string; // Optional branding
     tenantId: string;
-    status: 'active' | 'inactive';
+    status: 'active' | 'inactive' | 'deleted' | 'scheduled_for_deletion';
 }
 
 export interface Room {

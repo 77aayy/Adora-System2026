@@ -116,7 +116,7 @@ export const suggestUniquePin = async (): Promise<string> => {
  */
 export const createManager = async (data: {
     name: string;
-    phone: string; // ✅ رقم هاتف المدير (إجباري)
+    phone?: string; // ✅ رقم هاتف المدير (اختياري)
     code: string;
     hotelName?: string; // Optional hotel name for the tenant
     maxBranches?: number; // ✅ License: Maximum number of branches allowed

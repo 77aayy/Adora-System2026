@@ -2738,7 +2738,7 @@ const ExpenseVouchersTab: React.FC<{
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">التاريخ / الوقت:</span>
-                                <span class="detail-value">${formattedDate} (الميلادي)<br>${hijriDate} (الهجري)</span>
+                                <span class="detail-value">${gregorianDate} (الميلادي)<br>${hijriDate} (الهجري)</span>
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">دفع لـ:</span>
@@ -3373,7 +3373,7 @@ const InvoicesTab: React.FC<{
                 return `
                     <tr style="border-bottom: 1px solid #e5e7eb;">
                         <td style="padding: 8px 6px; text-align: center; font-size: 9pt; color: #1f2937; font-weight: 600;">${invoice.invoiceNumber || '-'}</td>
-                        <td style="padding: 8px 6px; text-align: right; font-size: 9pt; color: #1f2937;">${formattedDate}</td>
+                        <td style="padding: 8px 6px; text-align: right; font-size: 9pt; color: #1f2937;">${gregorianDate}<br><span style="font-size: 8pt; color: #6b7280;">${hijriDate}</span></td>
                         <td style="padding: 8px 6px; text-align: right; font-size: 9pt; color: #1f2937;">${invoice.managerName || '-'}</td>
                         <td style="padding: 8px 6px; text-align: center; font-size: 9pt; color: #1f2937;">${invoice.managerCode || '-'}</td>
                         <td style="padding: 8px 6px; text-align: center; font-size: 9pt; color: #1f2937;">${invoice.branchCode || '-'}</td>

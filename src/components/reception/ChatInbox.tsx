@@ -359,8 +359,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
                     new Notification('💬 رسالة جديدة من نزيل', {
                         body: `لديك ${newMsgCount} رسالة جديدة في الشات`,
                         icon: '/adora-logo.png',
-                        tag: 'chat-notification',
-                        renotify: true
+                        tag: 'chat-notification'
                     });
                 }
             }
