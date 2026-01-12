@@ -227,23 +227,9 @@ export default defineConfig({
         assetsInlineLimit: 4096, // Inline assets smaller than 4KB
         rollupOptions: {
             output: {
-                manualChunks: (id) => {
-                    // ✅ ONLY split node_modules to avoid circular dependencies
-                    if (id.includes('node_modules')) {
-                        // ✅ React MUST be first and separate
-                        if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
-                            return 'vendor-react';
-                        }
-                        // ✅ Firebase (large) - separate chunk
-                        if (id.includes('firebase')) {
-                            return 'vendor-firebase';
-                        }
-                        // ✅ ALL OTHER node_modules (including charts) stay in ONE vendor chunk
-                        // This fixes circular dependency issues with chart.js/recharts/d3
-                        return 'vendor';
-                    }
-                    // Application code stays in main bundle
-                },
+                // ✅ Let Vite/Rollup handle chunking automatically
+                // Manual chunks cause circular dependency issues with chart libraries
+                manualChunks: undefined,
                 // أسماء ملفات مُحسَّنة
                 chunkFileNames: 'assets/[name]-[hash].js',
                 entryFileNames: 'assets/[name]-[hash].js',
