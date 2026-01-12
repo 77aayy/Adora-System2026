@@ -24,6 +24,17 @@ import { PageTransition } from '../../components/common/PageTransition';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
 
 // ============================================================
+// HELPER: Safe Date Conversion (handles Firestore Timestamps)
+// ============================================================
+const toSafeDate = (dateValue: any): Date => {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Timestamp) return dateValue.toDate();
+    if (typeof dateValue?.toDate === 'function') return dateValue.toDate();
+    if (dateValue instanceof Date) return dateValue;
+    return new Date(dateValue);
+};
+
+// ============================================================
 // TYPES
 // ============================================================
 
@@ -346,7 +357,7 @@ export const SuperAdminMasterAccess: React.FC = () => {
                                             انتهاء الرخصة
                                         </div>
                                         <p className="text-sm font-bold text-white">
-                                            {selectedTenant.licenseExpiry.toLocaleDateString('ar-EG')}
+                                            {toSafeDate(selectedTenant.licenseExpiry).toLocaleDateString('ar-EG')}
                                         </p>
                                     </div>
                                 </div>

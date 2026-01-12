@@ -7,10 +7,86 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// ✅ Plugin to fix modulepreload order - vendor-react MUST load first
+const fixModulePreloadOrder = () => {
+    return {
+        name: 'fix-modulepreload-order',
+        enforce: 'post' as const,
+        closeBundle() {
+            // ✅ Run after all files are written
+            const distPath = path.resolve(__dirname, 'dist');
+            const indexPath = path.join(distPath, 'index.html');
+            const assetsPath = path.join(distPath, 'assets');
+            
+            if (!fs.existsSync(indexPath)) return;
+            
+            let html = fs.readFileSync(indexPath, 'utf-8');
+            
+            // ✅ Find vendor-chartjs file in assets
+            let chartJsFileName: string | null = null;
+            if (fs.existsSync(assetsPath)) {
+                const files = fs.readdirSync(assetsPath);
+                const chartJsFile = files.find(f => f.includes('vendor-chartjs') && f.endsWith('.js'));
+                if (chartJsFile) chartJsFileName = chartJsFile;
+            }
+            
+            // Extract all modulepreload links
+            const preloadRegex = /<link rel="modulepreload"[^>]*href="([^"]+)"[^>]*>/g;
+            const preloads: string[] = [];
+            let match;
+            
+            while ((match = preloadRegex.exec(html)) !== null) {
+                preloads.push(match[0]);
+            }
+            
+            // ✅ Add vendor-chartjs if found but not in preloads
+            if (chartJsFileName && !preloads.some(p => p.includes('vendor-chartjs'))) {
+                preloads.push(`<link rel="modulepreload" crossorigin href="/assets/${chartJsFileName}">`);
+            }
+            
+            if (preloads.length === 0) return;
+            
+            // Sort preloads: vendor-react first, then vendor, then vendor-firebase, then others
+            const sortOrder = (link: string): number => {
+                if (link.includes('vendor-react')) return 0;
+                if (link.includes('/vendor-') && !link.includes('vendor-firebase') && !link.includes('vendor-recharts') && !link.includes('vendor-chartjs')) return 1;
+                if (link.includes('vendor-firebase')) return 2;
+                if (link.includes('vendor-chartjs')) return 3;
+                if (link.includes('vendor-recharts')) return 4;
+                if (link.includes('service-')) return 5;
+                if (link.includes('feature-')) return 6;
+                return 7;
+            };
+            
+            const sortedPreloads = [...preloads].sort((a, b) => sortOrder(a) - sortOrder(b));
+            
+            // Remove all existing preloads
+            let newHtml = html;
+            for (const preload of preloads) {
+                newHtml = newHtml.replace(preload, '');
+            }
+            
+            // Add sorted preloads before </head>
+            const preloadBlock = sortedPreloads.join('\n  ');
+            newHtml = newHtml.replace('</head>', `  ${preloadBlock}\n</head>`);
+            
+            // Clean up extra whitespace
+            newHtml = newHtml.replace(/\n\s*\n\s*\n/g, '\n\n');
+            
+            // ✅ Write back
+            fs.writeFileSync(indexPath, newHtml, 'utf-8');
+            console.log('✅ Fixed modulepreload order');
+        },
+    };
+};
 
 export default defineConfig({
     plugins: [
         react(),
+        fixModulePreloadOrder(),
         // PWA Configuration
         VitePWA({
             registerType: 'autoUpdate',
@@ -117,6 +193,9 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': '/src',
+            // ✅ Redirect lodash to lodash-es for proper ESM support
+            // This fixes "does not provide an export named 'default'" errors
+            'lodash': 'lodash-es',
         },
     },
     server: {
@@ -139,42 +218,24 @@ export default defineConfig({
             'firebase/auth',
             'firebase/firestore',
             'lucide-react',
-            'lodash'
+            // ✅ Use lodash-es for proper ESM support (lodash is CommonJS)
+            'lodash-es',
+            // ✅ CRITICAL: Include chart.js and react-chartjs-2 in pre-bundling
+            // This ensures they are loaded early and added to modulepreload
+            'chart.js',
+            'react-chartjs-2',
+            // ✅ Include recharts and its lodash dependency
+            'recharts'
         ],
-        // ✅ Exclude chart libraries from pre-bundling to avoid initialization conflicts
-        exclude: ['chart.js', 'react-chartjs-2', 'recharts'],
     },
     build: {
         outDir: 'dist',
         sourcemap: false,
         // ✅ تحسين حجم الـ chunks
         chunkSizeWarningLimit: 600,
-        // ✅ تحسين الـ minification
-        minify: 'terser',
-        target: 'es2020', // Modern browsers for smaller bundles
-        terserOptions: {
-            compress: {
-                drop_console: true, // إزالة console.log في الإنتاج
-                drop_debugger: true,
-                pure_funcs: ['console.log', 'console.info', 'console.warn', 'console.debug'], // إزالة جميع console
-                passes: 2, // ✅ Reduced from 3 to avoid initialization order issues
-                ecma: 2020,
-                unsafe: false, // ✅ CRITICAL: Disabled to prevent 'ft' initialization errors
-                unsafe_arrows: false, // ✅ Disabled for chart libraries compatibility
-                unsafe_methods: false, // ✅ Disabled for chart libraries compatibility
-                keep_infinity: true, // ✅ Preserve Infinity for physics calculations
-            },
-            format: {
-                comments: false, // Remove comments
-                ecma: 2020,
-            },
-            mangle: {
-                safari10: true,
-                keep_classnames: false, // ✅ Allow class name mangling
-                keep_fnames: false, // ✅ Allow function name mangling
-                reserved: ['Chart', 'ChartJS'], // ✅ Preserve Chart.js class names
-            },
-        },
+        // ✅ Use esbuild for minification (safer than Terser, less aggressive)
+        minify: 'esbuild',
+        target: 'es2020',
         // ✅ CSS code splitting
         cssCodeSplit: true,
         // ✅ Optimize asset names
@@ -182,55 +243,29 @@ export default defineConfig({
         rollupOptions: {
             output: {
                 manualChunks: (id) => {
-                    // ✅ Node modules
+                    // ✅ ONLY split node_modules to avoid circular dependencies
+                    // Application code stays in main bundle for proper initialization order
                     if (id.includes('node_modules')) {
-                        // React core
+                        // ✅ React MUST be first and separate
                         if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
                             return 'vendor-react';
                         }
-                        // React Router
-                        if (id.includes('react-router')) {
-                            return 'vendor-router';
-                        }
-                        // Firebase (large, separate chunk)
-                        if (id.includes('firebase')) {
-                            return 'vendor-firebase';
-                        }
-                        // ✅ Chart libraries - separate chunks to avoid initialization conflicts
-                        // CRITICAL: Must be separate to prevent 'ft' initialization errors
+                        // ✅ Chart.js separate from Recharts
                         if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
                             return 'vendor-chartjs';
                         }
                         if (id.includes('recharts') || id.includes('recharts-scale')) {
                             return 'vendor-recharts';
                         }
-                        // UI libraries
-                        if (id.includes('lucide-react')) {
-                            return 'vendor-ui';
+                        // ✅ Firebase (large)
+                        if (id.includes('firebase')) {
+                            return 'vendor-firebase';
                         }
-                        // Other node_modules
+                        // ✅ All other node_modules
                         return 'vendor';
                     }
-                    // ✅ Features by route (code splitting)
-                    if (id.includes('/features/')) {
-                        if (id.includes('/admin/')) return 'feature-admin';
-                        if (id.includes('/reception/')) return 'feature-reception';
-                        if (id.includes('/housekeeping/')) return 'feature-housekeeping';
-                        if (id.includes('/bellman/')) return 'feature-bellman';
-                        if (id.includes('/maintenance/')) return 'feature-maintenance';
-                        if (id.includes('/procurement/')) return 'feature-procurement';
-                        if (id.includes('/super-admin/')) return 'feature-super-admin';
-                        if (id.includes('/coffeeshop/')) return 'feature-coffeeshop';
-                        if (id.includes('/guest/')) return 'feature-guest';
-                        if (id.includes('/auth/')) return 'feature-auth';
-                        return 'feature-other';
-                    }
-                    // ✅ Services (lazy loaded)
-                    if (id.includes('/services/')) {
-                        if (id.includes('firebase')) return 'service-firebase';
-                        if (id.includes('billing') || id.includes('payment')) return 'service-billing';
-                        return 'service-core';
-                    }
+                    // ✅ NO feature/service splitting - keeps everything in main bundle
+                    // This prevents circular chunk dependencies
                 },
                 // أسماء ملفات مُحسَّنة
                 chunkFileNames: 'assets/[name]-[hash].js',

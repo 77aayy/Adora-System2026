@@ -8,6 +8,34 @@ import { collection, query, where, getDocs, getCountFromServer, Timestamp, order
 import { db } from './firebase';
 
 // ============================================================
+// HELPERS
+// ============================================================
+
+/**
+ * Safely convert Firestore Timestamp, Date, string, or number to JavaScript Date
+ * Handles all edge cases to prevent "toLocaleDateString is not a function" errors
+ */
+const toSafeDate = (value: unknown, fallback: Date = new Date()): Date => {
+    if (!value) return fallback;
+    
+    // Already a Date
+    if (value instanceof Date) return value;
+    
+    // Firestore Timestamp (has toDate method)
+    if (typeof (value as Timestamp)?.toDate === 'function') {
+        return (value as Timestamp).toDate();
+    }
+    
+    // String or number timestamp
+    if (typeof value === 'string' || typeof value === 'number') {
+        const parsed = new Date(value);
+        return isNaN(parsed.getTime()) ? fallback : parsed;
+    }
+    
+    return fallback;
+};
+
+// ============================================================
 // TYPES
 // ============================================================
 
@@ -148,8 +176,9 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         const activeTenants = tenants.filter(t => t.info?.status === 'active').length;
         const suspendedTenants = tenants.filter(t => t.info?.status === 'suspended').length;
         const expiredTenants = tenants.filter(t => {
-            const expiry = t.info?.licenseExpiry?.toDate();
-            return expiry && expiry < new Date();
+            if (!t.info?.licenseExpiry) return false;
+            const expiry = toSafeDate(t.info.licenseExpiry, new Date(0));
+            return expiry < new Date();
         }).length;
         
         // Plan distribution - from already loaded data (no extra queries!)
@@ -426,8 +455,8 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
             const totalBranches = cachedStats.totalBranches || manager?.branchCodes?.length || manager?.maxBranches || 1;
             
             // Calculate license expiry
-            const licenseExpiry = info.licenseExpiry?.toDate();
-            const daysUntilExpiry = licenseExpiry
+            const licenseExpiry = toSafeDate(info.licenseExpiry, new Date(0));
+            const daysUntilExpiry = info.licenseExpiry
                 ? Math.ceil((licenseExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
                 : 0;
             
@@ -443,12 +472,12 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
                 totalRooms: cachedStats.totalRooms || 0,
                 totalRequests: cachedStats.totalRequests || 0,
                 totalRequestsToday: cachedStats.totalRequestsToday || 0,
-                lastActivity: cachedStats.lastActivity?.toDate?.() || new Date(),
+                lastActivity: toSafeDate(cachedStats.lastActivity),
                 activeEmployees: cachedStats.activeEmployees || 0,
                 activeSessions: cachedStats.activeSessions || 0,
                 featuresUsed: cachedStats.featuresUsed || {},
-                subscriptionStartDate: info.createdAt?.toDate() || new Date(),
-                licenseExpiryDate: licenseExpiry || new Date(),
+                subscriptionStartDate: toSafeDate(info.createdAt),
+                licenseExpiryDate: toSafeDate(licenseExpiry),
                 daysUntilExpiry,
                 paymentStatus: info.paymentStatus || 'pending',
                 employeesGrowth: cachedStats.employeesGrowth || 0,
@@ -488,8 +517,8 @@ export const getTenantAnalyticsById = async (tenantId: string): Promise<TenantAn
         const totalBranches = cachedStats.totalBranches || info?.maxBranches || 1;
         
         // Calculate license expiry
-        const licenseExpiry = info.licenseExpiry?.toDate();
-        const daysUntilExpiry = licenseExpiry
+        const licenseExpiry = toSafeDate(info.licenseExpiry, new Date(0));
+        const daysUntilExpiry = info.licenseExpiry
             ? Math.ceil((licenseExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
             : 0;
         
@@ -503,12 +532,12 @@ export const getTenantAnalyticsById = async (tenantId: string): Promise<TenantAn
             totalRooms: cachedStats.totalRooms || 0,
             totalRequests: cachedStats.totalRequests || 0,
             totalRequestsToday: cachedStats.totalRequestsToday || 0,
-            lastActivity: cachedStats.lastActivity?.toDate?.() || new Date(),
+            lastActivity: toSafeDate(cachedStats.lastActivity),
             activeEmployees: cachedStats.activeEmployees || 0,
             activeSessions: cachedStats.activeSessions || 0,
             featuresUsed: cachedStats.featuresUsed || {},
-            subscriptionStartDate: info.createdAt?.toDate() || new Date(),
-            licenseExpiryDate: licenseExpiry || new Date(),
+            subscriptionStartDate: toSafeDate(info.createdAt),
+            licenseExpiryDate: toSafeDate(licenseExpiry),
             daysUntilExpiry,
             paymentStatus: info.paymentStatus || 'pending',
             employeesGrowth: cachedStats.employeesGrowth || 0,

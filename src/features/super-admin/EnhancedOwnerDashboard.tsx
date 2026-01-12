@@ -92,6 +92,24 @@ import { DemoLinkManager } from '../../components/owner/DemoLinkManager';
 type TabType = 'overview' | 'tenants' | 'settings' | 'analytics' | 'updates' | 'broadcasts' | 'billing' | 'core-config' | 'demo';
 
 // ============================================================
+// HELPER: Safe Date Conversion (handles Firestore Timestamps)
+// ============================================================
+/**
+ * Safely convert any date-like value to a JavaScript Date
+ * Handles: Firestore Timestamp, Date object, timestamp number, ISO string
+ */
+const toSafeDate = (dateValue: any): Date => {
+    if (!dateValue) return new Date();
+    // Firestore Timestamp
+    if (dateValue instanceof Timestamp) return dateValue.toDate();
+    if (typeof dateValue?.toDate === 'function') return dateValue.toDate();
+    // Already a Date
+    if (dateValue instanceof Date) return dateValue;
+    // Timestamp number or ISO string
+    return new Date(dateValue);
+};
+
+// ============================================================
 // LOCAL STORAGE CACHE - Persistent across page reloads
 // ============================================================
 const CACHE_KEY_PREFIX = 'adora_owner_cache_';
@@ -1135,13 +1153,13 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                     <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
                                         <span className="text-white/80">تاريخ البدء</span>
                                         <span className="text-white font-medium">
-                                            {selectedManager.subscriptionStartDate.toLocaleDateString('ar-EG')}
+                                            {toSafeDate(selectedManager.subscriptionStartDate).toLocaleDateString('ar-EG')}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
                                         <span className="text-white/80">تاريخ الانتهاء</span>
                                         <span className="text-white font-medium">
-                                            {selectedManager.licenseExpiryDate.toLocaleDateString('ar-EG')}
+                                            {toSafeDate(selectedManager.licenseExpiryDate).toLocaleDateString('ar-EG')}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">

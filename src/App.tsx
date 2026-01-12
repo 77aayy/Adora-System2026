@@ -48,6 +48,11 @@ import { UpdateNotifications } from './components/system/UpdateNotifications';
 import { UnifiedManagerHeader } from './components/layout/UnifiedManagerHeader';
 import './index.css';
 
+// ✅ CRITICAL: Pre-import Chart.js to ensure vendor-chartjs is in dependency graph
+// This ensures it's added to modulepreload automatically by Vite
+import 'chart.js';
+import 'react-chartjs-2';
+
 // ⚡ Performance: Route preloading
 import { useRoutePreload, preloadAdjacentRoutes } from './hooks/useRoutePreload';
 

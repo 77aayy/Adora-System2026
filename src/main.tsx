@@ -14,6 +14,11 @@ import './styles/guest-unified.css';
 // Initialize i18n (Arabic/English)
 import './i18n';
 
+// ✅ CRITICAL: Pre-import Chart.js to ensure it's in the dependency graph
+// This ensures vendor-chartjs is added to modulepreload automatically
+import 'chart.js';
+import 'react-chartjs-2';
+
 // ✅ Force unregister Service Workers in development to prevent caching issues
 if (import.meta.env.DEV) {
     // Unregister all service workers
