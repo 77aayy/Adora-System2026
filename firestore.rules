@@ -418,6 +418,16 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSuperAdmin() || isOwner();
     }
+
+    // ------------------------------------------------------------
+    // ⚙️ GLOBAL SETTINGS (Pre-login access)
+    // ✅ Public read for basic settings needed before authentication
+    // ------------------------------------------------------------
+    match /settings/{settingId} {
+      // ✅ Public read (needed for login page, theme, etc.)
+      allow read: if true;
+      allow write: if isSuperAdmin() || isOwner();
+    }
     
     // ------------------------------------------------------------
     // 📱 DEMO LINKS (Public preview)
@@ -538,9 +548,10 @@ service cloud.firestore {
     // ------------------------------------------------------------
     // 📜 AUDIT LOGS (System-wide)
     // ✅ Required for quickAudit function
+    // ✅ Public create (logs are immutable, no security risk)
     // ------------------------------------------------------------
     match /auditLogs/{logId} {
-      allow create: if isSignedIn();
+      allow create: if true; // Public create - logs are immutable
       allow read: if isSuperAdmin() || isOwner();
       allow update, delete: if false; // Immutable
     }

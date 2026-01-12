@@ -38,6 +38,7 @@ export interface FirebaseConfig {
     storageBucket: string;
     messagingSenderId?: string;
     appId?: string;
+    measurementId?: string;
 }
 
 // ============================================================
@@ -192,13 +193,18 @@ const initializeFirebaseServices = () => {
         storage = getStorage(app);
         isConfigured = true;
 
-        // Initialize Analytics only if appId is provided
-        if (typeof window !== 'undefined' && config.appId && !config.appId.includes('YOUR_')) {
+        // Initialize Analytics only if measurementId is provided
+        // Note: Firebase Analytics requires measurementId, not just appId
+        const measurementId = (config as any).measurementId;
+        if (typeof window !== 'undefined' && measurementId && !measurementId.includes('YOUR_') && measurementId !== 'undefined') {
             try {
                 analytics = getAnalytics(app);
+                console.log('📊 Analytics initialized with measurement ID');
             } catch (e) {
                 console.warn('⚠️ Analytics not available:', e);
             }
+        } else {
+            console.log('ℹ️ Analytics not configured - measurementId not provided');
         }
 
         // 🛡️ Initialize App Check (Budget Protection)
