@@ -46,6 +46,7 @@ import { uploadInspectionPhoto } from '../../services/storageService';
 import { PhotoUpload } from '../../components/shared/PhotoUpload';
 import { updateRoomStatus } from '../../services/roomService';
 import { usei18n } from '../../i18n/i18nContext';
+import { useBrandName } from '../../hooks/useBrandName';
 
 // Shared Components
 import { ShiftNotes } from '../../components/shared/ShiftNotes';
@@ -808,6 +809,7 @@ export const HousekeepingDashboard: React.FC = () => {
     const tenantId = tenantContext.tenantId;
     const { success, error, haptic, playSound } = useUX();
     const { t } = usei18n();
+    const brandName = useBrandName();
 
     // State
     const [tasks, setTasks] = useState<CleaningRequest[]>([]);
@@ -1663,12 +1665,9 @@ export const HousekeepingDashboard: React.FC = () => {
             <FlexibleHeader
                 title="الهاوس كيبنج"
                 titleIcon={<Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400 flex-shrink-0" />}
-                subtitle={
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="truncate">{user?.name}</span>
-                        <PointsTracker employeeId={user?.id || ''} inline showHistory />
-                    </div>
-                }
+                showGreeting={true}
+                brandName={brandName}
+                subtitle={<PointsTracker employeeId={user?.id || ''} inline showHistory />}
                 actions={[
                     {
                         id: 'shiftNotes',

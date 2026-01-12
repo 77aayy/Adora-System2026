@@ -7,11 +7,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-    Crown, Settings, TrendingUp, Users, Building2, Zap,
+    Crown, Settings, TrendingUp, Users, Building2, Zap, Building,
     Bell, AlertTriangle, CheckCircle, MessageSquare, DollarSign,
     Activity, Shield, Database, RefreshCw, Save, Plus, X,
     Play, Pause, Eye, Edit2, Trash2, Upload, ChevronDown, Check, DoorOpen, Search, Calendar, Clock,
-    LayoutDashboard, CreditCard, BarChart3, Menu
+    LayoutDashboard, CreditCard, BarChart3, Menu, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
@@ -40,6 +40,7 @@ import { LineChart, BarChart, DoughnutChart } from '../../components/analytics/C
 import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
 import { FileText, AlertCircle, Download, Code2, Palette } from 'lucide-react';
 import { useAllBranchesForOwner } from '../../hooks/useTenantData'; // ✅ SaaS Integration
+import { clearAllCache as clearRequestCache } from '../../utils/requestCache'; // ✅ For force refresh
 import { StatCard } from '../../components/common/StatCard'; // ✅ Use project StatCard
 import { DataHealthReportCard } from '../../components/admin/DataHealthReportCard'; // ✅ Data Health Report
 import {
@@ -314,6 +315,20 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         
         loadDataRef.current = true;
         console.log(forceRefresh ? '🔄 Force refresh requested' : '📦 Loading with cache...');
+        
+        // ✅ FIX: Clear ALL caches when force refresh requested
+        if (forceRefresh) {
+            console.log('🗑️ Clearing all cached data...');
+            // Clear localStorage cache
+            localStorage.removeItem(CACHE_KEY_PREFIX + 'settings');
+            localStorage.removeItem(CACHE_KEY_PREFIX + 'analytics');
+            localStorage.removeItem(CACHE_KEY_PREFIX + 'revenue');
+            localStorage.removeItem(CACHE_KEY_PREFIX + 'tenants');
+            localStorage.removeItem(CACHE_KEY_PREFIX + 'multiBranch');
+            localStorage.removeItem(CACHE_KEY_PREFIX + 'managerStats');
+            // Clear in-memory request cache
+            clearRequestCache();
+        }
         
         // ✅ PHASE 0: Show cached data IMMEDIATELY (instant UI)
         if (!forceRefresh) {
@@ -954,7 +969,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         {activeTab === 'tenants' && (
                             <TenantsTab 
                                 tenants={tenants} 
-                                onRefresh={loadData} 
+                                onRefresh={() => loadData(true)}  // ✅ FIX: Force refresh to clear cache
                                 onAddManager={() => setShowAddManagerModal(true)}
                                 onViewDetails={(tenant) => {
                                     console.log('👁️ View Details clicked:', tenant.tenantName, tenant.tenantId);
@@ -1788,10 +1803,66 @@ const TenantsTab: React.FC<{
         };
         loadDeleted();
     }, []);
+    
+    // ✅ Helper function to map deleted manager to TenantAnalytics format
+    // Used in BOTH "deleted" and "all" filters to avoid code duplication
+    const mapDeletedManagerToTenant = useCallback((manager: any): TenantAnalytics & { isDeleted: true } => {
+        // Get license expiry date from various possible fields
+        let licenseExpiryDate: Date;
+        if (manager.licenseExpiry?.toDate) {
+            licenseExpiryDate = manager.licenseExpiry.toDate();
+        } else if (manager.licenseExpiry) {
+            licenseExpiryDate = new Date(manager.licenseExpiry);
+        } else if (manager.tenantBackup?.info?.licenseExpiry?.toDate) {
+            licenseExpiryDate = manager.tenantBackup.info.licenseExpiry.toDate();
+        } else if (manager.tenantBackup?.info?.licenseExpiry) {
+            licenseExpiryDate = new Date(manager.tenantBackup.info.licenseExpiry);
+        } else {
+            licenseExpiryDate = new Date();
+        }
+        
+        // Calculate days until expiry
+        const now = new Date();
+        const daysUntilExpiry = Math.ceil((licenseExpiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        return {
+            tenantId: manager.tenantId || manager.id,
+            tenantName: manager.hotelName || manager.tenantBackup?.info?.name || manager.name || 'غير محدد',
+            managerName: manager.name,
+            managerCode: manager.code,
+            plan: (manager.plan || manager.tenantBackup?.info?.plan || 'basic') as 'basic' | 'pro' | 'enterprise',
+            status: 'deleted' as const,
+            isDeleted: true as const,
+            totalEmployees: manager.cachedStats?.totalUsers || manager.tenantBackup?.info?.cachedStats?.totalUsers || 0,
+            totalBranches: manager.maxBranches || manager.tenantBackup?.info?.maxBranches || 1,
+            totalRooms: manager.cachedStats?.totalRooms || manager.tenantBackup?.info?.cachedStats?.totalRooms || 0,
+            totalRequests: manager.cachedStats?.totalRequests || 0,
+            totalRequestsToday: 0,
+            lastActivity: manager.deletedAt || new Date(),
+            activeEmployees: 0,
+            activeSessions: 0,
+            featuresUsed: {
+                qrCode: 0,
+                pointsSystem: 0,
+                gamification: 0,
+                scheduledTasks: 0
+            },
+            subscriptionStartDate: manager.createdAt?.toDate?.() || new Date(),
+            licenseExpiryDate,
+            daysUntilExpiry,
+            paymentStatus: 'pending' as const,
+            employeesGrowth: 0,
+            requestsGrowth: 0
+        };
+    }, []);
 
     // Filter tenants by status, search, and expiry
     const filteredTenants = useMemo(() => {
-        let filtered = [...tenants];
+        // ✅ FIX: Filter out deleted tenants from the main list to avoid duplicates
+        // When we merge deleted managers later, we don't want them appearing twice
+        let filtered = tenants
+            .filter(t => t.status !== 'deleted')
+            .map(t => ({ ...t })); // Create copies to avoid mutation
 
         // Apply status filter
         if (activeFilter === 'active') {
@@ -1886,35 +1957,18 @@ const TenantsTab: React.FC<{
                 return getDaysUntil(a) - getDaysUntil(b);
             });
         } else if (activeFilter === 'deleted') {
-            // Show deleted managers (from deletedManagers array)
-            return deletedManagers.map(manager => ({
-                tenantId: manager.tenantId || manager.id,
-                tenantName: manager.hotelName || manager.name || 'غير محدد',
-                managerName: manager.name,
-                managerCode: manager.code, // ✅ Add manager code for deleted managers
-                plan: 'basic' as const,
-                status: 'expired' as const,
-                totalEmployees: 0,
-                totalBranches: 0,
-                totalRooms: 0,
-                totalRequests: 0,
-                totalRequestsToday: 0,
-                lastActivity: new Date(),
-                activeEmployees: 0,
-                activeSessions: 0,
-                featuresUsed: {
-                    qrCode: 0,
-                    pointsSystem: 0,
-                    gamification: 0,
-                    scheduledTasks: 0
-                },
-                subscriptionStartDate: new Date(),
-                licenseExpiryDate: new Date(),
-                daysUntilExpiry: 0,
-                paymentStatus: 'pending' as const,
-                employeesGrowth: 0,
-                requestsGrowth: 0
-            }));
+            // ✅ REFACTORED: Use helper function to avoid code duplication
+            return deletedManagers.map(mapDeletedManagerToTenant);
+        }
+        
+        // ✅ REFACTORED: For "all" filter, include deleted managers with special marking
+        // Uses the same helper function to ensure consistent data
+        if (activeFilter === 'all' && deletedManagers.length > 0) {
+            const existingTenantIds = new Set(filtered.map(t => t.tenantId));
+            const deletedMapped = deletedManagers
+                .filter(manager => !existingTenantIds.has(manager.tenantId || manager.id)) // ✅ Avoid duplicates
+                .map(mapDeletedManagerToTenant); // ✅ Use same helper function
+            filtered = [...filtered, ...deletedMapped];
         }
 
         // Apply search filter (by name or code)
@@ -1927,7 +1981,7 @@ const TenantsTab: React.FC<{
         }
 
         return filtered;
-    }, [tenants, activeFilter, searchCode, deletedManagers]);
+    }, [tenants, activeFilter, searchCode, deletedManagers, mapDeletedManagerToTenant]);
 
     // Load manager details with branches
     const loadManagerDetails = async (tenant: TenantAnalytics) => {
@@ -2137,26 +2191,44 @@ const TenantsTab: React.FC<{
                                 : 'لا يوجد مستأجرون'}
                         </p>
                     ) : (
-                        filteredTenants.map((tenant: TenantAnalytics) => {
+                        filteredTenants.map((tenant: TenantAnalytics & { isDeleted?: boolean }) => {
+                            // ✅ Check if this is a deleted manager
+                            const isDeletedManager = (tenant as any).isDeleted === true || 
+                                                     tenant.status === 'deleted' || 
+                                                     activeFilter === 'deleted';
+                            
                             const statusLabel =
-                                tenant.status === 'active'
+                                isDeletedManager
+                                    ? 'محذوف'
+                                    : tenant.status === 'active'
                                     ? 'نشط'
                                     : tenant.status === 'suspended'
                                     ? 'موقوف مؤقتاً'
                                     : 'منتهي / غير فعّال';
 
                             const statusClasses =
-                                tenant.status === 'active'
+                                isDeletedManager
+                                    ? 'bg-gray-500/20 text-gray-300 border-gray-500/50'
+                                    : tenant.status === 'active'
                                     ? 'bg-green-500/15 text-green-300 border-green-500/40'
                                     : tenant.status === 'suspended'
                                     ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/40'
                                     : 'bg-red-500/15 text-red-300 border-red-500/40';
+                            
+                            // ✅ Special card styling for deleted managers
+                            const cardClasses = isDeletedManager
+                                ? 'bg-gradient-to-r from-red-950/30 via-gray-900/40 to-red-950/30 rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all border-2 border-dashed border-red-500/40 relative overflow-hidden opacity-75 hover:opacity-100'
+                                : 'bg-white/5 rounded-lg sm:rounded-xl p-3 sm:p-4 hover:bg-white/10 transition-all';
 
                             return (
                                 <div
                                     key={tenant.tenantId}
-                                    className="bg-white/5 rounded-lg sm:rounded-xl p-3 sm:p-4 hover:bg-white/10 transition-all"
+                                    className={cardClasses}
                                 >
+                                    {/* ✅ Deleted indicator stripe */}
+                                    {isDeletedManager && (
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500/60 via-red-400/80 to-red-500/60" />
+                                    )}
                                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
                                         <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-1">
                                             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 min-w-0">
@@ -2181,9 +2253,10 @@ const TenantsTab: React.FC<{
                                                     <span>{tenant.plan}</span>
                                                 </span>
                                                 <span
-                                                    className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full border ${statusClasses} self-start sm:self-auto`}
+                                                    className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full border ${statusClasses} self-start sm:self-auto flex items-center gap-1`}
                                                 >
-                                                    {activeFilter === 'deleted' ? 'محذوف' : statusLabel}
+                                                    {isDeletedManager && <Trash2 className="w-3 h-3" />}
+                                                    {statusLabel}
                                                 </span>
                                             </div>
                                             <p className="text-[10px] sm:text-xs text-white/40 mt-1 leading-relaxed">
@@ -2203,8 +2276,8 @@ const TenantsTab: React.FC<{
                                             </p>
                                         </div>
                                     <div className="flex gap-2 self-start sm:self-auto">
-                                        {activeFilter === 'deleted' ? (
-                                            // Restore button for deleted managers
+                                        {isDeletedManager ? (
+                                            // Restore button for deleted managers (in any filter)
                                             <button
                                                 onClick={async () => {
                                                     const deletedManager = deletedManagers.find((m: any) => 
@@ -3995,27 +4068,31 @@ const BroadcastModal: React.FC<{
     );
 };
 
-// ✅ Add Manager Modal
+// ✅ Add Manager Modal - Multi-Step Wizard
 const AddManagerModal: React.FC<{
     systemSettings: SystemSettings | null;
     onClose: () => void;
     onSuccess: () => void;
 }> = ({ systemSettings, onClose, onSuccess }) => {
+    // ✅ Wizard Step State
+    const [currentStep, setCurrentStep] = useState(1);
+    const TOTAL_STEPS = 4;
+    
+    // ✅ Step 1: Basic Info
     const [name, setName] = useState('');
-    const [phone, setPhone] = useState(''); // ✅ رقم هاتف المدير (إجباري)
+    const [phone, setPhone] = useState('');
+    const [phoneBackup, setPhoneBackup] = useState(''); // ✅ رقم الهاتف الاحتياطي
     const [code, setCode] = useState('');
     const [hotelName, setHotelName] = useState('');
+    
+    // ✅ Step 2: Branches
     const [branchCodes, setBranchCodes] = useState<Array<{ code: string; name: string }>>([]);
     const [currentBranchCode, setCurrentBranchCode] = useState('');
     const [currentBranchName, setCurrentBranchName] = useState('');
-    const [subscriptionDuration, setSubscriptionDuration] = useState<1 | 2>(1); // ✅ مدة الاشتراك: 1 = سنة، 2 = سنتين
-    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'bank_transfer' | 'deferred'>('cash'); // ✅ طريقة الدفع
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const { user, authReady } = useAuth();
-    const { success: showSuccess, error: showError } = useUX();
-    const [conflictingCodes, setConflictingCodes] = useState<Set<string>>(new Set());
-    const [checkingCodes, setCheckingCodes] = useState(false);
+    
+    // ✅ Step 3: Subscription & Payment
+    const [subscriptionDuration, setSubscriptionDuration] = useState<1 | 2>(1);
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'bank_transfer' | 'deferred'>('cash');
     
     // ✅ Firebase Config for Isolated Tenant Database (SaaS)
     const [firebaseConfig, setFirebaseConfig] = useState<FirebaseConfig>({
@@ -4027,6 +4104,52 @@ const AddManagerModal: React.FC<{
         appId: ''
     });
     const [firebaseTestPassed, setFirebaseTestPassed] = useState(false);
+    
+    // ✅ General State
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const { user, authReady } = useAuth();
+    const { success: showSuccess, error: showError } = useUX();
+    const [conflictingCodes, setConflictingCodes] = useState<Set<string>>(new Set());
+    const [checkingCodes, setCheckingCodes] = useState(false);
+    
+    // ✅ Wizard Navigation
+    const canGoNext = () => {
+        switch (currentStep) {
+            case 1: // Basic Info - اسم المشترك إجباري
+                return name.trim().length >= 2 && phone.length >= 9 && code.length === 4 && /^\d+$/.test(code) && !conflictingCodes.has(code);
+            case 2: // Branches
+                return branchCodes.length > 0;
+            case 3: // Subscription
+                return true; // Always valid
+            case 4: // Review
+                return true;
+            default:
+                return false;
+        }
+    };
+    
+    const handleNext = () => {
+        if (currentStep < TOTAL_STEPS && canGoNext()) {
+            setError('');
+            setCurrentStep(prev => prev + 1);
+        }
+    };
+    
+    const handleBack = () => {
+        if (currentStep > 1) {
+            setError('');
+            setCurrentStep(prev => prev - 1);
+        }
+    };
+    
+    // Step Titles
+    const stepTitles = {
+        1: 'البيانات الأساسية',
+        2: 'الفروع',
+        3: 'الاشتراك والدفع',
+        4: 'المراجعة والحفظ'
+    };
 
     const handleCodeChange = async (newCode: string) => {
         setCode(newCode);
@@ -4054,24 +4177,40 @@ const AddManagerModal: React.FC<{
     };
 
     const handleAddBranch = async () => {
-        if (!currentBranchCode.trim() || !currentBranchName.trim()) return;
+        console.log('🔵 handleAddBranch called', { currentBranchCode, currentBranchName, authReady, user: user?.email });
+        
+        if (!currentBranchCode.trim() || !currentBranchName.trim()) {
+            console.log('🔴 Empty branch code or name');
+            return;
+        }
         const bCode = currentBranchCode.trim();
-        if (bCode.length < 1 || bCode.length > 4 || !/^\d+$/.test(bCode)) {
-            setError('كود الفرع يجب أن يكون بين 1 و 4 أرقام');
+        
+        // ✅ التحقق من كود الفرع:
+        // 1. أرقام فقط (بدون حروف)
+        // 2. من 1 إلى 4 أرقام
+        // 3. لا يبدأ بـ 0
+        if (!/^[1-9]\d{0,3}$/.test(bCode)) {
+            console.log('🔴 Invalid branch code format:', bCode);
+            setError('كود الفرع يجب أن يكون من 1 إلى 4 أرقام، بدون حروف، ولا يبدأ بصفر');
             return;
         }
         if (branchCodes.some(b => b.code === bCode)) {
+            console.log('🔴 Branch code already exists in list');
             setError('كود الفرع موجود بالفعل في قائمتك');
             return;
         }
         if (bCode === code) {
+            console.log('🔴 Branch code same as manager code');
             setError('كود الفرع يجب أن يختلف عن كود المدير الرئيسي');
             return;
         }
+        
+        console.log('🟢 Validation passed, checking PIN availability...');
         setLoading(true);
         setCheckingCodes(true);
         try {
             const available = await isPinAvailable(bCode, { authReady, user: user as any });
+            console.log('🟢 PIN availability result:', available);
             if (!available) {
                 setError(`تحذير: كود الفرع ${bCode} مستخدم بالفعل في مؤسسة أخرى.`);
                 setConflictingCodes(prev => new Set(prev).add(bCode));
@@ -4079,6 +4218,7 @@ const AddManagerModal: React.FC<{
                 setCheckingCodes(false);
                 return;
             }
+            console.log('✅ Adding branch to list...');
             setBranchCodes([...branchCodes, { code: bCode, name: currentBranchName.trim() }]);
             setCurrentBranchCode('');
             setCurrentBranchName('');
@@ -4088,8 +4228,9 @@ const AddManagerModal: React.FC<{
                 next.delete(bCode);
                 return next;
             });
+            console.log('✅ Branch added successfully!');
         } catch (err: any) {
-            console.error('Branch PIN check error:', err);
+            console.error('🔴 Branch PIN check error:', err);
             setError('حدث خطأ أثناء التحقق من كود الفرع. حاول مرة أخرى.');
         } finally {
             setLoading(false);
@@ -4151,23 +4292,37 @@ const AddManagerModal: React.FC<{
             
             // ✅ Create manager with optional isolated Firebase config
             const hasCustomFirebase = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+            
+            // ✅ FIX: Build clean firebaseConfig object without undefined values
+            // Firebase WriteBatch.set() doesn't accept undefined values!
+            const cleanFirebaseConfig = hasCustomFirebase ? (() => {
+                const config: Record<string, string> = {
+                    apiKey: firebaseConfig.apiKey,
+                    authDomain: firebaseConfig.authDomain,
+                    projectId: firebaseConfig.projectId,
+                    storageBucket: firebaseConfig.storageBucket,
+                };
+                // Only add optional fields if they have actual values
+                if (firebaseConfig.messagingSenderId?.trim()) {
+                    config.messagingSenderId = firebaseConfig.messagingSenderId.trim();
+                }
+                if (firebaseConfig.appId?.trim()) {
+                    config.appId = firebaseConfig.appId.trim();
+                }
+                return config;
+            })() : undefined;
+            
             const managerResult = await createManager({
                 name: name.trim() || 'مدير جديد',
                 phone: phone.trim(), // ✅ رقم هاتف المدير (إجباري)
+                phoneBackup: phoneBackup.trim() || undefined, // ✅ رقم الهاتف الاحتياطي (اختياري)
                 code,
                 hotelName: hotelName.trim() || undefined,
                 maxBranches: branchCodes.length,
                 branchCodes: branchCodes.map(b => b.code),
                 branchNames: branchNamesMap,
                 // ✅ SaaS: Store Firebase config if provided (Isolated Multi-Tenancy)
-                firebaseConfig: hasCustomFirebase ? {
-                    apiKey: firebaseConfig.apiKey,
-                    authDomain: firebaseConfig.authDomain,
-                    projectId: firebaseConfig.projectId,
-                    storageBucket: firebaseConfig.storageBucket,
-                    messagingSenderId: firebaseConfig.messagingSenderId || undefined,
-                    appId: firebaseConfig.appId || undefined,
-                } : undefined,
+                firebaseConfig: cleanFirebaseConfig,
             });
             
             // ✅ Get tenantId from manager result
@@ -4538,287 +4693,373 @@ const AddManagerModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" style={{ backdropFilter: 'none' }}>
-            <div className="glass rounded-2xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col">
-                <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            {/* Main Card - Uses existing glass-card pattern */}
+            <div className="glass-card relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl overflow-hidden !p-0">
+                
+                {/* Header */}
+                <div className="p-4 flex items-center justify-between border-b border-theme">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-                            <Plus className="w-5 h-5 text-yellow-400" />
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center">
+                            <Plus className="w-5 h-5 text-white" />
                         </div>
-                        <h3 className="text-lg font-bold text-white">إضافة مدير جديد</h3>
+                        <div>
+                            <h3 className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>إضافة مدير جديد</h3>
+                            <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>{stepTitles[currentStep as keyof typeof stepTitles]}</p>
+                        </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:text-white"
-                    >
+                    <button onClick={onClose} className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-red-500/20 transition-colors" style={{ color: 'var(--theme-text-secondary)' }}>
                         <X className="w-5 h-5" />
                     </button>
                 </div>
-                <div className="p-4 space-y-4 overflow-y-auto">
-                    {/* ✅ One-Click Auto-Fill Button - For quick form filling only */}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            // Generate random data for quick form filling
-                            const demoNames = ['أحمد محمد', 'خالد العمري', 'سعد الغامدي', 'فهد السعيد', 'يوسف الحربي'];
-                            const demoHotels = ['فندق النخيل الذهبي', 'منتجع الشاطئ الأزرق', 'فندق الواحة الخضراء', 'قصر الضيافة الملكي', 'برج السماء'];
-                            const randomCode = String(Math.floor(1000 + Math.random() * 9000));
-                            const randomBranchCode = String(Math.floor(10 + Math.random() * 90));
-                            const randomPhone = '05' + String(Math.floor(10000000 + Math.random() * 90000000));
+                
+                {/* Step Progress */}
+                <div className="px-4 py-3 flex gap-2 border-b border-theme">
+                    {[1, 2, 3, 4].map((step) => (
+                        <div key={step} className="flex-1">
+                            <div className={`h-1.5 rounded-full mb-1 ${
+                                step < currentStep ? 'bg-teal-500' : 
+                                step === currentStep ? 'bg-yellow-500' : 
+                                'bg-gray-300 dark:bg-white/10'
+                            }`} />
+                            <span className="text-[9px] block text-center" style={{ color: step <= currentStep ? 'var(--theme-text-primary)' : 'var(--theme-text-disabled)' }}>
+                                {step === 1 ? 'الأساسية' : step === 2 ? 'الفروع' : step === 3 ? 'الاشتراك' : 'المراجعة'}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+                
+                {/* Step Content */}
+                <div className="p-4 overflow-y-auto flex-1">
+                    {/* ==================== STEP 1: Basic Info ==================== */}
+                    {currentStep === 1 && (
+                        <div className="space-y-4">
+                            {/* Subscriber Name - Required */}
+                            <div>
+                                <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    <Users className="w-4 h-4 text-teal-500" />
+                                    اسم المشترك
+                                    <span className="text-red-500">*</span>
+                                </label>
+                                <input type="text" value={name} onChange={e => setName(e.target.value)} className="input" placeholder="محمد أحمد" required />
+                            </div>
                             
-                            setName(demoNames[Math.floor(Math.random() * demoNames.length)]);
-                            setPhone(randomPhone);
-                            setCode(randomCode);
-                            setHotelName(demoHotels[Math.floor(Math.random() * demoHotels.length)]);
-                            setBranchCodes([{ code: randomBranchCode, name: 'الفرع الرئيسي' }]);
-                        }}
-                        className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 text-purple-300 hover:from-purple-500/30 hover:to-pink-500/30 transition-all flex items-center justify-center gap-2"
-                    >
-                        <Zap className="w-4 h-4" />
-                        <span className="text-sm font-medium">⚡ تعبئة بيانات تلقائية (للتجربة السريعة)</span>
-                    </button>
-                    <p className="text-xs text-white/50 text-center -mt-2">
-                        💡 لإنشاء روابط تجريبية للمشاركة، استخدم تبويب "روابط الديمو" في القائمة
-                    </p>
-
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">اسم المدير (اختياري)</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400"
-                            placeholder="مثال: محمد أحمد"
-                        />
-                    </div>
-                    {/* ✅ رقم هاتف المدير - إجباري */}
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">
-                            رقم هاتف المدير <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                            type="tel"
-                            value={phone}
-                            onChange={e => setPhone(e.target.value.replace(/[^0-9+]/g, ''))}
-                            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-teal-400"
-                            placeholder="05xxxxxxxx"
-                            dir="ltr"
-                        />
-                        <p className="text-xs text-white/40 mt-1">
-                            لسهولة التواصل عند نسيان الكود أو للدعم الفني
-                        </p>
-                    </div>
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">كود المدير (4 أرقام) *</label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={code}
-                                onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                className={`w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-center text-2xl tracking-widest ${conflictingCodes.has(code) ? 'border-yellow-500/50 text-yellow-500' : ''}`}
-                                placeholder="0000"
-                                maxLength={4}
-                            />
-                            {checkingCodes && (
-                                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                                    <AdoraLoaderInline size={16} />
+                            {/* Phone Numbers - Grid Layout */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {/* Primary Phone */}
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--theme-text-secondary)' }}>
+                                        <MessageSquare className="w-4 h-4 text-green-500" />
+                                        رقم الهاتف
+                                        <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="relative">
+                                        <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9+]/g, ''))} className="input text-left" placeholder="05xxxxxxxx" dir="ltr" />
+                                        {phone.length >= 9 && (
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                                                <CheckCircle className="w-5 h-5 text-green-500" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {/* Backup Phone */}
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--theme-text-secondary)' }}>
+                                        <MessageSquare className="w-4 h-4 text-blue-400" />
+                                        هاتف احتياطي
+                                        <span className="text-[10px]" style={{ color: 'var(--theme-text-disabled)' }}>(اختياري)</span>
+                                    </label>
+                                    <div className="relative">
+                                        <input type="tel" value={phoneBackup} onChange={e => setPhoneBackup(e.target.value.replace(/[^0-9+]/g, ''))} className="input text-left" placeholder="05xxxxxxxx" dir="ltr" />
+                                        {phoneBackup.length >= 9 && (
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                                                <CheckCircle className="w-5 h-5 text-blue-400" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-xs -mt-2 mb-2" style={{ color: 'var(--theme-text-disabled)' }}>💡 للتواصل عند نسيان الكود</p>
+                            
+                            {/* Manager Code */}
+                            <div>
+                                <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    <Shield className="w-4 h-4 text-yellow-500" />
+                                    كود المدير
+                                    <span className="text-red-500">*</span>
+                                    <span style={{ color: 'var(--theme-text-disabled)' }} className="text-[11px]">(4 أرقام)</span>
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={code}
+                                        onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                        className={`input text-center text-2xl font-mono tracking-[0.4em] ${
+                                            conflictingCodes.has(code) ? '!border-red-500 !bg-red-500/10' : 
+                                            code.length === 4 ? '!border-green-500 !bg-green-500/10' : ''
+                                        }`}
+                                        placeholder="• • • •"
+                                        maxLength={4}
+                                    />
+                                    {checkingCodes && <div className="absolute left-3 top-1/2 -translate-y-1/2"><AdoraLoaderInline size={18} /></div>}
+                                    {!checkingCodes && code.length === 4 && !conflictingCodes.has(code) && (
+                                        <div className="absolute left-3 top-1/2 -translate-y-1/2"><CheckCircle className="w-5 h-5 text-green-500" /></div>
+                                    )}
+                                </div>
+                                {error && (error.includes(code) || error.includes('المدير')) && (
+                                    <div className="mt-2 p-2 rounded-lg bg-red-500/10 border border-red-500/30">
+                                        <p className="text-xs flex items-center gap-1.5 text-red-500"><AlertTriangle className="w-3.5 h-3.5" />{error}</p>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Hotel/Brand Name */}
+                            <div>
+                                <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    <Building className="w-4 h-4 text-purple-500" />
+                                    اسم الفندق / البراند
+                                </label>
+                                <input type="text" value={hotelName} onChange={e => setHotelName(e.target.value)} className="input" placeholder="سلسلة فنادق الأهرام" />
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* ==================== STEP 2: Branches ==================== */}
+                    {currentStep === 2 && (
+                        <div className="space-y-4">
+                            {/* Info Banner */}
+                            <div className="p-3 rounded-xl flex items-center gap-3 bg-blue-500/10 border border-blue-500/30">
+                                <Building className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                                <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    أضف فروع الفندق. كل فرع يحتاج <strong>كود رقمي فريد</strong> من 1-4 أرقام.
+                                </p>
+                            </div>
+                            
+                            {/* Add Branch Form */}
+                            <div className="glass rounded-xl p-4">
+                                <label className="flex items-center gap-2 text-sm mb-3" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    <Plus className="w-4 h-4 text-teal-500" />
+                                    إضافة فرع جديد
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={currentBranchCode}
+                                        onChange={e => {
+                                            let val = e.target.value.replace(/\D/g, '');
+                                            if (val.startsWith('0')) val = val.slice(1);
+                                            if (val.length > 4) val = val.slice(0, 4);
+                                            setCurrentBranchCode(val);
+                                        }}
+                                        maxLength={4}
+                                        className={`input w-20 text-center font-mono text-lg tracking-wider ${conflictingCodes.has(currentBranchCode) ? '!border-red-500' : ''}`}
+                                        placeholder="كود"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={currentBranchName}
+                                        onChange={e => setCurrentBranchName(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleAddBranch()}
+                                        className="input flex-1"
+                                        placeholder="اسم الفرع"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddBranch}
+                                    disabled={loading || !currentBranchCode.trim() || !currentBranchName.trim()}
+                                    className="w-full mt-3 py-3 rounded-xl text-white font-bold disabled:opacity-40 transition-all flex items-center justify-center gap-2 bg-teal-500 hover:bg-teal-600"
+                                >
+                                    {loading && checkingCodes ? <AdoraLoaderInline size={18} /> : <><Plus className="w-5 h-5" />إضافة الفرع</>}
+                                </button>
+                                {error && (error.includes('كود الفرع') || error.includes('مستخدم') || error.includes('الفرع')) && (
+                                    <div className="mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30">
+                                        <p className="text-sm flex items-center gap-2 text-red-500"><AlertTriangle className="w-4 h-4" />{error}</p>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Branch List */}
+                            <div>
+                                <label className="flex items-center justify-between text-sm mb-3" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    <span className="flex items-center gap-2"><Building2 className="w-4 h-4 text-purple-500" />الفروع المضافة</span>
+                                    {branchCodes.length > 0 && <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-teal-500/20 text-teal-600">{branchCodes.length} فرع</span>}
+                                </label>
+                                <div className="space-y-2 max-h-40 overflow-y-auto">
+                                    {branchCodes.length > 0 ? branchCodes.map((branch, idx) => (
+                                        <div key={branch.code} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20">
+                                            <div className="flex items-center gap-3">
+                                                <span className="w-7 h-7 rounded-lg text-white text-sm flex items-center justify-center font-bold bg-teal-500">{idx + 1}</span>
+                                                <div>
+                                                    <span className="text-sm font-medium block" style={{ color: 'var(--theme-text-primary)' }}>{branch.name}</span>
+                                                    <span className="text-xs font-mono" style={{ color: 'var(--theme-text-disabled)' }}>كود: {branch.code}</span>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => handleRemoveBranch(branch.code)} className="w-7 h-7 rounded-lg flex items-center justify-center text-red-500 hover:bg-red-500/10"><X className="w-4 h-4" /></button>
+                                        </div>
+                                    )) : (
+                                        <div className="text-center py-8 rounded-xl glass border-2 border-dashed">
+                                            <Building className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--theme-text-disabled)' }} />
+                                            <p className="text-sm" style={{ color: 'var(--theme-text-disabled)' }}>لا توجد فروع مضافة بعد</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* ==================== STEP 3: Subscription & Payment ==================== */}
+                    {currentStep === 3 && (
+                        <div className="space-y-4">
+                            {/* Payment Method */}
+                            <div>
+                                <label className="flex items-center gap-2 text-sm mb-3" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    <CreditCard className="w-4 h-4 text-green-500" />طريقة استلام المبلغ
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { value: 'cash', label: 'كاش', icon: '💵' },
+                                        { value: 'credit', label: 'كريديت', icon: '💳' },
+                                        { value: 'bank_transfer', label: 'تحويل بنكي', icon: '🏦' },
+                                        { value: 'deferred', label: 'مؤجل', icon: '⏳' },
+                                    ].map((m) => (
+                                        <button
+                                            key={m.value}
+                                            type="button"
+                                            onClick={() => setPaymentMethod(m.value as any)}
+                                            className={`p-3 rounded-xl font-medium transition-all flex items-center gap-2 border ${
+                                                paymentMethod === m.value ? 'border-teal-500 bg-teal-500/10' : 'border-theme glass'
+                                            }`}
+                                            style={{ color: 'var(--theme-text-primary)' }}
+                                        >
+                                            <span className="text-lg">{m.icon}</span>
+                                            <span className="text-sm">{m.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {/* Subscription Duration */}
+                            <div>
+                                <label className="flex items-center gap-2 text-sm mb-3" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    <Calendar className="w-4 h-4 text-yellow-500" />مدة الاشتراك
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button type="button" onClick={() => setSubscriptionDuration(1)}
+                                        className={`p-4 rounded-xl transition-all flex flex-col items-center gap-2 border ${subscriptionDuration === 1 ? 'border-teal-500 bg-teal-500/10' : 'border-theme glass'}`}>
+                                        <span className="text-2xl">📅</span>
+                                        <span className="font-bold text-sm" style={{ color: 'var(--theme-text-primary)' }}>سنة واحدة</span>
+                                    </button>
+                                    <button type="button" onClick={() => setSubscriptionDuration(2)}
+                                        className={`p-4 rounded-xl transition-all flex flex-col items-center gap-2 relative border ${subscriptionDuration === 2 ? 'border-yellow-500 bg-yellow-500/10' : 'border-theme glass'}`}>
+                                        <span className="absolute top-1 left-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500 text-white">توفير</span>
+                                        <span className="text-2xl">📅📅</span>
+                                        <span className="font-bold text-sm" style={{ color: 'var(--theme-text-primary)' }}>سنتين</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Price Summary */}
+                            {systemSettings && (
+                                <div className="glass rounded-xl p-4">
+                                    <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
+                                        <DollarSign className="w-4 h-4 text-yellow-500" />ملخص الحساب
+                                    </h4>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between items-center"><span style={{ color: 'var(--theme-text-secondary)' }}>سعر الفرع/سنة:</span><span style={{ color: 'var(--theme-text-primary)' }}>{systemSettings.defaultSubscriptionPrice?.toLocaleString() || 0} ر.س</span></div>
+                                        <div className="flex justify-between items-center"><span style={{ color: 'var(--theme-text-secondary)' }}>عدد الفروع:</span><span style={{ color: 'var(--theme-text-primary)' }}>{branchCodes.length} فرع</span></div>
+                                        <div className="flex justify-between items-center"><span style={{ color: 'var(--theme-text-secondary)' }}>المدة:</span><span style={{ color: 'var(--theme-text-primary)' }}>{subscriptionDuration === 1 ? 'سنة' : 'سنتين'}</span></div>
+                                        <div className="pt-2 mt-2 border-t border-theme">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>الإجمالي:</span>
+                                                <span className="text-xl font-bold text-teal-500">{((systemSettings.defaultSubscriptionPrice || 0) * branchCodes.length * subscriptionDuration).toLocaleString()} ر.س</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
+                            
+                            {/* Firebase Config */}
+                            <TenantFirebaseConfig config={firebaseConfig} onChange={setFirebaseConfig} disabled={loading} compact={true} showTestButton={true} onTestResult={(success) => setFirebaseTestPassed(success)} />
                         </div>
-                        {error && (error.includes(code) || error.includes('المدير')) && (
-                            <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3" />
-                                {error}
-                            </p>
-                        )}
-                    </div>
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">اسم الفندق / البراند</label>
-                        <input
-                            type="text"
-                            value={hotelName}
-                            onChange={e => setHotelName(e.target.value)}
-                            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400"
-                            placeholder="مثال: سلسلة فنادق الأهرام"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">الفروع (الكود + الاسم) *</label>
-                        <div className="flex flex-col gap-2 mb-3">
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={currentBranchCode}
-                                    onChange={e => setCurrentBranchCode(e.target.value.replace(/\D/g, ''))}
-                                    className={`w-24 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-center ${conflictingCodes.has(currentBranchCode) ? 'border-yellow-500/50 text-yellow-500' : ''}`}
-                                    placeholder="الكود"
-                                />
-                                <input
-                                    type="text"
-                                    value={currentBranchName}
-                                    onChange={e => setCurrentBranchName(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleAddBranch()}
-                                    className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400"
-                                    placeholder="اسم الفرع"
-                                />
+                    )}
+                    
+                    {/* ==================== STEP 4: Review & Save ==================== */}
+                    {currentStep === 4 && (
+                        <div className="space-y-3">
+                            {/* Success Banner */}
+                            <div className="p-3 rounded-xl flex items-center gap-3 bg-green-500/10 border border-green-500/30">
+                                <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                                <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>راجع البيانات قبل <strong>الحفظ النهائي</strong></p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={handleAddBranch}
-                                disabled={loading || !currentBranchCode.trim() || !currentBranchName.trim()}
-                                className="w-full py-2 rounded-xl bg-primary-500 text-white font-medium disabled:opacity-50 hover:bg-primary-600 transition-colors"
-                            >
-                                {loading && checkingCodes ? (
-                                    <AdoraLoaderInline size={16} />
-                                ) : (
-                                    'إضافة للترخيص ➕'
-                                )}
-                            </button>
-                        </div>
-                        {/* ✅ Warning Messages - Show all branch-related errors */}
-                        {error && (error.includes('كود الفرع') || error.includes('مستخدم بالفعل') || error.includes('يختلف عن كود المدير') || error.includes('الفرع')) && (
-                            <div className="mt-2 p-3 rounded-lg bg-red-500/15 border border-red-500/40 animate-pulse">
-                                <p className="text-red-400 text-sm flex items-center gap-2 font-medium">
-                                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                                    <span>{error}</span>
-                                </p>
-                            </div>
-                        )}
-                        <div className="space-y-2">
-                            {branchCodes.length > 0 ? (
-                                branchCodes.map((branch) => (
-                                    <div
-                                        key={branch.code}
-                                        className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <span className="w-8 h-8 rounded-lg bg-primary-500/20 text-primary-400 text-xs flex items-center justify-center font-bold">
-                                                {branch.code}
-                                            </span>
-                                            <span className="text-sm text-white font-medium">{branch.name}</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveBranch(branch.code)}
-                                            className="text-red-400 hover:text-red-300 p-1"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                            
+                            {/* Summary Cards */}
+                            <div className="space-y-2">
+                                {/* Basic Info */}
+                                <div className="glass rounded-xl p-3">
+                                    <h4 className="text-xs font-bold mb-2 flex items-center gap-2 text-teal-500"><Users className="w-3.5 h-3.5" />البيانات الأساسية</h4>
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>الاسم</span><span style={{ color: 'var(--theme-text-primary)' }}>{name || 'مدير جديد'}</span></div>
+                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>الهاتف</span><span style={{ color: 'var(--theme-text-primary)' }} dir="ltr">{phone}</span></div>
+                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>الكود</span><span className="font-mono font-bold text-teal-500">{code}</span></div>
+                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>البراند</span><span style={{ color: 'var(--theme-text-primary)' }}>{hotelName || '-'}</span></div>
                                     </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-8 text-white/40">لا توجد فروع مضافة</div>
-                            )}
-                        </div>
-                        <p className="text-xs text-white/40 mt-2">
-                            عدد الفروع في العقد: <span className="text-white font-bold">{branchCodes.length}</span>
-                        </p>
-                    </div>
-                    
-                    {/* ✅ طريقة الدفع - نقلت للأعلى */}
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">طريقة استلام المبلغ *</label>
-                        <select
-                            value={paymentMethod}
-                            onChange={(e) => setPaymentMethod(e.target.value as any)}
-                            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all appearance-none cursor-pointer hover:bg-white/10 hover:border-white/20 [&>option]:bg-[#0f172a] [&>option]:text-white"
-                        >
-                            <option value="cash">كاش</option>
-                            <option value="credit">كريديت</option>
-                            <option value="bank_transfer">تحويل بنكي</option>
-                            <option value="deferred">مؤجل الدفع</option>
-                        </select>
-                        <p className="text-xs text-white/40 mt-1.5">
-                            سيتم تطبيق طريقة الدفع على جميع سندات القبض المولدة
-                        </p>
-                    </div>
-                    
-                    {/* ✅ مدة الاشتراك */}
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">مدة الاشتراك *</label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setSubscriptionDuration(1)}
-                                className={`py-3 rounded-xl font-medium transition-all ${
-                                    subscriptionDuration === 1
-                                        ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/20'
-                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
-                                }`}
-                            >
-                                سنة واحدة
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setSubscriptionDuration(2)}
-                                className={`py-3 rounded-xl font-medium transition-all ${
-                                    subscriptionDuration === 2
-                                        ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/20'
-                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
-                                }`}
-                            >
-                                سنتين
-                            </button>
-                        </div>
-                        {systemSettings && (
-                            <div className="mt-3 p-3 bg-white/5 rounded-xl border border-white/10">
-                                <p className="text-xs text-white/60 mb-1">حساب المبلغ:</p>
-                                <p className="text-sm text-white">
-                                    سعر الاشتراك للفرع (سنة واحدة): <span className="font-bold text-teal-400">
-                                        {systemSettings.defaultSubscriptionPrice?.toLocaleString() || 0} ر.س
-                                    </span> (شامل الضريبة)
-                                </p>
-                                <p className="text-sm text-white mt-1">
-                                    عدد الفروع: <span className="font-bold">{branchCodes.length}</span>
-                                </p>
-                                <p className="text-sm text-white mt-1">
-                                    مدة الاشتراك: <span className="font-bold">{subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'}</span>
-                                </p>
-                                <p className="text-sm text-white mt-1">
-                                    المبلغ الإجمالي: <span className="font-bold text-yellow-400">
-                                        {((systemSettings.defaultSubscriptionPrice || 0) * branchCodes.length * subscriptionDuration).toLocaleString()} ر.س
-                                    </span>
-                                    <span className="text-xs text-white/60 mr-2">
-                                        ({systemSettings.defaultSubscriptionPrice?.toLocaleString() || 0} × {branchCodes.length} × {subscriptionDuration})
-                                    </span>
-                                </p>
+                                </div>
+                                
+                                {/* Branches */}
+                                <div className="glass rounded-xl p-3">
+                                    <h4 className="text-xs font-bold mb-2 flex items-center gap-2 text-purple-500"><Building2 className="w-3.5 h-3.5" />الفروع ({branchCodes.length})</h4>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {branchCodes.map((b, i) => (
+                                            <span key={b.code} className="px-2 py-1 rounded-lg text-xs bg-teal-500/10 text-teal-600 border border-teal-500/20">{i + 1}. {b.name} ({b.code})</span>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                {/* Subscription */}
+                                <div className="glass rounded-xl p-3 border-yellow-500/30">
+                                    <h4 className="text-xs font-bold mb-2 flex items-center gap-2 text-yellow-500"><DollarSign className="w-3.5 h-3.5" />تفاصيل الاشتراك</h4>
+                                    <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>المدة</span><span style={{ color: 'var(--theme-text-primary)' }}>{subscriptionDuration === 1 ? 'سنة' : 'سنتين'}</span></div>
+                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>الدفع</span><span style={{ color: 'var(--theme-text-primary)' }}>{paymentMethod === 'cash' ? 'كاش' : paymentMethod === 'credit' ? 'كريديت' : paymentMethod === 'bank_transfer' ? 'بنكي' : 'مؤجل'}</span></div>
+                                    </div>
+                                    <div className="p-2 rounded-lg bg-teal-500/10 border border-teal-500/30 flex justify-between items-center">
+                                        <span className="font-bold text-sm" style={{ color: 'var(--theme-text-primary)' }}>الإجمالي:</span>
+                                        <span className="text-lg font-bold text-teal-500">{((systemSettings?.defaultSubscriptionPrice || 0) * branchCodes.length * subscriptionDuration).toLocaleString()} ر.س</span>
+                                    </div>
+                                </div>
+                                
+                                {firebaseConfig.apiKey && (
+                                    <div className="glass rounded-xl p-3">
+                                        <div className="text-sm flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" /><span style={{ color: 'var(--theme-text-secondary)' }}>Firebase منفصل</span></div>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                    
-                    {/* ✅ Firebase Config for Isolated Database (SaaS Feature) */}
-                    <TenantFirebaseConfig
-                        config={firebaseConfig}
-                        onChange={setFirebaseConfig}
-                        disabled={loading}
-                        compact={true}
-                        showTestButton={true}
-                        onTestResult={(success) => setFirebaseTestPassed(success)}
-                    />
-                    
-                    {/* ✅ Other errors (not branch code errors) - shown at bottom */}
-                    {error && !error.includes(code) && !error.includes('المدير') && !error.includes('كود الفرع') && !error.includes('مستخدم بالفعل') && (
-                        <p className="text-red-400 text-sm text-center bg-red-500/10 p-2 rounded-lg flex items-center justify-center gap-2">
-                            <AlertTriangle className="w-4 h-4" />
-                            {error}
-                        </p>
+                            
+                            {error && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30"><p className="text-sm flex items-center gap-2 text-red-500"><AlertTriangle className="w-4 h-4" />{error}</p></div>}
+                        </div>
                     )}
                 </div>
-                <div className="p-4 border-t border-white/10">
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading || branchCodes.length === 0 || code.length !== 4}
-                        className="w-full py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-yellow-500/20 transition-all"
-                    >
-                        {loading ? (
-                            <AdoraLoaderInline size={20} />
-                        ) : (
-                            <>
-                                <Save className="w-5 h-5" />
-                                حفظ وإنشاء الحساب
-                            </>
+                
+                {/* Footer */}
+                <div className="p-4 border-t border-theme">
+                    <div className="flex gap-3">
+                        {currentStep > 1 && (
+                            <button type="button" onClick={handleBack} disabled={loading} className="flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 glass border border-theme" style={{ color: 'var(--theme-text-primary)' }}>
+                                <ChevronRight className="w-5 h-5 rotate-180" />رجوع
+                            </button>
                         )}
-                    </button>
+                        {currentStep < TOTAL_STEPS ? (
+                            <button type="button" onClick={handleNext} disabled={!canGoNext()} className="flex-1 py-3 rounded-xl text-white font-bold flex items-center justify-center gap-2 disabled:opacity-40 transition-all bg-teal-500 hover:bg-teal-600">
+                                التالي<ChevronRight className="w-5 h-5" />
+                            </button>
+                        ) : (
+                            <button onClick={handleSubmit} disabled={loading} className="flex-1 py-3 rounded-xl text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all bg-teal-500 hover:bg-teal-600">
+                                {loading ? <AdoraLoaderInline size={20} /> : <><Save className="w-5 h-5" />حفظ وإنشاء</>}
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

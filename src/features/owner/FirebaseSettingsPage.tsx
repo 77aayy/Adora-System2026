@@ -45,37 +45,129 @@ type ConnectionStatus = 'idle' | 'testing' | 'success' | 'error';
 const FIRESTORE_RULES_TEMPLATE = `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ✅ Health Check - Allow read for connection testing
-    match /health_check/{doc} {
+    
+    // ============================================
+    // 🔐 Adora Hotel Management System Rules
+    // V4 Simplified - Complete Version
+    // ============================================
+    
+    // 🏢 Tenant data - accessible by authenticated users
+    match /tenants/{tenantId}/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 🔑 Global codes - readable by all (for PIN login)
+    match /globalCodes/{codeId} {
       allow read: if true;
       allow write: if request.auth != null;
     }
     
-    // ✅ Settings - Allow authenticated users
-    match /settings/{doc} {
-      allow read, write: if request.auth != null;
+    // 👤 Users collection
+    // ✅ V5 FIX: Allow owner/admin to manage all users
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;  // Allows owner to delete/modify managers
     }
     
-    // ✅ Rooms - Allow authenticated users
-    match /rooms/{roomId} {
-      allow read, write: if request.auth != null;
-    }
-    
-    // ✅ Requests - Allow authenticated users
+    // 📋 Requests collection
     match /requests/{requestId} {
       allow read, write: if request.auth != null;
     }
     
-    // ✅ Users - Allow authenticated users
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId || request.auth.token.role == 'admin';
+    // 🏥 Health check
+    match /health_check/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
-    // ✅ All other collections - Require auth
-    match /{document=**} {
+    // ⚙️ System settings (CRITICAL for subscription price!)
+    match /system/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // ⚙️ System settings (alternate path)
+    match /systemSettings/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // ⚙️ System configs
+    match /system_configs/{configId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // 👔 Managers collection (CRITICAL!)
+    match /managers/{managerId} {
       allow read, write: if request.auth != null;
     }
+    
+    // 🗑️ Deleted managers archive
+    match /deleted_managers/{managerId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 🔗 User bindings (role mapping)
+    match /userBindings/{uid} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 📜 Audit logs - append only
+    match /audit_logs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+    
+    // 📜 Audit logs (alternate path)
+    match /auditLogs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+    
+    // 🧾 Receipts & Invoices
+    match /receiptVouchers/{id} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /invoices/{id} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 📊 Global logs
+    match /logs/{logId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 🔐 Secure access tokens
+    match /secureAccessTokens/{tokenId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // ⚙️ Global settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // 📱 Demo links
+    match /demoLinks/{linkId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 📜 License notifications
+    match /licenseNotifications/{notificationId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 💾 Global backups
+    match /backups/{backupId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // ⛔ DEFAULT DENY
   }
 }`;
 

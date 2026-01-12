@@ -106,6 +106,7 @@ import { RoomBillCard } from '../../components/reception/RoomBillCard'; // 💰 
 import { isRequestDelayed } from './receptionAdvancedFeatures';
 import { loadBranchSettings } from '../dashboard/dashboardAdvancedFeatures';
 import { PointsNotification } from '../../components/shared/PointsNotification';
+import { useBrandName } from '../../hooks/useBrandName';
 // DeveloperSignature is now in GlobalFooter (App.tsx)
 import { BranchLocationWarning } from '../../components/auth/BranchLocationWarning';
 import { checkBranchLocation } from '../../services/branchLocationService';
@@ -1853,6 +1854,7 @@ export const ReceptionDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { success, error, haptic, playSound } = useUX();
+    const brandName = useBrandName();
 
     // Voice Agent
     const {
@@ -2952,12 +2954,9 @@ export const ReceptionDashboard: React.FC = () => {
             {/* Flexible Header */}
             <FlexibleHeader
                 title="الاستقبال"
-                subtitle={
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="truncate">{user?.name}</span>
-                        <PointsTracker employeeId={user?.id || ''} inline showHistory />
-                    </div>
-                }
+                showGreeting={true}
+                brandName={brandName}
+                subtitle={<PointsTracker employeeId={user?.id || ''} inline showHistory />}
                 actions={[
                     {
                         id: 'history',

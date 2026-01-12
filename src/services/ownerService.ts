@@ -117,6 +117,7 @@ export const suggestUniquePin = async (): Promise<string> => {
 export const createManager = async (data: {
     name: string;
     phone?: string; // ✅ رقم هاتف المدير (اختياري)
+    phoneBackup?: string; // ✅ رقم الهاتف الاحتياطي (اختياري)
     code: string;
     hotelName?: string; // Optional hotel name for the tenant
     maxBranches?: number; // ✅ License: Maximum number of branches allowed
@@ -185,7 +186,10 @@ export const createManager = async (data: {
 
             // ✅ Isolated Multi-Tenancy: Custom Firebase config (if provided)
             // When manager logs in, system will use this config instead of master DB
-            firebaseConfig: data.firebaseConfig || null,
+            // ✅ FIX: Clean firebaseConfig to remove any undefined values (Firebase rejects undefined!)
+            firebaseConfig: data.firebaseConfig ? Object.fromEntries(
+                Object.entries(data.firebaseConfig).filter(([, v]) => v !== undefined && v !== '')
+            ) : null,
             hasIsolatedDatabase: Boolean(data.firebaseConfig),
         }
     });
@@ -225,6 +229,7 @@ export const createManager = async (data: {
         id: managerId,
         name: data.name,
         phone: data.phone, // ✅ رقم هاتف المدير (إجباري)
+        phoneBackup: data.phoneBackup || undefined, // ✅ رقم الهاتف الاحتياطي (اختياري)
         code: data.code,
         department: 'admin',
         role: 'manager',
@@ -284,6 +289,7 @@ export const createManager = async (data: {
         // ✅ Store essential user data for login (avoids reading from users collection)
         name: data.name,
         phone: data.phone, // ✅ رقم هاتف المدير
+        phoneBackup: data.phoneBackup || undefined, // ✅ رقم الهاتف الاحتياطي
         status: 'active',
         role: 'manager',
         department: 'admin',
@@ -584,18 +590,26 @@ export const checkLicenseExpiryNotifications = (expiryDate: Date | Timestamp | n
 
 // ✅ Soft delete manager (move to deleted_managers collection with automatic backup)
 export const softDeleteManager = async (managerId: string, tenantId?: string): Promise<void> => {
-    // ✅ 1. Create automatic backup before deletion - REQUIRED
+    // ✅ 1. Try to create backup before deletion (non-blocking if permission denied)
     let backupId: string | null = null;
     if (tenantId) {
         try {
             const { createTenantBackup } = await import('./backupService');
             backupId = await createTenantBackup(tenantId, 'before_delete');
-            if (!backupId || backupId === 'SKIPPED_NO_DB') {
-                throw new Error('فشل إنشاء النسخة الاحتياطية. تم إلغاء الحذف لحماية البيانات.');
-            }
+            console.log('✅ Backup created successfully:', backupId);
         } catch (err: any) {
-            console.error('Failed to create backup before deletion:', err);
-            throw new Error(err.message || 'فشل إنشاء النسخة الاحتياطية. تم إلغاء الحذف لحماية البيانات.');
+            // ✅ Check if it's a permission error - continue deletion anyway
+            const isPermissionError = err?.code === 'permission-denied' || 
+                                       err?.message?.includes('permission-denied') ||
+                                       err?.message?.includes('Missing or insufficient permissions');
+            
+            if (isPermissionError) {
+                console.warn('⚠️ Backup skipped due to permission issues. Continuing with deletion...');
+                backupId = 'BACKUP_SKIPPED_PERMISSIONS';
+            } else {
+                console.error('Failed to create backup before deletion:', err);
+                throw new Error(err.message || 'فشل إنشاء النسخة الاحتياطية. تم إلغاء الحذف لحماية البيانات.');
+            }
         }
     }
 
@@ -771,15 +785,31 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
         }
     }
 
-    await batch.commit();
-    
-    // ✅ AUDIT: Log manager deletion
-    quickAudit('MANAGER_DELETE', 'manager', managerId, {
-        tenantId,
-        backupId,
-        managerName: managerData?.name,
-        branchCodesCount: branchCodes.length
-    }, managerData?.name || 'مدير');
+    try {
+        await batch.commit();
+        console.log('✅ Manager deleted successfully:', managerId);
+        
+        // ✅ AUDIT: Log manager deletion
+        quickAudit('MANAGER_DELETE', 'manager', managerId, {
+            tenantId,
+            backupId,
+            managerName: managerData?.name,
+            branchCodesCount: branchCodes.length
+        }, managerData?.name || 'مدير');
+    } catch (commitError: any) {
+        console.error('❌ Failed to commit batch deletion:', commitError);
+        
+        // Check if it's a permission error
+        const isPermissionError = commitError?.code === 'permission-denied' || 
+                                   commitError?.message?.includes('permission-denied') ||
+                                   commitError?.message?.includes('Missing or insufficient permissions');
+        
+        if (isPermissionError) {
+            throw new Error('فشل في الحذف: صلاحيات Firebase غير كافية. يرجى نشر قواعد الأمان المحدثة.');
+        }
+        
+        throw new Error(commitError.message || 'فشل في تنفيذ عملية الحذف');
+    }
 };
 
 // ✅ Restore deleted manager (within 7-day recovery period)

@@ -78,17 +78,36 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
     // Create form state
     const [permissionLevel, setPermissionLevel] = useState<DemoPermissionLevel>('tester');
     const [selectedScopes, setSelectedScopes] = useState<DemoScope[]>(['all']);
+    
+    // ✅ الصلاحيات التفصيلية مرتبطة بمستوى الصلاحية
+    const getDefaultPermissions = (level: DemoPermissionLevel) => ({
+        canCreateRequests: level !== 'viewer', // المشاهد لا يمكنه الإنشاء
+        canManageEmployees: level === 'full_access', // فقط الصلاحية الكاملة
+        canViewReports: true, // الكل يمكنه رؤية التقارير
+        canAccessSettings: level === 'full_access', // فقط الصلاحية الكاملة
+    });
+    
     const [canCreateRequests, setCanCreateRequests] = useState(true);
     const [canManageEmployees, setCanManageEmployees] = useState(false);
     const [canViewReports, setCanViewReports] = useState(true);
     const [canAccessSettings, setCanAccessSettings] = useState(false);
+    
+    // ✅ تحديث الصلاحيات التفصيلية عند تغيير مستوى الصلاحية
+    const handlePermissionLevelChange = (level: DemoPermissionLevel) => {
+        setPermissionLevel(level);
+        const defaults = getDefaultPermissions(level);
+        setCanCreateRequests(defaults.canCreateRequests);
+        setCanManageEmployees(defaults.canManageEmployees);
+        setCanViewReports(defaults.canViewReports);
+        setCanAccessSettings(defaults.canAccessSettings);
+    };
     const [includeTour, setIncludeTour] = useState(true);
     const [tourLanguage, setTourLanguage] = useState<'ar' | 'en'>('ar');
     const [maxUses, setMaxUses] = useState(10);
     const [validForHours, setValidForHours] = useState(72);
     const [multiLicense, setMultiLicense] = useState(false);
     const [licensesCount, setLicensesCount] = useState(1);
-    const [branchesPerLicense, setBranchesPerLicense] = useState(1);
+    // ✅ تم حذف branchesPerLicense لأن: ترخيص واحد = فرع واحد
     
     // ============================================================
     // LOAD DATA
@@ -143,7 +162,7 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
                     validForHours,
                     multiLicense,
                     licensesCount,
-                    branchesPerLicense,
+                    branchesPerLicense: 1, // ✅ دائماً 1 لأن: ترخيص واحد = فرع واحد
                 }
             );
             
@@ -321,9 +340,9 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
                                                     متوقف
                                                 </span>
                                             )}
-                                            {link.multiLicense && (
+                                            {link.multiLicense && link.licensesCount > 1 && (
                                                 <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs">
-                                                    {link.licensesCount} ترخيص
+                                                    {link.licensesCount} فروع
                                                 </span>
                                             )}
                                         </div>
@@ -504,7 +523,7 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
                                     {PERMISSION_LEVELS.map(level => (
                                         <button
                                             key={level.value}
-                                            onClick={() => setPermissionLevel(level.value)}
+                                            onClick={() => handlePermissionLevelChange(level.value)}
                                             className={`w-full p-4 rounded-xl text-right transition-all ${
                                                 permissionLevel === level.value
                                                     ? 'bg-teal-500/20 border-2 border-teal-500'
@@ -541,26 +560,43 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
                             
                             {/* Detailed Permissions */}
                             <div>
-                                <label className="block text-white font-medium mb-3">صلاحيات تفصيلية</label>
+                                <label className="block text-white font-medium mb-3">
+                                    صلاحيات تفصيلية
+                                    <span className="text-white/40 text-xs font-normal mr-2">
+                                        (تتغير تلقائياً حسب مستوى الصلاحية)
+                                    </span>
+                                </label>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <label className="flex items-center gap-3 p-3 rounded-xl bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
+                                    <label className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                                        permissionLevel === 'viewer' 
+                                            ? 'bg-white/5 opacity-50 cursor-not-allowed' 
+                                            : 'bg-white/5 cursor-pointer hover:bg-white/10'
+                                    }`}>
                                         <input
                                             type="checkbox"
                                             checked={canCreateRequests}
-                                            onChange={(e) => setCanCreateRequests(e.target.checked)}
+                                            onChange={(e) => permissionLevel !== 'viewer' && setCanCreateRequests(e.target.checked)}
+                                            disabled={permissionLevel === 'viewer'}
                                             className="w-5 h-5 rounded accent-teal-500"
                                         />
                                         <span className="text-white">إنشاء طلبات</span>
+                                        {permissionLevel === 'viewer' && <span className="text-xs text-red-400">(غير متاح للمشاهد)</span>}
                                     </label>
                                     
-                                    <label className="flex items-center gap-3 p-3 rounded-xl bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
+                                    <label className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                                        permissionLevel !== 'full_access' 
+                                            ? 'bg-white/5 opacity-50 cursor-not-allowed' 
+                                            : 'bg-white/5 cursor-pointer hover:bg-white/10'
+                                    }`}>
                                         <input
                                             type="checkbox"
                                             checked={canManageEmployees}
-                                            onChange={(e) => setCanManageEmployees(e.target.checked)}
+                                            onChange={(e) => permissionLevel === 'full_access' && setCanManageEmployees(e.target.checked)}
+                                            disabled={permissionLevel !== 'full_access'}
                                             className="w-5 h-5 rounded accent-teal-500"
                                         />
                                         <span className="text-white">إدارة الموظفين</span>
+                                        {permissionLevel !== 'full_access' && <span className="text-xs text-yellow-400">(يتطلب صلاحية كاملة)</span>}
                                     </label>
                                     
                                     <label className="flex items-center gap-3 p-3 rounded-xl bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
@@ -573,14 +609,20 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
                                         <span className="text-white">عرض التقارير</span>
                                     </label>
                                     
-                                    <label className="flex items-center gap-3 p-3 rounded-xl bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
+                                    <label className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                                        permissionLevel !== 'full_access' 
+                                            ? 'bg-white/5 opacity-50 cursor-not-allowed' 
+                                            : 'bg-white/5 cursor-pointer hover:bg-white/10'
+                                    }`}>
                                         <input
                                             type="checkbox"
                                             checked={canAccessSettings}
-                                            onChange={(e) => setCanAccessSettings(e.target.checked)}
+                                            onChange={(e) => permissionLevel === 'full_access' && setCanAccessSettings(e.target.checked)}
+                                            disabled={permissionLevel !== 'full_access'}
                                             className="w-5 h-5 rounded accent-teal-500"
                                         />
                                         <span className="text-white">الوصول للإعدادات</span>
+                                        {permissionLevel !== 'full_access' && <span className="text-xs text-yellow-400">(يتطلب صلاحية كاملة)</span>}
                                     </label>
                                 </div>
                             </div>
@@ -651,35 +693,28 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
                                         className="w-5 h-5 rounded accent-purple-500"
                                     />
                                     <div>
-                                        <p className="text-white font-medium">عرض متعدد التراخيص</p>
-                                        <p className="text-white/50 text-sm">محاكاة نظام بأكثر من ترخيص وفروع</p>
+                                        <p className="text-white font-medium">عرض متعدد الفروع</p>
+                                        <p className="text-white/50 text-sm">محاكاة فندق بأكثر من فرع (ترخيص واحد = فرع واحد)</p>
                                     </div>
                                 </label>
                                 
                                 {multiLicense && (
-                                    <div className="mt-4 grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-white/70 text-sm mb-2">عدد التراخيص</label>
-                                            <input
-                                                type="number"
-                                                value={licensesCount}
-                                                onChange={(e) => setLicensesCount(parseInt(e.target.value) || 1)}
-                                                min={1}
-                                                max={10}
-                                                className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-white/70 text-sm mb-2">فروع لكل ترخيص</label>
-                                            <input
-                                                type="number"
-                                                value={branchesPerLicense}
-                                                onChange={(e) => setBranchesPerLicense(parseInt(e.target.value) || 1)}
-                                                min={1}
-                                                max={10}
-                                                className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white"
-                                            />
-                                        </div>
+                                    <div className="mt-4">
+                                        <label className="block text-white/70 text-sm mb-2">
+                                            عدد الفروع (التراخيص)
+                                            <span className="text-purple-400 mr-2">• كل فرع = ترخيص منفصل</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={licensesCount}
+                                            onChange={(e) => setLicensesCount(parseInt(e.target.value) || 1)}
+                                            min={1}
+                                            max={10}
+                                            className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white"
+                                        />
+                                        <p className="text-xs text-white/40 mt-2">
+                                            💡 في Adora: ترخيص واحد = فرع واحد. لو الفندق عنده 3 فروع، يحتاج 3 تراخيص.
+                                        </p>
                                     </div>
                                 )}
                             </div>

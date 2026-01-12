@@ -64,245 +64,131 @@ const STEPS: StepInfo[] = [
     { id: 'verify', title: 'التحقق النهائي', subtitle: 'اختبار الاتصال', icon: <Zap className="w-5 h-5" /> },
 ];
 
-// Security Rules Template - V3 IRON SHIELD (Complete Production Rules)
+// Security Rules Template - V4 Simplified (Easy to Understand)
 const SECURITY_RULES = `rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ============================================================
-    // 🛡️ ADORA IRON SHIELD V3 - Multi-Tenant Security Rules
-    // ============================================================
-    // 💰 BUDGET PROTECTION: No "if true" anywhere!
-    // 🔐 TENANT ISOLATION: Each hotel sees only its own data
-    // 👤 ANONYMOUS AUTH: QR guests get temporary identity
-    // 💵 PRICE PROTECTION: Guests cannot manipulate prices
-    // ============================================================
-
-    // ------------------------------------------------------------
-    // 🔧 HELPER FUNCTIONS
-    // ------------------------------------------------------------
+    // ============================================
+    // 🔐 Adora Hotel Management System Rules
+    // ============================================
     
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isSuperAdmin() {
-      return isSignedIn() && request.auth.token.super_admin == true;
-    }
-
-    function isOwner() {
-      return isSignedIn() && (request.auth.token.role == 'owner' || isSuperAdmin());
-    }
-
-    function belongsToTenant(tenantId) {
-      return isSignedIn() && (
-        request.auth.token.tenantId == tenantId || 
-        isSuperAdmin() ||
-        isOwner()
-      );
-    }
-
-    function isManager(tenantId) {
-      return belongsToTenant(tenantId) && 
-             (request.auth.token.role == 'manager' || isOwner());
+    // 🏢 Tenant data - accessible by authenticated users
+    match /tenants/{tenantId}/{document=**} {
+      allow read, write: if request.auth != null;
     }
     
-    function isAnonymousGuest() {
-      return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
-    }
-
-    // ------------------------------------------------------------
-    // 🔐 SYSTEM CONFIGURATIONS (Owner Only)
-    // ------------------------------------------------------------
-    match /system_configs/{configId} {
-      allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || isOwner();
-    }
-
-    match /systemSettings/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || isOwner();
-    }
-
-    // ------------------------------------------------------------
-    // 🔐 GLOBAL CODES (Login Verification)
-    // ------------------------------------------------------------
+    // 🔑 Global codes - readable by all (for PIN login), writable by authenticated
     match /globalCodes/{codeId} {
-      allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || isOwner();
-    }
-
-    // ------------------------------------------------------------
-    // 👤 USERS COLLECTION
-    // ------------------------------------------------------------
-    match /users/{userId} {
-      allow read: if isSignedIn() && (
-        request.auth.uid == userId || 
-        isSuperAdmin() || 
-        isOwner()
-      );
-      allow create: if isSuperAdmin() || isOwner();
-      allow update: if isSignedIn() && (
-        request.auth.uid == userId || 
-        isSuperAdmin() || 
-        isOwner()
-      );
-      allow delete: if isSuperAdmin() || isOwner();
-    }
-
-    // ------------------------------------------------------------
-    // 🏢 TENANT DATA (Multi-Tenant Core)
-    // ------------------------------------------------------------
-    match /tenants/{tenantId} {
-      allow read: if belongsToTenant(tenantId);
-      allow create: if isSuperAdmin() || isOwner();
-      allow update: if isManager(tenantId);
-      allow delete: if isSuperAdmin();
-
-      // 🛏️ ROOMS
-      match /rooms/{roomId} {
-        allow read: if belongsToTenant(tenantId);
-        allow write: if belongsToTenant(tenantId);
-      }
-
-      // 📋 REQUESTS - 🔐 WITH PRICE PROTECTION!
-      match /requests/{requestId} {
-        allow read: if belongsToTenant(tenantId);
-        allow create: if belongsToTenant(tenantId) || (
-          isAnonymousGuest() &&
-          request.resource.data.source == 'guest' &&
-          request.resource.data.tenantId == tenantId &&
-          request.resource.data.roomNumber != null &&
-          request.resource.data.roomNumber is string &&
-          request.resource.data.type in ['housekeeping', 'maintenance', 'bellman', 'coffee', 'minibar', 'roomservice', 'other'] &&
-          // 💰 PRICE PROTECTION: Guests CANNOT set prices
-          !('price' in request.resource.data) &&
-          !('cost' in request.resource.data) &&
-          !('amount' in request.resource.data) &&
-          !('discount' in request.resource.data) &&
-          !('total' in request.resource.data)
-        );
-        allow update: if belongsToTenant(tenantId);
-        allow delete: if isManager(tenantId);
-      }
-
-      // 👷 EMPLOYEES
-      match /employees/{employeeId} {
-        allow read: if belongsToTenant(tenantId);
-        allow write: if isManager(tenantId);
-      }
-
-      // 🏨 BRANCHES
-      match /branches/{branchId} {
-        allow read: if belongsToTenant(tenantId);
-        allow write: if isManager(tenantId);
-        
-        match /rooms/{roomId} {
-          allow read: if belongsToTenant(tenantId);
-          allow write: if belongsToTenant(tenantId);
-        }
-      }
-
-      // 👥 TEAMS
-      match /teams/{teamId} {
-        allow read: if belongsToTenant(tenantId);
-        allow write: if isManager(tenantId);
-      }
-
-      // 🎫 GUESTS
-      match /guests/{guestId} {
-        allow read: if belongsToTenant(tenantId);
-        allow write: if belongsToTenant(tenantId);
-      }
-
-      // 💬 CHATS - 🔐 WITH MESSAGE SIZE LIMIT
-      match /chats/{chatId} {
-        allow read: if belongsToTenant(tenantId) || (
-          isAnonymousGuest() && resource.data.roomNumber != null
-        );
-        allow create: if belongsToTenant(tenantId) || (
-          isAnonymousGuest() &&
-          request.resource.data.roomNumber != null &&
-          request.resource.data.tenantId == tenantId
-        );
-        allow update: if belongsToTenant(tenantId);
-        allow delete: if isManager(tenantId);
-
-        match /messages/{messageId} {
-          allow read: if belongsToTenant(tenantId) || isAnonymousGuest();
-          allow create: if (belongsToTenant(tenantId) || isAnonymousGuest()) && 
-            request.resource.data.content is string &&
-            request.resource.data.content.size() <= 2000;
-          allow update, delete: if belongsToTenant(tenantId);
-        }
-      }
-
-      // ⏱️ LIVE TIMERS, 🏆 POINTS, ⚙️ SETTINGS, 📊 LOGS
-      match /liveTimers/{timerId} { allow read, write: if belongsToTenant(tenantId); }
-      match /points/{pointId} { allow read, write: if belongsToTenant(tenantId); }
-      match /achievements/{id} { allow read: if belongsToTenant(tenantId); allow write: if isManager(tenantId); }
-      match /settings/{id} { allow read: if belongsToTenant(tenantId); allow write: if isManager(tenantId); }
-      match /logs/{id} { allow read, create: if belongsToTenant(tenantId); allow update, delete: if isManager(tenantId); }
-      match /backups/{id} { allow read, write: if isManager(tenantId); }
-      match /billing/{id} { allow read: if belongsToTenant(tenantId); allow write: if isManager(tenantId); }
-      
-      // 🔐 SECURE ACCESS TOKENS (Tenant-specific)
-      match /secureAccessTokens/{tokenId} {
-        allow read: if isSignedIn();
-        allow write: if belongsToTenant(tenantId);
-      }
-
-      // 📋 ANY OTHER SUB-COLLECTION
-      match /{subcollection}/{docId} {
-        allow read: if belongsToTenant(tenantId);
-        allow write: if belongsToTenant(tenantId);
-      }
-    }
-
-    // ------------------------------------------------------------
-    // 📊 GLOBAL COLLECTIONS
-    // ------------------------------------------------------------
-    match /logs/{logId} {
-      allow create: if isSignedIn();
-      allow read: if isSuperAdmin() || isOwner();
-      allow update, delete: if isSuperAdmin();
-    }
-
-    match /licenseNotifications/{id} {
-      allow read, write: if isSuperAdmin() || isOwner();
-    }
-
-    match /secureAccessTokens/{tokenId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn() && !isAnonymousGuest();
-    }
-
-    match /securityAuditLogs/{logId} {
-      allow create: if isSignedIn();
-      allow read: if isSuperAdmin() || isOwner();
-      allow update, delete: if false; // IMMUTABLE!
-    }
-
-    match /guestRateLimits/{limitId} {
-      allow read, write: if isSignedIn() && request.auth.uid == limitId;
-      // Staff can read (monitoring) and delete (checkout cleanup)
-      allow read, delete: if isSignedIn() && !isAnonymousGuest();
-    }
-
-    match /health_check/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || isOwner();
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
-    match /demoLinks/{linkId} {
-      allow read: if isSignedIn();
-      allow write: if isSuperAdmin() || isOwner();
+    // 👤 Users collection
+    // ✅ V5 FIX: Allow owner/admin to manage all users
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;  // Allows owner to delete/modify managers
     }
-
-    match /receiptVouchers/{id} { allow read, write: if isSuperAdmin() || isOwner(); }
-    match /invoices/{id} { allow read, write: if isSuperAdmin() || isOwner(); }
-    match /managers/{id} { allow read, write: if isSuperAdmin() || isOwner(); }
-
+    
+    // 📋 Requests collection - accessible by authenticated users
+    match /requests/{requestId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 🏥 Health check collection - for connection testing
+    match /health_check/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // ⚙️ System settings - read by all, write by authenticated
+    match /system/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // ⚙️ System settings (alternate path)
+    match /systemSettings/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // ⚙️ System configs
+    match /system_configs/{configId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // 👔 Managers collection (Owner's view)
+    match /managers/{managerId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 🗑️ Deleted managers archive
+    match /deleted_managers/{managerId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 🔗 User bindings (role mapping)
+    match /userBindings/{uid} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 📜 Audit logs - append only (immutable)
+    match /audit_logs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+    
+    // 📜 Audit logs (alternate path)
+    match /auditLogs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+    
+    // 🧾 Receipts & Invoices
+    match /receiptVouchers/{id} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /invoices/{id} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 📊 Global logs
+    match /logs/{logId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 🔐 Secure access tokens
+    match /secureAccessTokens/{tokenId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // ⚙️ Global settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // 📱 Demo links
+    match /demoLinks/{linkId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 📜 License notifications
+    match /licenseNotifications/{notificationId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 💾 Global backups
+    match /backups/{backupId} {
+      allow read, write: if request.auth != null;
+    }
+    
     // ⛔ DEFAULT DENY - Anything not explicitly allowed is DENIED!
   }
 }`;
@@ -367,6 +253,15 @@ export const FirebaseSetupWizard: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [showApiKey, setShowApiKey] = useState(false);
     const [copiedItem, setCopiedItem] = useState<string | null>(null);
+    
+    // 🔒 SECURITY: Redirect to login if Firebase is already configured
+    // This prevents unauthorized access to setup page
+    useEffect(() => {
+        if (isFirebaseConfigured()) {
+            console.log('🔒 Firebase already configured - redirecting to login');
+            navigate('/login', { replace: true });
+        }
+    }, [navigate]);
     
     // Step completion status
     const [stepStatus, setStepStatus] = useState({

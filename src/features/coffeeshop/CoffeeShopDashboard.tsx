@@ -33,6 +33,7 @@ import { SupportTicketModal } from '../../components/shared/SupportTicketModal';
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
+import { useBrandName } from '../../hooks/useBrandName';
 
 // ============================================================
 // TYPES
@@ -48,6 +49,7 @@ export const CoffeeShopDashboard: React.FC = () => {
     const { user, logout } = useAuth();
     const { success, error } = useUX();
     const { tenantId } = useTenant();
+    const brandName = useBrandName();
 
     const branchId = useMemo(() => (user as any)?.branch || (user as any)?.branchId || 'default', [user]);
 
@@ -199,6 +201,8 @@ export const CoffeeShopDashboard: React.FC = () => {
                 {/* Header */}
                 <FlexibleHeader
                     title="كوفي شوب"
+                    showGreeting={true}
+                    brandName={brandName}
                     subtitle="إدارة طلبات المشروبات والوجبات"
                     actions={[
                         {

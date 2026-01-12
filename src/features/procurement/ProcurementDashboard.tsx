@@ -64,6 +64,7 @@ import { BranchLocationWarning } from '../../components/auth/BranchLocationWarni
 import { checkBranchLocation } from '../../services/branchLocationService';
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
+import { useBrandName } from '../../hooks/useBrandName';
 
 // ============================================================
 // STATUS CONFIG
@@ -236,6 +237,7 @@ export const ProcurementDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { success, error, haptic, playSound } = useUX();
+    const brandName = useBrandName();
     
     // ✅ Feature Gate: Check if procurement system is enabled
     const { isEnabled: isProcurementEnabled } = useFeatureGate('procurementSystem');
@@ -547,7 +549,8 @@ export const ProcurementDashboard: React.FC = () => {
                 <FlexibleHeader
                 title="المشتريات"
                 titleIcon={<ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 flex-shrink-0" />}
-                subtitle={user?.name}
+                showGreeting={true}
+                brandName={brandName}
                 actions={[
                     {
                         id: 'general-instructions',

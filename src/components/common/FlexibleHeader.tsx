@@ -4,11 +4,12 @@
  * Adora Hotel Management System V2
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Menu, X, LogOut, History, MessageSquare, ShoppingCart, Users, RefreshCw, FileText } from 'lucide-react';
 import { HeaderButton } from './HeaderButton';
 import { MobileMenu } from './MobileMenu';
 import { useAuth } from '../../context/AuthContext';
+import { getGreetingParts } from '../../utils/greetings';
 
 interface HeaderAction {
     id: string;
@@ -28,6 +29,10 @@ interface FlexibleHeaderProps {
     actions?: HeaderAction[];
     showLogout?: boolean;
     className?: string;
+    /** Enable dynamic greeting with user name */
+    showGreeting?: boolean;
+    /** Brand name to show below greeting */
+    brandName?: string;
 }
 
 export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
@@ -36,10 +41,18 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
     subtitle,
     actions = [],
     showLogout = true,
-    className = ''
+    className = '',
+    showGreeting = false,
+    brandName
 }) => {
     const { user, logout } = useAuth();
     const [showMobileMenu, setShowMobileMenu] = useState(false);
+    
+    // Dynamic greeting based on time of day
+    const greeting = useMemo(() => {
+        if (!showGreeting || !user?.name) return null;
+        return getGreetingParts(user.name);
+    }, [showGreeting, user?.name]);
 
     // Filter actions based on user role
     const visibleActions = actions.filter(action => {
@@ -73,19 +86,50 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
                             </div>
                         )}
                         <div className="flex-1 min-w-0">
-                            <h1 
-                                className="text-xl sm:text-2xl md:text-3xl font-bold truncate"
-                                style={{ color: 'var(--theme-text-primary)' }}
-                            >
-                                {title}
-                            </h1>
-                            {subtitle && (
-                                <div 
-                                    className="mt-1 sm:mt-1.5 text-xs sm:text-sm truncate"
-                                    style={{ color: 'var(--theme-text-secondary)' }}
-                                >
-                                    {subtitle}
-                                </div>
+                            {/* Dynamic Greeting Mode */}
+                            {showGreeting && greeting ? (
+                                <>
+                                    <h1 
+                                        className="text-lg sm:text-xl md:text-2xl font-bold truncate"
+                                        style={{ color: 'var(--theme-text-primary)' }}
+                                    >
+                                        {greeting.emoji} {greeting.timeGreeting}، {greeting.motivational} يا {user?.name}
+                                    </h1>
+                                    {brandName && (
+                                        <div 
+                                            className="mt-1 sm:mt-1.5 text-xs sm:text-sm flex items-center gap-1.5"
+                                            style={{ color: 'var(--theme-text-secondary)' }}
+                                        >
+                                            🏨 {brandName}
+                                        </div>
+                                    )}
+                                    {subtitle && (
+                                        <div 
+                                            className="mt-1 text-xs truncate"
+                                            style={{ color: 'var(--theme-text-tertiary)' }}
+                                        >
+                                            {subtitle}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                /* Standard Title Mode */
+                                <>
+                                    <h1 
+                                        className="text-xl sm:text-2xl md:text-3xl font-bold truncate"
+                                        style={{ color: 'var(--theme-text-primary)' }}
+                                    >
+                                        {title}
+                                    </h1>
+                                    {subtitle && (
+                                        <div 
+                                            className="mt-1 sm:mt-1.5 text-xs sm:text-sm truncate"
+                                            style={{ color: 'var(--theme-text-secondary)' }}
+                                        >
+                                            {subtitle}
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>

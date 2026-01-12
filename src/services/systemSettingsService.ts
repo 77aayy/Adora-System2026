@@ -234,12 +234,12 @@ export const getSystemSettings = async (forceRefresh: boolean = false): Promise<
 
 // Internal function to fetch settings
 const _fetchSystemSettings = async (): Promise<SystemSettings> => {
+    // ✅ FIX: Always check localStorage FIRST as backup
+    const localKey = 'adora_system_settings';
+    const localData = localStorage.getItem(localKey);
+    const localSettings = localData ? JSON.parse(localData) : null;
+    
     try {
-        // ✅ Check localStorage first for cached settings
-        const localKey = 'adora_system_settings';
-        const localData = localStorage.getItem(localKey);
-        const localSettings = localData ? JSON.parse(localData) : null;
-        
         // ✅ Guard: Return localStorage or defaults if Firebase not initialized
         if (!db) {
             console.debug('Firebase not initialized, returning local/default settings');
@@ -250,7 +250,7 @@ const _fetchSystemSettings = async (): Promise<SystemSettings> => {
         
         if (snap.exists()) {
             const data = snap.data();
-            return {
+            const firebaseSettings = {
                 ...DEFAULT_SETTINGS,
                 ...data,
                 updates: data.updates?.map((u: any) => ({
@@ -263,13 +263,28 @@ const _fetchSystemSettings = async (): Promise<SystemSettings> => {
                     endDate: m.endDate?.toDate() || new Date()
                 })) || []
             } as SystemSettings;
+            
+            // ✅ Sync Firebase data to localStorage for offline access
+            localStorage.setItem(localKey, JSON.stringify(firebaseSettings));
+            return firebaseSettings;
         }
         
-        // If no settings exist, create default
+        // If no settings exist in Firebase, try to create from localStorage
+        if (localSettings) {
+            console.log('📦 No Firebase settings, using localStorage');
+            return { ...DEFAULT_SETTINGS, ...localSettings };
+        }
+        
+        // If no settings exist anywhere, create default
         await setSystemSettings(DEFAULT_SETTINGS);
         return DEFAULT_SETTINGS;
     } catch (error) {
         console.error('Error getting system settings:', error);
+        // ✅ FIX: Return localStorage settings on Firebase error (not defaults!)
+        if (localSettings) {
+            console.log('📦 Firebase error, using localStorage backup (price=' + localSettings.defaultSubscriptionPrice + ')');
+            return { ...DEFAULT_SETTINGS, ...localSettings };
+        }
         return DEFAULT_SETTINGS;
     }
 };
@@ -324,11 +339,15 @@ export const updateSystemSettings = async (
         }
         
         const docRef = doc(db, SYSTEM_SETTINGS_PATH);
-        await updateDoc(docRef, {
+        // ✅ FIX: Use setDoc with merge:true to CREATE if not exists, UPDATE if exists
+        // updateDoc fails if document doesn't exist!
+        await setDoc(docRef, {
             ...sanitizedUpdates,
             updatedAt: serverTimestamp(),
             updatedBy
-        });
+        }, { merge: true });
+        
+        console.log('✅ Settings saved to Firebase successfully');
     } catch (error) {
         console.error('Error updating system settings in Firebase:', error);
         // ✅ Don't throw - localStorage backup already saved

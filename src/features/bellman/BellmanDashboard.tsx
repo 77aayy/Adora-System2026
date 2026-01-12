@@ -65,6 +65,7 @@ import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboar
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
 // DeveloperSignature is now in GlobalFooter (App.tsx)
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline';
+import { useBrandName } from '../../hooks/useBrandName';
 
 // Types
 import { RoomCard } from '../../types';
@@ -434,6 +435,7 @@ export const BellmanDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { success, error, haptic, playSound } = useUX();
+    const brandName = useBrandName();
 
     // State
     const [roomCards, setRoomCards] = useState<RoomCard[]>([]);
@@ -910,12 +912,9 @@ export const BellmanDashboard: React.FC = () => {
             <FlexibleHeader
                 title="البيلمان"
                 titleIcon={<Bell className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 flex-shrink-0" />}
-                subtitle={
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="truncate">{user?.name}</span>
-                        <PointsTracker employeeId={user?.id || ''} inline showHistory />
-                    </div>
-                }
+                showGreeting={true}
+                brandName={brandName}
+                subtitle={<PointsTracker employeeId={user?.id || ''} inline showHistory />}
                 actions={[
                     {
                         id: 'instructions',

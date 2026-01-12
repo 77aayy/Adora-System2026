@@ -50,6 +50,8 @@ import { uploadMaintenancePhoto } from '../../services/storageService'; // ✅ A
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
+import { useBrandName } from '../../hooks/useBrandName';
+import { getGreetingParts } from '../../utils/greetings';
 
 // Creative Dashboard Components
 import { TaskProgress } from '../../components/dashboard';
@@ -92,6 +94,8 @@ export const MaintenanceDashboard: React.FC = () => {
     const { user, logout } = useAuth();
     const { success, error, haptic } = useUX();
     const { tenantId, setTenant } = useTenant(); // ✅ Use Tenant Context - moved early
+    const brandName = useBrandName();
+    const greeting = getGreetingParts(user?.name);
 
     // State
     const [currentTab, setCurrentTab] = useState<'active' | 'completed'>('active');
@@ -961,14 +965,18 @@ export const MaintenanceDashboard: React.FC = () => {
             <ManagerAnnouncementBanner department="maintenance" />
             
             <div className="min-h-screen p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
-            {/* Flexible Header */}
+            {/* Flexible Header with Dynamic Greeting */}
             <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <div className="flex-1 min-w-0">
-                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1">
-                        الصيانة
+                    <h1 className="text-lg sm:text-xl lg:text-2xl font-bold mb-1" style={{ color: 'var(--theme-text-primary)' }}>
+                        {greeting.emoji} {greeting.timeGreeting}، {greeting.motivational} يا {user?.name}
                     </h1>
+                    {brandName && (
+                        <div className="text-xs sm:text-sm mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
+                            🏨 {brandName}
+                        </div>
+                    )}
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white/60 text-sm sm:text-base truncate">{user?.name}</span>
                         <PointsTracker employeeId={user?.id || ''} showHistory={false} inline={true} />
                     </div>
                 </div>
