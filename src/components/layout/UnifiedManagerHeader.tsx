@@ -335,7 +335,7 @@ export const UnifiedManagerHeader: React.FC = () => {
                             }}
                         />
 
-                        {/* Tabs - Icons with Labels below */}
+                        {/* Tabs - Icons with Labels below - ✅ Unified Teal Color with Animation */}
                         {departmentTabs.map((tab) => {
                             const isActive = activeTab === tab.id;
                             return (
@@ -345,22 +345,24 @@ export const UnifiedManagerHeader: React.FC = () => {
                                     onClick={() => handleTabClick(tab)}
                                     title={tab.label}
                                     className={`
-                                        relative flex flex-col items-center justify-center gap-0.5 px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-lg transition-all duration-200 min-w-[44px] sm:min-w-[56px]
+                                        relative flex flex-col items-center justify-center gap-0.5 px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-xl min-w-[44px] sm:min-w-[56px]
+                                        transition-all duration-300 ease-out
                                         ${isActive 
-                                            ? 'text-white' 
-                                            : 'hover:bg-slate-100 dark:hover:bg-slate-700'
+                                            ? 'text-white scale-105 shadow-lg' 
+                                            : 'hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:scale-102 active:scale-95'
                                         }
                                     `}
                                     style={{
                                         background: isActive 
-                                            ? `linear-gradient(135deg, ${tab.color} 0%, ${tab.color}dd 100%)`
+                                            ? 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)'
                                             : 'transparent',
                                         color: isActive ? 'white' : 'var(--theme-text-secondary)',
-                                        boxShadow: isActive ? `0 4px 12px ${tab.color}40` : 'none',
+                                        boxShadow: isActive ? '0 4px 15px rgba(20, 184, 166, 0.4)' : 'none',
+                                        border: isActive ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
                                     }}
                                 >
                                     {/* Icon - Always visible, larger */}
-                                    <span className="text-lg sm:text-base">
+                                    <span className={`text-lg sm:text-base transition-transform duration-300 ${isActive ? 'animate-pulse' : ''}`}>
                                         {React.cloneElement(tab.icon as React.ReactElement, {
                                             className: 'w-5 h-5 sm:w-4 sm:h-4'
                                         })}
