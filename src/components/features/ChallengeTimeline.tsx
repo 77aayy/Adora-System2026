@@ -88,120 +88,87 @@ export const ChallengeTimeline: React.FC = () => {
 
     return (
         <>
-        {/* ✅ تصميم H Rewards - مصغر وباهت */}
+        {/* ✅ تصميم موحد مع الكروت الإحصائية - Adora Style */}
         <div 
-            className="relative overflow-hidden rounded-xl cursor-pointer group transition-all hover:scale-[1.01] active:scale-[0.99]"
+            className="group relative overflow-hidden rounded-lg sm:rounded-xl bg-gradient-to-br from-teal-100 to-teal-50 dark:from-teal-500/10 dark:to-teal-500/5 border border-teal-300 dark:border-teal-500/20 backdrop-blur-sm shadow-sm hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-pointer p-2 sm:p-3"
             onClick={() => setShowHistory(true)}
-            style={{
-                background: 'linear-gradient(135deg, #f0fdfa 0%, #e6fffa 50%, #d5f5f6 100%)'
-            }}
         >
-            {/* خطوط زخرفية في الخلفية - أخف */}
-            <div className="absolute inset-0 opacity-10">
-                {Array.from({ length: 8 }).map((_, i) => (
-                    <div 
-                        key={i}
-                        className="absolute h-full w-0.5 bg-teal-300/30"
-                        style={{ 
-                            left: `${i * 12 + 6}%`,
-                            transform: 'rotate(15deg)',
-                            transformOrigin: 'center'
-                        }}
-                    />
-                ))}
+            {/* Shine effect */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
             </div>
 
-            <div className="relative p-2.5">
-                {/* الهيدر - العنوان + عداد الأيام */}
+            <div className="relative">
+                {/* الهيدر */}
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-lg flex items-center justify-center shadow">
-                            <Sparkles className="w-3.5 h-3.5 text-white" />
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-md sm:rounded-lg bg-teal-200 dark:bg-teal-500/15 flex items-center justify-center">
+                            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-600 dark:text-teal-400" />
                         </div>
                         <div>
-                            <h3 className="text-[11px] font-bold text-slate-700">تحدي الالتزام</h3>
-                            <p className="text-[8px] font-medium text-slate-500">{currentMonth}</p>
+                            <div className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">تحدي الالتزام</div>
+                            <div className="text-[9px] sm:text-[10px] text-slate-600 dark:text-slate-400">{currentMonth}</div>
                         </div>
                     </div>
-                    <div className="flex flex-col items-center bg-white/50 rounded-lg px-2 py-1 border border-teal-100">
-                        <Clock className="w-3 h-3 text-teal-500 mb-0.5" />
-                        <span className="text-[10px] font-bold text-teal-600">{daysRemaining}d</span>
+                    <div className="text-right">
+                        <div className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">{daysRemaining}d</div>
+                        <div className="text-[9px] sm:text-[10px] text-slate-600 dark:text-slate-400">متبقي</div>
                     </div>
                 </div>
 
-                {/* التايم لاين الأفقي - مصغر */}
-                <div className="bg-white/40 rounded-lg p-1.5 border border-teal-50" ref={scrollRef}>
-                    <div className="flex items-center justify-between overflow-x-auto scrollbar-hide gap-1">
-                        {milestones.slice(0, 5).map((milestone, index) => {
-                            const status = getMilestoneStatus(milestone);
-                            const isLast = index === Math.min(4, milestones.length - 1);
-                            
-                            return (
-                                <div key={milestone.day} className="flex items-center flex-shrink-0">
-                                    {/* الدائرة مع المعلومات */}
-                                    <div className="flex flex-col items-center">
-                                        <div className={`
-                                            w-7 h-7 rounded-full flex items-center justify-center border-2 shadow-sm transition-all
-                                            ${status === 'claimed' 
-                                                ? 'bg-gradient-to-br from-teal-400 to-teal-500 border-white shadow-teal-200/50' 
-                                                : status === 'unlocked'
-                                                    ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-white shadow-amber-200/50 animate-pulse'
-                                                    : 'bg-slate-100 border-slate-200'
-                                            }
-                                        `}>
-                                            {status === 'claimed' ? (
-                                                <CheckCircle2 className="w-4 h-4 text-white" />
-                                            ) : status === 'unlocked' ? (
-                                                <Gift className="w-3.5 h-3.5 text-white" />
-                                            ) : (
-                                                <Lock className="w-3 h-3 text-slate-400" />
-                                            )}
-                                        </div>
-                                        
-                                        <div className="mt-1 text-center">
-                                            <div className={`text-[8px] font-bold ${
-                                                status === 'claimed' ? 'text-teal-600' :
-                                                status === 'unlocked' ? 'text-amber-600' :
-                                                'text-slate-500'
-                                            }`}>
-                                                يوم {milestone.day}
-                                            </div>
-                                            <span className={`text-[9px] font-bold ${
-                                                status === 'claimed' ? 'text-teal-500' :
-                                                status === 'unlocked' ? 'text-amber-500' :
-                                                'text-slate-400'
-                                            }`}>
-                                                {milestone.rewardPoints}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* الخط الرابط */}
-                                    {!isLast && (
-                                        <div className={`
-                                            w-2 sm:w-3 h-0.5 mx-0.5 rounded-full
-                                            ${status === 'claimed' 
-                                                ? 'bg-teal-400' 
-                                                : 'bg-slate-200'
-                                            }
-                                        `} />
+                {/* التايم لاين - البيانات بين الأقفال */}
+                <div className="flex items-center" ref={scrollRef}>
+                    {milestones.slice(0, 5).map((milestone, index) => {
+                        const status = getMilestoneStatus(milestone);
+                        const isLast = index === Math.min(4, milestones.length - 1);
+                        
+                        return (
+                            <React.Fragment key={milestone.day}>
+                                {/* القفل بحد تركواز */}
+                                <div className={`
+                                    w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center border-2 flex-shrink-0 transition-all
+                                    ${status === 'claimed' 
+                                        ? 'bg-teal-500 border-teal-400 shadow-sm shadow-teal-300' 
+                                        : status === 'unlocked'
+                                            ? 'bg-amber-500 border-amber-400 shadow-sm shadow-amber-300 animate-pulse'
+                                            : 'bg-teal-100 dark:bg-teal-900/30 border-teal-400 dark:border-teal-500'
+                                    }
+                                `}>
+                                    {status === 'claimed' ? (
+                                        <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                                    ) : status === 'unlocked' ? (
+                                        <Gift className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                                    ) : (
+                                        <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-teal-600 dark:text-teal-400" />
                                     )}
                                 </div>
-                            );
-                        })}
-                    </div>
+                                
+                                {/* البيانات بين الأقفال */}
+                                {!isLast && (
+                                    <div className="flex-1 flex flex-col items-center px-0.5 sm:px-1">
+                                        <span className="text-[7px] sm:text-[8px] font-bold text-slate-700 dark:text-slate-300">
+                                            {milestone.day}d
+                                        </span>
+                                        <div className={`w-full h-0.5 rounded-full my-0.5 ${
+                                            status === 'claimed' ? 'bg-teal-400' : 'bg-teal-200 dark:bg-teal-700'
+                                        }`} />
+                                        <span className="text-[7px] sm:text-[8px] font-bold text-teal-600 dark:text-teal-400">
+                                            {milestone.rewardPoints}
+                                        </span>
+                                    </div>
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
                 </div>
 
-                {/* الفوتر - السلسلة الحالية */}
-                <div className="mt-1.5 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 bg-white/40 rounded-md px-1.5 py-0.5 border border-teal-50">
-                        <TrendingUp className="w-3 h-3 text-teal-500" />
-                        <span className="text-[9px] font-bold text-slate-600">{currentStreak} يوم متتالي</span>
+                {/* الفوتر */}
+                <div className="mt-2 pt-2 border-t border-teal-200 dark:border-teal-500/20 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                        <TrendingUp className="w-3 h-3 text-teal-600 dark:text-teal-400" />
+                        <span className="text-[10px] sm:text-xs font-bold text-slate-700 dark:text-slate-300">{currentStreak} يوم متتالي</span>
                     </div>
-                    <div className="flex items-center gap-0.5 text-[8px] font-medium text-slate-500 group-hover:text-teal-600 transition-colors">
-                        <span>التفاصيل</span>
-                        <ChevronLeft className="w-2.5 h-2.5" />
-                    </div>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 group-hover:text-teal-600 transition-colors">التفاصيل ←</span>
                 </div>
             </div>
         </div>
