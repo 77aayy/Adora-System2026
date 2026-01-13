@@ -8,7 +8,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Coffee, Clock, CheckCircle2, AlertCircle,
     Package, Search, Filter, X, User, Building2, ShoppingCart,
-    QrCode, Check, Eye, LogOut, MessageSquare, BookOpen
+    QrCode, Check, Eye, LogOut, MessageSquare, BookOpen,
+    Trophy, Lock
 } from 'lucide-react';
 import { HeaderButton } from '../../components/common/HeaderButton';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
@@ -252,7 +253,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                     <TransferNotificationBadge department="coffee_shop" />
                 </div>
 
-                {/* Stats + Challenge Timeline في صف واحد */}
+                {/* Stats + Challenge Timeline في صف واحد متناسق */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4">
                     <StatCard
                         count={groupedOrders.pending.length}
@@ -281,11 +282,26 @@ export const CoffeeShopDashboard: React.FC = () => {
                         lastUpdate="تم التحديث الآن"
                         trend="—"
                     />
-                </div>
-
-                {/* ✅ تايم لاين الالتزام - مصغر للكافي شوب */}
-                <div className="transform scale-75 origin-top-right -my-4">
-                    <ChallengeTimeline />
+                    {/* ✅ كارت الالتزام - الكارت الرابع */}
+                    <div className="adora-card p-3 flex flex-col justify-between cursor-pointer hover:shadow-lg transition-all" onClick={() => {}}>
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center">
+                                <Trophy className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="text-xs font-bold adora-text-primary">سجل الالتزام</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1">
+                                {[1,3,7,15,30].slice(0,4).map((day, i) => (
+                                    <div key={day} className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                                        <Lock className="w-2.5 h-2.5 text-slate-400" />
+                                    </div>
+                                ))}
+                            </div>
+                            <span className="text-lg font-black text-primary-500">0</span>
+                        </div>
+                        <div className="text-[9px] adora-text-secondary mt-1 text-left">17d متبقي</div>
+                    </div>
                 </div>
 
                 {/* Search */}
