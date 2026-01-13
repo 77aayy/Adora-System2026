@@ -67,6 +67,7 @@ import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnoun
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
 import { useBrandName } from '../../hooks/useBrandName';
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline'; // ✅ Commitment Timeline
+import { PurchaseCompleteModal } from '../../components/procurement/PurchaseCompleteModal'; // ✅ Purchase Complete Modal
 
 // ============================================================
 // STATUS CONFIG
@@ -269,6 +270,10 @@ export const ProcurementDashboard: React.FC = () => {
     
     // ✅ General Instructions State
     const [showGeneralInstructions, setShowGeneralInstructions] = useState(false);
+    
+    // ✅ Purchase Complete Modal State
+    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+    const [selectedRequest, setSelectedRequest] = useState<ProcurementRequest | null>(null);
 
     // Voice Agent Integration
     const {
@@ -507,23 +512,56 @@ export const ProcurementDashboard: React.FC = () => {
         }
     };
 
-    const handleComplete = async (request: ProcurementRequest) => {
+    // ✅ فتح نافذة تسجيل الشراء (بدلاً من الشراء المباشر)
+    const handleOpenPurchaseModal = (request: ProcurementRequest) => {
+        setSelectedRequest(request);
+        setShowPurchaseModal(true);
+    };
+
+    // ✅ تنفيذ الشراء بعد تحديد الكميات من النافذة
+    const handleCompletePurchase = async (
+        items: { itemName: string; purchasedQty: number; unitPrice?: number }[],
+        totalCost: number,
+        notes?: string
+    ) => {
+        if (!selectedRequest) return;
+        
         try {
-            // For demo - mark all as purchased with full quantity
-            const items = request.items.map(item => ({
-                itemName: item.itemName,
-                purchasedQty: item.quantity,
-                unitPrice: 0
-            }));
-            await completePurchase(request.id, items, 0);
+            // 1. تسجيل الشراء مع الكميات المحددة
+            const newRequestId = await completePurchase(selectedRequest.id, items, totalCost, notes);
 
-            // Also mark as delivered
-            await deliverItems(request.id, user?.id || '', user?.name || '');
+            // 2. تسليم للقسم الطالب (DELIVERED)
+            await deliverItems(selectedRequest.id, user?.id || '', user?.name || '', tenantId);
 
-            success('تم إكمال الشراء والتسليم');
+            // 3. التحقق من الشراء الجزئي
+            const hasPartial = items.some((item, index) => {
+                const originalItem = selectedRequest.items[index];
+                return item.purchasedQty < originalItem.quantity;
+            });
+
+            if (hasPartial && newRequestId) {
+                success('تم الشراء الجزئي وإنشاء طلب جديد للكمية المتبقية');
+            } else {
+                success('تم إكمال الشراء وإرساله للقسم الطالب');
+            }
+
+            // ✅ Auto-check daily attendance
+            if (tenantId && user?.id) {
+                try {
+                    const { checkDailyAttendance } = await import('../../services/challengeService');
+                    checkDailyAttendance(tenantId, user.id).catch(err => {
+                        console.warn('Failed to check daily attendance:', err);
+                    });
+                } catch (err) {
+                    console.warn('Could not load challengeService:', err);
+                }
+            }
+
+            haptic('success');
         } catch (err) {
-            console.error('Error completing:', err);
+            console.error('Error completing purchase:', err);
             error('فشل إكمال الشراء');
+            haptic('error');
         }
     };
     
@@ -705,7 +743,7 @@ export const ProcurementDashboard: React.FC = () => {
                             onApprove={() => handleApprove(request.id)}
                             onReject={() => handleReject(request.id)}
                             onStartPurchase={() => handleStartPurchase(request.id)}
-                            onComplete={() => handleComplete(request)}
+                            onComplete={() => handleOpenPurchaseModal(request)}
                         />
                     ))
                 )}
@@ -762,6 +800,19 @@ export const ProcurementDashboard: React.FC = () => {
                 onClose={closeTour}
                 onComplete={completeTour}
             />
+
+            {/* ✅ Purchase Complete Modal - نافذة تسجيل الشراء */}
+            {selectedRequest && (
+                <PurchaseCompleteModal
+                    isOpen={showPurchaseModal}
+                    onClose={() => {
+                        setShowPurchaseModal(false);
+                        setSelectedRequest(null);
+                    }}
+                    request={selectedRequest}
+                    onComplete={handleCompletePurchase}
+                />
+            )}
 
             {/* 📝 Developer Signature */}
             {/* Developer Signature is in GlobalFooter (App.tsx) */}

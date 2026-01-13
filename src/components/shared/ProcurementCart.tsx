@@ -386,12 +386,14 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
 
         setLoadingOrders(true);
         const branchId = (user as any)?.branch || 'default';
+        const currentTenantId = tenantId || (user as any)?.tenantId;
         const requestsRef = collection(db, 'procurementRequests');
 
         // Load orders for this department that are purchased/delivered (ready to receive)
-        // NOTE: Removed orderBy to avoid requiring a composite index during development
+        // ✅ FIX: Added tenantId filter for SaaS isolation
         const q = query(
             requestsRef,
+            where('tenantId', '==', currentTenantId),
             where('department', '==', department),
             where('branch', '==', branchId),
             limit(20)
