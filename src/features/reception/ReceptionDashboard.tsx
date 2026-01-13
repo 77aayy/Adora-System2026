@@ -72,7 +72,7 @@ import {
 // Shared Components
 import { ShiftNotes } from '../../components/shared/ShiftNotes';
 import { PointsTracker } from '../../components/shared/PointsTracker';
-import { ProcurementCart } from '../../components/shared/ProcurementCart';
+import { ProcurementCartWizard } from '../../components/shared/ProcurementCartWizard';
 import { VoiceInputButton } from '../../components/shared/VoiceInputButton'; // ✅ Import
 import { ReceptionVerificationPanel } from '../../components/shared/ReceptionVerificationPanel'; // 🆕 Guest Verification
 
@@ -3441,7 +3441,7 @@ export const ReceptionDashboard: React.FC = () => {
             />
 
             <ShiftNotes isOpen={showShiftNotes} onClose={() => setShowShiftNotes(false)} />
-            <ProcurementCart isOpen={showProcurement} onClose={() => setShowProcurement(false)} department="reception" />
+            <ProcurementCartWizard isOpen={showProcurement} onClose={() => setShowProcurement(false)} department="reception" tenantId={tenantId || ''} />
             <TeamMembers isOpen={showTeam} onClose={() => setShowTeam(false)} department="reception" />
             <UnifiedHistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} defaultDepartment="all" />
             
