@@ -90,7 +90,7 @@ export const ChallengeTimeline: React.FC = () => {
         <>
         {/* ✅ تصميم موحد مع الكروت الإحصائية - Adora Style */}
         <div 
-            className="group relative overflow-hidden rounded-lg sm:rounded-xl bg-gradient-to-br from-teal-100 to-teal-50 dark:from-teal-500/10 dark:to-teal-500/5 border border-teal-300 dark:border-teal-500/20 backdrop-blur-sm shadow-sm hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-pointer p-2 sm:p-3"
+            className="group relative overflow-hidden rounded-lg sm:rounded-xl bg-gradient-to-br from-teal-100 to-teal-50 dark:from-teal-500/10 dark:to-teal-500/5 border border-teal-200/50 dark:border-teal-500/20 backdrop-blur-sm shadow-sm hover:shadow-lg hover:shadow-teal-100 dark:hover:shadow-teal-500/10 hover:scale-[1.01] transition-all duration-300 cursor-pointer p-2 sm:p-3"
             onClick={() => setShowHistory(true)}
         >
             {/* Shine effect */}

@@ -153,11 +153,11 @@ export const StatCard: React.FC<StatCardProps> = ({
                 group relative overflow-hidden 
                 rounded-lg sm:rounded-xl
                 bg-gradient-to-br ${config.gradient}
-                border ${config.border}
+                border border-teal-200/50 dark:border-teal-500/20
                 backdrop-blur-sm
                 shadow-sm sm:shadow-md dark:shadow-none
                 transition-all duration-300
-                hover:scale-[1.01] sm:hover:scale-[1.02] hover:shadow-lg sm:hover:shadow-xl dark:hover:shadow-lg hover:${config.shadow}
+                hover:scale-[1.01] sm:hover:scale-[1.02] hover:shadow-lg sm:hover:shadow-xl dark:hover:shadow-lg hover:shadow-teal-100 dark:hover:shadow-teal-500/10
                 p-2 sm:p-3 lg:p-4
                 ${pulse || urgencyStyle ? 'ring-2 ' + (urgencyStyle?.ring || 'ring-teal-500/30') : ''}
                 ${urgencyStyle?.pulse || (pulse ? 'animate-pulse-subtle' : '')}
