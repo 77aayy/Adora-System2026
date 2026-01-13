@@ -568,7 +568,7 @@ export const ProcurementDashboard: React.FC = () => {
                 titleIcon={<ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 flex-shrink-0" />}
                 showGreeting={true}
                 brandName={brandName}
-                subtitle={<PointsTracker employeeId={user?.id || ''} inline showHistory />}
+                subtitle={undefined}
                 actions={[
                     {
                         id: 'general-instructions',

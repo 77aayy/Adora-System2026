@@ -1069,7 +1069,7 @@ export const BellmanDashboard: React.FC = () => {
                 titleIcon={<Bell className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 flex-shrink-0" />}
                 showGreeting={true}
                 brandName={brandName}
-                subtitle={<PointsTracker employeeId={user?.id || ''} inline showHistory />}
+                subtitle={undefined}
                 actions={[
                     {
                         id: 'instructions',

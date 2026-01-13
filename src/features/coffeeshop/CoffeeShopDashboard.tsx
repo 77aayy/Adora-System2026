@@ -215,7 +215,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                     title="كوفي شوب"
                     showGreeting={true}
                     brandName={brandName}
-                    subtitle={<PointsTracker employeeId={user?.id || ''} inline showHistory />}
+                    subtitle={undefined}
                     actions={[
                         {
                             id: 'instructions',

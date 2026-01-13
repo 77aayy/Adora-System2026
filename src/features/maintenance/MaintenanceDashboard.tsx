@@ -986,13 +986,10 @@ export const MaintenanceDashboard: React.FC = () => {
                         {greeting.emoji} {greeting.timeGreeting}، {greeting.motivational} يا {user?.name}
                     </h1>
                     {brandName && (
-                        <div className="text-xs sm:text-sm mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
+                        <div className="text-xs sm:text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
                             🏨 {brandName}
                         </div>
                     )}
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <PointsTracker employeeId={user?.id || ''} showHistory={false} inline={true} />
-                    </div>
                 </div>
 
                 {/* Mobile: Hamburger Menu | Desktop: All buttons visible */}
