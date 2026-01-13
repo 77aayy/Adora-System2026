@@ -38,7 +38,7 @@ import { PageTransition } from '../../components/common/PageTransition';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
 import { LineChart, BarChart, DoughnutChart } from '../../components/analytics/ChartComponents';
 import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
-import { FileText, AlertCircle, Download, Code2, Palette } from 'lucide-react';
+import { FileText, AlertCircle, Download, Code2, Palette, Printer } from 'lucide-react';
 import { useAllBranchesForOwner } from '../../hooks/useTenantData'; // ✅ SaaS Integration
 import { clearAllCache as clearRequestCache } from '../../utils/requestCache'; // ✅ For force refresh
 import { StatCard } from '../../components/common/StatCard'; // ✅ Use project StatCard
@@ -1052,20 +1052,6 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     />
                 )}
 
-                {showAddManagerModal && (
-                    <AddManagerModal
-                        systemSettings={effectiveSettings}
-                        onClose={() => setShowAddManagerModal(false)}
-                        onSuccess={async () => {
-                            setShowAddManagerModal(false);
-                            await loadData(true); // Force refresh after adding manager
-                            success('تم إضافة المدير وإنشاء سند القبض بنجاح');
-                            // ✅ الانتقال التلقائي إلى تبويب الفواتير
-                            setSearchParams({ tab: 'billing' });
-                        }}
-                    />
-                )}
-                
                 {/* ✅ Owner Sidebar with Overlay */}
                 {showSidebar && (
                     <>
@@ -1088,67 +1074,213 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 
             </div>
 
-            {/* ✅ Manager Details Modal - Rendered inside main component */}
+            {/* ✅ Add Manager Modal - Rendered OUTSIDE main container */}
+            {showAddManagerModal && (
+                <AddManagerModal
+                    systemSettings={effectiveSettings}
+                    onClose={() => setShowAddManagerModal(false)}
+                    onSuccess={async () => {
+                        setShowAddManagerModal(false);
+                        await loadData(true); // Force refresh after adding manager
+                        success('تم إضافة المدير وإنشاء سند القبض بنجاح');
+                        // ✅ الانتقال التلقائي إلى تبويب الفواتير
+                        setSearchParams({ tab: 'billing' });
+                    }}
+                />
+            )}
+
+            {/* ✅ Manager Details Modal - Enhanced for Light Mode + Print */}
             {showManagerDetailsModal && selectedManager && (
-                <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4" style={{ backdropFilter: 'none' }}>
-                    <div className="solid-modal rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="fixed inset-0 z-[100] bg-black/40 dark:bg-black/80 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)' }}>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10">
                         {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-white/20">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                <Users className="w-6 h-6 text-blue-400" />
+                        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/20 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-transparent dark:to-transparent">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                                 تفاصيل المدير
                             </h3>
-                            <button
-                                onClick={() => {
-                                    setShowManagerDetailsModal(false);
-                                    setSelectedManager(null);
-                                }}
-                                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
-                            >
-                                <X className="w-5 h-5 text-white" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {/* Print Button */}
+                                <button
+                                    onClick={() => {
+                                        const printWindow = window.open('', '_blank');
+                                        if (!printWindow) return;
+                                        printWindow.document.write(`
+                                            <!DOCTYPE html>
+                                            <html dir="rtl" lang="ar">
+                                            <head>
+                                                <meta charset="UTF-8">
+                                                <title>تقرير اشتراك - ${selectedManager.tenantName}</title>
+                                                <style>
+                                                    * { font-family: 'Segoe UI', Tahoma, sans-serif; box-sizing: border-box; }
+                                                    body { padding: 40px; background: white; color: #1e293b; line-height: 1.6; }
+                                                    .header { text-align: center; border-bottom: 3px solid #0d9488; padding-bottom: 20px; margin-bottom: 30px; }
+                                                    .header h1 { color: #0d9488; margin: 0 0 10px 0; font-size: 28px; }
+                                                    .section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+                                                    .section h3 { color: #0d9488; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin: 0 0 15px 0; }
+                                                    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+                                                    .stat { background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+                                                    .stat-label { font-size: 12px; color: #64748b; margin-bottom: 5px; }
+                                                    .stat-value { font-size: 18px; font-weight: bold; color: #1e293b; }
+                                                    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+                                                    .badge-green { background: #dcfce7; color: #166534; }
+                                                    .badge-yellow { background: #fef3c7; color: #92400e; }
+                                                    .badge-red { background: #fee2e2; color: #991b1b; }
+                                                    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
+                                                    @media print { body { padding: 20px; } }
+                                                </style>
+                                            </head>
+                                            <body>
+                                                <div class="header">
+                                                    <h1>🏨 تقرير اشتراك Adora</h1>
+                                                    <p><strong>${selectedManager.tenantName}</strong></p>
+                                                    <p>كود المدير: ${selectedManager.managerCode || 'غير محدد'}</p>
+                                                    <p>تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                                </div>
+                                                
+                                                <div class="section">
+                                                    <h3>📋 معلومات المشترك</h3>
+                                                    <div class="grid">
+                                                        <div class="stat">
+                                                            <div class="stat-label">اسم الفندق</div>
+                                                            <div class="stat-value">${selectedManager.tenantName}</div>
+                                                        </div>
+                                                        <div class="stat">
+                                                            <div class="stat-label">اسم المدير</div>
+                                                            <div class="stat-value">${selectedManager.managerName || 'غير محدد'}</div>
+                                                        </div>
+                                                        <div class="stat">
+                                                            <div class="stat-label">رمز المدير</div>
+                                                            <div class="stat-value">${selectedManager.managerCode || 'غير محدد'}</div>
+                                                        </div>
+                                                        <div class="stat">
+                                                            <div class="stat-label">الخطة</div>
+                                                            <div class="stat-value">${selectedManager.plan}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="section">
+                                                    <h3>📊 الإحصائيات</h3>
+                                                    <div class="grid">
+                                                        <div class="stat">
+                                                            <div class="stat-label">عدد الموظفين</div>
+                                                            <div class="stat-value">${selectedManager.totalEmployees}</div>
+                                                        </div>
+                                                        <div class="stat">
+                                                            <div class="stat-label">عدد الفروع</div>
+                                                            <div class="stat-value">${selectedManager.totalBranches}</div>
+                                                        </div>
+                                                        <div class="stat">
+                                                            <div class="stat-label">عدد الغرف</div>
+                                                            <div class="stat-value">${selectedManager.totalRooms}</div>
+                                                        </div>
+                                                        <div class="stat">
+                                                            <div class="stat-label">إجمالي الطلبات</div>
+                                                            <div class="stat-value">${selectedManager.totalRequests}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="section">
+                                                    <h3>📅 معلومات الترخيص</h3>
+                                                    <div class="grid">
+                                                        <div class="stat">
+                                                            <div class="stat-label">تاريخ البدء</div>
+                                                            <div class="stat-value">${toSafeDate(selectedManager.subscriptionStartDate).toLocaleDateString('ar-EG')}</div>
+                                                        </div>
+                                                        <div class="stat">
+                                                            <div class="stat-label">تاريخ الانتهاء</div>
+                                                            <div class="stat-value">${toSafeDate(selectedManager.licenseExpiryDate).toLocaleDateString('ar-EG')}</div>
+                                                        </div>
+                                                        <div class="stat">
+                                                            <div class="stat-label">الأيام المتبقية</div>
+                                                            <div class="stat-value">
+                                                                <span class="badge ${selectedManager.daysUntilExpiry > 30 ? 'badge-green' : selectedManager.daysUntilExpiry > 7 ? 'badge-yellow' : 'badge-red'}">
+                                                                    ${selectedManager.daysUntilExpiry} يوم
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="stat">
+                                                            <div class="stat-label">الحالة</div>
+                                                            <div class="stat-value">
+                                                                <span class="badge ${selectedManager.status === 'active' ? 'badge-green' : selectedManager.status === 'suspended' ? 'badge-yellow' : 'badge-red'}">
+                                                                    ${selectedManager.status === 'active' ? 'نشط' : selectedManager.status === 'suspended' ? 'موقوف' : 'منتهي'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="footer">
+                                                    <p>تم إنشاء هذا التقرير بواسطة نظام Adora لإدارة الفنادق</p>
+                                                    <p>© ${new Date().getFullYear()} Adora Hotel Management System</p>
+                                                </div>
+                                            </body>
+                                            </html>
+                                        `);
+                                        printWindow.document.close();
+                                        printWindow.print();
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-500/30 transition-colors border border-teal-300 dark:border-teal-500/30"
+                                    title="طباعة تقرير الاشتراك"
+                                >
+                                    <Printer className="w-5 h-5" />
+                                    <span className="hidden sm:inline">طباعة</span>
+                                </button>
+                                {/* Close Button */}
+                                <button
+                                    onClick={() => {
+                                        setShowManagerDetailsModal(false);
+                                        setSelectedManager(null);
+                                    }}
+                                    className="p-2 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 transition-colors"
+                                >
+                                    <X className="w-5 h-5 text-slate-600 dark:text-white" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Content */}
-                        <div className="p-6 space-y-6">
+                        <div className="p-6 space-y-6 bg-slate-50 dark:bg-transparent">
                             {/* Basic Info */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-white/5 rounded-xl p-4">
-                                    <p className="text-sm text-white/60 mb-1">اسم الفندق</p>
-                                    <p className="text-lg font-bold text-white">{selectedManager.tenantName}</p>
+                                <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
+                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">اسم الفندق</p>
+                                    <p className="text-lg font-bold text-slate-800 dark:text-white">{selectedManager.tenantName}</p>
                                 </div>
-                                <div className="bg-white/5 rounded-xl p-4">
-                                    <p className="text-sm text-white/60 mb-1">اسم المدير</p>
-                                    <p className="text-lg font-bold text-white">{selectedManager.managerName || 'غير محدد'}</p>
+                                <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
+                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">اسم المدير</p>
+                                    <p className="text-lg font-bold text-slate-800 dark:text-white">{selectedManager.managerName || 'غير محدد'}</p>
                                 </div>
-                                <div className="bg-white/5 rounded-xl p-4">
-                                    <p className="text-sm text-white/60 mb-1">رمز المدير</p>
-                                    <p className="text-lg font-bold text-teal-400">{selectedManager.managerCode || 'غير محدد'}</p>
+                                <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
+                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">رمز المدير</p>
+                                    <p className="text-lg font-bold text-teal-600 dark:text-teal-400">{selectedManager.managerCode || 'غير محدد'}</p>
                                 </div>
-                                <div className="bg-white/5 rounded-xl p-4">
-                                    <p className="text-sm text-white/60 mb-1">الخطة</p>
-                                    <p className="text-lg font-bold text-white capitalize">{selectedManager.plan}</p>
+                                <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
+                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">الخطة</p>
+                                    <p className="text-lg font-bold text-slate-800 dark:text-white capitalize">{selectedManager.plan}</p>
                                 </div>
                             </div>
 
                             {/* Status */}
-                            <div className="bg-white/5 rounded-xl p-4">
-                                <p className="text-sm text-white/60 mb-2">الحالة</p>
+                            <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
+                                <p className="text-sm text-slate-500 dark:text-white/60 mb-2">الحالة</p>
                                 <div className="flex items-center gap-2">
                                     {selectedManager.status === 'active' && (
-                                        <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm border border-green-500/30 flex items-center gap-1">
+                                        <span className="px-3 py-1 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-full text-sm border border-green-300 dark:border-green-500/30 flex items-center gap-1">
                                             <CheckCircle className="w-4 h-4" />
                                             نشط
                                         </span>
                                     )}
                                     {selectedManager.status === 'suspended' && (
-                                        <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-sm border border-yellow-500/30 flex items-center gap-1">
+                                        <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 rounded-full text-sm border border-yellow-300 dark:border-yellow-500/30 flex items-center gap-1">
                                             <Pause className="w-4 h-4" />
                                             موقوف مؤقتاً
                                         </span>
                                     )}
                                     {selectedManager.status === 'expired' && (
-                                        <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm border border-red-500/30 flex items-center gap-1">
+                                        <span className="px-3 py-1 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-full text-sm border border-red-300 dark:border-red-500/30 flex items-center gap-1">
                                             <X className="w-4 h-4" />
                                             منتهي
                                         </span>
@@ -1157,56 +1289,56 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             </div>
 
                             {/* Statistics */}
-                            <div className="bg-white/5 rounded-xl p-4">
-                                <p className="text-sm text-white/60 mb-3">الإحصائيات</p>
+                            <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
+                                <p className="text-sm text-slate-500 dark:text-white/60 mb-3">الإحصائيات</p>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="bg-white/5 rounded-xl p-4 text-center">
-                                        <Users className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-                                        <p className="text-2xl font-bold text-white">{selectedManager.totalEmployees}</p>
-                                        <p className="text-xs text-white/60">موظف</p>
+                                    <div className="bg-blue-50 dark:bg-white/5 rounded-xl p-4 text-center border border-blue-200 dark:border-transparent">
+                                        <Users className="w-6 h-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+                                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalEmployees}</p>
+                                        <p className="text-xs text-slate-500 dark:text-white/60">موظف</p>
                                     </div>
-                                    <div className="bg-white/5 rounded-xl p-4 text-center">
-                                        <Building2 className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-                                        <p className="text-2xl font-bold text-white">{selectedManager.totalBranches}</p>
-                                        <p className="text-xs text-white/60">فرع</p>
+                                    <div className="bg-purple-50 dark:bg-white/5 rounded-xl p-4 text-center border border-purple-200 dark:border-transparent">
+                                        <Building2 className="w-6 h-6 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
+                                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalBranches}</p>
+                                        <p className="text-xs text-slate-500 dark:text-white/60">فرع</p>
                                     </div>
-                                    <div className="bg-white/5 rounded-xl p-4 text-center">
-                                        <DoorOpen className="w-6 h-6 text-teal-400 mx-auto mb-2" />
-                                        <p className="text-2xl font-bold text-white">{selectedManager.totalRooms}</p>
-                                        <p className="text-xs text-white/60">غرفة</p>
+                                    <div className="bg-teal-50 dark:bg-white/5 rounded-xl p-4 text-center border border-teal-200 dark:border-transparent">
+                                        <DoorOpen className="w-6 h-6 text-teal-600 dark:text-teal-400 mx-auto mb-2" />
+                                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalRooms}</p>
+                                        <p className="text-xs text-slate-500 dark:text-white/60">غرفة</p>
                                     </div>
-                                    <div className="bg-white/5 rounded-xl p-4 text-center">
-                                        <Activity className="w-6 h-6 text-green-400 mx-auto mb-2" />
-                                        <p className="text-2xl font-bold text-white">{selectedManager.totalRequests}</p>
-                                        <p className="text-xs text-white/60">طلب</p>
+                                    <div className="bg-green-50 dark:bg-white/5 rounded-xl p-4 text-center border border-green-200 dark:border-transparent">
+                                        <Activity className="w-6 h-6 text-green-600 dark:text-green-400 mx-auto mb-2" />
+                                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalRequests}</p>
+                                        <p className="text-xs text-slate-500 dark:text-white/60">طلب</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* License Info */}
-                            <div className="bg-white/5 rounded-xl p-4">
-                                <p className="text-sm text-white/60 mb-3">معلومات الترخيص</p>
+                            <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
+                                <p className="text-sm text-slate-500 dark:text-white/60 mb-3">معلومات الترخيص</p>
                                 <div className="space-y-2">
-                                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                                        <span className="text-white/80">تاريخ البدء</span>
-                                        <span className="text-white font-medium">
+                                    <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
+                                        <span className="text-slate-700 dark:text-white/80">تاريخ البدء</span>
+                                        <span className="text-slate-800 dark:text-white font-medium">
                                             {toSafeDate(selectedManager.subscriptionStartDate).toLocaleDateString('ar-EG')}
                                         </span>
                                     </div>
-                                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                                        <span className="text-white/80">تاريخ الانتهاء</span>
-                                        <span className="text-white font-medium">
+                                    <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
+                                        <span className="text-slate-700 dark:text-white/80">تاريخ الانتهاء</span>
+                                        <span className="text-slate-800 dark:text-white font-medium">
                                             {toSafeDate(selectedManager.licenseExpiryDate).toLocaleDateString('ar-EG')}
                                         </span>
                                     </div>
-                                    <div className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                                        <span className="text-white/80">الأيام المتبقية</span>
+                                    <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
+                                        <span className="text-slate-700 dark:text-white/80">الأيام المتبقية</span>
                                         <span className={`font-bold ${
                                             selectedManager.daysUntilExpiry <= 7 
-                                                ? 'text-red-400' 
+                                                ? 'text-red-600 dark:text-red-400' 
                                                 : selectedManager.daysUntilExpiry <= 30
-                                                ? 'text-yellow-400'
-                                                : 'text-green-400'
+                                                ? 'text-yellow-600 dark:text-yellow-400'
+                                                : 'text-green-600 dark:text-green-400'
                                         }`}>
                                             {selectedManager.daysUntilExpiry} يوم
                                         </span>
@@ -1214,23 +1346,47 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Last Activity */}
-                            <div className="bg-white/5 rounded-xl p-4">
-                                <p className="text-sm text-white/60 mb-1">آخر نشاط</p>
-                                <p className="text-white">
-                                    {selectedManager.lastActivity.toLocaleString('ar-EG')}
+                            {/* Last Activity - ✅ Human-readable format */}
+                            <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
+                                <p className="text-sm text-slate-500 dark:text-white/60 mb-1">آخر نشاط</p>
+                                <p className="text-slate-800 dark:text-white">
+                                    {(() => {
+                                        const lastDate = selectedManager.lastActivity instanceof Date 
+                                            ? selectedManager.lastActivity 
+                                            : new Date(selectedManager.lastActivity);
+                                        const now = new Date();
+                                        const diffMs = now.getTime() - lastDate.getTime();
+                                        const diffMins = Math.floor(diffMs / (1000 * 60));
+                                        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                                        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                        
+                                        if (diffMins < 1) return 'الآن';
+                                        if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
+                                        if (diffHours < 24) return `منذ ${diffHours} ساعة`;
+                                        if (diffDays === 1) return 'أمس';
+                                        if (diffDays < 7) return `منذ ${diffDays} أيام`;
+                                        if (diffDays < 30) return `منذ ${Math.floor(diffDays / 7)} أسبوع`;
+                                        
+                                        return lastDate.toLocaleDateString('ar-SA', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
+                                    })()}
                                 </p>
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-white/10">
                             <button
                                 onClick={() => {
                                     setShowManagerDetailsModal(false);
                                     setSelectedManager(null);
                                 }}
-                                className="px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                className="px-6 py-2 rounded-lg bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white transition-colors"
                             >
                                 إغلاق
                             </button>
@@ -1318,29 +1474,63 @@ const OverviewTab: React.FC<{
             {/* ✅ Export Buttons - Compact Design */}
             <div className="flex gap-2 justify-end">
                 <button
-               onClick={() => {
-                   try {
-                       exportToPDF(analytics, 'dashboard-report.pdf');
-                   } catch (err) {
-                       console.error('PDF export failed:', err);
-                   }
-               }}
-               className="px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs"
-               title="تصدير PDF"
+                    onClick={() => {
+                        if (!analytics || Object.keys(analytics).length === 0) {
+                            alert('لا توجد بيانات للتصدير. انتظر حتى يتم تحميل البيانات.');
+                            return;
+                        }
+                        try {
+                            // ✅ Prepare comprehensive export data
+                            const exportData = {
+                                ...analytics,
+                                totalTenants: analytics.totalTenants || 0,
+                                activeTenants: analytics.activeTenants || 0,
+                                totalUsers: analytics.totalUsers || 0,
+                                totalBranches: analytics.totalBranches || 0,
+                                totalRooms: analytics.totalRooms || 0,
+                                totalRequests: analytics.totalRequests || 0,
+                                exportDate: new Date().toISOString()
+                            };
+                            exportToPDF(exportData, 'adora-dashboard-report.pdf');
+                        } catch (err) {
+                            console.error('PDF export failed:', err);
+                            alert('فشل في تصدير PDF. حاول مرة أخرى.');
+                        }
+                    }}
+                    disabled={!analytics}
+                    className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={analytics ? "تصدير PDF" : "انتظر تحميل البيانات..."}
                 >
                     <FileText className="w-4 h-4" />
                     <span className="hidden sm:inline text-xs">PDF</span>
                 </button>
                 <button
-               onClick={() => {
-                   try {
-                       exportToExcel(analytics, 'dashboard-report.xlsx');
-                   } catch (err) {
-                       console.error('Excel export failed:', err);
-                   }
-               }}
-               className="px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs"
-               title="تصدير Excel"
+                    onClick={() => {
+                        if (!analytics || Object.keys(analytics).length === 0) {
+                            alert('لا توجد بيانات للتصدير. انتظر حتى يتم تحميل البيانات.');
+                            return;
+                        }
+                        try {
+                            // ✅ Prepare comprehensive export data
+                            const exportData = {
+                                ...analytics,
+                                totalTenants: analytics.totalTenants || 0,
+                                activeTenants: analytics.activeTenants || 0,
+                                totalUsers: analytics.totalUsers || 0,
+                                totalBranches: analytics.totalBranches || 0,
+                                totalRooms: analytics.totalRooms || 0,
+                                totalRequests: analytics.totalRequests || 0,
+                                exportDate: new Date().toISOString()
+                            };
+                            exportToExcel(exportData, 'adora-dashboard-report.xlsx');
+                        } catch (err) {
+                            console.error('Excel export failed:', err);
+                            alert('فشل في تصدير Excel. حاول مرة أخرى.');
+                        }
+                    }}
+                    disabled={!analytics}
+                    className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={analytics ? "تصدير Excel" : "انتظر تحميل البيانات..."}
                 >
                     <Download className="w-4 h-4" />
                     <span className="hidden sm:inline text-xs">Excel</span>
@@ -1438,7 +1628,7 @@ const OverviewTab: React.FC<{
                         </div>
                         <div>
                             <p className="text-lg sm:text-xl font-bold text-green-400">{managerStats.active}</p>
-                            <p className="text-xs text-white/60">مدير نشط</p>
+                            <p className="text-xs text-white/60">مشترك نشط</p>
                         </div>
                     </div>
                 </div>
@@ -1906,8 +2096,13 @@ const TenantsTab: React.FC<{
             });
         } else if (activeFilter === 'expiring') {
             // Show ALL tenants sorted by expiry date (closest first)
-            // No filtering, just sorting
+            // ✅ FIX: استثناء المحذوفين من "الأقرب للانتهاء"
+            const deletedIds = new Set(deletedManagers.map((m: any) => m.tenantId || m.id));
             filtered = filtered.filter(t => {
+                // ✅ استثناء المحذوفين
+                if ((t as any).isDeleted || deletedIds.has(t.tenantId)) {
+                    return false;
+                }
                 // Only filter out invalid dates
                 try {
                     if (t.daysUntilExpiry !== undefined && t.daysUntilExpiry !== null) {
@@ -2082,7 +2277,7 @@ const TenantsTab: React.FC<{
             
             <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
-                    <h3 className="text-lg sm:text-xl font-bold text-white">قائمة المستأجرين</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">قائمة المستأجرين</h3>
                     <button
                         onClick={onAddManager}
                         className="w-full sm:w-auto px-3 sm:px-4 py-2 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg sm:rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm"
@@ -2106,12 +2301,18 @@ const TenantsTab: React.FC<{
                         ].map(filter => {
                             const Icon = filter.icon;
                             const isActive = activeFilter === filter.id;
+                            // ✅ FIX: قائمة IDs المحذوفين لاستثنائهم من الإحصاء
+                            const deletedTenantIds = new Set(deletedManagers.map((m: any) => m.tenantId || m.id));
                             const count = filter.id === 'all' 
                                 ? tenants.length 
                                 : filter.id === 'deleted'
                                 ? deletedManagers.length
                                 : filter.id === 'expiring'
-                                ? tenants.length // Show count of all tenants (will be sorted by expiry)
+                                ? tenants.filter(t => 
+                                    t.status !== 'deleted' && 
+                                    !(t as any).isDeleted && 
+                                    !deletedTenantIds.has(t.tenantId)
+                                  ).length // ✅ FIX: استثناء المحذوفين بكل الطرق
                                 : tenants.filter(t => {
                                     if (filter.id === 'active') return t.status === 'active';
                                     if (filter.id === 'suspended') return t.status === 'suspended';
@@ -2150,8 +2351,8 @@ const TenantsTab: React.FC<{
                                     onClick={() => setActiveFilter(filter.id)}
                                     className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm flex-shrink-0 ${
                                         isActive
-                                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 shadow-lg shadow-yellow-500/10'
-                                            : 'bg-white/5 text-white/60 hover:bg-white/10 border border-white/5'
+                                            ? 'bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/40 shadow-lg shadow-teal-500/10'
+                                            : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-300 dark:border-white/10'
                                     }`}
                                 >
                                     <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
@@ -2159,8 +2360,8 @@ const TenantsTab: React.FC<{
                                     {count > 0 && (
                                         <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                                             isActive 
-                                                ? 'bg-yellow-500/30 text-yellow-300' 
-                                                : 'bg-white/10 text-white/70'
+                                                ? 'bg-teal-500/30 text-teal-700 dark:text-teal-300' 
+                                                : 'bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-white/70'
                                         }`}>
                                             {count}
                                         </span>
@@ -2172,20 +2373,20 @@ const TenantsTab: React.FC<{
 
                     {/* Search by Name/Code - Mobile First */}
                     <div className="relative">
-                        <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-white/40" />
+                        <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400 dark:text-white/40" />
                         <input
                             type="text"
                             placeholder="ابحث بالاسم أو كود المدير..."
                             value={searchCode}
                             onChange={(e) => setSearchCode(e.target.value)}
-                            className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                            className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-lg sm:rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/40 focus:outline-none focus:border-teal-500 dark:focus:border-blue-400 transition-colors text-sm sm:text-base shadow-sm"
                         />
                     </div>
                 </div>
 
                 <div className="space-y-3">
                     {filteredTenants.length === 0 ? (
-                        <p className="text-center text-white/40 py-8">
+                        <p className="text-center text-slate-500 dark:text-white/40 py-8">
                             {searchCode || activeFilter !== 'all' 
                                 ? 'لا توجد نتائج للبحث أو الفلتر المحدد' 
                                 : 'لا يوجد مستأجرون'}
@@ -2208,17 +2409,17 @@ const TenantsTab: React.FC<{
 
                             const statusClasses =
                                 isDeletedManager
-                                    ? 'bg-gray-500/20 text-gray-300 border-gray-500/50'
+                                    ? 'bg-gray-200 dark:bg-gray-500/20 text-gray-600 dark:text-gray-300 border-gray-400 dark:border-gray-500/50'
                                     : tenant.status === 'active'
-                                    ? 'bg-green-500/15 text-green-300 border-green-500/40'
+                                    ? 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-300 border-green-500'
                                     : tenant.status === 'suspended'
-                                    ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/40'
-                                    : 'bg-red-500/15 text-red-300 border-red-500/40';
+                                    ? 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500'
+                                    : 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-500';
                             
                             // ✅ Special card styling for deleted managers
                             const cardClasses = isDeletedManager
-                                ? 'bg-gradient-to-r from-red-950/30 via-gray-900/40 to-red-950/30 rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all border-2 border-dashed border-red-500/40 relative overflow-hidden opacity-75 hover:opacity-100'
-                                : 'bg-white/5 rounded-lg sm:rounded-xl p-3 sm:p-4 hover:bg-white/10 transition-all';
+                                ? 'bg-gradient-to-r from-red-100 via-gray-100 to-red-100 dark:from-red-950/30 dark:via-gray-900/40 dark:to-red-950/30 rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all border-2 border-dashed border-red-400 dark:border-red-500/40 relative overflow-hidden opacity-80 hover:opacity-100'
+                                : 'bg-white dark:bg-white/5 rounded-xl sm:rounded-2xl p-4 sm:p-5 hover:bg-white dark:hover:bg-white/10 transition-all duration-300 border border-slate-200/80 dark:border-transparent shadow-[0_8px_30px_rgba(0,0,0,0.15),0_4px_10px_rgba(0,0,0,0.1)] hover:shadow-[0_15px_50px_rgba(0,0,0,0.2),0_8px_20px_rgba(0,0,0,0.15)] hover:border-teal-400 dark:hover:border-teal-500/30 hover:-translate-y-1';
 
                             return (
                                 <div
@@ -2227,24 +2428,24 @@ const TenantsTab: React.FC<{
                                 >
                                     {/* ✅ Deleted indicator stripe */}
                                     {isDeletedManager && (
-                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500/60 via-red-400/80 to-red-500/60" />
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-400 via-red-500 to-red-400" />
                                     )}
                                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
                                         <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-1">
                                             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 min-w-0">
-                                                <h4 className="text-base sm:text-lg font-bold text-white truncate w-full sm:w-auto">
+                                                <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate w-full sm:w-auto">
                                                     {tenant.tenantName}
                                                 </h4>
                                                 {tenant.managerName && (
-                                                    <span className="text-xs text-white/70 bg-white/10 border border-white/15 rounded-full px-2 py-0.5 truncate self-start sm:self-auto flex items-center gap-1.5">
+                                                    <span className="text-xs text-slate-600 dark:text-white/70 bg-slate-200 dark:bg-white/10 border border-slate-300 dark:border-white/15 rounded-full px-2 py-0.5 truncate self-start sm:self-auto flex items-center gap-1.5">
                                                         <span>المدير: {tenant.managerName}</span>
                                                         {tenant.managerCode && (
-                                                            <span className="text-white/50 font-mono">({tenant.managerCode})</span>
+                                                            <span className="text-slate-500 dark:text-white/50 font-mono">({tenant.managerCode})</span>
                                                         )}
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap text-xs sm:text-sm text-white/60">
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap text-xs sm:text-sm text-slate-600 dark:text-white/60">
                                                 <span className="flex flex-wrap gap-1.5">
                                                     <span>{tenant.totalBranches} فروع</span>
                                                     <span className="hidden sm:inline">•</span>
@@ -2259,15 +2460,45 @@ const TenantsTab: React.FC<{
                                                     {statusLabel}
                                                 </span>
                                             </div>
-                                            <p className="text-[10px] sm:text-xs text-white/40 mt-1 leading-relaxed">
+                                            {/* ✅ Branches with codes */}
+                                            {(() => {
+                                                // Use branches if available, otherwise fallback to branchCodes
+                                                const branchList = tenant.branches && tenant.branches.length > 0 
+                                                    ? tenant.branches 
+                                                    : ((tenant as any).branchCodes || []).map((code: string) => ({
+                                                        id: `branch-${code}`,
+                                                        name: `فرع ${code}`,
+                                                        code: code
+                                                    }));
+                                                return branchList.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                                        {branchList.map((branch: any) => (
+                                                            <span 
+                                                                key={branch.id}
+                                                                className="text-[10px] bg-teal-100 dark:bg-primary-500/15 text-teal-700 dark:text-primary-300 border border-teal-400 dark:border-primary-500/30 rounded-lg px-2 py-0.5 flex items-center gap-1"
+                                                            >
+                                                                <Building2 className="w-3 h-3" />
+                                                                <span>{branch.name}</span>
+                                                                <span className="text-teal-600 dark:text-primary-400/70 font-mono">({branch.code})</span>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : null;
+                                            })()}
+                                            <p className="text-[10px] sm:text-xs text-slate-500 dark:text-white/40 mt-1 leading-relaxed">
                                                 انتهاء الترخيص:{' '}
                                                 <span className="block sm:inline">
-                                                {new Date(tenant.licenseExpiryDate).toLocaleDateString('ar-SA', {
+                                                {new Date(tenant.licenseExpiryDate).toLocaleDateString('ar-SA-u-ca-islamic', {
                                                     year: 'numeric',
                                                     month: 'long',
                                                     day: 'numeric'
-                                                })}{' '}
-                                                    هـ
+                                                })}
+                                                {' - '}
+                                                {new Date(tenant.licenseExpiryDate).toLocaleDateString('ar-EG', {
+                                                    year: 'numeric',
+                                                    month: 'short',
+                                                    day: 'numeric'
+                                                })}م
                                                 </span>
                                                 <span className="hidden sm:inline"> • </span>
                                                 <span className="block sm:inline">
@@ -3631,7 +3862,7 @@ const StatusItem: React.FC<{
 }> = ({ label, value, icon: Icon, color }) => {
     const colorClasses = {
         blue: 'text-blue-500',
-        green: 'text-emerald-500',
+        green: 'text-primary-500',
         yellow: 'text-amber-500',
         red: 'text-red-500'
     };
@@ -4315,7 +4546,7 @@ const AddManagerModal: React.FC<{
             const managerResult = await createManager({
                 name: name.trim() || 'مدير جديد',
                 phone: phone.trim(), // ✅ رقم هاتف المدير (إجباري)
-                phoneBackup: phoneBackup.trim() || undefined, // ✅ رقم الهاتف الاحتياطي (اختياري)
+                phoneBackup: phoneBackup.trim() || undefined, // ✅ سيتم تنظيفه في ownerService (تحويل undefined إلى null)
                 code,
                 hotelName: hotelName.trim() || undefined,
                 maxBranches: branchCodes.length,
@@ -5066,7 +5297,7 @@ const AddManagerModal: React.FC<{
     );
 };
 
-// Manager Details Modal Component
+// Manager Details Modal Component - ✅ Enhanced for Light Mode + Print
 const ManagerDetailsModal: React.FC<{
     tenant: TenantAnalytics;
     managerDetails: any;
@@ -5101,33 +5332,150 @@ const ManagerDetailsModal: React.FC<{
         ? managerDetails.createdAt.toDate() 
         : new Date(managerDetails.createdAt || Date.now());
 
+    // ✅ Print subscription report
+    const handlePrint = () => {
+        const printContent = document.getElementById('subscription-report-content');
+        if (!printContent) return;
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html dir="rtl" lang="ar">
+            <head>
+                <meta charset="UTF-8">
+                <title>تقرير اشتراك - ${tenant.tenantName}</title>
+                <style>
+                    * { font-family: 'Segoe UI', Tahoma, sans-serif; box-sizing: border-box; }
+                    body { padding: 40px; background: white; color: #1e293b; line-height: 1.6; }
+                    .header { text-align: center; border-bottom: 3px solid #0d9488; padding-bottom: 20px; margin-bottom: 30px; }
+                    .header h1 { color: #0d9488; margin: 0 0 10px 0; font-size: 28px; }
+                    .header p { color: #64748b; margin: 5px 0; }
+                    .section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+                    .section h3 { color: #0d9488; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin: 0 0 15px 0; }
+                    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+                    .stat { background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+                    .stat-label { font-size: 12px; color: #64748b; margin-bottom: 5px; }
+                    .stat-value { font-size: 18px; font-weight: bold; color: #1e293b; }
+                    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+                    .badge-green { background: #dcfce7; color: #166534; }
+                    .badge-yellow { background: #fef3c7; color: #92400e; }
+                    .badge-red { background: #fee2e2; color: #991b1b; }
+                    .features { display: flex; flex-wrap: wrap; gap: 8px; }
+                    .feature-tag { background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 15px; font-size: 11px; }
+                    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
+                    @media print { body { padding: 20px; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>🏨 تقرير اشتراك Adora</h1>
+                    <p><strong>${tenant.tenantName}</strong></p>
+                    <p>كود المدير: ${managerDetails.manager.code || 'غير متوفر'} • ${managerDetails.branches.length} فرع</p>
+                    <p>تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                </div>
+                
+                <div class="section">
+                    <h3>📋 معلومات الاشتراك</h3>
+                    <div class="grid">
+                        <div class="stat">
+                            <div class="stat-label">تاريخ إنشاء الحساب</div>
+                            <div class="stat-value">${createdAt.toLocaleDateString('ar-SA')}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">مدة الاشتراك</div>
+                            <div class="stat-value">${Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))} يوم</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">الخطة</div>
+                            <div class="stat-value">${tenant.plan}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">حالة الترخيص</div>
+                            <div class="stat-value">
+                                <span class="badge ${tenant.daysUntilExpiry > 30 ? 'badge-green' : tenant.daysUntilExpiry > 7 ? 'badge-yellow' : 'badge-red'}">
+                                    ${tenant.daysUntilExpiry > 0 ? tenant.daysUntilExpiry + ' يوم متبقي' : 'منتهي'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                ${managerDetails.branches.map((branch: any) => `
+                    <div class="section">
+                        <h3>🏢 فرع: ${branch.name || branch.id}</h3>
+                        <div class="grid">
+                            <div class="stat">
+                                <div class="stat-label">عدد الموظفين</div>
+                                <div class="stat-value">${branch.employeesCount || 0}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-label">إجمالي الطلبات</div>
+                                <div class="stat-value">${branch.totalRequests || 0}</div>
+                            </div>
+                        </div>
+                        ${branch.enabledFeatures?.length > 0 ? `
+                            <div style="margin-top: 15px;">
+                                <div class="stat-label">المميزات المفعلة:</div>
+                                <div class="features" style="margin-top: 8px;">
+                                    ${branch.enabledFeatures.map((f: string) => `<span class="feature-tag">${featureLabels[f] || f}</span>`).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('')}
+
+                <div class="footer">
+                    <p>تم إنشاء هذا التقرير بواسطة نظام Adora لإدارة الفنادق</p>
+                    <p>© ${new Date().getFullYear()} Adora Hotel Management System</p>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+    };
+
     return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" style={{ backdropFilter: 'none' }}>
-            <div className="glass-card w-full max-w-5xl rounded-3xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center z-50 p-4" style={{ backdropFilter: 'blur(4px)' }}>
+            <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-3xl overflow-hidden max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 dark:border-white/10">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
+                <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/10 flex-shrink-0 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-transparent dark:to-transparent">
                     <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                            <Users className="w-7 h-7 text-blue-400" />
+                        <div className="w-14 h-14 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                            <Users className="w-7 h-7 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-bold text-white">{tenant.tenantName}</h3>
-                            <p className="text-sm text-white/60">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white">{tenant.tenantName}</h3>
+                            <p className="text-sm text-slate-600 dark:text-white/60">
                                 كود المدير: {managerDetails.manager.code || 'غير متوفر'} • 
                                 {managerDetails.branches.length} فرع
                             </p>
                         </div>
                     </div>
-                    <button 
-                        onClick={onClose}
-                        className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {/* Print Button */}
+                        <button 
+                            onClick={handlePrint}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-500/30 transition-colors border border-teal-300 dark:border-teal-500/30"
+                            title="طباعة تقرير الاشتراك"
+                        >
+                            <Printer className="w-5 h-5" />
+                            <span className="hidden sm:inline">طباعة</span>
+                        </button>
+                        {/* Close Button */}
+                        <button 
+                            onClick={onClose}
+                            className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/10 flex items-center justify-center text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:text-white transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 overflow-y-auto flex-1">
+                <div id="subscription-report-content" className="p-6 overflow-y-auto flex-1 bg-slate-50 dark:bg-transparent">
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
                             <AdoraLoader size="md" showMessage={false} />
@@ -5135,15 +5483,15 @@ const ManagerDetailsModal: React.FC<{
                     ) : (
                         <div className="space-y-6">
                             {/* Manager Lifecycle */}
-                            <div className="glass rounded-2xl p-6 border border-white/10">
-                                <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                    <Clock className="w-5 h-5 text-blue-400" />
+                            <div className="bg-white dark:bg-white/5 rounded-2xl p-6 border border-slate-200 dark:border-white/10 shadow-sm">
+                                <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                    <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                     دورة حياة المدير
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-sm text-white/60 mb-1">تاريخ إنشاء الحساب</p>
-                                        <p className="text-white font-medium">
+                                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
+                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">تاريخ إنشاء الحساب</p>
+                                        <p className="text-slate-800 dark:text-white font-medium">
                                             {createdAt.toLocaleDateString('ar-SA', { 
                                                 year: 'numeric', 
                                                 month: 'long', 
@@ -5153,19 +5501,19 @@ const ManagerDetailsModal: React.FC<{
                                             })}
                                         </p>
                                     </div>
-                                    <div>
-                                        <p className="text-sm text-white/60 mb-1">مدة الاشتراك</p>
-                                        <p className="text-white font-medium">
+                                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
+                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">مدة الاشتراك</p>
+                                        <p className="text-slate-800 dark:text-white font-medium">
                                             {Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))} يوم
                                         </p>
                                     </div>
-                                    <div>
-                                        <p className="text-sm text-white/60 mb-1">الخطة</p>
-                                        <p className="text-white font-medium capitalize">{tenant.plan}</p>
+                                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
+                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">الخطة</p>
+                                        <p className="text-slate-800 dark:text-white font-medium capitalize">{tenant.plan}</p>
                                     </div>
-                                    <div>
-                                        <p className="text-sm text-white/60 mb-1">حالة الترخيص</p>
-                                        <p className={`font-medium ${tenant.daysUntilExpiry > 30 ? 'text-green-400' : tenant.daysUntilExpiry > 7 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
+                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">حالة الترخيص</p>
+                                        <p className={`font-medium ${tenant.daysUntilExpiry > 30 ? 'text-green-600 dark:text-green-400' : tenant.daysUntilExpiry > 7 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
                                             {tenant.daysUntilExpiry > 0 ? `${tenant.daysUntilExpiry} يوم متبقي` : 'منتهي'}
                                         </p>
                                     </div>
@@ -5174,9 +5522,9 @@ const ManagerDetailsModal: React.FC<{
 
                             {/* Branches Tabs */}
                             {managerDetails.branches.length > 1 ? (
-                                <div className="glass rounded-2xl p-4 border border-white/10">
-                                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                        <Building2 className="w-5 h-5 text-blue-400" />
+                                <div className="bg-white dark:bg-white/5 rounded-2xl p-4 border border-slate-200 dark:border-white/10 shadow-sm">
+                                    <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                        <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                         الفروع ({managerDetails.branches.length})
                                     </h4>
                                     <div className="flex gap-2 mb-4 overflow-x-auto">
@@ -5186,8 +5534,8 @@ const ManagerDetailsModal: React.FC<{
                                                 onClick={() => setActiveBranchTab(branch.id)}
                                                 className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
                                                     activeBranchTab === branch.id
-                                                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                                        : 'bg-white/5 text-white/60 hover:bg-white/10'
+                                                        ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-500/30'
+                                                        : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10'
                                                 }`}
                                             >
                                                 {branch.name || branch.id}
@@ -5200,39 +5548,39 @@ const ManagerDetailsModal: React.FC<{
                             {/* Active Branch Details */}
                             {activeBranch && (
                                 <div className="space-y-4">
-                                    <div className="glass rounded-2xl p-6 border border-white/10">
-                                        <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                            <Building2 className="w-5 h-5 text-blue-400" />
+                                    <div className="bg-white dark:bg-white/5 rounded-2xl p-6 border border-slate-200 dark:border-white/10 shadow-sm">
+                                        <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                            <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                             {activeBranch.name || activeBranch.id}
                                         </h4>
                                         
                                         {/* Branch Stats */}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                            <div className="bg-white/5 rounded-xl p-4">
-                                                <p className="text-sm text-white/60 mb-1">عدد الموظفين</p>
-                                                <p className="text-2xl font-bold text-white">{activeBranch.employeesCount || 0}</p>
+                                            <div className="bg-blue-50 dark:bg-white/5 rounded-xl p-4 border border-blue-200 dark:border-transparent">
+                                                <p className="text-sm text-slate-500 dark:text-white/60 mb-1">عدد الموظفين</p>
+                                                <p className="text-2xl font-bold text-slate-800 dark:text-white">{activeBranch.employeesCount || 0}</p>
                                             </div>
-                                            <div className="bg-white/5 rounded-xl p-4">
-                                                <p className="text-sm text-white/60 mb-1">إجمالي الطلبات</p>
-                                                <p className="text-2xl font-bold text-white">{activeBranch.totalRequests || 0}</p>
+                                            <div className="bg-teal-50 dark:bg-white/5 rounded-xl p-4 border border-teal-200 dark:border-transparent">
+                                                <p className="text-sm text-slate-500 dark:text-white/60 mb-1">إجمالي الطلبات</p>
+                                                <p className="text-2xl font-bold text-slate-800 dark:text-white">{activeBranch.totalRequests || 0}</p>
                                             </div>
-                                            <div className="bg-white/5 rounded-xl p-4">
-                                                <p className="text-sm text-white/60 mb-1">أكثر الأقسام طلباً</p>
-                                                <p className="text-lg font-bold text-white">{activeBranch.topDepartment}</p>
+                                            <div className="bg-purple-50 dark:bg-white/5 rounded-xl p-4 border border-purple-200 dark:border-transparent">
+                                                <p className="text-sm text-slate-500 dark:text-white/60 mb-1">أكثر الأقسام طلباً</p>
+                                                <p className="text-lg font-bold text-slate-800 dark:text-white">{activeBranch.topDepartment}</p>
                                             </div>
                                         </div>
 
                                         {/* Department Breakdown */}
                                         {activeBranch.departmentCounts && Object.keys(activeBranch.departmentCounts).length > 0 && (
                                             <div className="mb-6">
-                                                <p className="text-sm font-medium text-white/80 mb-3">توزيع الطلبات حسب الأقسام:</p>
+                                                <p className="text-sm font-medium text-slate-700 dark:text-white/80 mb-3">توزيع الطلبات حسب الأقسام:</p>
                                                 <div className="space-y-2">
                                                     {Object.entries(activeBranch.departmentCounts)
                                                         .sort(([, a], [, b]) => (b as number) - (a as number))
                                                         .map(([dept, count]) => (
-                                                            <div key={dept} className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                                                                <span className="text-white/80">{dept}</span>
-                                                                <span className="text-blue-400 font-bold">{count as number}</span>
+                                                            <div key={dept} className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3 border border-slate-200 dark:border-transparent">
+                                                                <span className="text-slate-700 dark:text-white/80">{dept}</span>
+                                                                <span className="text-blue-600 dark:text-blue-400 font-bold">{count as number}</span>
                                                             </div>
                                                         ))}
                                                 </div>
@@ -5242,12 +5590,12 @@ const ManagerDetailsModal: React.FC<{
                                         {/* Enabled Features */}
                                         {activeBranch.enabledFeatures && activeBranch.enabledFeatures.length > 0 && (
                                             <div>
-                                                <p className="text-sm font-medium text-white/80 mb-3">المميزات المفعلة:</p>
+                                                <p className="text-sm font-medium text-slate-700 dark:text-white/80 mb-3">المميزات المفعلة:</p>
                                                 <div className="flex flex-wrap gap-2">
                                                     {activeBranch.enabledFeatures.map((feature: string) => (
                                                         <span
                                                             key={feature}
-                                                            className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs border border-green-500/30"
+                                                            className="px-3 py-1 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-full text-xs border border-green-300 dark:border-green-500/30"
                                                         >
                                                             {featureLabels[feature] || feature}
                                                         </span>
@@ -5261,38 +5609,38 @@ const ManagerDetailsModal: React.FC<{
 
                             {/* Single Branch View */}
                             {managerDetails.branches.length === 1 && activeBranch && (
-                                <div className="glass rounded-2xl p-6 border border-white/10">
-                                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                        <Building2 className="w-5 h-5 text-blue-400" />
+                                <div className="bg-white dark:bg-white/5 rounded-2xl p-6 border border-slate-200 dark:border-white/10 shadow-sm">
+                                    <h4 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                        <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                         {activeBranch.name || activeBranch.id}
                                     </h4>
                                     
                                     {/* Same content as above */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                        <div className="bg-white/5 rounded-xl p-4">
-                                            <p className="text-sm text-white/60 mb-1">عدد الموظفين</p>
-                                            <p className="text-2xl font-bold text-white">{activeBranch.employeesCount || 0}</p>
+                                        <div className="bg-blue-50 dark:bg-white/5 rounded-xl p-4 border border-blue-200 dark:border-transparent">
+                                            <p className="text-sm text-slate-500 dark:text-white/60 mb-1">عدد الموظفين</p>
+                                            <p className="text-2xl font-bold text-slate-800 dark:text-white">{activeBranch.employeesCount || 0}</p>
                                         </div>
-                                        <div className="bg-white/5 rounded-xl p-4">
-                                            <p className="text-sm text-white/60 mb-1">إجمالي الطلبات</p>
-                                            <p className="text-2xl font-bold text-white">{activeBranch.totalRequests || 0}</p>
+                                        <div className="bg-teal-50 dark:bg-white/5 rounded-xl p-4 border border-teal-200 dark:border-transparent">
+                                            <p className="text-sm text-slate-500 dark:text-white/60 mb-1">إجمالي الطلبات</p>
+                                            <p className="text-2xl font-bold text-slate-800 dark:text-white">{activeBranch.totalRequests || 0}</p>
                                         </div>
-                                        <div className="bg-white/5 rounded-xl p-4">
-                                            <p className="text-sm text-white/60 mb-1">أكثر الأقسام طلباً</p>
-                                            <p className="text-lg font-bold text-white">{activeBranch.topDepartment}</p>
+                                        <div className="bg-purple-50 dark:bg-white/5 rounded-xl p-4 border border-purple-200 dark:border-transparent">
+                                            <p className="text-sm text-slate-500 dark:text-white/60 mb-1">أكثر الأقسام طلباً</p>
+                                            <p className="text-lg font-bold text-slate-800 dark:text-white">{activeBranch.topDepartment}</p>
                                         </div>
                                     </div>
 
                                     {activeBranch.departmentCounts && Object.keys(activeBranch.departmentCounts).length > 0 && (
                                         <div className="mb-6">
-                                            <p className="text-sm font-medium text-white/80 mb-3">توزيع الطلبات حسب الأقسام:</p>
+                                            <p className="text-sm font-medium text-slate-700 dark:text-white/80 mb-3">توزيع الطلبات حسب الأقسام:</p>
                                             <div className="space-y-2">
                                                 {Object.entries(activeBranch.departmentCounts)
                                                     .sort(([, a], [, b]) => (b as number) - (a as number))
                                                     .map(([dept, count]) => (
-                                                        <div key={dept} className="flex items-center justify-between bg-white/5 rounded-lg p-3">
-                                                            <span className="text-white/80">{dept}</span>
-                                                            <span className="text-blue-400 font-bold">{count as number}</span>
+                                                        <div key={dept} className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3 border border-slate-200 dark:border-transparent">
+                                                            <span className="text-slate-700 dark:text-white/80">{dept}</span>
+                                                            <span className="text-blue-600 dark:text-blue-400 font-bold">{count as number}</span>
                                                         </div>
                                                     ))}
                                             </div>
@@ -5301,12 +5649,12 @@ const ManagerDetailsModal: React.FC<{
 
                                     {activeBranch.enabledFeatures && activeBranch.enabledFeatures.length > 0 && (
                                         <div>
-                                            <p className="text-sm font-medium text-white/80 mb-3">المميزات المفعلة:</p>
+                                            <p className="text-sm font-medium text-slate-700 dark:text-white/80 mb-3">المميزات المفعلة:</p>
                                             <div className="flex flex-wrap gap-2">
                                                 {activeBranch.enabledFeatures.map((feature: string) => (
                                                     <span
                                                         key={feature}
-                                                        className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs border border-green-500/30"
+                                                        className="px-3 py-1 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-full text-xs border border-green-300 dark:border-green-500/30"
                                                     >
                                                         {featureLabels[feature] || feature}
                                                     </span>

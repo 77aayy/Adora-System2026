@@ -52,6 +52,7 @@ import { GeneralInstructionsView } from '../../components/shared/GeneralInstruct
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
 import { useBrandName } from '../../hooks/useBrandName';
 import { getGreetingParts } from '../../utils/greetings';
+import { ChallengeTimeline } from '../../components/features/ChallengeTimeline'; // ✅ Commitment Timeline
 
 // Creative Dashboard Components
 import { TaskProgress } from '../../components/dashboard';
@@ -505,6 +506,19 @@ export const MaintenanceDashboard: React.FC = () => {
 
             closeStartModal();
             await addPointToEmployee('start_maintenance', { roomNumber: currentStartRequest.roomNumber });
+
+            // ✅ Auto-check daily attendance when employee starts maintenance
+            if (tenantId && user?.id) {
+                try {
+                    const { checkDailyAttendance } = await import('../../services/challengeService');
+                    checkDailyAttendance(tenantId, user.id).catch(err => {
+                        console.warn('Failed to check daily attendance:', err);
+                    });
+                } catch (err) {
+                    console.warn('Could not load challengeService:', err);
+                }
+            }
+
             success('تم بدء الصيانة بنجاح');
         } catch (err) {
             console.error('Error starting maintenance:', err);
@@ -668,10 +682,10 @@ export const MaintenanceDashboard: React.FC = () => {
             // ✅ Close modal (don't delete request - it's transferred to housekeeping)
             closeCompleteModal();
             
-            // ✅ Award points
+            // ✅ Award points (filter out undefined values)
             await addPointToEmployee('complete_maintenance', {
                 roomNumber: currentCompleteRequest.roomNumber,
-                maintenanceType: currentCompleteRequest.maintenanceType
+                ...(currentCompleteRequest.maintenanceType && { maintenanceType: currentCompleteRequest.maintenanceType })
             });
             
             success('تم إتمام الصيانة وإرسالها للفحص في الهاوس كيبنج ✓');
@@ -834,7 +848,7 @@ export const MaintenanceDashboard: React.FC = () => {
     };
 
     const renderMaintenanceCard = (request: MaintenanceRequest) => (
-        <div key={request.id} className="glass-card p-4 mb-3" onClick={() => handleCardClick(request.id)}>
+        <div key={request.id} className="adora-card p-4 mb-3" onClick={() => handleCardClick(request.id)}>
             <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -885,8 +899,8 @@ export const MaintenanceDashboard: React.FC = () => {
                         </div>
                     )}
                     <div className="flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3 text-white/40" />
-                        <p className="text-white/40 text-xs">{getTimeAgo(request.createdAt)}</p>
+                        <Clock className="w-3 h-3 adora-text-tertiary" />
+                        <p className="adora-text-tertiary text-xs">{getTimeAgo(request.createdAt)}</p>
                         <ReadReceipt request={request as any} size="sm" showPopup={false} />
                     </div>
                 </div>
@@ -906,7 +920,7 @@ export const MaintenanceDashboard: React.FC = () => {
                             e.stopPropagation();
                             setSelectedDetailRequest(request);
                         }}
-                        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all"
+                        className="adora-btn-ghost p-1.5 rounded-lg transition-all"
                         title="عرض التفاصيل"
                     >
                         <Eye className="w-4 h-4" />
@@ -986,7 +1000,7 @@ export const MaintenanceDashboard: React.FC = () => {
                     {/* Mobile: Hamburger Menu Button */}
                     <button
                         onClick={() => setShowMobileMenu(true)}
-                        className="lg:hidden w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white hover:bg-white/20 active:scale-95 transition-transform"
+                        className="lg:hidden adora-btn-ghost w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-transform"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -1038,6 +1052,9 @@ export const MaintenanceDashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* ✅ Challenge Timeline - شريط الالتزام */}
+            <ChallengeTimeline />
 
             {/* Golden Alert - Broadcast Messages */}
             <GoldenAlertDisplay department="maintenance" />
@@ -1124,7 +1141,7 @@ export const MaintenanceDashboard: React.FC = () => {
                         onClick={() => switchTab(tab.id as any)}
                         className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${currentTab === tab.id
                             ? 'bg-primary-500 text-white'
-                            : 'bg-white/5 text-white/60 hover:bg-white/10'
+                            : 'adora-btn-ghost'
                             }`}
                     >
                         {tab.label}
@@ -1137,7 +1154,7 @@ export const MaintenanceDashboard: React.FC = () => {
 
             {/* Issue Type Filter */}
             <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
-                <span className="text-white/40 text-sm flex-shrink-0">نوع العطل:</span>
+                <span className="adora-text-tertiary text-sm flex-shrink-0">نوع العطل:</span>
                 {[
                     { key: 'all', label: 'الكل', icon: '🔧' },
                     { key: 'كهرب', label: 'كهرباء', icon: '⚡' },
@@ -1153,7 +1170,7 @@ export const MaintenanceDashboard: React.FC = () => {
                         }}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0 flex items-center gap-1.5 ${issueTypeFilter === type.key
                             ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
-                            : 'bg-white/10 text-white/60 hover:bg-white/20'
+                            : 'adora-card adora-text-secondary hover:opacity-80'
                             }`}
                     >
                         <span>{type.icon}</span>
@@ -1168,10 +1185,10 @@ export const MaintenanceDashboard: React.FC = () => {
                 {currentTab === 'completed' && filteredCompletedRequests.map(renderMaintenanceCard)}
 
                 {currentTab === 'active' && filteredActiveRequests.length === 0 && (
-                    <div className="text-center py-12 text-white/40">لا توجد طلبات صيانة نشطة</div>
+                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات صيانة نشطة</div>
                 )}
                 {currentTab === 'completed' && filteredCompletedRequests.length === 0 && (
-                    <div className="text-center py-12 text-white/40">لا توجد طلبات منجزة اليوم</div>
+                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات منجزة اليوم</div>
                 )}
             </div>
 
@@ -1196,13 +1213,13 @@ export const MaintenanceDashboard: React.FC = () => {
 
                         <div className="p-4 space-y-4">
                             {/* Request Details */}
-                            <div className="bg-white/5 p-3 rounded-xl">
-                                <p className="text-white/60 text-sm mb-1">نوع الصيانة</p>
+                            <div className="adora-card p-3 rounded-xl">
+                                <p className="adora-text-secondary text-sm mb-1">نوع الصيانة</p>
                                 <p className="text-white font-medium">{currentStartRequest.maintenanceType || 'عام'}</p>
                             </div>
 
-                            <div className="bg-white/5 p-3 rounded-xl">
-                                <p className="text-white/60 text-sm mb-1">الوصف</p>
+                            <div className="adora-card p-3 rounded-xl">
+                                <p className="adora-text-secondary text-sm mb-1">الوصف</p>
                                 <p className="text-white">{currentStartRequest.description || 'لا يوجد وصف'}</p>
                             </div>
 
@@ -1222,7 +1239,8 @@ export const MaintenanceDashboard: React.FC = () => {
                                 ) : (
                                     <button
                                         onClick={() => beforePhotoRef.current?.click()}
-                                        className="w-full py-8 border-2 border-dashed border-white/20 rounded-xl flex flex-col items-center gap-2 text-white/40"
+                                        className="adora-btn-ghost w-full py-8 border-2 border-dashed rounded-xl flex flex-col items-center gap-2"
+                                        style={{ borderColor: 'var(--theme-border-secondary)' }}
                                     >
                                         <Camera className="w-8 h-8" />
                                         <span>التقاط صورة</span>
@@ -1268,7 +1286,7 @@ export const MaintenanceDashboard: React.FC = () => {
                             </div>
                             <button 
                                 onClick={closeCompleteModal} 
-                                className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-colors"
+                                className="adora-btn-ghost w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -1278,12 +1296,12 @@ export const MaintenanceDashboard: React.FC = () => {
                         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)] space-y-4">
                             {/* Request Info */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
-                                    <p className="text-white/60 text-xs mb-1">نوع الصيانة</p>
+                                <div className="adora-card p-3 rounded-xl">
+                                    <p className="adora-text-secondary text-xs mb-1">نوع الصيانة</p>
                                     <p className="text-white font-medium text-sm">{currentCompleteRequest.maintenanceType || 'عام'}</p>
                                 </div>
-                                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
-                                    <p className="text-white/60 text-xs mb-1">الأولوية</p>
+                                <div className="adora-card p-3 rounded-xl">
+                                    <p className="adora-text-secondary text-xs mb-1">الأولوية</p>
                                     <p className={`font-medium text-sm ${currentCompleteRequest.priority === 'urgent' ? 'text-red-400' : 'text-blue-400'}`}>
                                         {currentCompleteRequest.priority === 'urgent' ? '🚨 عاجل' : '⏱️ عادي'}
                                     </p>
@@ -1376,7 +1394,7 @@ export const MaintenanceDashboard: React.FC = () => {
                             <button
                                 onClick={confirmComplete}
                                 disabled={!afterPhoto || uploadingPhoto}
-                                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="flex-1 bg-gradient-to-r from-primary-500 to-teal-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {uploadingPhoto ? (
                                     <>
@@ -1546,12 +1564,12 @@ const RequestDetailsModal: React.FC<{
                     </div>
 
                     {/* Description/Notes */}
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                        <label className="block text-white/40 text-xs mb-2 flex items-center gap-1">
+                    <div className="adora-card p-4 rounded-xl">
+                        <label className="block adora-text-secondary text-xs mb-2 flex items-center gap-1">
                             <MessageSquare className="w-3 h-3" />
                             وصف المشكلة (من الاستقبال)
                         </label>
-                        <p className="text-white leading-relaxed">
+                        <p className="adora-text-primary leading-relaxed">
                             {request.notes || request.description || 'لا يوجد وصف'}
                         </p>
                     </div>
@@ -1559,19 +1577,20 @@ const RequestDetailsModal: React.FC<{
                     {/* Images */}
                     {request.damagePhoto && (
                         <div>
-                            <label className="block text-white/40 text-xs mb-2">صورة المشكلة</label>
+                            <label className="block adora-text-secondary text-xs mb-2">صورة المشكلة</label>
                             <img
                                 src={request.damagePhoto}
                                 alt="Damage"
-                                className="w-full h-48 object-cover rounded-xl border border-white/10"
+                                className="w-full h-48 object-cover rounded-xl cursor-pointer hover:opacity-80 transition-opacity"
+                                style={{ border: '1px solid var(--theme-border-primary)' }}
                                 onClick={() => window.open(request.damagePhoto, '_blank')}
                             />
                         </div>
                     )}
                 </div>
 
-                <div className="p-4 border-t border-white/10">
-                    <button onClick={onClose} className="w-full py-3 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-all">
+                <div className="p-4" style={{ borderTop: '1px solid var(--theme-border-primary)' }}>
+                    <button onClick={onClose} className="adora-btn-secondary w-full py-3">
                         إغلاق
                     </button>
                 </div>

@@ -1470,3 +1470,424 @@ html.light [class*="badge"],
 html.light [class*="tag"] {
   border: 1px solid currentColor !important;
 }
+
+/* ─────────────────────────────────────────────────────────
+   PRO MODAL - Light Mode (Theme-Aware)
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .pro-modal,
+html.light .pro-modal {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+}
+
+html[data-theme="light"] .pro-modal-header,
+html.light .pro-modal-header {
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+html[data-theme="light"] .pro-modal-backdrop,
+html.light .pro-modal-backdrop {
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Text colors inside modals */
+html[data-theme="light"] .pro-modal .text-white,
+html.light .pro-modal .text-white {
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] .pro-modal .text-white\/50,
+html[data-theme="light"] .pro-modal .text-white\/60,
+html[data-theme="light"] .pro-modal .text-white\/70,
+html.light .pro-modal .text-white\/50,
+html.light .pro-modal .text-white\/60,
+html.light .pro-modal .text-white\/70 {
+  color: #64748b !important;
+}
+
+html[data-theme="light"] .pro-modal .text-white\/30,
+html[data-theme="light"] .pro-modal .text-white\/40,
+html.light .pro-modal .text-white\/30,
+html.light .pro-modal .text-white\/40 {
+  color: #94a3b8 !important;
+}
+
+/* Background colors inside modals */
+html[data-theme="light"] .pro-modal .bg-white\/10,
+html[data-theme="light"] .pro-modal .bg-white\/5,
+html.light .pro-modal .bg-white\/10,
+html.light .pro-modal .bg-white\/5 {
+  background: #f1f5f9 !important;
+}
+
+html[data-theme="light"] .pro-modal .bg-white\/20,
+html.light .pro-modal .bg-white\/20 {
+  background: #e2e8f0 !important;
+}
+
+html[data-theme="light"] .pro-modal .hover\:bg-white\/20:hover,
+html.light .pro-modal .hover\:bg-white\/20:hover {
+  background: #cbd5e1 !important;
+}
+
+/* Border colors inside modals */
+html[data-theme="light"] .pro-modal .border-white\/10,
+html[data-theme="light"] .pro-modal .border-white\/20,
+html.light .pro-modal .border-white\/10,
+html.light .pro-modal .border-white\/20 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Divider line inside modals */
+html[data-theme="light"] .pro-modal .bg-white\/10,
+html.light .pro-modal .bg-white\/10 {
+  background: #e2e8f0 !important;
+}
+
+/* Pro Card inside modal */
+html[data-theme="light"] .pro-modal .pro-card,
+html.light .pro-modal .pro-card {
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+html[data-theme="light"] .pro-modal .pro-card:hover,
+html.light .pro-modal .pro-card:hover {
+  background: #e2e8f0 !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   INPUT FIELDS - Light Mode (Theme-Aware Contrast)
+   ───────────────────────────────────────────────────────── */
+
+/* All inputs inside pro-modal */
+html[data-theme="light"] .pro-modal input,
+html[data-theme="light"] .pro-modal textarea,
+html[data-theme="light"] .pro-modal select,
+html[data-theme="light"] .pro-modal .input,
+html[data-theme="light"] .pro-modal .pro-input,
+html.light .pro-modal input,
+html.light .pro-modal textarea,
+html.light .pro-modal select,
+html.light .pro-modal .input,
+html.light .pro-modal .pro-input {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] .pro-modal input:focus,
+html[data-theme="light"] .pro-modal textarea:focus,
+html[data-theme="light"] .pro-modal select:focus,
+html[data-theme="light"] .pro-modal .input:focus,
+html[data-theme="light"] .pro-modal .pro-input:focus,
+html.light .pro-modal input:focus,
+html.light .pro-modal textarea:focus,
+html.light .pro-modal select:focus,
+html.light .pro-modal .input:focus,
+html.light .pro-modal .pro-input:focus {
+  background: #ffffff !important;
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+}
+
+html[data-theme="light"] .pro-modal input::placeholder,
+html[data-theme="light"] .pro-modal textarea::placeholder,
+html.light .pro-modal input::placeholder,
+html.light .pro-modal textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Global inputs in Light Mode (outside modals too) */
+html[data-theme="light"] .input,
+html.light .input {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] .input:focus,
+html.light .input:focus {
+  background: #ffffff !important;
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+}
+
+html[data-theme="light"] .input::placeholder,
+html.light .input::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Glass card inputs in Light Mode */
+html[data-theme="light"] .glass-card input,
+html[data-theme="light"] .glass-card textarea,
+html[data-theme="light"] .glass-card select,
+html.light .glass-card input,
+html.light .glass-card textarea,
+html.light .glass-card select {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] .glass-card input:focus,
+html[data-theme="light"] .glass-card textarea:focus,
+html[data-theme="light"] .glass-card select:focus,
+html.light .glass-card input:focus,
+html.light .glass-card textarea:focus,
+html.light .glass-card select:focus {
+  background: #ffffff !important;
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+}
+
+/* Adora card inputs in Light Mode */
+html[data-theme="light"] .adora-card input,
+html[data-theme="light"] .adora-card textarea,
+html[data-theme="light"] .adora-card select,
+html.light .adora-card input,
+html.light .adora-card textarea,
+html.light .adora-card select {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] .adora-card input:focus,
+html[data-theme="light"] .adora-card textarea:focus,
+html[data-theme="light"] .adora-card select:focus,
+html.light .adora-card input:focus,
+html.light .adora-card textarea:focus,
+html.light .adora-card select:focus {
+  background: #ffffff !important;
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   GLOBAL MODAL INPUT CONTRAST - Light Mode Fix
+   Targets ALL modals including fixed position dialogs
+   ───────────────────────────────────────────────────────── */
+
+/* Any input/textarea/select with white background in Light Mode needs contrast */
+html[data-theme="light"] [class*="fixed"][class*="inset"] input,
+html[data-theme="light"] [class*="fixed"][class*="inset"] textarea,
+html[data-theme="light"] [class*="fixed"][class*="inset"] select,
+html.light [class*="fixed"][class*="inset"] input,
+html.light [class*="fixed"][class*="inset"] textarea,
+html.light [class*="fixed"][class*="inset"] select {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] [class*="fixed"][class*="inset"] input:focus,
+html[data-theme="light"] [class*="fixed"][class*="inset"] textarea:focus,
+html[data-theme="light"] [class*="fixed"][class*="inset"] select:focus,
+html.light [class*="fixed"][class*="inset"] input:focus,
+html.light [class*="fixed"][class*="inset"] textarea:focus,
+html.light [class*="fixed"][class*="inset"] select:focus {
+  background: #ffffff !important;
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+}
+
+/* Specifically target inputs with white/transparent backgrounds */
+html[data-theme="light"] input[class*="bg-white"],
+html[data-theme="light"] input[class*="bg-transparent"],
+html[data-theme="light"] input:not([class*="bg-"]),
+html.light input[class*="bg-white"],
+html.light input[class*="bg-transparent"] {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+/* Target text-center inputs commonly used in modals */
+html[data-theme="light"] input.text-center,
+html.light input.text-center {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] input.text-center:focus,
+html.light input.text-center:focus {
+  background: #ffffff !important;
+  border-color: #14b8a6 !important;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15) !important;
+}
+
+/* Placeholder text contrast */
+html[data-theme="light"] input::placeholder,
+html.light input::placeholder {
+  color: #64748b !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   CRITICAL FIX: text-white on Light Mode
+   This fixes the issue where text-white is invisible on white backgrounds
+   ───────────────────────────────────────────────────────── */
+
+/* Fix text-white inside cards/panels in Light Mode */
+html[data-theme="light"] .glass-card .text-white,
+html[data-theme="light"] .adora-card .text-white,
+html[data-theme="light"] .adora-modal .text-white,
+html[data-theme="light"] .pro-modal .text-white,
+html[data-theme="light"] .pro-card .text-white,
+html.light .glass-card .text-white,
+html.light .adora-card .text-white,
+html.light .adora-modal .text-white,
+html.light .pro-modal .text-white,
+html.light .pro-card .text-white {
+  color: #1e293b !important;
+}
+
+/* Fix text-white/60, text-white/70, text-white/80 variants */
+html[data-theme="light"] .glass-card [class*="text-white/"],
+html[data-theme="light"] .adora-card [class*="text-white/"],
+html[data-theme="light"] .adora-modal [class*="text-white/"],
+html[data-theme="light"] .pro-modal [class*="text-white/"],
+html[data-theme="light"] .pro-card [class*="text-white/"],
+html.light .glass-card [class*="text-white/"],
+html.light .adora-card [class*="text-white/"],
+html.light .adora-modal [class*="text-white/"],
+html.light .pro-modal [class*="text-white/"],
+html.light .pro-card [class*="text-white/"] {
+  color: #475569 !important;
+}
+
+/* Fix bg-white/5, bg-white/10 backgrounds */
+html[data-theme="light"] [class*="bg-white/5"],
+html[data-theme="light"] [class*="bg-white/10"],
+html[data-theme="light"] [class*="bg-white/20"],
+html.light [class*="bg-white/5"],
+html.light [class*="bg-white/10"],
+html.light [class*="bg-white/20"] {
+  background: #f1f5f9 !important;
+}
+
+/* Fix border-white/10, border-white/20 borders */
+html[data-theme="light"] [class*="border-white/10"],
+html[data-theme="light"] [class*="border-white/20"],
+html.light [class*="border-white/10"],
+html.light [class*="border-white/20"] {
+  border-color: #e2e8f0 !important;
+}
+
+/* Exception: Keep text-white on colored backgrounds (buttons) */
+html[data-theme="light"] .bg-primary-500 .text-white,
+html[data-theme="light"] .bg-primary-600 .text-white,
+html[data-theme="light"] .bg-teal-500 .text-white,
+html[data-theme="light"] .bg-teal-600 .text-white,
+html[data-theme="light"] .bg-green-500 .text-white,
+html[data-theme="light"] .bg-green-600 .text-white,
+html[data-theme="light"] .bg-red-500 .text-white,
+html[data-theme="light"] .bg-red-600 .text-white,
+html[data-theme="light"] .bg-yellow-500 .text-white,
+html[data-theme="light"] .bg-blue-500 .text-white,
+html[data-theme="light"] .bg-gradient-to-r .text-white,
+html[data-theme="light"] .adora-btn-primary .text-white,
+html[data-theme="light"] .adora-btn-success .text-white,
+html[data-theme="light"] .adora-btn-danger .text-white,
+html.light .bg-primary-500 .text-white,
+html.light .bg-primary-600 .text-white,
+html.light .bg-teal-500 .text-white,
+html.light .bg-teal-600 .text-white,
+html.light .bg-green-500 .text-white,
+html.light .bg-green-600 .text-white,
+html.light .bg-red-500 .text-white,
+html.light .bg-red-600 .text-white,
+html.light .bg-yellow-500 .text-white,
+html.light .bg-blue-500 .text-white,
+html.light .bg-gradient-to-r .text-white,
+html.light .adora-btn-primary .text-white,
+html.light .adora-btn-success .text-white,
+html.light .adora-btn-danger .text-white {
+  color: #ffffff !important;
+}
+
+/* Fix placeholder-white/40 */
+html[data-theme="light"] [class*="placeholder-white"]::placeholder,
+html.light [class*="placeholder-white"]::placeholder {
+  color: #64748b !important;
+}
+
+/* Global fix for common containers */
+html[data-theme="light"] .space-y-4 > div .text-white:not([class*="bg-"]),
+html[data-theme="light"] .space-y-3 > div .text-white:not([class*="bg-"]),
+html.light .space-y-4 > div .text-white:not([class*="bg-"]),
+html.light .space-y-3 > div .text-white:not([class*="bg-"]) {
+  color: #1e293b !important;
+}
+
+/* Fix StatCards and Dashboard Cards */
+html[data-theme="light"] .adora-stat-card .text-white,
+html[data-theme="light"] .stat-card-pro .text-white,
+html[data-theme="light"] .stat-card-pro-compact .text-white,
+html.light .adora-stat-card .text-white,
+html.light .stat-card-pro .text-white,
+html.light .stat-card-pro-compact .text-white {
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] .adora-stat-card [class*="text-white/"],
+html[data-theme="light"] .stat-card-pro [class*="text-white/"],
+html[data-theme="light"] .stat-card-pro-compact [class*="text-white/"],
+html.light .adora-stat-card [class*="text-white/"],
+html.light .stat-card-pro [class*="text-white/"],
+html.light .stat-card-pro-compact [class*="text-white/"] {
+  color: #475569 !important;
+}
+
+/* Fix rounded-xl cards (common pattern) */
+html[data-theme="light"] .rounded-xl .text-white,
+html[data-theme="light"] .rounded-2xl .text-white,
+html[data-theme="light"] .rounded-3xl .text-white,
+html.light .rounded-xl .text-white,
+html.light .rounded-2xl .text-white,
+html.light .rounded-3xl .text-white {
+  color: #1e293b !important;
+}
+
+html[data-theme="light"] .rounded-xl [class*="text-white/"],
+html[data-theme="light"] .rounded-2xl [class*="text-white/"],
+html[data-theme="light"] .rounded-3xl [class*="text-white/"],
+html.light .rounded-xl [class*="text-white/"],
+html.light .rounded-2xl [class*="text-white/"],
+html.light .rounded-3xl [class*="text-white/"] {
+  color: #475569 !important;
+}
+
+/* Keep text-white on actual dark backgrounds */
+html[data-theme="light"] .bg-slate-800 .text-white,
+html[data-theme="light"] .bg-slate-900 .text-white,
+html[data-theme="light"] .bg-gray-800 .text-white,
+html[data-theme="light"] .bg-gray-900 .text-white,
+html[data-theme="light"] .bg-black .text-white,
+html[data-theme="light"] [class*="bg-gradient-to-br"][class*="from-slate"] .text-white,
+html.light .bg-slate-800 .text-white,
+html.light .bg-slate-900 .text-white,
+html.light .bg-gray-800 .text-white,
+html.light .bg-gray-900 .text-white,
+html.light .bg-black .text-white,
+html.light [class*="bg-gradient-to-br"][class*="from-slate"] .text-white {
+  color: #ffffff !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   NUCLEAR FIX: Force all text-white to dark in Light Mode
+   Excludes only buttons with solid colored backgrounds
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .text-white:not(.bg-primary-500 .text-white):not(.bg-teal-500 .text-white):not(.bg-green-500 .text-white):not(.bg-red-500 .text-white):not(.bg-blue-500 .text-white):not(button.bg-green-500 > *):not(button.bg-red-500 > *),
+html.light .text-white:not(.bg-primary-500 .text-white):not(.bg-teal-500 .text-white):not(.bg-green-500 .text-white):not(.bg-red-500 .text-white):not(.bg-blue-500 .text-white):not(button.bg-green-500 > *):not(button.bg-red-500 > *) {
+  color: #1e293b !important;
+}
+
+/* Force opacity variants */
+html[data-theme="light"] [class*="text-white\\/"],
+html.light [class*="text-white\\/"] {
+  color: #475569 !important;
+}

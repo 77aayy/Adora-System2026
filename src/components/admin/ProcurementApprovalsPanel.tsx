@@ -75,18 +75,18 @@ export const ProcurementApprovalsPanel: React.FC = () => {
     }
 
     return (
-        <div className="glass-card p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="adora-card p-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-                        <Package className="w-6 h-6 text-yellow-400" />
+                        <Package className="w-6 h-6 text-yellow-500" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-white">طلبات المشتريات المعلقة</h3>
-                        <p className="text-sm text-white/60">{pendingRequests.length} طلب بانتظار الموافقة</p>
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">طلبات المشتريات المعلقة</h3>
+                        <p className="text-sm text-slate-600 dark:text-white/60">{pendingRequests.length} طلب بانتظار الموافقة</p>
                     </div>
                 </div>
-                <div className="px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-xs font-bold border border-yellow-500/30">
+                <div className="px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs font-bold border border-yellow-500/30">
                     {pendingRequests.length}
                 </div>
             </div>
@@ -95,24 +95,24 @@ export const ProcurementApprovalsPanel: React.FC = () => {
                 {pendingRequests.map(request => (
                     <div
                         key={request.id}
-                        className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                        className="p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
                     >
                         <div className="flex items-start justify-between gap-4 mb-3">
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-white font-medium">{request.department}</span>
-                                    <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-xs">
+                                    <span className="text-slate-800 dark:text-white font-medium">{request.department}</span>
+                                    <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs">
                                         <Clock className="w-3 h-3 inline mr-1" />
                                         بانتظار الموافقة
                                     </span>
                                 </div>
-                                <div className="text-white/60 text-sm mb-2">
+                                <div className="text-slate-600 dark:text-white/60 text-sm mb-2">
                                     <User className="w-3 h-3 inline mr-1" />
                                     {request.requestedBy.name}
                                 </div>
                                 <div className="space-y-1">
                                     {request.items.map((item, idx) => (
-                                        <div key={idx} className="text-white/80 text-sm">
+                                        <div key={idx} className="text-slate-700 dark:text-white/80 text-sm">
                                             • {item.itemName} × {item.quantity}
                                         </div>
                                     ))}
@@ -123,14 +123,14 @@ export const ProcurementApprovalsPanel: React.FC = () => {
                         <div className="flex gap-2 mt-3">
                             <button
                                 onClick={() => handleApprove(request.id)}
-                                className="flex-1 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 font-medium flex items-center justify-center gap-2 transition-all"
+                                className="flex-1 py-2 rounded-lg bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30 font-medium flex items-center justify-center gap-2 transition-all"
                             >
                                 <Check className="w-4 h-4" />
                                 تعميد
                             </button>
                             <button
                                 onClick={() => setRejectingId(request.id)}
-                                className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium flex items-center justify-center gap-2 transition-all"
+                                className="px-4 py-2 rounded-lg bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 font-medium flex items-center justify-center gap-2 transition-all"
                             >
                                 <X className="w-4 h-4" />
                                 رفض
@@ -144,7 +144,7 @@ export const ProcurementApprovalsPanel: React.FC = () => {
                                     value={rejectReason}
                                     onChange={(e) => setRejectReason(e.target.value)}
                                     placeholder="سبب الرفض..."
-                                    className="w-full p-2 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/10 resize-none mb-2"
+                                    className="w-full p-2 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/40 border border-slate-300 dark:border-white/10 resize-none mb-2"
                                     rows={2}
                                 />
                                 <div className="flex gap-2">
@@ -159,7 +159,7 @@ export const ProcurementApprovalsPanel: React.FC = () => {
                                             setRejectingId(null);
                                             setRejectReason('');
                                         }}
-                                        className="px-4 py-2 rounded-lg bg-white/10 text-white/60 hover:bg-white/20"
+                                        className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-300 dark:hover:bg-white/20"
                                     >
                                         إلغاء
                                     </button>

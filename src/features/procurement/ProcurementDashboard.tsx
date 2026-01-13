@@ -34,6 +34,7 @@ import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboar
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
 // DeveloperSignature is now in GlobalFooter (App.tsx)
 import VoiceInputButton from '../../components/shared/VoiceInputButton';
+import { PointsTracker } from '../../components/shared/PointsTracker'; // ✅ Points tracker
 import { db } from '../../services/firebase';
 import {
     collection,
@@ -65,6 +66,7 @@ import { checkBranchLocation } from '../../services/branchLocationService';
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
 import { useBrandName } from '../../hooks/useBrandName';
+import { ChallengeTimeline } from '../../components/features/ChallengeTimeline'; // ✅ Commitment Timeline
 
 // ============================================================
 // STATUS CONFIG
@@ -179,14 +181,14 @@ const RequestCard: React.FC<{
                     <>
                         <button
                             onClick={onApprove}
-                            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium flex items-center justify-center gap-2"
+                            className="adora-btn-primary flex-1 py-3 flex items-center justify-center gap-2"
                         >
                             <Check className="w-5 h-5" />
                             تعميد
                         </button>
                         <button
                             onClick={onReject}
-                            className="py-3 px-4 rounded-xl bg-red-500/20 text-red-400 font-medium"
+                            className="adora-btn-danger py-3 px-4"
                             title="رفض الطلب"
                         >
                             <X className="w-5 h-5" />
@@ -195,21 +197,15 @@ const RequestCard: React.FC<{
                 )}
                 {/* ℹ️ Show message if self-approval is blocked */}
                 {isManager && request.status === 'PENDING_APPROVAL' && request.requestedBy.id === currentUserId && (
-                    <div 
-                        className="flex-1 py-2 px-3 rounded-xl text-xs text-center"
-                        style={{ 
-                            background: 'var(--theme-bg-tertiary)', 
-                            border: '1px solid var(--theme-border-primary)',
-                            color: 'var(--theme-text-tertiary)',
-                        }}
-                    >
+                    <div className="adora-info-box teal flex-1 justify-center text-xs">
                         بانتظار تعميد من مدير آخر
                     </div>
                 )}
                 {isRep && request.status === 'APPROVED' && (
                     <button
                         onClick={onStartPurchase}
-                        className="flex-1 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-medium flex items-center justify-center gap-2"
+                        className="adora-btn flex-1 py-3 flex items-center justify-center gap-2"
+                        style={{ background: 'linear-gradient(to right, #a855f7, #6366f1)', color: 'white' }}
                     >
                         <ShoppingCart className="w-5 h-5" />
                         بدء الشراء
@@ -218,7 +214,8 @@ const RequestCard: React.FC<{
                 {isRep && request.status === 'PURCHASING' && (
                     <button
                         onClick={onComplete}
-                        className="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium flex items-center justify-center gap-2"
+                        className="adora-btn flex-1 py-3 flex items-center justify-center gap-2"
+                        style={{ background: 'linear-gradient(to right, #06b6d4, #3b82f6)', color: 'white' }}
                     >
                         <Package className="w-5 h-5" />
                         تم الشراء
@@ -360,7 +357,11 @@ export const ProcurementDashboard: React.FC = () => {
 
     // Load data with fallback for missing index
     useEffect(() => {
-        if (!user || !branchId || !tenantId) return;
+        if (!user || !tenantId) return;
+        
+        // ✅ FIX: Manager/Owner sees ALL branches if no specific branch selected
+        // Regular employees only see their branch
+        const shouldFilterByBranch = !isManager || (isManager && branchId);
 
         const requestsRef = collection(db, 'procurementRequests');
         let unsubscribe: (() => void) | null = null;
@@ -370,9 +371,13 @@ export const ProcurementDashboard: React.FC = () => {
         // Try with orderBy first, fallback to simple query if index not ready
         const trySubscribe = (useOrderBy: boolean) => {
             const constraints: any[] = [
-                where('tenantId', '==', tenantId), // ✅ SaaS requirement - mandatory filter
-                where('branch', '==', branchId)
+                where('tenantId', '==', tenantId) // ✅ SaaS requirement - mandatory filter
             ];
+            
+            // ✅ Only filter by branch if not a manager viewing all, or if specific branch is selected
+            if (shouldFilterByBranch && branchId) {
+                constraints.push(where('branch', '==', branchId));
+            }
             
             if (useOrderBy) {
                 constraints.push(orderBy('createdAt', 'desc'));
@@ -484,6 +489,18 @@ export const ProcurementDashboard: React.FC = () => {
         try {
             await startPurchasing(id, user?.id || '', user?.name || '');
             haptic('success');
+
+            // ✅ Auto-check daily attendance when employee starts purchasing
+            if (tenantId && user?.id) {
+                try {
+                    const { checkDailyAttendance } = await import('../../services/challengeService');
+                    checkDailyAttendance(tenantId, user.id).catch(err => {
+                        console.warn('Failed to check daily attendance:', err);
+                    });
+                } catch (err) {
+                    console.warn('Could not load challengeService:', err);
+                }
+            }
         } catch (error) {
             console.error('Error starting purchase:', error);
             haptic('error');
@@ -551,6 +568,7 @@ export const ProcurementDashboard: React.FC = () => {
                 titleIcon={<ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 flex-shrink-0" />}
                 showGreeting={true}
                 brandName={brandName}
+                subtitle={<PointsTracker employeeId={user?.id || ''} inline showHistory />}
                 actions={[
                     {
                         id: 'general-instructions',
@@ -586,7 +604,8 @@ export const ProcurementDashboard: React.FC = () => {
                 onResetErrors={resetErrors}
             />
 
-            { /* Golden Alert - Broadcast Messages */}
+            {/* ✅ Challenge Timeline - شريط الالتزام */}
+            <ChallengeTimeline />
 
             {/* Golden Alert - Broadcast Messages */}
             <GoldenAlertDisplay department="procurement" />
@@ -604,37 +623,31 @@ export const ProcurementDashboard: React.FC = () => {
             )}
 
             {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <div className="stat-card-pro-compact">
-                    <StatCard
-                        count={pendingApproval.length}
-                        label="⏳ بانتظار التعميد"
-                        icon={Clock}
-                        iconColor="orange"
-                        status={pendingApproval.length > 10 ? 'warning' : 'normal'}
-                        lastUpdate="تم التحديث الآن"
-                    />
-                </div>
-                <div className="stat-card-pro-compact">
-                    <StatCard
-                        count={approved.length}
-                        label="🛒 قيد الشراء"
-                        icon={ShoppingCart}
-                        iconColor="purple"
-                        status="normal"
-                        lastUpdate="تم التحديث الآن"
-                    />
-                </div>
-                <div className="stat-card-pro-compact">
-                    <StatCard
-                        count={completed.length}
-                        label="✅ مكتمل"
-                        icon={CheckCircle}
-                        iconColor="green"
-                        status="success"
-                        lastUpdate="تم التحديث الآن"
-                    />
-                </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-4">
+                <StatCard
+                    count={pendingApproval.length}
+                    label="⏳ بانتظار التعميد"
+                    icon={Clock}
+                    iconColor="orange"
+                    status={pendingApproval.length > 10 ? 'warning' : 'normal'}
+                    lastUpdate="تم التحديث الآن"
+                />
+                <StatCard
+                    count={approved.length}
+                    label="🛒 قيد الشراء"
+                    icon={ShoppingCart}
+                    iconColor="purple"
+                    status="normal"
+                    lastUpdate="تم التحديث الآن"
+                />
+                <StatCard
+                    count={completed.length}
+                    label="✅ مكتمل"
+                    icon={CheckCircle}
+                    iconColor="green"
+                    status="success"
+                    lastUpdate="تم التحديث الآن"
+                />
             </div>
 
             {/* Tabs */}

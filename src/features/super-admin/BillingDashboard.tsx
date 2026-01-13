@@ -452,7 +452,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
 // STATS COMPONENTS
 // ============================================================
 
-// ✅ Comprehensive Financial Stats Component
+// ✅ Simplified Financial Stats Component - Only Essential Cards
 const ComprehensiveFinancialStats: React.FC<{
     totalRevenue: number;
     totalExpenses: number;
@@ -475,196 +475,98 @@ const ComprehensiveFinancialStats: React.FC<{
     totalRevenue,
     totalExpenses,
     netProfit,
-    mrr,
-    arr,
     receiptVouchers,
     expenseVouchers,
-    invoices,
-    overdue,
-    monthlyRenewalRevenue,
-    newManagersThisMonth,
-    renewalsThisMonth,
-    collectionRate,
-    averageVoucherAmount,
-    todayRevenue,
-    weekRevenue,
-    monthRevenue
+    overdue
 }) => {
     const totalReceiptVouchers = receiptVouchers.filter(v => !v.isDeleted).length;
     const totalExpenseVouchers = expenseVouchers.filter(v => !v.isDeleted).length;
-    const totalInvoices = invoices.length;
     const totalOverdueAmount = overdue.reduce((sum, inv) => sum + inv.amount, 0);
     const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100) : 0;
 
+    // ✅ Calculate receipt vouchers total
+    const totalReceiptAmount = receiptVouchers
+        .filter(v => !v.isDeleted)
+        .reduce((sum, v) => sum + v.totalAmount, 0);
+    
+    // ✅ Calculate expense vouchers total
+    const totalExpenseAmount = expenseVouchers
+        .filter(v => !v.isDeleted)
+        .reduce((sum, v) => sum + v.amount, 0);
+
     return (
         <div className="space-y-4">
-            {/* ✅ Main Financial KPIs - Row 1 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30">
+            {/* ✅ Essential Financial KPIs - Single Row */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {/* 1. إجمالي الإيرادات */}
+                <div className="bg-white dark:bg-gradient-to-br dark:from-green-500/20 dark:to-green-600/10 rounded-xl p-4 border border-green-200 dark:border-green-500/30 shadow-md dark:shadow-none">
                     <StatCard
                         icon={TrendingUp}
                         iconColor="green"
                         label="💰 إجمالي الإيرادات"
                         value={`${totalRevenue.toLocaleString()} ر.س`}
-                        lastUpdate="إجمالي كل السندات والفواتير"
                     />
                 </div>
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30">
+                
+                {/* 2. إجمالي المصروفات */}
+                <div className="bg-white dark:bg-gradient-to-br dark:from-red-500/20 dark:to-red-600/10 rounded-xl p-4 border border-red-200 dark:border-red-500/30 shadow-md dark:shadow-none">
                     <StatCard
                         icon={TrendingDown}
                         iconColor="red"
-                        label="💸 إجمالي المصروفات"
+                        label="💸 المصروفات"
                         value={`${totalExpenses.toLocaleString()} ر.س`}
-                        lastUpdate="من سندات الصرف"
                     />
                 </div>
-                <div className={`stat-card-pro-compact stat-card-billing bg-gradient-to-br ${netProfit >= 0 ? 'from-teal-500/20 to-teal-600/10 border-teal-500/30' : 'from-orange-500/20 to-orange-600/10 border-orange-500/30'}`}>
+                
+                {/* 3. صافي الربح */}
+                <div className={`bg-white dark:bg-gradient-to-br rounded-xl p-4 border shadow-md dark:shadow-none ${
+                    netProfit >= 0 
+                        ? 'border-teal-200 dark:from-teal-500/20 dark:to-teal-600/10 dark:border-teal-500/30' 
+                        : 'border-orange-200 dark:from-orange-500/20 dark:to-orange-600/10 dark:border-orange-500/30'
+                }`}>
                     <StatCard
                         icon={netProfit >= 0 ? TrendingUp : TrendingDown}
                         iconColor={netProfit >= 0 ? "teal" : "orange"}
                         label="📊 صافي الربح"
                         value={`${netProfit.toLocaleString()} ر.س`}
-                        lastUpdate={`هامش الربح: ${profitMargin.toFixed(1)}%`}
+                        lastUpdate={`${profitMargin.toFixed(0)}%`}
                     />
-                </div>
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500/30">
-                    <StatCard
-                        icon={BarChart3}
-                        iconColor="blue"
-                        label="📈 الإيرادات الشهرية (MRR)"
-                        value={`${mrr.toLocaleString()} ر.س`}
-                        lastUpdate="من الاشتراكات النشطة"
-                    />
-                </div>
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-purple-500/30">
-                    <StatCard
-                        icon={BarChart3}
-                        iconColor="purple"
-                        label="📊 الإيرادات السنوية (ARR)"
-                        value={`${arr.toLocaleString()} ر.س`}
-                        lastUpdate="MRR × 12"
-                    />
-                </div>
             </div>
 
-            {/* ✅ Period-Based Revenue - Row 2 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500/30">
-                    <StatCard
-                        icon={Calendar}
-                        iconColor="blue"
-                        label="📅 إيرادات اليوم"
-                        value={`${todayRevenue.toLocaleString()} ر.س`}
-                        lastUpdate="من سندات اليوم"
-                    />
-                </div>
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-purple-500/30">
-                    <StatCard
-                        icon={Calendar}
-                        iconColor="purple"
-                        label="📅 إيرادات الأسبوع"
-                        value={`${weekRevenue.toLocaleString()} ر.س`}
-                        lastUpdate="آخر 7 أيام"
-                    />
-                </div>
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-pink-500/20 to-pink-600/10 border-pink-500/30">
-                    <StatCard
-                        icon={Calendar}
-                        iconColor="pink"
-                        label="📅 إيرادات الشهر"
-                        value={`${monthRevenue.toLocaleString()} ر.س`}
-                        lastUpdate="هذا الشهر"
-                    />
-                </div>
-            </div>
-
-            {/* ✅ Operational Stats - Row 3 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                <div className="stat-card-pro-compact stat-card-billing">
+                {/* 4. سندات القبض */}
+                <div className="bg-white dark:bg-gradient-to-br dark:from-blue-500/20 dark:to-blue-600/10 rounded-xl p-4 border border-blue-200 dark:border-blue-500/30 shadow-md dark:shadow-none">
                     <StatCard
                         icon={CreditCard}
-                        iconColor="green"
+                        iconColor="blue"
                         label="📝 سندات القبض"
                         count={totalReceiptVouchers}
-                        lastUpdate="إجمالي السندات"
+                        lastUpdate={`${totalReceiptAmount.toLocaleString()} ر.س`}
                     />
                 </div>
-                <div className="stat-card-pro-compact stat-card-billing">
+                
+                {/* 5. سندات الصرف */}
+                <div className="bg-white dark:bg-gradient-to-br dark:from-purple-500/20 dark:to-purple-600/10 rounded-xl p-4 border border-purple-200 dark:border-purple-500/30 shadow-md dark:shadow-none">
                     <StatCard
                         icon={DollarSign}
-                        iconColor="red"
+                        iconColor="purple"
                         label="📤 سندات الصرف"
                         count={totalExpenseVouchers}
-                        lastUpdate="إجمالي السندات"
+                        lastUpdate={`${totalExpenseAmount.toLocaleString()} ر.س`}
                     />
                 </div>
-                <div className="stat-card-pro-compact stat-card-billing">
-                    <StatCard
-                        icon={FileText}
-                        iconColor="blue"
-                        label="🧾 الفواتير"
-                        count={totalInvoices}
-                        lastUpdate="إجمالي الفواتير"
-                    />
-                </div>
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-orange-500/20 to-orange-600/10 border-orange-500/30">
+                
+                {/* 6. مستحقات متأخرة - Only show if there are overdue */}
+                {overdue.length > 0 && (
+                    <div className="bg-white dark:bg-gradient-to-br dark:from-orange-500/20 dark:to-orange-600/10 rounded-xl p-4 border border-orange-300 dark:border-orange-500/30 shadow-md dark:shadow-none animate-pulse">
                     <StatCard
                         icon={AlertTriangle}
                         iconColor="orange"
-                        label="⚠️ مستحقات متأخرة"
+                            label="⚠️ متأخرات"
                         value={`${totalOverdueAmount.toLocaleString()} ر.س`}
                         lastUpdate={`${overdue.length} فاتورة`}
                     />
                 </div>
-                <div className="stat-card-pro-compact stat-card-billing">
-                    <StatCard
-                        icon={RefreshCw}
-                        iconColor="teal"
-                        label="🔄 تجديدات الشهر"
-                        count={renewalsThisMonth}
-                        lastUpdate={`${monthlyRenewalRevenue.toLocaleString()} ر.س`}
-                    />
-                </div>
-                <div className="stat-card-pro-compact stat-card-billing">
-                    <StatCard
-                        icon={Users}
-                        iconColor="purple"
-                        label="👥 مديرين جدد"
-                        count={newManagersThisMonth}
-                        lastUpdate="هذا الشهر"
-                    />
-                </div>
-            </div>
-
-            {/* ✅ Performance Metrics - Row 4 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/30">
-                    <StatCard
-                        icon={Percent}
-                        iconColor="green"
-                        label="✅ نسبة التحصيل"
-                        value={`${collectionRate.toFixed(1)}%`}
-                        lastUpdate={`${invoices.filter(inv => inv.status === 'paid').length} من ${totalInvoices} فاتورة`}
-                    />
-                </div>
-                <div className="stat-card-pro-compact stat-card-billing">
-                    <StatCard
-                        icon={DollarSign}
-                        iconColor="blue"
-                        label="📊 متوسط قيمة السند"
-                        value={`${averageVoucherAmount.toLocaleString()} ر.س`}
-                        lastUpdate="من سندات القبض"
-                    />
-                </div>
-                <div className="stat-card-pro-compact stat-card-billing bg-gradient-to-br from-teal-500/20 to-teal-600/10 border-teal-500/30">
-                    <StatCard
-                        icon={Activity}
-                        iconColor="teal"
-                        label="📈 إيرادات التجديدات"
-                        value={`${monthlyRenewalRevenue.toLocaleString()} ر.س`}
-                        lastUpdate="هذا الشهر"
-                    />
-                </div>
+                )}
             </div>
         </div>
     );
@@ -1849,179 +1751,333 @@ const ReceiptVouchersTab: React.FC<{
                 </div>
             )}
             
-            {/* Vouchers List */}
-            <div className="space-y-3">
+            {/* ✅ Grouped Vouchers - تجميع السندات حسب المشترك والتاريخ */}
+            <div className="space-y-4">
                 {filteredVouchers.length === 0 ? (
-                    <p className="text-center text-white/40 py-8">لا توجد سندات قبض</p>
+                    <p className="text-center text-slate-500 dark:text-white/40 py-8">لا توجد سندات قبض</p>
                 ) : (
                     <>
                         {/* Select All */}
-                        <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-200 dark:border-white/10">
                             <input
                                 type="checkbox"
                                 checked={selectedVouchers.size === filteredVouchers.length && filteredVouchers.length > 0}
                                 onChange={toggleSelectAll}
-                                className="w-4 h-4 rounded border-white/20 bg-white/5 text-teal-500 focus:ring-teal-500/50"
+                                className="w-4 h-4 rounded border-slate-300 dark:border-white/20 bg-white dark:bg-white/5 text-teal-500 focus:ring-teal-500/50"
                             />
-                            <span className="text-sm text-white/60">
+                            <span className="text-sm text-slate-600 dark:text-white/60">
                                 تحديد الكل ({filteredVouchers.length})
                             </span>
                         </div>
                         
-                        {/* Vouchers - Compact Cards */}
-                        {filteredVouchers.map((voucher) => (
-                            <div
-                                key={voucher.id}
-                                className={`glass rounded-lg p-3 transition-all hover:bg-white/5 ${
-                                    voucher.isDeleted ? 'opacity-50 border border-red-500/30' : ''
-                                } ${selectedVouchers.has(voucher.id) ? 'ring-2 ring-teal-500/50' : ''}`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    {/* Checkbox */}
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedVouchers.has(voucher.id)}
-                                        onChange={() => toggleSelection(voucher.id)}
-                                        className="w-4 h-4 rounded border-white/20 bg-white/5 text-teal-500 focus:ring-teal-500/50 flex-shrink-0"
-                                    />
-                                    
-                                    {/* Main Info - Compact Row */}
-                                    <div className="flex-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                                        {/* رقم السند */}
-                                        <span className="font-bold text-white">#{voucher.voucherNumber || '-'}</span>
+                        {/* ✅ Grouped Vouchers by Manager + Date */}
+                        {(() => {
+                            // Group vouchers by managerCode + date (same day)
+                            const groups: { [key: string]: typeof filteredVouchers } = {};
+                            filteredVouchers.forEach(voucher => {
+                                const dateKey = new Date(voucher.createdAt).toISOString().split('T')[0];
+                                const groupKey = `${voucher.managerCode}_${dateKey}`;
+                                if (!groups[groupKey]) {
+                                    groups[groupKey] = [];
+                                }
+                                groups[groupKey].push(voucher);
+                            });
+                            
+                            // Sort groups by date (newest first)
+                            const sortedGroupKeys = Object.keys(groups).sort((a, b) => {
+                                const dateA = new Date(groups[a][0].createdAt);
+                                const dateB = new Date(groups[b][0].createdAt);
+                                return dateB.getTime() - dateA.getTime();
+                            });
+                            
+                            return sortedGroupKeys.map(groupKey => {
+                                const groupVouchers = groups[groupKey];
+                                const firstVoucher = groupVouchers[0];
+                                const totalAmount = groupVouchers.reduce((sum, v) => sum + v.totalAmount, 0);
+                                const allSelected = groupVouchers.every(v => selectedVouchers.has(v.id));
+                                const someSelected = groupVouchers.some(v => selectedVouchers.has(v.id));
+                                
+                                // Toggle all vouchers in group
+                                const toggleGroupSelection = () => {
+                                    const newSelected = new Set(selectedVouchers);
+                                    if (allSelected) {
+                                        groupVouchers.forEach(v => newSelected.delete(v.id));
+                                    } else {
+                                        groupVouchers.forEach(v => {
+                                            if (!v.isDeleted) newSelected.add(v.id);
+                                        });
+                                    }
+                                    setSelectedVouchers(newSelected);
+                                };
+                                
+                                // Print all vouchers in group
+                                const printGroup = () => {
+                                    const htmlContent = generateReportHTML(groupVouchers);
+                                    if (!htmlContent) return;
+                                    const printWindow = window.open('', '_blank');
+                                    if (printWindow) {
+                                        printWindow.document.write(htmlContent);
+                                        printWindow.document.close();
+                                        setTimeout(() => printWindow.print(), 250);
+                                    }
+                                };
+                                
+                                return (
+                                    <div
+                                        key={groupKey}
+                                        className="bg-white dark:bg-slate-900/50 rounded-2xl border-2 border-slate-200 dark:border-white/10 shadow-lg overflow-hidden"
+                                    >
+                                        {/* ✅ Group Header - معلومات المشترك */}
+                                        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-900/20 dark:to-emerald-900/20 p-4 border-b border-slate-200 dark:border-white/10">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    {/* Group Checkbox */}
+                                                    <label className="relative flex items-center cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={allSelected}
+                                                            onChange={toggleGroupSelection}
+                                                            className="sr-only peer"
+                                                        />
+                                                        <div className={`
+                                                            w-5 h-5 rounded-lg border-2 transition-all duration-200
+                                                            ${allSelected ? 'bg-teal-500 border-teal-500' : someSelected ? 'bg-teal-200 border-teal-400' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600'}
+                                                            flex items-center justify-center
+                                                        `}>
+                                                            {(allSelected || someSelected) && <Check className="w-3 h-3 text-white" />}
+                                                        </div>
+                                                    </label>
+                                                    
+                                                    {/* Manager Info */}
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-bold text-slate-800 dark:text-white text-lg">
+                                                                {firstVoucher.managerName}
+                                                            </span>
+                                                            <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold">
+                                                                كود: {firstVoucher.managerCode}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1 text-sm text-slate-600 dark:text-slate-400">
+                                                            <Calendar className="w-3.5 h-3.5" />
+                                                            <span>
+                                                                {new Date(firstVoucher.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                                            </span>
+                                                            <span className="text-slate-400">|</span>
+                                                            <span className="text-xs">
+                                                                {new Date(firstVoucher.createdAt).toLocaleDateString('ar-SA-u-ca-islamic', { year: 'numeric', month: 'short', day: 'numeric' })} هـ
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Group Total & Actions */}
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-left">
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400">إجمالي ({groupVouchers.length} {groupVouchers.length === 1 ? 'سند' : 'سندات'})</p>
+                                                        <p className="text-xl font-bold text-teal-600 dark:text-teal-400">
+                                                            {totalAmount.toLocaleString()} <span className="text-sm">ر.س</span>
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        onClick={printGroup}
+                                                        className="px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-600 text-white font-medium text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                                                        title="طباعة كل السندات"
+                                                    >
+                                                        <Printer className="w-4 h-4" />
+                                                        طباعة الكل
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                         
-                                        {/* التاريخ */}
-                                        <span className="text-white/60">
-                                            {new Date(voucher.createdAt).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' })}
-                                        </span>
-                                        
-                                        {/* المدير */}
-                                        <span className="text-white/80">{voucher.managerName}</span>
-                                        
-                                        {/* طريقة الدفع */}
-                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                            voucher.paymentMethod === 'cash' ? 'bg-green-500/20 text-green-400' :
-                                            voucher.paymentMethod === 'credit' ? 'bg-blue-500/20 text-blue-400' :
-                                            voucher.paymentMethod === 'bank_transfer' ? 'bg-purple-500/20 text-purple-400' :
-                                            'bg-yellow-500/20 text-yellow-400'
-                                        }`}>
-                                            {voucher.paymentMethod === 'cash' ? 'كاش' :
-                                             voucher.paymentMethod === 'credit' ? 'كريديت' :
-                                             voucher.paymentMethod === 'bank_transfer' ? 'بنكي' : 'مؤجل'}
-                                        </span>
-                                        
-                                        {/* المبلغ */}
-                                        <span className="font-bold text-teal-400">{voucher.totalAmount.toLocaleString()} ر.س</span>
-                                        
-                                        {/* علامة محذوف */}
-                                        {voucher.isDeleted && (
-                                            <span className="text-red-400 text-[10px]">🗑️ محذوف</span>
-                                        )}
+                                        {/* ✅ Individual Vouchers - السندات الفردية */}
+                                        <div className="p-3 space-y-2">
+                                            {groupVouchers.map((voucher, idx) => (
+                                                <div
+                                                    key={voucher.id}
+                                                    className={`
+                                                        relative flex items-center gap-3 p-3 rounded-xl transition-all duration-200
+                                                        ${voucher.isDeleted 
+                                                            ? 'bg-red-50 dark:bg-red-900/10 opacity-60' 
+                                                            : 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                                        }
+                                                        ${selectedVouchers.has(voucher.id) ? 'ring-2 ring-teal-500' : ''}
+                                                        border border-slate-200 dark:border-slate-700
+                                                    `}
+                                                >
+                                                    {/* Checkbox */}
+                                                    <label className="flex-shrink-0 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedVouchers.has(voucher.id)}
+                                                            onChange={() => toggleSelection(voucher.id)}
+                                                            className="sr-only peer"
+                                                        />
+                                                        <div className={`
+                                                            w-4 h-4 rounded border-2 transition-all
+                                                            ${selectedVouchers.has(voucher.id) ? 'bg-teal-500 border-teal-500' : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500'}
+                                                            flex items-center justify-center
+                                                        `}>
+                                                            {selectedVouchers.has(voucher.id) && <Check className="w-2.5 h-2.5 text-white" />}
+                                                        </div>
+                                                    </label>
+                                                    
+                                                    {/* Voucher Number */}
+                                                    <div className={`
+                                                        flex-shrink-0 w-10 h-10 rounded-lg flex flex-col items-center justify-center
+                                                        ${voucher.paymentMethod === 'cash' ? 'bg-emerald-100 dark:bg-emerald-900/30' : 
+                                                          voucher.paymentMethod === 'credit' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                                                          voucher.paymentMethod === 'bank_transfer' ? 'bg-purple-100 dark:bg-purple-900/30' :
+                                                          'bg-amber-100 dark:bg-amber-900/30'}
+                                                    `}>
+                                                        <span className="text-[8px] text-slate-500 dark:text-slate-400">سند</span>
+                                                        <span className={`text-sm font-bold ${
+                                                            voucher.paymentMethod === 'cash' ? 'text-emerald-600 dark:text-emerald-400' :
+                                                            voucher.paymentMethod === 'credit' ? 'text-blue-600 dark:text-blue-400' :
+                                                            voucher.paymentMethod === 'bank_transfer' ? 'text-purple-600 dark:text-purple-400' :
+                                                            'text-amber-600 dark:text-amber-400'
+                                                        }`}>{voucher.voucherNumber || '-'}</span>
+                                                    </div>
+                                                    
+                                                    {/* Branch Info - الأهم للمحاسب */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-semibold text-slate-800 dark:text-white">
+                                                                فرع: {voucher.branchName || '-'}
+                                                            </span>
+                                                            <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold">
+                                                                #{voucher.branchCode || '-'}
+                                                            </span>
+                                                            {voucher.isDeleted && (
+                                                                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                                                    محذوف
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                                            <span>{voucher.subscriptionDuration === 1 ? 'سنة' : 'سنتين'}</span>
+                                                            <span>•</span>
+                                                            <span className={`font-medium ${
+                                                                voucher.paymentMethod === 'cash' ? 'text-emerald-600 dark:text-emerald-400' :
+                                                                voucher.paymentMethod === 'credit' ? 'text-blue-600 dark:text-blue-400' :
+                                                                voucher.paymentMethod === 'bank_transfer' ? 'text-purple-600 dark:text-purple-400' :
+                                                                'text-amber-600 dark:text-amber-400'
+                                                            }`}>
+                                                                {voucher.paymentMethod === 'cash' ? 'كاش' :
+                                                                 voucher.paymentMethod === 'credit' ? 'كريديت' :
+                                                                 voucher.paymentMethod === 'bank_transfer' ? 'بنكي' : 'مؤجل'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Amount */}
+                                                    <div className="flex-shrink-0 text-left">
+                                                        <span className="text-base font-bold text-slate-800 dark:text-white">
+                                                            {voucher.totalAmount.toLocaleString()}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-500 dark:text-slate-400 mr-1">ر.س</span>
+                                                    </div>
+                                                    
+                                                    {/* Actions */}
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => setPreviewVoucher(voucher)}
+                                                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 transition-all"
+                                                            title="معاينة"
+                                                        >
+                                                            <Eye className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                const htmlContent = generateReportHTML([voucher]);
+                                                                if (!htmlContent) return;
+                                                                const printWindow = window.open('', '_blank');
+                                                                if (printWindow) {
+                                                                    printWindow.document.write(htmlContent);
+                                                                    printWindow.document.close();
+                                                                    setTimeout(() => printWindow.print(), 250);
+                                                                }
+                                                            }}
+                                                            className="p-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 dark:bg-teal-900/30 dark:hover:bg-teal-900/50 transition-all"
+                                                            title="طباعة"
+                                                        >
+                                                            <Printer className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                    
-                                    {/* Action Buttons - Eye (Preview) + Print */}
-                                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                                        {/* زر المعاينة */}
-                                        <button
-                                            onClick={() => setPreviewVoucher(voucher)}
-                                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                                            title="معاينة السند"
-                                        >
-                                            <Eye className="w-4 h-4 text-white/60" />
-                                        </button>
-                                        
-                                        {/* زر الطباعة */}
-                                        <button
-                                            onClick={() => {
-                                                const singleVoucher = [voucher];
-                                                const htmlContent = generateReportHTML(singleVoucher);
-                                                if (!htmlContent) return;
-                                                const printWindow = window.open('', '_blank');
-                                                if (printWindow) {
-                                                    printWindow.document.write(htmlContent);
-                                                    printWindow.document.close();
-                                                    setTimeout(() => printWindow.print(), 250);
-                                                }
-                                            }}
-                                            className="p-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 transition-colors"
-                                            title="طباعة السند"
-                                        >
-                                            <Printer className="w-4 h-4 text-teal-400" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                                );
+                            });
+                        })()}
                     </>
                 )}
             </div>
             
-            {/* ✅ Preview Modal - معاينة السند */}
+            {/* ✅ Preview Modal - معاينة السند - محسّن للوضوح */}
             {previewVoucher && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" style={{ backdropFilter: 'none' }}>
-                    <div className="glass rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-white">سند قبض #{previewVoucher.voucherNumber}</h3>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10">
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white">سند قبض #{previewVoucher.voucherNumber}</h3>
                             <button
                                 onClick={() => setPreviewVoucher(null)}
-                                className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 transition-colors"
                             >
-                                <X className="w-5 h-5 text-white/60" />
+                                <X className="w-5 h-5 text-slate-600 dark:text-white/60" />
                             </button>
                         </div>
                         
-                        <div className="space-y-3 text-sm">
+                        <div className="space-y-4">
+                            {/* التاريخ */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-white/5 rounded-lg p-2">
-                                    <p className="text-[10px] text-white/40 mb-0.5">التاريخ الميلادي</p>
-                                    <p className="text-white text-xs">{new Date(previewVoucher.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })} م</p>
+                                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
+                                    <p className="text-xs text-slate-500 dark:text-white/50 mb-1 font-medium">التاريخ الميلادي</p>
+                                    <p className="text-slate-800 dark:text-white font-semibold">{new Date(previewVoucher.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })} م</p>
                                 </div>
-                                <div className="bg-white/5 rounded-lg p-2">
-                                    <p className="text-[10px] text-white/40 mb-0.5">التاريخ الهجري</p>
-                                    <p className="text-white text-xs">{new Date(previewVoucher.createdAt).toLocaleDateString('ar-SA-u-ca-islamic', { year: 'numeric', month: 'short', day: 'numeric' })} هـ</p>
+                                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
+                                    <p className="text-xs text-slate-500 dark:text-white/50 mb-1 font-medium">التاريخ الهجري</p>
+                                    <p className="text-slate-800 dark:text-white font-semibold">{new Date(previewVoucher.createdAt).toLocaleDateString('ar-SA-u-ca-islamic', { year: 'numeric', month: 'short', day: 'numeric' })} هـ</p>
                                 </div>
                             </div>
                             
+                            {/* المشترك */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-white/5 rounded-lg p-2">
-                                    <p className="text-[10px] text-white/40 mb-0.5">اسم المدير</p>
-                                    <p className="text-white text-xs">{previewVoucher.managerName}</p>
+                                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
+                                    <p className="text-xs text-slate-500 dark:text-white/50 mb-1 font-medium">اسم المشترك</p>
+                                    <p className="text-slate-800 dark:text-white font-semibold">{previewVoucher.managerName}</p>
                                 </div>
-                                <div className="bg-white/5 rounded-lg p-2">
-                                    <p className="text-[10px] text-white/40 mb-0.5">كود المدير</p>
-                                    <p className="text-white text-xs">{previewVoucher.managerCode}</p>
+                                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
+                                    <p className="text-xs text-slate-500 dark:text-white/50 mb-1 font-medium">كود المشترك</p>
+                                    <p className="text-slate-800 dark:text-white font-bold text-lg">{previewVoucher.managerCode}</p>
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-white/5 rounded-lg p-2">
-                                    <p className="text-[10px] text-white/40 mb-0.5">اسم الفرع</p>
-                                    <p className="text-white text-xs">{previewVoucher.branchName}</p>
-                                </div>
-                                <div className="bg-white/5 rounded-lg p-2">
-                                    <p className="text-[10px] text-white/40 mb-0.5">رقم الفرع</p>
-                                    <p className="text-white text-xs">{previewVoucher.branchCode}</p>
-                                </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-white/5 rounded-lg p-2">
-                                    <p className="text-[10px] text-white/40 mb-0.5">عدد الفروع</p>
-                                    <p className="text-white text-xs">{previewVoucher.numberOfBranches}</p>
-                                </div>
-                                <div className="bg-white/5 rounded-lg p-2">
-                                    <p className="text-[10px] text-white/40 mb-0.5">مدة الاشتراك</p>
-                                    <p className="text-white text-xs">{previewVoucher.subscriptionDuration === 1 ? 'سنة' : 'سنتين'}</p>
+                            {/* الفرع - السند الواحد لفرع واحد فقط! */}
+                            <div className="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-4 border border-teal-200 dark:border-teal-700/30">
+                                <p className="text-xs text-teal-600 dark:text-teal-400 mb-2 font-medium">بيانات الفرع</p>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-slate-800 dark:text-white font-bold text-lg">{previewVoucher.branchName || 'الفرع الرئيسي'}</p>
+                                        <p className="text-slate-500 dark:text-slate-400 text-sm">كود الفرع: #{previewVoucher.branchCode}</p>
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">مدة الاشتراك</p>
+                                        <p className="text-teal-600 dark:text-teal-400 font-bold">{previewVoucher.subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'}</p>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <div className="bg-white/5 rounded-lg p-2">
-                                <p className="text-[10px] text-white/40 mb-0.5">طريقة الدفع</p>
-                                <p className={`text-xs font-medium ${
-                                    previewVoucher.paymentMethod === 'cash' ? 'text-green-400' :
-                                    previewVoucher.paymentMethod === 'credit' ? 'text-blue-400' :
-                                    previewVoucher.paymentMethod === 'bank_transfer' ? 'text-purple-400' :
-                                    'text-yellow-400'
+                            {/* طريقة الدفع */}
+                            <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
+                                <p className="text-xs text-slate-500 dark:text-white/50 mb-2 font-medium">طريقة الدفع</p>
+                                <p className={`text-base font-bold ${
+                                    previewVoucher.paymentMethod === 'cash' ? 'text-emerald-600 dark:text-emerald-400' :
+                                    previewVoucher.paymentMethod === 'credit' ? 'text-blue-600 dark:text-blue-400' :
+                                    previewVoucher.paymentMethod === 'bank_transfer' ? 'text-purple-600 dark:text-purple-400' :
+                                    'text-amber-600 dark:text-amber-400'
                                 }`}>
                                     {previewVoucher.paymentMethod === 'cash' ? '💵 كاش' :
                                      previewVoucher.paymentMethod === 'credit' ? '💳 كريديت' :
@@ -2029,21 +2085,22 @@ const ReceiptVouchersTab: React.FC<{
                                 </p>
                             </div>
                             
-                            <div className="bg-teal-500/10 border border-teal-500/30 rounded-lg p-3 text-center">
-                                <p className="text-[10px] text-teal-300/70 mb-1">المبلغ الإجمالي</p>
-                                <p className="text-2xl font-bold text-teal-400">{previewVoucher.totalAmount.toLocaleString()} ر.س</p>
+                            {/* المبلغ */}
+                            <div className="bg-gradient-to-r from-teal-500 to-emerald-500 rounded-xl p-4 text-center">
+                                <p className="text-teal-100 text-sm mb-1">المبلغ الإجمالي</p>
+                                <p className="text-3xl font-bold text-white">{previewVoucher.totalAmount.toLocaleString()} <span className="text-lg">ر.س</span></p>
                             </div>
                             
                             {previewVoucher.notes && (
-                                <div className="bg-white/5 rounded-lg p-2">
-                                    <p className="text-[10px] text-white/40 mb-0.5">ملاحظات</p>
-                                    <p className="text-white/80 text-xs">{previewVoucher.notes}</p>
+                                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 border border-amber-200 dark:border-amber-700/30">
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 mb-1 font-medium">ملاحظات</p>
+                                    <p className="text-slate-700 dark:text-white/80">{previewVoucher.notes}</p>
                                 </div>
                             )}
                         </div>
                         
                         {/* Action Buttons */}
-                        <div className="flex gap-2 mt-4">
+                        <div className="flex gap-3 mt-5">
                             <button
                                 onClick={() => {
                                     const singleVoucher = [previewVoucher];
@@ -2056,14 +2113,14 @@ const ReceiptVouchersTab: React.FC<{
                                         setTimeout(() => printWindow.print(), 250);
                                     }
                                 }}
-                                className="flex-1 py-2 rounded-lg bg-teal-500 hover:bg-teal-600 text-white text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                                className="flex-1 py-3 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-teal-500/30 hover:shadow-xl"
                             >
-                                <Printer className="w-4 h-4" />
+                                <Printer className="w-5 h-5" />
                                 طباعة
                             </button>
                             <button
                                 onClick={() => setPreviewVoucher(null)}
-                                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm transition-colors"
+                                className="px-6 py-3 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-white font-medium transition-colors"
                             >
                                 إغلاق
                             </button>
@@ -3062,10 +3119,10 @@ const ExpenseVouchersTab: React.FC<{
                 </div>
             )}
             
-            {/* Vouchers List */}
-            <div className="space-y-2">
+            {/* Vouchers List - ✅ Enhanced with better contrast like receipt vouchers */}
+            <div className="space-y-3">
                 {filteredVouchers.length === 0 ? (
-                    <p className="text-center text-white/40 py-8">لا توجد سندات صرف</p>
+                    <p className="text-center text-slate-500 dark:text-white/40 py-8">لا توجد سندات صرف</p>
                 ) : (
                     filteredVouchers.map(voucher => {
                         const paymentMethodLabels = {
@@ -3078,87 +3135,115 @@ const ExpenseVouchersTab: React.FC<{
                         return (
                             <div
                                 key={voucher.id}
-                                className={`glass rounded-xl p-4 hover:bg-white/10 transition-all ${
-                                    voucher.isDeleted ? 'opacity-60 border border-red-500/30' : ''
-                                } ${selectedVouchers.has(voucher.id) ? 'ring-2 ring-teal-500/50 bg-teal-500/10' : ''}`}
+                                className={`
+                                    group relative overflow-hidden rounded-xl transition-all duration-300
+                                    ${voucher.isDeleted 
+                                        ? 'bg-gradient-to-r from-red-50 via-gray-50 to-red-50 dark:from-red-950/20 dark:via-gray-900/40 dark:to-red-950/20 opacity-60' 
+                                        : 'bg-white dark:bg-gradient-to-br dark:from-slate-800/50 dark:to-slate-900/50'
+                                    }
+                                    ${selectedVouchers.has(voucher.id) 
+                                        ? 'ring-2 ring-orange-500 shadow-lg shadow-orange-500/20' 
+                                        : 'shadow-[0_4px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.18)] dark:shadow-none'
+                                    }
+                                    border-2 border-slate-200 dark:border-white/10 hover:border-orange-400 dark:hover:border-orange-500/50
+                                    hover:-translate-y-1
+                                `}
                             >
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="flex items-start gap-3 flex-1">
+                                {/* ✅ Orange Accent Line for Expense */}
+                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 via-red-500 to-orange-400" />
+                                
+                                <div className="p-4 flex items-center gap-4">
+                                    {/* ✅ Enhanced Checkbox */}
                                         {!voucher.isDeleted && (
+                                        <div className="flex-shrink-0">
+                                            <label className="relative flex items-center cursor-pointer">
                                             <input
                                                 type="checkbox"
                                                 checked={selectedVouchers.has(voucher.id)}
                                                 onChange={() => toggleSelectVoucher(voucher.id)}
-                                                className="mt-1 w-4 h-4 rounded border-white/20 bg-white/5 text-teal-500 focus:ring-teal-500/50"
-                                            />
-                                        )}
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-xs text-white/50">رقم السند:</span>
-                                                <span className="text-sm font-bold text-teal-400">
-                                                    {String(voucher.voucherNumber || voucher.id.slice(0, 8)).padStart(6, '0')}#
-                                                </span>
+                                                    className="sr-only peer"
+                                                />
+                                                <div className={`
+                                                    w-5 h-5 rounded-lg border-2 transition-all duration-200
+                                                    ${selectedVouchers.has(voucher.id)
+                                                        ? 'bg-orange-500 border-orange-500'
+                                                        : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600'
+                                                    }
+                                                    peer-hover:border-orange-400 peer-focus:ring-2 peer-focus:ring-orange-500/30
+                                                    flex items-center justify-center
+                                                `}>
+                                                    {selectedVouchers.has(voucher.id) && (
+                                                        <Check className="w-3 h-3 text-white" />
+                                                    )}
                                             </div>
-                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                                                <div>
-                                                    <p className="text-[10px] text-white/50 mb-0.5">دفع لـ</p>
-                                                    <p className="text-xs font-medium text-white">{voucher.paidTo}</p>
+                                            </label>
                                                 </div>
-                                                <div>
-                                                    <p className="text-[10px] text-white/50 mb-0.5">طريقة الدفع</p>
-                                                    <p className="text-xs font-medium text-white">{paymentMethodLabels[voucher.paymentMethod] || '-'}</p>
+                                    )}
+                                    
+                                    {/* ✅ Voucher Number Badge */}
+                                    <div className="flex-shrink-0 w-14 h-14 rounded-xl flex flex-col items-center justify-center bg-gradient-to-br from-orange-100 to-red-50 dark:from-orange-900/30 dark:to-red-900/20 border border-orange-200 dark:border-orange-700/50">
+                                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">صرف</span>
+                                        <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                                            {voucher.voucherNumber || '-'}
+                                        </span>
                                                 </div>
-                                                <div>
-                                                    <p className="text-[10px] text-white/50 mb-0.5">التاريخ</p>
-                                                    <p className="text-xs font-medium text-white">
-                                                        {new Date(voucher.createdAt).toLocaleDateString('ar-EG', {
-                                                            year: 'numeric',
-                                                            month: 'short',
-                                                            day: 'numeric'
-                                                        })} م
-                                                    </p>
-                                                    <p className="text-[10px] text-white/40">
-                                                        {new Date(voucher.createdAt).toLocaleDateString('ar-SA-u-ca-islamic', {
-                                                            year: 'numeric',
-                                                            month: 'short',
-                                                            day: 'numeric'
-                                                        })} هـ
-                                                    </p>
+                                    
+                                    {/* ✅ Main Info Section */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-bold text-slate-800 dark:text-white truncate">
+                                                {voucher.paidTo}
+                                            </span>
+                                            {voucher.isDeleted && (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-700/50">
+                                                    محذوف
+                                                </span>
+                                            )}
                                                 </div>
-                                                <div className="col-span-2 md:col-span-3">
-                                                    <p className="text-[10px] text-white/50 mb-0.5">الغرض</p>
-                                                    <p className="text-xs font-medium text-white">{voucher.purpose}</p>
+                                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-700 dark:text-slate-200 font-semibold">
+                                            {/* Date - Gregorian + Hijri */}
+                                            <span className="flex items-center gap-1">
+                                                <Calendar className="w-3 h-3 text-slate-500" />
+                                                <span>
+                                                    {new Date(voucher.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                                    <span className="text-slate-400 dark:text-slate-500 font-normal text-[10px] mx-1">|</span>
+                                                    <span className="text-slate-400 dark:text-slate-500 font-normal text-[10px]">
+                                                        {new Date(voucher.createdAt).toLocaleDateString('ar-SA-u-ca-islamic', { month: 'short', day: 'numeric' })} هـ
+                                                    </span>
+                                                </span>
+                                            </span>
+                                            {/* Payment Method */}
+                                            <span className="px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-[10px] font-bold border border-orange-200 dark:border-orange-700/50">
+                                                {paymentMethodLabels[voucher.paymentMethod] || '-'}
+                                            </span>
                                                 </div>
+                                        {/* Purpose */}
+                                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
+                                            {voucher.purpose}
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
+                                    
+                                    {/* ✅ Amount & Actions */}
+                                    <div className="flex items-center gap-3">
                                         <div className="text-right">
-                                            <p className="text-lg font-bold text-teal-400">
+                                            <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
                                                 {voucher.amount.toLocaleString()} ر.س
                                             </p>
                                         </div>
                                         <button
                                             onClick={() => {
-                                                // ✅ طباعة السند حتى لو محذوف
                                                 const voucherToPrint = expenseVouchers.find(v => v.id === voucher.id);
                                                 if (voucherToPrint) {
                                                     handlePrintSingle(voucherToPrint);
                                                 }
                                             }}
-                                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                                            className="p-2.5 rounded-lg bg-orange-100 hover:bg-orange-200 dark:bg-orange-500/20 dark:hover:bg-orange-500/30 transition-all"
                                             title="طباعة"
                                         >
-                                            <Printer className="w-4 h-4 text-teal-400" />
+                                            <Printer className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                                         </button>
                                     </div>
                                 </div>
-                                {voucher.isDeleted && (
-                                    <div className="mt-2 text-xs text-red-400 flex items-center gap-1">
-                                        <Trash2 className="w-3 h-3" />
-                                        محذوف {voucher.deletedAt ? `بتاريخ ${new Date(voucher.deletedAt).toLocaleDateString('ar-SA')}` : ''}
-                                    </div>
-                                )}
                             </div>
                         );
                     })
@@ -3979,81 +4064,226 @@ const InvoicesTab: React.FC<{
                 </div>
             )}
             
-            {/* Invoices List */}
-            <div className="space-y-2">
+            {/* ✅ Grouped Invoices - تجميع الفواتير حسب المشترك والتاريخ */}
+            <div className="space-y-4">
                 {filteredInvoices.length === 0 ? (
-                    <p className="text-center text-white/40 py-8">لا توجد فواتير</p>
+                    <p className="text-center text-slate-500 dark:text-white/40 py-8">لا توجد فواتير</p>
                 ) : (
-                    filteredInvoices.map(invoice => {
+                    (() => {
                         const paymentMethodLabels = {
                             'cash': 'كاش',
                             'credit': 'كريديت',
                             'bank_transfer': 'تحويل بنكي',
-                            'deferred': 'مؤجل الدفع'
+                            'deferred': 'مؤجل'
                         };
                         
-                        return (
-                            <div
-                                key={invoice.id}
-                                className={`bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-all ${
-                                    invoice.isDeleted ? 'opacity-50' : ''
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedInvoices.has(invoice.id)}
-                                        onChange={() => toggleSelectInvoice(invoice.id)}
-                                        className="w-4 h-4 rounded border-white/20 bg-white/5 text-teal-400 focus:ring-teal-400 focus:ring-2"
-                                    />
-                                    <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs">
-                                <div>
-                                            <div className="text-white/40 mb-1">رقم الفاتورة</div>
-                                            <div className="text-white font-medium">#{invoice.invoiceNumber || '-'}</div>
-                                </div>
-                                        <div>
-                                            <div className="text-white/40 mb-1">التاريخ</div>
-                                            <div className="text-white">{new Date(invoice.issueDate).toLocaleDateString('ar-SA')}</div>
-                                </div>
-                                        <div>
-                                            <div className="text-white/40 mb-1">اسم المدير</div>
-                                            <div className="text-white">{invoice.managerName || '-'}</div>
-                            </div>
-                                        <div>
-                                            <div className="text-white/40 mb-1">كود المدير</div>
-                                            <div className="text-white">{invoice.managerCode || '-'}</div>
-                        </div>
-                                        <div>
-                                            <div className="text-white/40 mb-1">رقم الفرع</div>
-                                            <div className="text-white">{invoice.branchCode || '-'}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-white/40 mb-1">طريقة الدفع</div>
-                                            <div className="text-white">{invoice.paymentMethod ? paymentMethodLabels[invoice.paymentMethod as keyof typeof paymentMethodLabels] : '-'}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-white/40 mb-1">مدة الاشتراك</div>
-                                            <div className="text-white">{invoice.subscriptionDuration === 1 ? 'سنة' : invoice.subscriptionDuration === 2 ? 'سنتين' : '-'}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-white/40 mb-1">الإجمالي</div>
-                                            <div className="text-teal-400 font-bold">{(invoice.totalAmount || invoice.amount).toLocaleString()} ر.س</div>
+                        // Group invoices by managerCode + date (same day)
+                        const groups: { [key: string]: typeof filteredInvoices } = {};
+                        filteredInvoices.forEach(invoice => {
+                            const dateKey = new Date(invoice.issueDate).toISOString().split('T')[0];
+                            const groupKey = `${invoice.managerCode}_${dateKey}`;
+                            if (!groups[groupKey]) {
+                                groups[groupKey] = [];
+                            }
+                            groups[groupKey].push(invoice);
+                        });
+                        
+                        // Sort groups by date (newest first)
+                        const sortedGroupKeys = Object.keys(groups).sort((a, b) => {
+                            const dateA = new Date(groups[a][0].issueDate);
+                            const dateB = new Date(groups[b][0].issueDate);
+                            return dateB.getTime() - dateA.getTime();
+                        });
+                        
+                        return sortedGroupKeys.map(groupKey => {
+                            const groupInvoices = groups[groupKey];
+                            const firstInvoice = groupInvoices[0];
+                            const totalAmount = groupInvoices.reduce((sum, inv) => sum + (inv.totalAmount || inv.amount), 0);
+                            const allSelected = groupInvoices.every(inv => selectedInvoices.has(inv.id));
+                            const someSelected = groupInvoices.some(inv => selectedInvoices.has(inv.id));
+                            
+                            // Toggle all invoices in group
+                            const toggleGroupSelection = () => {
+                                const newSelected = new Set(selectedInvoices);
+                                if (allSelected) {
+                                    groupInvoices.forEach(inv => newSelected.delete(inv.id));
+                                } else {
+                                    groupInvoices.forEach(inv => {
+                                        if (!inv.isDeleted) newSelected.add(inv.id);
+                                    });
+                                }
+                                setSelectedInvoices(newSelected);
+                            };
+                            
+                            // Print all invoices in group
+                            const printGroup = () => {
+                                const newSelected = new Set(groupInvoices.map(inv => inv.id));
+                                setSelectedInvoices(newSelected);
+                                setTimeout(() => handlePrint(), 100);
+                            };
+                            
+                            return (
+                                <div
+                                    key={groupKey}
+                                    className="bg-white dark:bg-slate-900/50 rounded-2xl border-2 border-slate-200 dark:border-white/10 shadow-lg overflow-hidden"
+                                >
+                                    {/* ✅ Group Header - معلومات المشترك */}
+                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 border-b border-slate-200 dark:border-white/10">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                {/* Group Checkbox */}
+                                                <label className="relative flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={allSelected}
+                                                        onChange={toggleGroupSelection}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className={`
+                                                        w-5 h-5 rounded-lg border-2 transition-all duration-200
+                                                        ${allSelected ? 'bg-blue-500 border-blue-500' : someSelected ? 'bg-blue-200 border-blue-400' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600'}
+                                                        flex items-center justify-center
+                                                    `}>
+                                                        {(allSelected || someSelected) && <Check className="w-3 h-3 text-white" />}
+                                                    </div>
+                                                </label>
+                                                
+                                                {/* Manager Info */}
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-slate-800 dark:text-white text-lg">
+                                                            {firstInvoice.managerName || '-'}
+                                                        </span>
+                                                        <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold">
+                                                            كود: {firstInvoice.managerCode || '-'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-1 text-sm text-slate-600 dark:text-slate-400">
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                        <span>
+                                                            {new Date(firstInvoice.issueDate).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                                        </span>
+                                                        <span className="text-slate-400">|</span>
+                                                        <span className="text-xs">
+                                                            {new Date(firstInvoice.issueDate).toLocaleDateString('ar-SA-u-ca-islamic', { year: 'numeric', month: 'short', day: 'numeric' })} هـ
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Group Total & Actions */}
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-left">
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">إجمالي ({groupInvoices.length} {groupInvoices.length === 1 ? 'فاتورة' : 'فواتير'})</p>
+                                                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                                                        {totalAmount.toLocaleString()} <span className="text-sm">ر.س</span>
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={printGroup}
+                                                    className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium text-sm flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                                                    title="طباعة كل الفواتير"
+                                                >
+                                                    <Printer className="w-4 h-4" />
+                                                    طباعة الكل
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => {
-                                            setSelectedInvoices(new Set([invoice.id]));
-                                            handlePrint();
-                                        }}
-                                        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                                        title="طباعة"
-                                    >
-                                        <Printer className="w-4 h-4 text-teal-400" />
-                                    </button>
+                                    
+                                    {/* ✅ Individual Invoices - الفواتير الفردية */}
+                                    <div className="p-3 space-y-2">
+                                        {groupInvoices.map((invoice) => (
+                                            <div
+                                                key={invoice.id}
+                                                className={`
+                                                    relative flex items-center gap-3 p-3 rounded-xl transition-all duration-200
+                                                    ${invoice.isDeleted 
+                                                        ? 'bg-red-50 dark:bg-red-900/10 opacity-60' 
+                                                        : 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                                    }
+                                                    ${selectedInvoices.has(invoice.id) ? 'ring-2 ring-blue-500' : ''}
+                                                    border border-slate-200 dark:border-slate-700
+                                                `}
+                                            >
+                                                {/* Checkbox */}
+                                                <label className="flex-shrink-0 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedInvoices.has(invoice.id)}
+                                                        onChange={() => toggleSelectInvoice(invoice.id)}
+                                                        className="sr-only peer"
+                                                    />
+                                                    <div className={`
+                                                        w-4 h-4 rounded border-2 transition-all
+                                                        ${selectedInvoices.has(invoice.id) ? 'bg-blue-500 border-blue-500' : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500'}
+                                                        flex items-center justify-center
+                                                    `}>
+                                                        {selectedInvoices.has(invoice.id) && <Check className="w-2.5 h-2.5 text-white" />}
+                                                    </div>
+                                                </label>
+                                                
+                                                {/* Invoice Number */}
+                                                <div className="flex-shrink-0 w-10 h-10 rounded-lg flex flex-col items-center justify-center bg-blue-100 dark:bg-blue-900/30">
+                                                    <span className="text-[8px] text-slate-500 dark:text-slate-400">فاتورة</span>
+                                                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{invoice.invoiceNumber || '-'}</span>
+                                                </div>
+                                                
+                                                {/* Branch Info - الأهم للمحاسب */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-semibold text-slate-800 dark:text-white">
+                                                            فرع: {invoice.branchName || 'الفرع الرئيسي'}
+                                                        </span>
+                                                        <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold">
+                                                            #{invoice.branchCode || '-'}
+                                                        </span>
+                                                        {invoice.isDeleted && (
+                                                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                                                ملغية
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                                        <span>{invoice.subscriptionDuration === 1 ? 'سنة' : 'سنتين'}</span>
+                                                        <span>•</span>
+                                                        <span className={`font-medium ${
+                                                            invoice.paymentMethod === 'cash' ? 'text-emerald-600 dark:text-emerald-400' :
+                                                            invoice.paymentMethod === 'credit' ? 'text-blue-600 dark:text-blue-400' :
+                                                            invoice.paymentMethod === 'bank_transfer' ? 'text-purple-600 dark:text-purple-400' :
+                                                            'text-amber-600 dark:text-amber-400'
+                                                        }`}>
+                                                            {paymentMethodLabels[invoice.paymentMethod as keyof typeof paymentMethodLabels] || '-'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Amount */}
+                                                <div className="flex-shrink-0 text-left">
+                                                    <span className="text-base font-bold text-slate-800 dark:text-white">
+                                                        {(invoice.totalAmount || invoice.amount).toLocaleString()}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 mr-1">ر.س</span>
+                                                </div>
+                                                
+                                                {/* Actions */}
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedInvoices(new Set([invoice.id]));
+                                                        setTimeout(() => handlePrint(), 100);
+                                                    }}
+                                                    className="p-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 transition-all"
+                                                    title="طباعة"
+                                                >
+                                                    <Printer className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })
+                            );
+                        });
+                    })()
                 )}
             </div>
         </div>
@@ -4120,33 +4350,33 @@ const AddExpenseVoucherModal: React.FC<{
     
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="bg-slate-900/95 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/10 shadow-2xl">
+            <div className="bg-white dark:bg-slate-900/95 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-white/10 shadow-2xl">
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-white">إضافة سند صرف جديد</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">إضافة سند صرف جديد</h2>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                        className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
                     >
-                        <X className="w-5 h-5 text-white/60" />
+                        <X className="w-5 h-5 text-slate-600 dark:text-white/60" />
                     </button>
                 </div>
                 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                        <label className="text-sm text-white/80">دفع لـ *</label>
+                        <label className="text-sm text-slate-700 dark:text-white/80 font-medium">دفع لـ *</label>
                         <input
                             type="text"
                             value={paidTo}
                             onChange={(e) => setPaidTo(e.target.value)}
                             placeholder="اسم المستلم"
                             required
-                            className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                            className="w-full px-4 py-2 rounded-lg bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-400"
                         />
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-sm text-white/80">المبلغ (ر.س) *</label>
+                            <label className="text-sm text-slate-700 dark:text-white/80 font-medium">المبلغ (ر.س) *</label>
                             <input
                                 type="number"
                                 step="0.01"
@@ -4155,17 +4385,17 @@ const AddExpenseVoucherModal: React.FC<{
                                 onChange={(e) => setAmount(e.target.value)}
                                 placeholder="0.00"
                                 required
-                                className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                                className="w-full px-4 py-2 rounded-lg bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-400"
                             />
                         </div>
                         
                         <div className="space-y-2">
-                            <label className="text-sm text-white/80">طريقة الدفع *</label>
+                            <label className="text-sm text-slate-700 dark:text-white/80 font-medium">طريقة الدفع *</label>
                             <select
                                 value={paymentMethod}
                                 onChange={(e) => setPaymentMethod(e.target.value as any)}
                                 required
-                                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all appearance-none cursor-pointer hover:bg-white/10 hover:border-white/20 [&>option]:bg-[#0f172a] [&>option]:text-white"
+                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 rounded-lg text-slate-800 dark:text-white text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all cursor-pointer hover:border-slate-400 dark:hover:border-white/20"
                             >
                                 <option value="cash">نقداً</option>
                                 <option value="credit">كريديت</option>
@@ -4176,25 +4406,25 @@ const AddExpenseVoucherModal: React.FC<{
                     </div>
                     
                     <div className="space-y-2">
-                        <label className="text-sm text-white/80">الغرض *</label>
+                        <label className="text-sm text-slate-700 dark:text-white/80 font-medium">الغرض *</label>
                         <textarea
                             value={purpose}
                             onChange={(e) => setPurpose(e.target.value)}
                             placeholder="مثل: لأجل بدل التأمين للوحدات"
                             required
                             rows={3}
-                            className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                            className="w-full px-4 py-2 rounded-lg bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-400 resize-none"
                         />
                     </div>
                     
                     <div className="space-y-2">
-                        <label className="text-sm text-white/80">تعليقات</label>
+                        <label className="text-sm text-slate-700 dark:text-white/80 font-medium">تعليقات</label>
                         <textarea
                             value={comments}
                             onChange={(e) => setComments(e.target.value)}
                             placeholder="تعليقات إضافية (اختياري)"
                             rows={2}
-                            className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                            className="w-full px-4 py-2 rounded-lg bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-400 resize-none"
                         />
                     </div>
                     
@@ -4202,14 +4432,14 @@ const AddExpenseVoucherModal: React.FC<{
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 px-4 py-2.5 rounded-lg bg-teal-500 hover:bg-teal-600 text-white font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {loading ? 'جاري الحفظ...' : 'حفظ'}
+                            {loading ? 'جاري الحفظ...' : 'حفظ سند الصرف'}
                         </button>
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 transition-colors"
+                            className="px-4 py-2.5 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
                         >
                             إلغاء
                         </button>

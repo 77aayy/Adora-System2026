@@ -179,32 +179,32 @@ const TaskCard: React.FC<{
 
     return (
         <div
-            className={`glass-card p-3 sm:p-4 transition-all hover:scale-[1.02] active:scale-[0.98] touch-manipulation ${task.priority === 'urgent' ? 'ring-2 ring-red-500/50' : ''
+            className={`adora-card p-3 sm:p-4 transition-all hover:scale-[1.02] active:scale-[0.98] touch-manipulation ${task.priority === 'urgent' ? 'ring-2 ring-red-500/50' : ''
                 } ${isDelayed ? 'ring-2 ring-orange-500/50' : ''}`}
             onClick={handleClick}
         >
             {/* Header - Mobile Optimized */}
             <div className="flex items-center justify-between mb-2 sm:mb-3">
                 <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--theme-accent-cyan) 0%, var(--theme-accent-blue) 100%)', opacity: 0.9 }}>
                         <span className="text-xl sm:text-2xl font-bold text-white">{task.roomNumber}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                            <span className={`px-1.5 sm:px-2 py-0.5 rounded-lg text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
+                            <span className={`adora-badge px-1.5 sm:px-2 py-0.5 rounded-lg text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
                                 {typeConfig.label}
                             </span>
                             {task.priority === 'urgent' && (
-                                <span className="px-1.5 sm:px-2 py-0.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold">
+                                <span className="adora-badge adora-badge-danger px-1.5 sm:px-2 py-0.5 text-xs font-bold">
                                     عاجل
                                 </span>
                             )}
                         </div>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <p className="text-white/50 text-xs sm:text-sm truncate">{task.guestName || 'نزيل'}</p>
+                            <p className="adora-text-secondary text-xs sm:text-sm truncate">{task.guestName || 'نزيل'}</p>
                             {/* ✅ QR Badge - Show if request is from QR */}
                             {(task as any).source === 'QR' && (
-                                <span className="px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 text-[10px] font-bold flex items-center gap-1 flex-shrink-0">
+                                <span className="adora-badge adora-badge-primary px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-1 flex-shrink-0">
                                     <QrCode className="w-3 h-3" />
                                     <span>QR</span>
                                 </span>
@@ -218,7 +218,7 @@ const TaskCard: React.FC<{
                         <span className={`text-xs ${statusConfig.color}`}>{statusConfig.label}</span>
                     </div>
                     <div className="flex items-center gap-1 mt-1 justify-center">
-                        <p className="text-white/40 text-xs">{timeAgo}</p>
+                        <p className="adora-text-tertiary text-xs">{timeAgo}</p>
                         <ReadReceipt request={task as any} size="sm" showPopup={false} />
                     </div>
                 </div>
@@ -228,15 +228,18 @@ const TaskCard: React.FC<{
             {task.status === 'IN_PROGRESS' && elapsedTime !== null && (
                 <div className="mb-3">
                     <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-white/50">الوقت المنقضي</span>
-                        <span className={`text-xs font-bold ${isDelayed ? 'text-orange-400' : 'text-white/70'}`}>
+                        <span className="text-xs adora-text-secondary">الوقت المنقضي</span>
+                        <span className={`text-xs font-bold ${isDelayed ? 'text-orange-400' : 'adora-text-primary'}`}>
                             {elapsedTime} دقيقة
                         </span>
                     </div>
-                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--theme-bg-tertiary)' }}>
                         <div
-                            className={`h-full transition-all ${isDelayed ? 'bg-orange-500' : 'bg-blue-500'}`}
-                            style={{ width: `${Math.min(100, (elapsedTime / 45) * 100)}%` }}
+                            className={`h-full transition-all ${isDelayed ? 'bg-orange-500' : ''}`}
+                            style={{ 
+                                width: `${Math.min(100, (elapsedTime / 45) * 100)}%`,
+                                background: isDelayed ? undefined : 'var(--theme-accent-blue)'
+                            }}
                         />
                     </div>
                 </div>
@@ -244,7 +247,7 @@ const TaskCard: React.FC<{
 
             {/* Notes */}
             {task.notes && (
-                <p className="text-white/50 text-sm mb-3 bg-white/5 p-2 rounded-lg">
+                <p className="adora-text-secondary text-sm mb-3 p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                     💬 {task.notes}
                 </p>
             )}
@@ -254,7 +257,8 @@ const TaskCard: React.FC<{
                 {task.status === 'CONFIRMED' && onStart && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onStart(); }}
-                        className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-blue-500/25 transition-all"
+                        className="adora-btn-primary flex-1 py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
+                        style={{ background: 'linear-gradient(135deg, var(--theme-accent-blue) 0%, var(--theme-accent-indigo) 100%)' }}
                     >
                         <Play className="w-5 h-5" />
                         بدء التنظيف
@@ -263,7 +267,8 @@ const TaskCard: React.FC<{
                 {task.status === 'IN_PROGRESS' && onComplete && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onComplete(); }}
-                        className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-green-500/25 transition-all"
+                        className="adora-btn-primary flex-1 py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
+                        style={{ background: 'linear-gradient(135deg, var(--theme-primary-500) 0%, var(--theme-primary-600) 100%)' }}
                     >
                         <CheckCircle2 className="w-5 h-5" />
                         إتمام التنظيف
@@ -383,14 +388,19 @@ const InspectionModal: React.FC<{
             setUploading(false);
         }
 
-        onSubmit(
-            selectedResult,
-            notes,
-            consumption.length > 0 ? consumption : undefined,
-            photoUrl || undefined
-        );
+        // ✅ FIX: Await the async onSubmit before resetting state
+        try {
+            await onSubmit(
+                selectedResult,
+                notes,
+                consumption.length > 0 ? consumption : undefined,
+                photoUrl || undefined
+            );
+        } catch (err) {
+            console.error('Error during inspection submit:', err);
+        }
 
-        // Reset state
+        // Reset state after successful submission
         setSelectedResult(null);
         setNotes('');
         setMinibarConsumption({});
@@ -400,7 +410,7 @@ const InspectionModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" style={{ backdropFilter: 'none' }}>
-            <div className="glass-card w-full max-w-md rounded-3xl overflow-hidden">
+            <div className="adora-modal w-full max-w-md rounded-3xl overflow-hidden">
                 <div className="p-6">
                     <div className="text-center mb-6">
                         <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
@@ -416,7 +426,7 @@ const InspectionModal: React.FC<{
                             onClick={() => setSelectedResult('clean')}
                             className={`w-full p-4 rounded-xl flex items-center gap-3 transition-all ${selectedResult === 'clean'
                                 ? 'bg-green-500 text-white'
-                                : 'bg-white/10 text-white hover:bg-white/20'
+                                : 'adora-btn-ghost'
                                 }`}
                         >
                             <CheckCircle2 className="w-6 h-6" />
@@ -430,7 +440,7 @@ const InspectionModal: React.FC<{
                             onClick={() => setSelectedResult('damages')}
                             className={`w-full p-4 rounded-xl flex items-center gap-3 transition-all ${selectedResult === 'damages'
                                 ? 'bg-orange-500 text-white'
-                                : 'bg-white/10 text-white hover:bg-white/20'
+                                : 'adora-btn-ghost'
                                 }`}
                         >
                             <AlertCircle className="w-6 h-6" />
@@ -444,7 +454,7 @@ const InspectionModal: React.FC<{
                             onClick={() => setSelectedResult('missing_items')}
                             className={`w-full p-4 rounded-xl flex items-center gap-3 transition-all ${selectedResult === 'missing_items'
                                 ? 'bg-red-500 text-white'
-                                : 'bg-white/10 text-white hover:bg-white/20'
+                                : 'adora-btn-ghost'
                                 }`}
                         >
                             <Package className="w-6 h-6" />
@@ -460,7 +470,7 @@ const InspectionModal: React.FC<{
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder={selectedResult === 'damages' || selectedResult === 'missing_items' ? 'وصف التلفيات/المفقودات (اختياري)...' : 'ملاحظات الفحص (اختياري)...'}
-                        className="w-full p-3 rounded-xl bg-white/10 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none mb-4"
+                        className="adora-input w-full p-3 rounded-xl resize-none mb-4"
                         rows={3}
                     />
 
@@ -499,7 +509,7 @@ const InspectionModal: React.FC<{
                             </label>
                             <div className="space-y-2 max-h-48 overflow-y-auto">
                                 {minibarProducts.map(product => (
-                                    <div key={product.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                                    <div key={product.id} className="adora-card flex items-center justify-between p-3 rounded-xl">
                                         <div className="flex-1">
                                             <p className="text-sm font-medium text-white">{product.name}</p>
                                             <p className="text-xs text-white/60">{product.price} ر.س</p>
@@ -507,7 +517,7 @@ const InspectionModal: React.FC<{
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => adjustMinibar(product.id, -1)}
-                                                className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
+                                                className="adora-btn-ghost w-8 h-8 rounded-lg flex items-center justify-center transition-all"
                                                 disabled={!minibarConsumption[product.id]}
                                             >
                                                 -
@@ -517,7 +527,7 @@ const InspectionModal: React.FC<{
                                             </span>
                                             <button
                                                 onClick={() => adjustMinibar(product.id, 1)}
-                                                className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
+                                                className="adora-btn-ghost w-8 h-8 rounded-lg flex items-center justify-center transition-all"
                                             >
                                                 +
                                             </button>
@@ -526,7 +536,7 @@ const InspectionModal: React.FC<{
                                 ))}
                             </div>
                             {minibarTotal > 0 && (
-                                <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30">
+                                <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-green-500/20 to-primary-500/20 border border-green-500/30">
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-white/80">الإجمالي:</span>
                                         <span className="text-lg font-bold text-green-400">{minibarTotal} ر.س</span>
@@ -541,7 +551,7 @@ const InspectionModal: React.FC<{
                     <div className="flex gap-3">
                         <button
                             onClick={onClose}
-                            className="flex-1 py-3 rounded-xl bg-white/10 text-white font-medium hover:bg-white/20 transition-all"
+                            className="adora-btn-ghost flex-1 py-3 rounded-xl font-medium transition-all"
                         >
                             إلغاء
                         </button>
@@ -650,7 +660,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                     onClick={() => setCleaningType('occupied')}
                                     className={`flex-1 py-2 px-3 rounded-xl text-sm flex items-center justify-center gap-1 transition-all ${cleaningType === 'occupied'
                                         ? 'bg-blue-500/30 border border-blue-500/50 text-blue-400'
-                                        : 'bg-white/5 border border-white/10 text-white/60'
+                                        : 'adora-btn-ghost'
                                         }`}
                                 >
                                     🏠 ساكن
@@ -659,7 +669,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                     onClick={() => setCleaningType('checkout')}
                                     className={`flex-1 py-2 px-3 rounded-xl text-sm flex items-center justify-center gap-1 transition-all ${cleaningType === 'checkout'
                                         ? 'bg-orange-500/30 border border-orange-500/50 text-orange-400'
-                                        : 'bg-white/5 border border-white/10 text-white/60'
+                                        : 'adora-btn-ghost'
                                         }`}
                                 >
                                     🚪 مغادرة
@@ -675,7 +685,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                     onClick={() => setGuestStatus('out')}
                                     className={`flex-1 py-2 px-3 rounded-xl text-sm flex items-center justify-center gap-1 transition-all ${guestStatus === 'out'
                                         ? 'bg-green-500/30 border border-green-500/50 text-green-400'
-                                        : 'bg-white/5 border border-white/10 text-white/60'
+                                        : 'adora-btn-ghost'
                                         }`}
                                 >
                                     🚶 خارج
@@ -684,7 +694,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                     onClick={() => setGuestStatus('in')}
                                     className={`flex-1 py-2 px-3 rounded-xl text-sm flex items-center justify-center gap-1 transition-all ${guestStatus === 'in'
                                         ? 'bg-yellow-500/30 border border-yellow-500/50 text-yellow-400'
-                                        : 'bg-white/5 border border-white/10 text-white/60'
+                                        : 'adora-btn-ghost'
                                         }`}
                                 >
                                     🏠 داخل
@@ -705,7 +715,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                         ? 'bg-green-500/20 border border-green-500/50'
                                         : selectingRoom === section.id
                                             ? 'bg-blue-500/30 border border-blue-500/50'
-                                            : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                                            : 'adora-card border hover:opacity-80'
                                         }`}
                                 >
                                     <span className="text-lg">{section.icon}</span>
@@ -715,7 +725,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                             ✓ {roomAssignments[section.id].name.split(' ')[0]}
                                         </p>
                                     ) : (
-                                        <p className="text-[9px] text-white/40 mt-0.5">اختر</p>
+                                        <p className="text-[9px] adora-text-tertiary mt-0.5">اختر</p>
                                     )}
                                 </button>
                             ))}
@@ -724,14 +734,14 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
 
                     {/* Employee Selection (when selecting a room) */}
                     {selectingRoom && (
-                        <div className="bg-white/5 rounded-xl p-3">
-                            <p className="text-sm text-white/60 mb-2">
+                        <div className="adora-card rounded-xl p-3">
+                            <p className="text-sm adora-text-secondary mb-2">
                                 اختر موظف لـ {roomSections.find(s => s.id === selectingRoom)?.name}:
                             </p>
                             {teamMembers.length === 0 ? (
-                                <div className="text-center py-4 text-white/60">
+                                <div className="text-center py-4 adora-text-secondary">
                                     <p className="text-sm mb-2">لا يوجد فريق محفوظ</p>
-                                    <p className="text-xs text-white/40">يرجى إضافة فريق من قائمة الفريق في الترويسة</p>
+                                    <p className="text-xs adora-text-tertiary">يرجى إضافة فريق من قائمة الفريق في الترويسة</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
@@ -739,10 +749,10 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                         <button
                                             key={member.id}
                                             onClick={() => assignEmployee(member.id, member.name)}
-                                            className="p-1.5 bg-white/5 rounded-lg text-xs text-white hover:bg-white/10 transition-all flex flex-col items-center gap-1 text-center"
+                                            className="adora-card p-1.5 rounded-lg text-xs hover:opacity-80 transition-all flex flex-col items-center gap-1 text-center"
                                         >
-                                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                                                <User className="w-4 h-4 text-white/60" />
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                                <User className="w-4 h-4 adora-text-secondary" />
                                             </div>
                                             <span className="truncate w-full">{member.name}</span>
                                         </button>
@@ -751,7 +761,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                             )}
                             <button
                                 onClick={() => setSelectingRoom(null)}
-                                className="mt-2 text-xs text-white/40 hover:text-white"
+                                className="mt-2 text-xs adora-text-tertiary hover:opacity-70"
                             >
                                 إلغاء
                             </button>
@@ -763,7 +773,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                 <div className="p-4 border-t border-white/10 flex gap-3">
                     <button
                         onClick={onClose}
-                        className="flex-1 py-3 bg-white/5 rounded-xl text-white hover:bg-white/10 transition-all"
+                        className="adora-btn-ghost flex-1 py-3 rounded-xl transition-all"
                     >
                         إلغاء
                     </button>
@@ -1781,7 +1791,7 @@ export const HousekeepingDashboard: React.FC = () => {
             </div>
 
             {/* Room Type Filter - Segmented Control Style */}
-            <div className="bg-white/5 p-1 rounded-2xl flex mb-4 relative z-0">
+            <div className="adora-card p-1 rounded-2xl flex mb-4 relative z-0">
                 {[
                     { key: 'all', label: 'الكل', icon: <DoorOpen className="w-4 h-4" /> },
                     { key: 'occupied', label: 'ساكن', icon: <span>🏠</span> },
@@ -1795,7 +1805,7 @@ export const HousekeepingDashboard: React.FC = () => {
                         }}
                         className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all relative z-10 ${roomFilter === filter.key
                             ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20'
-                            : 'text-white/60 hover:bg-white/5'
+                            : 'adora-text-secondary hover:opacity-70'
                             }`}
                     >
                         {filter.icon}
@@ -1806,7 +1816,7 @@ export const HousekeepingDashboard: React.FC = () => {
 
             {/* Floor Filter */}
             <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
-                <span className="text-white/40 text-sm flex-shrink-0">الطابق:</span>
+                <span className="adora-text-tertiary text-sm flex-shrink-0">الطابق:</span>
                 {availableFloors.map((floor) => (
                     <button
                         key={floor}
@@ -1816,7 +1826,7 @@ export const HousekeepingDashboard: React.FC = () => {
                         }}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0 ${floorFilter === floor
                             ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25'
-                            : 'bg-white/10 text-white/60 hover:bg-white/20'
+                            : 'adora-card adora-text-secondary hover:opacity-80'
                             }`}
                     >
                         {floor === 0 ? 'الكل' : floor}
@@ -1838,8 +1848,8 @@ export const HousekeepingDashboard: React.FC = () => {
                             haptic('light');
                         }}
                         className={`flex-shrink-0 snap-start flex items-center gap-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all border ${currentTab === tab.key
-                            ? 'bg-white/15 border-white/20 text-white shadow-lg'
-                            : 'bg-white/5 border-transparent text-white/50 hover:bg-white/10'
+                            ? 'adora-card border-primary-500/30 adora-text-primary shadow-lg'
+                            : 'adora-card border-transparent adora-text-secondary hover:opacity-80'
                             }`}
                     >
                         <span className={`w-2 h-2 rounded-full ${tab.color} ${currentTab === tab.key ? 'animate-pulse' : ''}`} />
@@ -1855,11 +1865,11 @@ export const HousekeepingDashboard: React.FC = () => {
             {/* Tasks List */}
             <div className="space-y-3">
                 {currentTasks.length === 0 ? (
-                    <div className="glass-card p-12 text-center">
-                        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-                            <Sparkles className="w-8 h-8 text-white/20" />
+                    <div className="adora-card p-12 text-center">
+                        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                            <Sparkles className="w-8 h-8" style={{ color: 'var(--theme-text-tertiary)' }} />
                         </div>
-                        <p className="text-white/40">لا توجد مهام في هذه القائمة</p>
+                        <p className="adora-text-tertiary">لا توجد مهام في هذه القائمة</p>
                     </div>
                 ) : (
                     currentTasks.map(task => (

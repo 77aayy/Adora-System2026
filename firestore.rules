@@ -7,9 +7,10 @@ service cloud.firestore {
     // V4 Simplified - Easy to Understand
     // ============================================
     
-    // 🏢 Tenant data - accessible by authenticated users
+    // 🏢 Tenant data - accessible by all (for demo/testing)
+    // ⚠️ TEMPORARY: Relaxed for demo system (TODO: Improve security for production)
     match /tenants/{tenantId}/{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;  // Allow demo system to read/write tenant data
     }
     
     // 🔑 Global codes - readable by all (for PIN login), writable by authenticated
@@ -71,14 +72,14 @@ service cloud.firestore {
     
     // 📜 Audit logs - append only (immutable)
     match /audit_logs/{logId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow read: if true;
+      allow create: if true;
       allow update, delete: if false;
     }
     
     // 📜 Audit logs (alternate path)
     match /auditLogs/{logId} {
-      allow read: if request.auth != null;
+      allow read: if true;
       allow create: if true;
       allow update, delete: if false;
     }
@@ -94,7 +95,7 @@ service cloud.firestore {
     
     // 📊 Global logs
     match /logs/{logId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     
     // 🔐 Secure access tokens
@@ -105,11 +106,68 @@ service cloud.firestore {
     // ⚙️ Global settings
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true; // ✅ Allow demo seeding
     }
     
-    // 📱 Demo links
+    // 🛏️ Room statuses (for seeding)
+    match /roomStatuses/{statusId} {
+      allow read, write: if true; // ✅ Allow demo seeding
+    }
+    
+    // 🏢 Departments (for seeding)
+    match /departments/{deptId} {
+      allow read, write: if true; // ✅ Allow demo seeding
+    }
+    
+    // 👤 Roles (for seeding)
+    match /roles/{roleId} {
+      allow read, write: if true; // ✅ Allow demo seeding
+    }
+    
+    // 🔧 Maintenance templates (for seeding)
+    match /maintenanceTemplates/{templateId} {
+      allow read, write: if true; // ✅ Allow demo seeding
+    }
+    
+    // 🎖️ Ranks (for seeding)
+    match /ranks/{rankId} {
+      allow read, write: if true; // ✅ Allow demo seeding
+    }
+    
+    // 🏨 Room Cards (for check-in/check-out)
+    match /roomCards/{cardId} {
+      allow read, write: if true; // ✅ Allow demo check-in/check-out
+    }
+    
+    // 🛏️ Rooms collection (for room management)
+    match /rooms/{roomId} {
+      allow read, write: if true; // ✅ Allow demo room management
+    }
+    
+    // 🎓 Onboarding status (tour completion tracking)
+    match /onboardingStatus/{userId} {
+      allow read, write: if true; // ✅ Allow tour tracking for all users
+    }
+    
+    // 📱 Demo links - readable and writable by all (for demo access)
     match /demoLinks/{linkId} {
+      allow read: if true;  // ✅ Allow demo users to read link info
+      allow write: if true; // ✅ Allow demo system to update usage
+    }
+    
+    // 📱 Demo sessions - for demo system
+    match /demoSessions/{sessionId} {
+      allow read: if true;  // ✅ Allow demo users to read their session
+      allow write: if true; // ✅ Allow creating demo sessions without auth (temporary demo data)
+    }
+    
+    // 🌱 Demo seeding logs
+    match /demoSeedingLogs/{logId} {
+      allow read, write: if true; // ✅ Allow demo system to log seeding actions
+    }
+    
+    // 🛒 Procurement requests
+    match /procurementRequests/{requestId} {
       allow read, write: if request.auth != null;
     }
     

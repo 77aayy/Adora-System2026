@@ -44,7 +44,7 @@ interface PointsConfig {
 
 const DEPARTMENT_COLORS: Record<DepartmentType, { gradient: string; text: string; icon: string }> = {
     bellman: { gradient: 'from-blue-500 to-cyan-500', text: 'text-blue-400', icon: '🧳' },
-    housekeeping: { gradient: 'from-green-500 to-emerald-500', text: 'text-green-400', icon: '🧹' },
+    housekeeping: { gradient: 'from-green-500 to-primary-500', text: 'text-green-400', icon: '🧹' },
     maintenance: { gradient: 'from-yellow-500 to-orange-500', text: 'text-yellow-400', icon: '🔧' },
     reception: { gradient: 'from-purple-500 to-pink-500', text: 'text-purple-400', icon: '🛎️' },
     procurement: { gradient: 'from-orange-500 to-red-500', text: 'text-orange-400', icon: '🛒' },
@@ -328,24 +328,24 @@ export const DepartmentPointsProgress: React.FC<DepartmentPointsProgressProps> =
                 {/* Time Zones */}
                 <div className="grid grid-cols-3 gap-2 text-center">
                     <div className={`p-3 rounded-xl ${progressInfo.status === 'fast' ? 'bg-green-500/20 ring-2 ring-green-500' : 'bg-white/5'}`}>
-                        <Zap className={`w-5 h-5 mx-auto mb-1 ${progressInfo.status === 'fast' ? 'text-green-400' : 'text-white/40'}`} />
+                        <Zap className={`w-5 h-5 mx-auto mb-1 ${progressInfo.status === 'fast' ? 'text-green-400' : 'text-white/70'}`} />
                         <p className={`text-xs font-medium ${progressInfo.status === 'fast' ? 'text-green-400' : 'text-white/50'}`}>سريع</p>
                         <p className={`text-lg font-bold ${progressInfo.status === 'fast' ? 'text-green-400' : 'text-white/60'}`}>+{config.fastPoints}</p>
-                        <p className="text-xs text-white/40">قبل {config.fastTime} د</p>
+                        <p className="text-xs text-white/70">قبل {config.fastTime} د</p>
                     </div>
                     
                     <div className={`p-3 rounded-xl ${progressInfo.status === 'normal' ? 'bg-yellow-500/20 ring-2 ring-yellow-500' : 'bg-white/5'}`}>
-                        <Clock className={`w-5 h-5 mx-auto mb-1 ${progressInfo.status === 'normal' ? 'text-yellow-400' : 'text-white/40'}`} />
+                        <Clock className={`w-5 h-5 mx-auto mb-1 ${progressInfo.status === 'normal' ? 'text-yellow-400' : 'text-white/70'}`} />
                         <p className={`text-xs font-medium ${progressInfo.status === 'normal' ? 'text-yellow-400' : 'text-white/50'}`}>عادي</p>
                         <p className={`text-lg font-bold ${progressInfo.status === 'normal' ? 'text-yellow-400' : 'text-white/60'}`}>+{config.normalPoints}</p>
-                        <p className="text-xs text-white/40">حتى {config.penaltyTime} د</p>
+                        <p className="text-xs text-white/70">حتى {config.penaltyTime} د</p>
                     </div>
                     
                     <div className={`p-3 rounded-xl ${progressInfo.status === 'penalty' ? 'bg-red-500/20 ring-2 ring-red-500' : 'bg-white/5'}`}>
-                        <AlertTriangle className={`w-5 h-5 mx-auto mb-1 ${progressInfo.status === 'penalty' ? 'text-red-400' : 'text-white/40'}`} />
+                        <AlertTriangle className={`w-5 h-5 mx-auto mb-1 ${progressInfo.status === 'penalty' ? 'text-red-400' : 'text-white/70'}`} />
                         <p className={`text-xs font-medium ${progressInfo.status === 'penalty' ? 'text-red-400' : 'text-white/50'}`}>متأخر</p>
                         <p className={`text-lg font-bold ${progressInfo.status === 'penalty' ? 'text-red-400' : 'text-white/60'}`}>{config.penaltyPoints}</p>
-                        <p className="text-xs text-white/40">بعد {config.penaltyTime} د</p>
+                        <p className="text-xs text-white/70">بعد {config.penaltyTime} د</p>
                     </div>
                 </div>
                 
@@ -411,7 +411,7 @@ export const DepartmentPointsProgress: React.FC<DepartmentPointsProgressProps> =
                 
                 {/* No active request */}
                 {!requestCreatedAt && (
-                    <div className="text-center py-4 text-white/40">
+                    <div className="text-center py-4 text-white/70">
                         <Gift className="w-10 h-10 mx-auto mb-2 opacity-50" />
                         <p>لا يوجد طلب نشط حالياً</p>
                         <p className="text-xs mt-1">ابدأ طلباً جديداً لتتبع النقاط</p>
@@ -451,17 +451,17 @@ export const PointsProgressCard: React.FC<{
                 <div className="p-2 rounded-lg bg-green-500/10">
                     <Zap className="w-4 h-4 mx-auto text-green-400 mb-1" />
                     <span className="text-green-400 font-bold">{fastCount}</span>
-                    <p className="text-white/40">سريع</p>
+                    <p className="text-white/70">سريع</p>
                 </div>
                 <div className="p-2 rounded-lg bg-yellow-500/10">
                     <Clock className="w-4 h-4 mx-auto text-yellow-400 mb-1" />
                     <span className="text-yellow-400 font-bold">{completedToday - fastCount - penaltyCount}</span>
-                    <p className="text-white/40">عادي</p>
+                    <p className="text-white/70">عادي</p>
                 </div>
                 <div className="p-2 rounded-lg bg-red-500/10">
                     <AlertTriangle className="w-4 h-4 mx-auto text-red-400 mb-1" />
                     <span className="text-red-400 font-bold">{penaltyCount}</span>
-                    <p className="text-white/40">متأخر</p>
+                    <p className="text-white/70">متأخر</p>
                 </div>
             </div>
             

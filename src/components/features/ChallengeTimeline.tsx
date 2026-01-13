@@ -1,6 +1,7 @@
 /**
  * Challenge Timeline Component
- * Gamified attendance tracker inspired by H Rewards
+ * تايم لاين الالتزام - مستوحى من H Rewards
+ * تصميم أفقي مع دوائر المراحل والأقفال
  */
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -37,28 +38,24 @@ export const ChallengeTimeline: React.FC = () => {
 
     const handleAttendanceCheck = async () => {
         if (!tenantId || !user?.id) {
-            setLoading(false); // ✅ Stop loading if no user
+            setLoading(false);
             return;
         }
 
         try {
-            // Initial load of config
             const config = await getChallengeConfig(tenantId);
             if (config?.milestones) {
                 setMilestones(config.milestones);
             }
 
-            // Initial load of current state
             const userData = user as any;
             if (userData.challengeProgress) {
                 setProgress(userData.challengeProgress);
             }
 
-            // Perform daily check
             const result = await checkDailyAttendance(tenantId, user.id);
 
             if (result.success && result.unlocked) {
-                // Milestone Unlocked!
                 soundManager.playUnlock();
                 confetti({
                     particleCount: 150,
@@ -71,127 +68,126 @@ export const ChallengeTimeline: React.FC = () => {
         } catch (error) {
             console.error('Error in challenge attendance check:', error);
         } finally {
-            // ✅ ALWAYS stop loading, even on error
             setLoading(false);
         }
     };
 
     const currentStreak = progress?.currentStreak || 0;
+    const today = new Date();
+    const currentMonth = today.toLocaleDateString('ar-EG', { month: 'long' });
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const daysRemaining = daysInMonth - today.getDate();
 
-    // Helper to determine status of a day node
-    const getStatus = (day: number) => {
-        if (day <= currentStreak) return 'completed';
-        const nextMilestone = milestones.find(m => m.day > currentStreak);
-        if (nextMilestone && day === nextMilestone.day) return 'target';
+    // تحديد حالة كل مرحلة
+    const getMilestoneStatus = (milestone: ChallengeMilestone) => {
+        const claimedMilestones = progress?.claimedMilestones || [];
+        if (claimedMilestones.includes(milestone.day)) return 'claimed';
+        if (currentStreak >= milestone.day) return 'unlocked';
         return 'locked';
     };
 
-    // ✅ REMOVED: Loading state causes issues when Firestore rules block access
-    // Component now renders immediately with available data
-
     return (
-        <div className="animate-fadeIn relative group/timeline w-full">
-            {/* Adora Sophisticated Micro-UI: Fully Fluid & Responsive (~56px Height) */}
-            <div className="glass-dark rounded-xl border border-white/10 flex items-center h-14 px-2 sm:px-4 gap-2 sm:gap-4 overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.4)] relative w-full">
-
-                {/* 1. Branding & Next Goal (Clickable for History) */}
-                <button
-                    onClick={() => setShowHistory(true)}
-                    className="flex-shrink-0 flex items-center gap-2 sm:gap-4 border-r border-white/5 pr-2 sm:pr-4 hover:bg-white/5 transition-colors cursor-pointer active:scale-95 group/branding text-right"
-                >
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-primary-500/20 flex items-center justify-center border border-primary-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)] group-hover/branding:border-primary-400">
-                            <Trophy className="w-4.5 h-4.5 text-primary-400" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-white/90 leading-none tracking-tight">سجل</span>
-                            <span className="text-[8px] font-bold text-primary-400/80 uppercase mt-1">الالتزام 📊</span>
-                        </div>
+        <>
+        {/* ✅ تصميم H Rewards - تايم لاين أفقي */}
+        <div 
+            className="adora-card p-4 sm:p-5 cursor-pointer hover:shadow-lg transition-all"
+            onClick={() => setShowHistory(true)}
+        >
+            {/* العنوان مع عداد الأيام */}
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg">
+                        <Trophy className="w-5 h-5 text-white" />
                     </div>
-
-                    {/* Next Reward Pill */}
-                    <div className="hidden sm:flex items-center gap-2.5 bg-white/5 px-3 py-1.5 rounded-xl border border-white/5 shadow-inner group-hover/branding:border-white/10">
-                        <Sparkles className="w-4 h-4 text-yellow-500 animate-pulse" />
-                        <div className="flex flex-col items-start min-w-[80px]">
-                            <span className="text-[8px] font-bold text-white/20 leading-none mb-1">الهدف القادم</span>
-                            <div className="flex items-center gap-1">
-                                <Gift className="w-3 h-3 text-yellow-500/80" />
-                                <span className="text-[11px] font-black text-primary-400 leading-none">
-                                    {(() => {
-                                        const next = milestones.find(m => m.day > currentStreak);
-                                        return next ? `يوم ${next.day}: ${next.rewardPoints} نقطة` : 'اكتمل!';
-                                    })()}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </button>
-
-                {/* 2. Micro Progress Track */}
-                <div ref={scrollRef} className="flex-1 min-w-0 h-full overflow-x-auto scrollbar-hide">
-                    <div className="flex items-center gap-2 min-w-max h-full py-1 pr-2">
-                        {Array.from({ length: 30 }).map((_, i) => {
-                            const dayNum = i + 1;
-                            const milestone = milestones.find(m => m.day === dayNum);
-                            const status = getStatus(dayNum);
-                            const isNext = dayNum === currentStreak + 1;
-
-                            // MILESTONE: High Contrast Stretchy Tablet
-                            if (milestone) {
-                                return (
-                                    <div key={dayNum} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                                        <span className={`text-[9px] font-black uppercase tracking-tight ${status === 'completed' ? 'text-emerald-400' : 'text-white/40'}`}>
-                                            يوم {dayNum}
-                                        </span>
-                                        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all relative
-                                        ${status === 'completed' ? 'bg-emerald-500/20 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]' : 'bg-yellow-500/10 border-yellow-500/30'}
-                                    `}>
-                                            <div className="relative">
-                                                <Gift className={`w-3.5 h-3.5 ${status === 'completed' ? 'text-emerald-400' : 'text-yellow-500'}`} />
-                                                {status !== 'completed' && <Lock className="w-2 h-2 text-yellow-600 absolute -top-1 -right-1" />}
-                                            </div>
-                                            <span className={`text-[10px] font-black tracking-tight ${status === 'completed' ? 'text-emerald-400' : 'text-yellow-400'}`}>
-                                                {milestone.rewardPoints}
-                                            </span>
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            // CURRENT TARGET: Focal Point
-                            if (isNext) {
-                                return (
-                                    <div key={dayNum} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                                        <span className="text-[10px] font-black text-primary-400 animate-pulse drop-shadow-[0_0_5px_rgba(16,185,129,0.5)]">هدفك 🎯</span>
-                                        <div className="w-7 h-7 rounded-xl bg-primary-500 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.6)] animate-pulse border-2 border-white/30">
-                                            <span className="text-white font-black text-[12px] tabular-nums">{dayNum}</span>
-                                        </div>
-                                    </div>
-                                );
-                            }
-
-                            // NORMAL DAY: Mini Dot (Fluid)
-                            return (
-                                <div
-                                    key={dayNum}
-                                    className={`
-                                        w-1.5 h-1.5 rounded-full transition-all mt-4 flex-shrink-0
-                                        ${dayNum <= currentStreak ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-white/10'}
-                                    `}
-                                />
-                            );
-                        })}
+                    <div>
+                        <h3 className="text-sm font-bold adora-text-primary">تحدي الالتزام لشهر {currentMonth}</h3>
+                        <p className="text-[11px] adora-text-secondary">سجّل حضورك يومياً واحصل على المكافآت</p>
                     </div>
                 </div>
-
-                {/* 3. Timer */}
-                <div className="flex-shrink-0 hidden sm:flex items-center gap-2 border-l border-white/5 pl-4 ml-2">
-                    <Clock className="w-4 h-4 text-primary-400" />
-                    <span className="text-[11px] font-black text-white/40 tabular-nums">
-                        {31 - new Date().getDate()}d
-                    </span>
+                <div className="flex flex-col items-center bg-primary-500/10 px-3 py-2 rounded-xl border border-primary-500/20">
+                    <span className="text-xl font-black text-primary-500">{daysRemaining}</span>
+                    <span className="text-[9px] font-bold adora-text-secondary">يوم متبقي</span>
                 </div>
             </div>
+
+            {/* التايم لاين الأفقي مع المراحل */}
+            <div className="relative overflow-x-auto scrollbar-hide" ref={scrollRef}>
+                <div className="flex items-center min-w-max px-2">
+                    {milestones.map((milestone, index) => {
+                        const status = getMilestoneStatus(milestone);
+                        const isLast = index === milestones.length - 1;
+                        
+                        return (
+                            <div key={milestone.day} className="flex items-center">
+                                {/* الدائرة */}
+                                <div className="flex flex-col items-center">
+                                    <div className={`
+                                        w-14 h-14 rounded-full flex items-center justify-center border-4 transition-all relative
+                                        ${status === 'claimed' 
+                                            ? 'bg-gradient-to-br from-emerald-400 to-green-600 border-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.4)]' 
+                                            : status === 'unlocked'
+                                                ? 'bg-gradient-to-br from-yellow-400 to-amber-500 border-yellow-300 shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse'
+                                                : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
+                                        }
+                                    `}>
+                                        {status === 'claimed' ? (
+                                            <CheckCircle2 className="w-7 h-7 text-white" />
+                                        ) : status === 'unlocked' ? (
+                                            <Gift className="w-6 h-6 text-white" />
+                                        ) : (
+                                            <Lock className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                                        )}
+                                    </div>
+                                    
+                                    {/* معلومات المرحلة */}
+                                    <div className="mt-2 text-center min-w-[70px]">
+                                        <div className={`text-[11px] font-bold ${
+                                            status === 'claimed' ? 'text-emerald-600 dark:text-emerald-400' :
+                                            status === 'unlocked' ? 'text-yellow-600 dark:text-yellow-400' :
+                                            'adora-text-secondary'
+                                        }`}>
+                                            يوم {milestone.day}
+                                        </div>
+                                        <div className={`text-xs font-black ${
+                                            status === 'claimed' ? 'text-emerald-500' :
+                                            status === 'unlocked' ? 'text-yellow-500' :
+                                            'adora-text-tertiary'
+                                        }`}>
+                                            {milestone.rewardPoints} نقطة
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* الخط الرابط */}
+                                {!isLast && (
+                                    <div className={`
+                                        w-8 sm:w-12 h-1 mx-1 rounded-full transition-all
+                                        ${status === 'claimed' 
+                                            ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' 
+                                            : 'bg-slate-200 dark:bg-slate-700'
+                                        }
+                                    `} />
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* ملخص الالتزام الحالي */}
+            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-primary-500/20 flex items-center justify-center">
+                        <span className="text-sm font-black text-primary-500">{currentStreak}</span>
+                    </div>
+                    <span className="text-xs adora-text-secondary">يوم التزام متتالي</span>
+                </div>
+                <span className="text-[10px] text-primary-500 font-bold flex items-center gap-1">
+                    اضغط للتفاصيل
+                    <ChevronLeft className="w-3 h-3" />
+                </span>
+            </div>
+        </div>
 
             {/* Attendance History Modal (PORTAL ARCHITECTURE) */}
             {showHistory && createPortal(
@@ -212,7 +208,7 @@ export const ChallengeTimeline: React.FC = () => {
                                 </div>
                                 <div className="text-right">
                                     <h3 className="text-xl font-black text-white">شفافية الالتزام</h3>
-                                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">سجل الـ 30 يوماً الماضية</p>
+                                    <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mt-1">سجل الـ 30 يوماً الماضية</p>
                                 </div>
                             </div>
                             <button
@@ -225,78 +221,137 @@ export const ChallengeTimeline: React.FC = () => {
                         </div>
 
                         {/* History Content */}
-                        <div className="p-8">
-                            <div className="grid grid-cols-7 gap-2 mb-8">
-                                {Array.from({ length: 30 }).map((_, i) => {
-                                    // ✅ FIX: Calculate actual date for last 30 days (not day of month)
+                        <div className="p-6">
+                            {/* Month Header */}
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-sm font-bold text-white/80">
+                                    {new Date().toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })}
+                                </h4>
+                                <span className="text-xs text-white/50">
+                                    من 1 إلى {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}
+                                </span>
+                            </div>
+
+                            {/* Days Grid - Dynamic based on current month */}
+                            <div className="grid grid-cols-7 gap-1.5 mb-6">
+                                {/* Day names header */}
+                                {['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'].map((dayName, i) => (
+                                    <div key={`header-${i}`} className="text-center text-[9px] font-bold text-white/40 py-1">
+                                        {dayName}
+                                    </div>
+                                ))}
+                                
+                                {(() => {
                                     const today = new Date();
-                                    const targetDate = new Date(today);
-                                    targetDate.setDate(today.getDate() - (29 - i)); // Day 0 = 29 days ago, Day 29 = today
-                                    const dateStr = targetDate.toISOString().split('T')[0];
-                                    const isPast = targetDate < today;
-                                    const isToday = targetDate.toISOString().split('T')[0] === today.toISOString().split('T')[0];
+                                    const year = today.getFullYear();
+                                    const month = today.getMonth();
+                                    const daysInMonth = new Date(year, month + 1, 0).getDate();
+                                    const firstDayOfMonth = new Date(year, month, 1).getDay();
                                     
-                                    // Find history item by actual date string
-                                    const historyItem = progress?.attendanceHistory?.find(h => h.date === dateStr);
+                                    // Create array for empty cells + actual days
+                                    const cells = [];
                                     
-                                    const attended = historyItem ? historyItem.attended : false;
-                                    const isException = historyItem?.isException;
-
-                                    return (
-                                        <div key={i} className="flex flex-col items-center gap-1.5">
-                                            <div
-                                                className={`w-full aspect-square rounded-lg border transition-all flex items-center justify-center relative group/day
-                                                    ${attended
-                                                        ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]'
-                                                        : isException
-                                                            ? 'bg-white/10 border-white/20 shadow-inner'
-                                                            : isPast
-                                                                ? 'bg-red-500/10 border-red-500/30'
-                                                                : 'bg-white/5 border-white/10'
-                                                    }
-                                                `}
-                                            >
-                                                {attended ? (
-                                                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                                                ) : isException ? (
-                                                    <Calendar className="w-3 h-3 text-white/40" />
-                                                ) : isPast ? (
-                                                    <Lock className="w-2.5 h-2.5 text-red-500" />
-                                                ) : null}
-
-                                                {/* Tooltip on hover */}
-                                                <div className="absolute bottom-full mb-2 hidden group-hover/day:block z-50">
-                                                    <div className="bg-slate-900 border border-white/10 px-2 py-1 rounded text-[8px] text-white whitespace-nowrap">
-                                                        {targetDate.toLocaleDateString('ar-SA', { day: 'numeric', month: 'short' })} {attended ? '(حاضر)' : isException ? '(إجازة)' : isPast ? '(غياب)' : ''}
+                                    // Add empty cells for days before the 1st
+                                    for (let i = 0; i < firstDayOfMonth; i++) {
+                                        cells.push(
+                                            <div key={`empty-${i}`} className="aspect-square" />
+                                        );
+                                    }
+                                    
+                                    // Add actual days of the month
+                                    for (let day = 1; day <= daysInMonth; day++) {
+                                        const targetDate = new Date(year, month, day);
+                                        const dateStr = targetDate.toISOString().split('T')[0];
+                                        const isToday = day === today.getDate();
+                                        const isPast = day < today.getDate();
+                                        const isFuture = day > today.getDate();
+                                        
+                                        // Find history item
+                                        const historyItem = progress?.attendanceHistory?.find(h => h.date === dateStr);
+                                        const attended = historyItem?.attended || false;
+                                        const isException = historyItem?.isException || false;
+                                        
+                                        // Day name for tooltip
+                                        const dayName = targetDate.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' });
+                                        
+                                        cells.push(
+                                            <div key={day} className="flex flex-col items-center group/day relative">
+                                                <div
+                                                    className={`
+                                                        w-full aspect-square rounded-lg flex flex-col items-center justify-center transition-all cursor-pointer
+                                                        ${attended
+                                                            ? 'bg-emerald-500/20 border-2 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                                                            : isException
+                                                                ? 'bg-blue-500/15 border border-blue-500/30'
+                                                                : isPast
+                                                                    ? 'bg-red-500/10 border border-red-500/20'
+                                                                    : isToday
+                                                                        ? 'bg-primary-500/30 border-2 border-primary-500 shadow-[0_0_15px_rgba(20,184,166,0.3)] animate-pulse'
+                                                                        : 'bg-white/5 border border-white/10'
+                                                        }
+                                                    `}
+                                                >
+                                                    {/* Day Number */}
+                                                    <span className={`text-sm font-black ${
+                                                        attended ? 'text-emerald-400' : 
+                                                        isException ? 'text-blue-400' : 
+                                                        isPast ? 'text-red-400/70' : 
+                                                        isToday ? 'text-primary-400' : 
+                                                        'text-white/30'
+                                                    }`}>
+                                                        {day}
+                                                    </span>
+                                                    
+                                                    {/* Status Icon */}
+                                                    {attended && <CheckCircle2 className="w-3 h-3 text-emerald-400 mt-0.5" />}
+                                                    {isException && <Calendar className="w-2.5 h-2.5 text-blue-400 mt-0.5" />}
+                                                    {isPast && !attended && !isException && <Lock className="w-2.5 h-2.5 text-red-400/50 mt-0.5" />}
+                                                </div>
+                                                
+                                                {/* Tooltip */}
+                                                <div className="absolute bottom-full mb-2 hidden group-hover/day:block z-50 pointer-events-none">
+                                                    <div className="bg-slate-900 border border-white/20 px-3 py-2 rounded-xl text-[11px] text-white whitespace-nowrap shadow-xl">
+                                                        <div className="font-bold">{dayName}</div>
+                                                        <div className={`text-[10px] mt-1 ${
+                                                            attended ? 'text-emerald-400' : 
+                                                            isException ? 'text-blue-400' : 
+                                                            isPast ? 'text-red-400' : 
+                                                            'text-white/50'
+                                                        }`}>
+                                                            {attended ? '✓ حاضر' : isException ? '📅 إجازة معتمدة' : isPast ? '✗ غياب' : isFuture ? '⏳ قادم' : '🎯 اليوم'}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span className="text-[8px] font-bold text-white/20 uppercase">
-                                                {isToday ? 'اليوم' : targetDate.toLocaleDateString('ar-SA', { day: 'numeric' })}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    }
+                                    
+                                    return cells;
+                                })()}
                             </div>
 
                             {/* Legend & Stats */}
-                            <div className="flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-white/5">
-                                <div className="flex gap-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                        <span className="text-[9px] font-black text-white/40 uppercase">حضور</span>
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-white/10">
+                                <div className="flex flex-wrap gap-3">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-500/50" />
+                                        <span className="text-[10px] font-bold text-white/70">حضور</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-sm bg-white/10 border border-white/20" />
-                                        <span className="text-[9px] font-black text-white/40 uppercase">إجازة</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3 h-3 rounded bg-blue-500/20 border border-blue-500/30" />
+                                        <span className="text-[10px] font-bold text-white/70">إجازة</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-red-500" />
-                                        <span className="text-[9px] font-black text-white/40 uppercase">غياب</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3 h-3 rounded bg-red-500/10 border border-red-500/20" />
+                                        <span className="text-[10px] font-bold text-white/70">غياب</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3 h-3 rounded bg-white/5 border border-white/10" />
+                                        <span className="text-[10px] font-bold text-white/70">قادم</span>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <span className="text-[10px] font-black text-primary-400 uppercase tracking-tighter italic">التزامك الحالي: {currentStreak} يوم</span>
+                                <div className="bg-primary-500/10 px-3 py-1.5 rounded-lg border border-primary-500/20">
+                                    <span className="text-[11px] font-black text-primary-400">🔥 سلسلة الالتزام: {currentStreak} يوم</span>
                                 </div>
                             </div>
                         </div>
@@ -325,16 +380,16 @@ export const ChallengeTimeline: React.FC = () => {
                                 <span className="text-white font-black text-3xl italic">H</span>
                             </div>
                             <h3 className="text-2xl font-black text-white mb-2 tracking-tight">إنجاز رائع! 🎉</h3>
-                            <p className="text-white/40 text-[11px] font-bold mb-6 leading-relaxed">
+                            <p className="text-white/70 text-[11px] font-bold mb-6 leading-relaxed">
                                 سجلت حضورك لـ {currentStreak} أيام متتالية وتستحق المكافأة
                             </p>
-                            <div className="bg-emerald-500/10 rounded-2xl p-6 mb-8 border border-emerald-500/20 shadow-inner group-hover:scale-105 transition-transform">
+                            <div className="bg-primary-500/10 rounded-2xl p-6 mb-8 border border-primary-500/20 shadow-inner group-hover:scale-105 transition-transform">
                                 <span className="text-4xl font-black text-emerald-400 tabular-nums">+{showCelebration.rewardPoints}</span>
                                 <p className="text-[9px] text-emerald-400/60 font-black uppercase tracking-widest mt-1">نقطة مضافة لمحفظتك</p>
                             </div>
                             <button
                                 onClick={() => setShowCelebration(null)}
-                                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-emerald-900/40 transition-all active:scale-95"
+                                className="w-full py-4 bg-primary-500 hover:bg-teal-600 text-white font-black rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-emerald-900/40 transition-all active:scale-95"
                             >
                                 استمرار في النجاح 🚀
                             </button>
@@ -343,7 +398,7 @@ export const ChallengeTimeline: React.FC = () => {
                 </div>,
                 document.body
             )}
-        </div>
+        </>
     );
 };
 

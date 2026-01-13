@@ -4,7 +4,7 @@
  * Adora Hotel Management System V2
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     X,
     CheckCircle,
@@ -18,6 +18,9 @@ import {
     Wind,
     Sofa,
     MoreHorizontal,
+    Upload,
+    Image as ImageIcon,
+    Loader2,
 } from 'lucide-react';
 import { Request, MaintenanceReport } from '../../types';
 import {
@@ -26,6 +29,7 @@ import {
     MaintenanceType,
 } from '../../utils/pointsCalculator';
 import { AdoraLoaderInline } from '../../components/common/AdoraLoader';
+import { uploadFileToImgBB, validateImageFile } from '../../services/imageUploadService';
 
 // ============================================================
 // TYPES
@@ -62,13 +66,51 @@ export const MaintenanceCompleteModal: React.FC<MaintenanceCompleteModalProps> =
     const [formData, setFormData] = useState({
         description: '',
         partsUsed: '',
-        afterPhotoSimulated: false,
     });
+    const [afterPhoto, setAfterPhoto] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPoints, setShowPoints] = useState(false);
     const [calculatedPoints, setCalculatedPoints] = useState<ReturnType<typeof calculateMaintenancePoints> | null>(null);
+    
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen) return null;
+
+    // ✅ Handle image upload
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file
+        const validation = validateImageFile(file);
+        if (!validation.valid) {
+            setUploadError(validation.error || 'ملف غير صالح');
+            return;
+        }
+
+        setIsUploading(true);
+        setUploadError(null);
+
+        try {
+            const result = await uploadFileToImgBB(file, (progress) => {
+                console.log('Upload progress:', progress);
+            });
+
+            if (result.success && result.url) {
+                setAfterPhoto(result.url);
+                setUploadError(null);
+            } else {
+                setUploadError(result.error || 'فشل رفع الصورة');
+            }
+        } catch (error: any) {
+            console.error('Upload error:', error);
+            setUploadError(error.message || 'حدث خطأ أثناء رفع الصورة');
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     const handleSubmit = async () => {
         const startTime = request.timeline.startedAt || request.timestamp;
@@ -86,8 +128,8 @@ export const MaintenanceCompleteModal: React.FC<MaintenanceCompleteModalProps> =
         try {
             const report: MaintenanceReport = {
                 description: formData.description,
-                beforePhoto: request.beforePhoto || 'simulated_before.jpg',
-                afterPhoto: formData.afterPhotoSimulated ? 'simulated_after.jpg' : undefined,
+                beforePhoto: request.beforePhoto || undefined,
+                afterPhoto: afterPhoto || undefined, // ✅ Use real uploaded photo
                 partsUsed: formData.partsUsed || undefined,
                 maintenanceType,
                 pointsEarned: points.total,
@@ -179,23 +221,88 @@ export const MaintenanceCompleteModal: React.FC<MaintenanceCompleteModalProps> =
                         </div>
                     )}
 
-                    {/* After Photo */}
+                    {/* After Photo - Real Upload */}
                     <div>
                         <label className="block text-sm text-white/70 mb-2 flex items-center gap-2">
                             <Camera className="w-4 h-4" />
                             صورة "بعد" الإصلاح
                         </label>
-                        <button
-                            type="button"
-                            onClick={() => setFormData({ ...formData, afterPhotoSimulated: !formData.afterPhotoSimulated })}
-                            className={`w-full p-4 rounded-xl border transition-all flex items-center justify-center gap-2 ${formData.afterPhotoSimulated
-                                    ? 'border-green-500 bg-green-500/20 text-green-400'
-                                    : 'border-dashed border-white/20 text-white/50 hover:text-white/70'
+                        
+                        {/* Hidden file input */}
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                        />
+                        
+                        {/* Upload Area */}
+                        {!afterPhoto ? (
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isUploading}
+                                className={`w-full p-6 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3 ${
+                                    isUploading 
+                                        ? 'border-orange-500/50 bg-orange-500/10 cursor-wait' 
+                                        : 'border-white/20 hover:border-orange-500/50 hover:bg-orange-500/5 text-white/50 hover:text-white/70'
                                 }`}
-                        >
-                            <Camera className="w-5 h-5" />
-                            {formData.afterPhotoSimulated ? 'تم التقاط الصورة ✓' : 'التقاط صورة (محاكاة)'}
-                        </button>
+                            >
+                                {isUploading ? (
+                                    <>
+                                        <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+                                        <span className="text-orange-400 text-sm">جاري رفع الصورة...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
+                                                <Camera className="w-6 h-6 text-orange-400" />
+                                            </div>
+                                            <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                                <Upload className="w-6 h-6 text-blue-400" />
+                                            </div>
+                                        </div>
+                                        <span className="text-sm">التقط صورة أو اختر من المعرض</span>
+                                    </>
+                                )}
+                            </button>
+                        ) : (
+                            // ✅ Photo Preview
+                            <div className="relative">
+                                <img 
+                                    src={afterPhoto} 
+                                    alt="صورة بعد الإصلاح"
+                                    className="w-full h-48 object-cover rounded-xl border border-green-500/50"
+                                />
+                                <div className="absolute top-2 right-2 flex gap-2">
+                                    <span className="px-3 py-1 rounded-full bg-green-500 text-white text-xs font-bold flex items-center gap-1">
+                                        <CheckCircle className="w-3 h-3" />
+                                        تم الرفع
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setAfterPhoto(null);
+                                            if (fileInputRef.current) fileInputRef.current.value = '';
+                                        }}
+                                        className="px-3 py-1 rounded-full bg-red-500/80 text-white text-xs font-bold hover:bg-red-500 transition-colors"
+                                    >
+                                        حذف
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Upload Error */}
+                        {uploadError && (
+                            <p className="mt-2 text-sm text-red-400 flex items-center gap-2">
+                                <X className="w-4 h-4" />
+                                {uploadError}
+                            </p>
+                        )}
                     </div>
 
                     {/* Points Preview */}

@@ -74,6 +74,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
     const [activeTab, setActiveTab] = useState<'activity' | 'wallet'>('activity');
+    const [activityFilter, setActivityFilter] = useState<'all' | 'performance' | 'attendance' | 'achievements'>('all');
     const [loading, setLoading] = useState(true);
     const [redeeming, setRedeeming] = useState(false);
 
@@ -156,10 +157,9 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
         };
     }, [employeeId, points, user, isPointsSystemEnabled]);
     
-    // ✅ Hide component if feature is disabled - AFTER all hooks
-    if (!isPointsSystemEnabled) {
-        return null;
-    }
+    // ✅ Show placeholder if feature is disabled (but don't hide completely)
+    // This ensures the cup icon is always visible for transparency
+    const featureDisabled = !isPointsSystemEnabled;
 
     async function getPointsServiceConfig() {
         try {
@@ -240,12 +240,12 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
     const getRankIcon = (rank: number) => {
         if (rank === 1) return <div className="relative">
             <Trophy className="w-5 h-5 text-yellow-400" />
-            <div className="absolute -top-1 -right-1 text-[8px] animate-bounce">👑</div>
+            <div className="absolute -top-1 -right-1 text-xs animate-bounce">👑</div>
         </div>;
         switch (rank) {
             case 2: return <Medal className="w-5 h-5 text-gray-300" />;
             case 3: return <Award className="w-5 h-5 text-amber-600" />;
-            default: return <span className="text-white/40 font-bold">{rank}</span>;
+            default: return <span className="text-white/70 font-bold">{rank}</span>;
         }
     };
 
@@ -255,6 +255,63 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
         if (lp >= 500) return { label: 'موظف متميز', icon: '🚀', color: 'text-blue-400' };
         return { label: 'طموح', icon: '🌱', color: 'text-green-400' };
     };
+
+    // ✅ تصنيف النقاط حسب المصدر
+    const categorizePoints = (reason: string): 'performance' | 'attendance' | 'achievements' => {
+        const reasonLower = reason.toLowerCase();
+        
+        // نقاط سرعة الأداء
+        if (reasonLower.includes('سريع') || reasonLower.includes('سرعة') || 
+            reasonLower.includes('fast') || reasonLower.includes('إتمام') ||
+            reasonLower.includes('تنظيف') || reasonLower.includes('صيانة') ||
+            reasonLower.includes('طلب') || reasonLower.includes('توصيل') ||
+            reasonLower.includes('check') || reasonLower.includes('تسليم')) {
+            return 'performance';
+        }
+        
+        // نقاط الرتب والأوسمة
+        if (reasonLower.includes('وسام') || reasonLower.includes('رتبة') ||
+            reasonLower.includes('badge') || reasonLower.includes('rank') ||
+            reasonLower.includes('إنجاز') || reasonLower.includes('achievement') ||
+            reasonLower.includes('تحدي') || reasonLower.includes('challenge') ||
+            reasonLower.includes('مكافأة') || reasonLower.includes('bonus') ||
+            reasonLower.includes('streak') || reasonLower.includes('سلسلة')) {
+            return 'achievements';
+        }
+        
+        // نقاط الالتزام (الحضور)
+        if (reasonLower.includes('حضور') || reasonLower.includes('attendance') ||
+            reasonLower.includes('التزام') || reasonLower.includes('يومي') ||
+            reasonLower.includes('daily') || reasonLower.includes('تسجيل دخول')) {
+            return 'attendance';
+        }
+        
+        // الافتراضي: سرعة الأداء
+        return 'performance';
+    };
+
+    // فلترة السجل حسب التبويب الفرعي النشط
+    const filteredHistory = useMemo(() => {
+        if (activityFilter === 'all') return history;
+        return history.filter(item => categorizePoints(item.reason) === activityFilter);
+    }, [history, activityFilter]);
+
+    // حساب الإحصائيات لكل فئة
+    const categoryStats = useMemo(() => {
+        const stats = {
+            performance: { count: 0, total: 0 },
+            attendance: { count: 0, total: 0 },
+            achievements: { count: 0, total: 0 }
+        };
+        
+        history.forEach(item => {
+            const category = categorizePoints(item.reason);
+            stats[category].count++;
+            stats[category].total += item.points;
+        });
+        
+        return stats;
+    }, [history]);
 
     const handleRedeemRequest = async () => {
         if (!points || points < minRedemption) return;
@@ -324,21 +381,235 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                     </>
                 )}
 
-                <div
+                <button
                     onClick={handleShowHistory}
-                    className={`flex items-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 px-2.5 py-1.5 rounded-xl border border-yellow-500/20 cursor-pointer transition-all duration-300 ${pulseStyle} ${flyingDelta ? 'animate-shake-cup' : ''}`}
+                    aria-label="سجل النقاط"
+                    className={`flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-3 py-2 rounded-xl shadow-lg shadow-amber-500/30 cursor-pointer transition-all duration-300 ${pulseStyle} ${flyingDelta ? 'animate-shake-cup' : ''}`}
                 >
-                    <Trophy className={`w-4 h-4 text-yellow-400 ${flyingDelta ? 'animate-shake-cup' : ''}`} />
-                    <span className="font-black text-yellow-400 text-sm tracking-tighter">
+                    <Trophy className={`w-5 h-5 text-white drop-shadow-md ${flyingDelta ? 'animate-shake-cup' : ''}`} />
+                    <span className="font-black text-white text-sm tracking-tighter">
                         {points ?? 0}
                     </span>
-                </div>
+                </button>
 
                 {teamName && teamPoints > 0 && (
                     <div className="flex items-center gap-1 bg-blue-500/10 px-2 py-1 rounded-lg border border-blue-500/10">
                         <Users className="w-3 h-3 text-blue-400" />
-                        <span className="font-bold text-blue-400 text-[10px]">{teamPoints}</span>
+                        <span className="font-bold text-blue-400 text-xs">{teamPoints}</span>
                     </div>
+                )}
+
+                {/* 🆕 History Modal for Inline Mode - Rendered via Portal */}
+                {showHistoryModal && createPortal(
+                    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fadeIn" style={{ backdropFilter: 'blur(4px)' }}>
+                        <div className="adora-card w-full max-w-xl max-h-[85vh] flex flex-col rounded-[2rem] overflow-hidden shadow-2xl">
+                            {/* Modal Header */}
+                            <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--theme-border-primary)', background: 'var(--theme-bg-tertiary)' }}>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-yellow-500/20 flex items-center justify-center">
+                                        <Trophy className="w-6 h-6 text-yellow-500" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black adora-text-primary">سجل النقاط</h3>
+                                        <p className="text-xs adora-text-tertiary">كل نقطة موضحة بالتفصيل</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowHistoryModal(false)}
+                                    className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-red-500/10"
+                                    style={{ background: 'var(--theme-bg-secondary)', color: 'var(--theme-text-secondary)' }}
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* ✅ إجمالي النقاط الكبير - ديناميكي حسب التبويب */}
+                            {(() => {
+                                // حساب القيم الديناميكية حسب التبويب المختار
+                                const displayConfig = {
+                                    all: {
+                                        icon: '🏆',
+                                        title: 'إجمالي نقاطك',
+                                        value: points ?? 0,
+                                        subtitle: 'نقطة متاحة للصرف',
+                                        gradient: 'linear-gradient(135deg, var(--theme-primary-500) 0%, var(--theme-primary-600) 100%)',
+                                        count: history.length
+                                    },
+                                    performance: {
+                                        icon: '⚡',
+                                        title: 'نقاط سرعة الأداء',
+                                        value: categoryStats.performance.total,
+                                        subtitle: `من ${categoryStats.performance.count} عملية`,
+                                        gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                        count: categoryStats.performance.count
+                                    },
+                                    attendance: {
+                                        icon: '📅',
+                                        title: 'نقاط الالتزام',
+                                        value: categoryStats.attendance.total,
+                                        subtitle: `من ${categoryStats.attendance.count} عملية`,
+                                        gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+                                        count: categoryStats.attendance.count
+                                    },
+                                    achievements: {
+                                        icon: '🏅',
+                                        title: 'نقاط الأوسمة والرتب',
+                                        value: categoryStats.achievements.total,
+                                        subtitle: `من ${categoryStats.achievements.count} إنجاز`,
+                                        gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                                        count: categoryStats.achievements.count
+                                    }
+                                };
+                                const config = displayConfig[activityFilter];
+                                
+                                return (
+                                    <div className="p-6 text-center transition-all duration-300" style={{ background: config.gradient }}>
+                                        <div className="flex items-center justify-center gap-3 mb-2">
+                                            <span className="text-3xl">{config.icon}</span>
+                                            <span className="text-white/90 text-sm font-bold">{config.title}</span>
+                                        </div>
+                                        <div className={`text-5xl font-black text-white mb-1 ${config.value < 0 ? 'text-red-200' : ''}`}>
+                                            {config.value > 0 && activityFilter !== 'all' ? '+' : ''}{config.value}
+                                        </div>
+                                        <div className="text-white/70 text-sm">{config.subtitle}</div>
+                                        {activityFilter === 'all' && (
+                                            <div className="mt-3 pt-3 border-t border-white/20 flex justify-center gap-6">
+                                                <div className="text-center">
+                                                    <div className="text-lg font-bold text-white">{lifetimePoints}</div>
+                                                    <div className="text-[10px] text-white/60">الإجمالي التاريخي</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-lg font-bold text-white">{history.length}</div>
+                                                    <div className="text-[10px] text-white/60">عدد العمليات</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* ✅ تبويبات تصنيف النقاط */}
+                            <div className="p-3" style={{ background: 'var(--theme-bg-secondary)', borderBottom: '1px solid var(--theme-border-primary)' }}>
+                                <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <button
+                                        onClick={() => setActivityFilter('all')}
+                                        className={`flex-1 py-2.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                            activityFilter === 'all' 
+                                                ? 'bg-white dark:bg-slate-700 shadow-sm adora-text-primary' 
+                                                : 'adora-text-tertiary hover:adora-text-primary'
+                                        }`}
+                                    >
+                                        <span>📊</span>
+                                        <span>الكل</span>
+                                        <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-200 dark:bg-slate-600">{history.length}</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setActivityFilter('performance')}
+                                        className={`flex-1 py-2.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                            activityFilter === 'performance' 
+                                                ? 'bg-blue-500 text-white shadow-sm' 
+                                                : 'text-blue-500 hover:bg-blue-500/10'
+                                        }`}
+                                    >
+                                        <span>⚡</span>
+                                        <span className="hidden sm:inline">أداء</span>
+                                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activityFilter === 'performance' ? 'bg-blue-600' : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'}`}>
+                                            {categoryStats.performance.total > 0 ? '+' : ''}{categoryStats.performance.total}
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() => setActivityFilter('attendance')}
+                                        className={`flex-1 py-2.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                            activityFilter === 'attendance' 
+                                                ? 'bg-green-500 text-white shadow-sm' 
+                                                : 'text-green-500 hover:bg-green-500/10'
+                                        }`}
+                                    >
+                                        <span>📅</span>
+                                        <span className="hidden sm:inline">التزام</span>
+                                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activityFilter === 'attendance' ? 'bg-green-600' : 'bg-green-100 dark:bg-green-900/50 text-green-600'}`}>
+                                            {categoryStats.attendance.total > 0 ? '+' : ''}{categoryStats.attendance.total}
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() => setActivityFilter('achievements')}
+                                        className={`flex-1 py-2.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                            activityFilter === 'achievements' 
+                                                ? 'bg-yellow-500 text-white shadow-sm' 
+                                                : 'text-yellow-500 hover:bg-yellow-500/10'
+                                        }`}
+                                    >
+                                        <span>🏅</span>
+                                        <span className="hidden sm:inline">أوسمة</span>
+                                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activityFilter === 'achievements' ? 'bg-yellow-600' : 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600'}`}>
+                                            {categoryStats.achievements.total > 0 ? '+' : ''}{categoryStats.achievements.total}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Modal Body - السجل */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+
+                                {/* عرض السجل المُفلتر */}
+                                {filteredHistory.length === 0 ? (
+                                    <div className="text-center py-16">
+                                        <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                            <Info className="w-8 h-8" style={{ color: 'var(--theme-text-tertiary)' }} />
+                                        </div>
+                                        <p className="adora-text-tertiary font-medium">
+                                            {activityFilter === 'all' 
+                                                ? 'لا يوجد سجل عمليات بعد' 
+                                                : `لا توجد نقاط من فئة "${
+                                                    activityFilter === 'performance' ? 'سرعة الأداء' :
+                                                    activityFilter === 'attendance' ? 'الالتزام' : 'الأوسمة'
+                                                }"`
+                                            }
+                                        </p>
+                                        <p className="text-xs adora-text-tertiary mt-1">ابدأ بإكمال المهام لكسب النقاط!</p>
+                                    </div>
+                                ) : (
+                                    filteredHistory.map((item) => {
+                                        const isPositive = item.points > 0;
+                                        return (
+                                            <div 
+                                                key={item.id} 
+                                                className="p-4 rounded-xl flex items-center justify-between transition-all hover:scale-[1.01]"
+                                                style={{ 
+                                                    background: 'var(--theme-bg-secondary)', 
+                                                    border: '1px solid var(--theme-border-primary)' 
+                                                }}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isPositive ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                                                        {isPositive ? (
+                                                            <Zap className="w-5 h-5 text-green-500" />
+                                                        ) : (
+                                                            <AlertCircle className="w-5 h-5 text-red-500" />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium adora-text-primary text-sm">{item.reason}</p>
+                                                        <p className="text-xs adora-text-tertiary flex items-center gap-1">
+                                                            <Clock className="w-3 h-3" />
+                                                            {formatDate(item.timestamp)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-left">
+                                                    <span className={`text-lg font-black ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                                                        {isPositive ? '+' : ''}{item.points}
+                                                    </span>
+                                                    <p className="text-xs adora-text-tertiary">نقطة</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
                 )}
             </div>
         );
@@ -366,10 +637,10 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                             <Trophy className="w-8 h-8 text-white drop-shadow-md" />
                         </div>
                         <div>
-                            <h3 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">الرصيد الملكي</h3>
+                            <h3 className="text-xs font-bold text-white/70 uppercase tracking-widest mb-1">الرصيد الملكي</h3>
                             <div className="flex items-baseline gap-1">
                                 <span className="text-3xl font-black text-white">{points ?? 0}</span>
-                                <span className="text-[10px] font-bold text-white/30">نقطة</span>
+                                <span className="text-xs font-bold text-white/70">نقطة</span>
                             </div>
                         </div>
                     </div>
@@ -378,7 +649,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                         {showLeaderboard && (
                             <button
                                 onClick={handleShowLeaderboard}
-                                className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
+                                className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/70 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
                                 title="لوحة المتصدرين"
                             >
                                 <Users className="w-5 h-5" />
@@ -386,7 +657,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                         )}
                         <button
                             onClick={handleShowHistory}
-                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-blue-400 hover:bg-blue-500/10 transition-all"
+                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/70 hover:text-blue-400 hover:bg-blue-500/10 transition-all"
                             title="سجل الشفافية"
                         >
                             <History className="w-5 h-5" />
@@ -401,7 +672,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                             <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                                 <Users className="w-4 h-4 text-blue-400" />
                             </div>
-                            <span className="text-xs font-bold text-white/40">فريق {teamName}</span>
+                            <span className="text-xs font-bold text-white/70">فريق {teamName}</span>
                         </div>
                         <span className="text-blue-400 font-black text-sm">{teamPoints}</span>
                     </div>
@@ -420,12 +691,12 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                 </div>
                                 <div>
                                     <h3 className="text-xl font-black text-white tracking-tight">سجل الشفافية</h3>
-                                    <p className="text-xs text-white/40">كل نقطة موضحة بالتفصيل والوقت</p>
+                                    <p className="text-xs text-white/70">كل نقطة موضحة بالتفصيل والوقت</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowHistoryModal(false)}
-                                className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:bg-red-500/20 transition-all"
+                                className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/70 hover:text-white hover:bg-red-500/20 transition-all"
                             >
                                 <X className="w-6 h-6" />
                             </button>
@@ -435,7 +706,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                         <div className="flex bg-white/5 mx-6 p-1 rounded-2xl border border-white/5">
                             <button
                                 onClick={() => setActiveTab('activity')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'activity' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-white/40 hover:text-white hover:bg-white/5'
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'activity' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-white/70 hover:text-white hover:bg-white/5'
                                     }`}
                             >
                                 <Zap className="w-4 h-4" />
@@ -443,7 +714,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                             </button>
                             <button
                                 onClick={() => setActiveTab('wallet')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'wallet' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-white/40 hover:text-white hover:bg-white/5'
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'wallet' ? 'bg-primary-500 text-white shadow-lg shadow-emerald-500/20' : 'text-white/70 hover:text-white hover:bg-white/5'
                                     }`}
                             >
                                 <DollarSign className="w-4 h-4" />
@@ -454,15 +725,84 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                         {/* Modal Body */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                             {activeTab === 'activity' ? (
-                                history.length === 0 ? (
-                                    <div className="text-center py-20">
-                                        <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
-                                            <Info className="w-10 h-10 text-white/10" />
-                                        </div>
-                                        <p className="text-white/20 font-bold">لا يوجد سجل عمليات بعد</p>
+                                <>
+                                    {/* ✅ تبويبات فرعية لتصنيف النقاط */}
+                                    <div className="grid grid-cols-4 gap-2 mb-4">
+                                        <button
+                                            onClick={() => setActivityFilter('all')}
+                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl transition-all ${
+                                                activityFilter === 'all' 
+                                                    ? 'bg-white/10 border border-white/20' 
+                                                    : 'bg-white/5 border border-transparent hover:bg-white/10'
+                                            }`}
+                                        >
+                                            <div className="text-lg">📊</div>
+                                            <span className="text-[10px] font-bold text-white/70">الكل</span>
+                                            <span className="text-xs font-black text-white">{history.length}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setActivityFilter('performance')}
+                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl transition-all ${
+                                                activityFilter === 'performance' 
+                                                    ? 'bg-blue-500/20 border border-blue-500/40' 
+                                                    : 'bg-white/5 border border-transparent hover:bg-blue-500/10'
+                                            }`}
+                                        >
+                                            <div className="text-lg">⚡</div>
+                                            <span className="text-[10px] font-bold text-blue-400">سرعة الأداء</span>
+                                            <span className={`text-xs font-black ${categoryStats.performance.total >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                {categoryStats.performance.total > 0 ? '+' : ''}{categoryStats.performance.total}
+                                            </span>
+                                        </button>
+                                        <button
+                                            onClick={() => setActivityFilter('attendance')}
+                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl transition-all ${
+                                                activityFilter === 'attendance' 
+                                                    ? 'bg-green-500/20 border border-green-500/40' 
+                                                    : 'bg-white/5 border border-transparent hover:bg-green-500/10'
+                                            }`}
+                                        >
+                                            <div className="text-lg">📅</div>
+                                            <span className="text-[10px] font-bold text-green-400">الالتزام</span>
+                                            <span className={`text-xs font-black ${categoryStats.attendance.total >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                {categoryStats.attendance.total > 0 ? '+' : ''}{categoryStats.attendance.total}
+                                            </span>
+                                        </button>
+                                        <button
+                                            onClick={() => setActivityFilter('achievements')}
+                                            className={`flex flex-col items-center gap-1 p-3 rounded-xl transition-all ${
+                                                activityFilter === 'achievements' 
+                                                    ? 'bg-yellow-500/20 border border-yellow-500/40' 
+                                                    : 'bg-white/5 border border-transparent hover:bg-yellow-500/10'
+                                            }`}
+                                        >
+                                            <div className="text-lg">🏅</div>
+                                            <span className="text-[10px] font-bold text-yellow-400">الأوسمة</span>
+                                            <span className={`text-xs font-black ${categoryStats.achievements.total >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                {categoryStats.achievements.total > 0 ? '+' : ''}{categoryStats.achievements.total}
+                                            </span>
+                                        </button>
                                     </div>
-                                ) : (
-                                    history.map((item) => {
+
+                                    {/* عرض السجل المُفلتر */}
+                                    {filteredHistory.length === 0 ? (
+                                        <div className="text-center py-20">
+                                            <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
+                                                <Info className="w-10 h-10 text-white/10" />
+                                            </div>
+                                            <p className="text-white/70 font-bold">
+                                                {activityFilter === 'all' 
+                                                    ? 'لا يوجد سجل عمليات بعد' 
+                                                    : `لا توجد نقاط من فئة "${
+                                                        activityFilter === 'performance' ? 'سرعة الأداء' :
+                                                        activityFilter === 'attendance' ? 'الالتزام' : 'الأوسمة'
+                                                    }"`
+                                                }
+                                            </p>
+                                            <p className="text-xs text-white/40 mt-2">ابدأ بإكمال المهام لكسب النقاط!</p>
+                                        </div>
+                                    ) : (
+                                        filteredHistory.map((item) => {
                                         const isPositive = item.points > 0;
                                         const isNeutral = item.points === 0;
 
@@ -483,7 +823,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                             </div>
                                                             <div>
                                                                 <p className="text-white font-bold leading-tight mb-1">{item.reason}</p>
-                                                                <div className="flex items-center gap-2 text-[10px] text-white/20 font-bold uppercase tracking-wider">
+                                                                <div className="flex items-center gap-2 text-xs text-white/70 font-bold uppercase tracking-wider">
                                                                     <Clock className="w-3 h-3" />
                                                                     {formatDate(item.timestamp)}
                                                                 </div>
@@ -493,26 +833,27 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                             <span className={`text-2xl font-black ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
                                                                 {isPositive ? '+' : ''}{item.points}
                                                             </span>
-                                                            <p className="text-[10px] text-white/30 font-bold">نقطة</p>
+                                                            <p className="text-xs text-white/70 font-bold">نقطة</p>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         );
                                     })
-                                )
+                                    )}
+                                </>
                             ) : (
                                 <div className="animate-fadeIn space-y-6">
                                     {/* Balance Summary Tooltip */}
                                     <div className="glass-dark p-8 rounded-[2rem] border border-white/5 flex flex-col items-center text-center relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full -mr-16 -mt-16" />
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/10 blur-[50px] rounded-full -mr-16 -mt-16" />
 
                                         <div className="text-xs font-black text-emerald-400 uppercase tracking-[0.2em] mb-4">الرصيد المتاح للسحب</div>
                                         <div className="text-5xl font-black text-white mb-2 leading-none flex items-baseline gap-2">
                                             {points ?? 0}
-                                            <span className="text-sm font-bold text-white/20 uppercase">Pts</span>
+                                            <span className="text-sm font-bold text-white/70 uppercase">Pts</span>
                                         </div>
-                                        <div className="text-xl font-bold text-white/40">
+                                        <div className="text-xl font-bold text-white/70">
                                             ≈ {(points || 0) * exchangeRate} <span className="text-xs">ريال سعودي</span>
                                         </div>
 
@@ -522,7 +863,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                 disabled={redeeming || (points || 0) < minRedemption}
                                                 className={`w-full py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 ${(points || 0) >= minRedemption
                                                     ? 'bg-gradient-to-r from-emerald-600 to-green-500 text-white shadow-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95'
-                                                    : 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'
+                                                    : 'bg-white/5 text-white/70 cursor-not-allowed border border-white/5'
                                                     }`}
                                             >
                                                 {redeeming ? <AdoraLoaderInline size={20} /> : <DollarSign className="w-5 h-5" />}
@@ -530,7 +871,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                             </button>
 
                                             {(points || 0) < minRedemption && (
-                                                <p className="text-[10px] text-white/30 font-bold">
+                                                <p className="text-xs text-white/70 font-bold">
                                                     * تحتاج إلى {minRedemption - (points || 0)} نقطة إضافية للتمكن من السحب
                                                 </p>
                                             )}
@@ -544,7 +885,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                 <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
                                                     <Trophy className="w-4 h-4 text-orange-400" />
                                                 </div>
-                                                <span className="text-[10px] font-black text-white/40 uppercase tracking-wider">الإجمالي التاريخي</span>
+                                                <span className="text-xs font-black text-white/70 uppercase tracking-wider">الإجمالي التاريخي</span>
                                             </div>
                                             <div className="text-2xl font-black text-white">{lifetimePoints}</div>
                                         </div>
@@ -553,7 +894,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
                                                     <Star className="w-4 h-4 text-indigo-400" />
                                                 </div>
-                                                <span className="text-[10px] font-black text-white/40 uppercase tracking-wider">مستوى الأداء</span>
+                                                <span className="text-xs font-black text-white/70 uppercase tracking-wider">مستوى الأداء</span>
                                             </div>
                                             <div className={`text-sm font-black ${getLifetimeBadge(lifetimePoints).color}`}>
                                                 {getLifetimeBadge(lifetimePoints).icon} {getLifetimeBadge(lifetimePoints).label}
@@ -563,13 +904,13 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
 
                                     {/* Payout History */}
                                     <div className="space-y-3 pt-2">
-                                        <h4 className="text-xs font-black text-white/40 uppercase tracking-[0.2em] px-2 flex items-center justify-between">
+                                        <h4 className="text-xs font-black text-white/70 uppercase tracking-[0.2em] px-2 flex items-center justify-between">
                                             <span>أحدث طلبات الصرف</span>
                                             <span className="text-indigo-400 lowercase">Last 3 only</span>
                                         </h4>
                                         {payoutHistory.slice(0, 3).length === 0 ? (
                                             <div className="p-8 text-center bg-white/[0.02] border border-white/5 border-dashed rounded-3xl">
-                                                <p className="text-xs text-white/20 font-bold">لم تطلب صرف أي مكافآت بعد</p>
+                                                <p className="text-xs text-white/70 font-bold">لم تطلب صرف أي مكافآت بعد</p>
                                             </div>
                                         ) : (
                                             payoutHistory.slice(0, 3).map((req) => (
@@ -583,7 +924,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                         </div>
                                                         <div>
                                                             <p className="text-sm font-bold text-white">{req.pointsAmount} نقطة</p>
-                                                            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider">{formatDate(req.createdAt)}</p>
+                                                            <p className="text-xs font-bold text-white/70 uppercase tracking-wider">{formatDate(req.createdAt)}</p>
                                                         </div>
                                                     </div>
                                                     <div className="text-left">
@@ -592,7 +933,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                             }`}>
                                                             {req.status === 'pending' ? 'قيد المراجعة ⌛' : req.status === 'approved' ? 'تم الدفع ✅' : 'مرفوض ❌'}
                                                         </div>
-                                                        <p className="text-[10px] font-bold text-white/30 mt-1 capitalize">{req.monetaryValue} SAR</p>
+                                                        <p className="text-xs font-bold text-white/70 mt-1 capitalize">{req.monetaryValue} SAR</p>
                                                     </div>
                                                 </div>
                                             ))
@@ -616,7 +957,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                 </div>
                                 <h3 className="text-xl font-black text-white">قاعة المشاهير</h3>
                             </div>
-                            <button onClick={() => setShowLeaderboardModal(false)} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40">
+                            <button onClick={() => setShowLeaderboardModal(false)} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/70">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -639,7 +980,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                             <p className={`font-bold ${isCurrentUser ? 'text-yellow-400' : 'text-white'}`}>
                                                 {entry.name}
                                             </p>
-                                            <p className="text-[10px] text-white/30 uppercase font-black">{entry.department}</p>
+                                            <p className="text-xs text-white/70 uppercase font-black">{entry.department}</p>
                                         </div>
                                         <div className="text-left">
                                             <p className="text-xl font-black text-white">{entry.points}</p>

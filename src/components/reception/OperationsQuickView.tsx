@@ -19,11 +19,8 @@ import {
     Clock,
     User,
     AlertTriangle,
-    ChevronLeft,
     ChevronRight,
-    X,
     Phone,
-    MessageSquare,
     Eye
 } from 'lucide-react';
 import { db } from '../../services/firebase';
@@ -76,38 +73,39 @@ interface OperationsQuickViewProps {
 // STAGE CONFIGURATION
 // ============================================================
 
+// ✅ THEME-AWARE: Using CSS Variables for Light/Dark consistency
 const STAGES: StageConfig[] = [
     {
         key: 'new',
         label: 'طلب جديد',
         icon: <Inbox className="w-4 h-4" />,
-        color: 'text-blue-400',
-        bgColor: 'bg-blue-500/20',
-        borderColor: 'border-blue-500/30'
+        color: 'adora-status-warning',
+        bgColor: 'adora-status-bg-warning',
+        borderColor: 'adora-border'
     },
     {
         key: 'assigning',
         label: 'قيد التوجيه',
         icon: <ArrowRightLeft className="w-4 h-4" />,
-        color: 'text-amber-400',
-        bgColor: 'bg-amber-500/20',
-        borderColor: 'border-amber-500/30'
+        color: 'adora-service-housekeeping',
+        bgColor: 'adora-service-bg-housekeeping',
+        borderColor: 'adora-border'
     },
     {
         key: 'in_progress',
         label: 'جاري التنفيذ',
         icon: <Wrench className="w-4 h-4" />,
-        color: 'text-teal-400',
-        bgColor: 'bg-teal-500/20',
-        borderColor: 'border-teal-500/30'
+        color: 'adora-service-maintenance',
+        bgColor: 'adora-service-bg-maintenance',
+        borderColor: 'adora-border'
     },
     {
         key: 'awaiting_confirmation',
         label: 'انتظار التأكيد',
         icon: <CheckCircle2 className="w-4 h-4" />,
-        color: 'text-purple-400',
-        bgColor: 'bg-purple-500/20',
-        borderColor: 'border-purple-500/30'
+        color: 'adora-status-success',
+        bgColor: 'adora-status-bg-success',
+        borderColor: 'adora-border'
     }
 ];
 
@@ -312,10 +310,9 @@ const StageCard: React.FC<StageCardProps> = ({ stage, requests, onRequestClick }
 
     return (
         <div className={`
-            flex-shrink-0 min-w-[180px] max-w-[280px]
-            rounded-xl border ${stage.borderColor} ${stage.bgColor}
-            p-3 transition-all duration-300
-            ${criticalCount > 0 ? 'ring-2 ring-red-500/50' : ''}
+            adora-card rounded-xl p-3 transition-all duration-300
+            ${stage.bgColor} ${stage.borderColor}
+            ${criticalCount > 0 ? 'ring-2 ring-red-500/30' : ''}
         `}>
             {/* Header */}
             <div className="flex items-center justify-between mb-2">
@@ -329,16 +326,16 @@ const StageCard: React.FC<StageCardProps> = ({ stage, requests, onRequestClick }
                 </div>
                 <div className="flex items-center gap-1">
                     {criticalCount > 0 && (
-                        <span className="px-1.5 py-0.5 rounded bg-red-500 text-white text-xs font-bold animate-pulse">
+                        <span className="adora-badge adora-badge-red text-xs font-bold animate-pulse">
                             {criticalCount}!
                         </span>
                     )}
                     {warningCount > 0 && (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white text-xs font-bold">
+                        <span className="adora-badge adora-badge-yellow text-xs font-bold">
                             {warningCount}
                         </span>
                     )}
-                    <span className="px-2 py-0.5 rounded-full bg-slate-700 text-white text-xs font-bold">
+                    <span className="adora-badge adora-badge-teal text-xs font-bold">
                         {requests.length}
                     </span>
                 </div>
@@ -347,7 +344,7 @@ const StageCard: React.FC<StageCardProps> = ({ stage, requests, onRequestClick }
             {/* Room Chips */}
             <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto scrollbar-thin">
                 {requests.length === 0 ? (
-                    <span className="text-xs text-slate-500 italic">لا يوجد طلبات</span>
+                    <span className="text-xs adora-text-tertiary italic">لا يوجد طلبات</span>
                 ) : (
                     requests.map(request => (
                         <RoomChip
@@ -374,7 +371,6 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
 }) => {
     const [requests, setRequests] = useState<ActiveRequest[]>([]);
     const [isExpanded, setIsExpanded] = useState(true);
-    const scrollRef = useRef<HTMLDivElement>(null);
 
     // ============================================================
     // REAL-TIME LISTENER
@@ -383,11 +379,14 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
     useEffect(() => {
         if (!tenantId || !branchId) return;
 
-        // Listen to active requests
-        const requestsRef = collection(db, `tenants/${tenantId}/branches/${branchId}/requests`);
+        // ✅ FIXED: Listen to the CORRECT 'requests' collection (root level)
+        // This is where ReceptionDashboard creates requests
+        const requestsRef = collection(db, 'requests');
         const q = query(
             requestsRef,
-            where('status', 'in', ['pending', 'assigned', 'in_progress', 'awaiting_confirmation']),
+            where('tenantId', '==', tenantId),
+            where('branch', '==', branchId),
+            where('status', 'in', ['PENDING', 'PENDING_RECEPTION', 'CONFIRMED', 'IN_PROGRESS', 'NEEDS_INSPECTION']),
             orderBy('createdAt', 'desc')
         );
 
@@ -395,24 +394,30 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
             const activeRequests: ActiveRequest[] = snapshot.docs.map(doc => {
                 const data = doc.data();
                 
-                // Map status to stage
+                // ✅ Map status to stage based on actual statuses used in Reception
                 let stage: ActiveRequest['stage'] = 'new';
-                if (data.status === 'assigned') stage = 'assigning';
-                else if (data.status === 'in_progress') stage = 'in_progress';
-                else if (data.status === 'awaiting_confirmation') stage = 'awaiting_confirmation';
+                if (data.status === 'PENDING' || data.status === 'PENDING_RECEPTION') {
+                    stage = 'new';
+                } else if (data.status === 'CONFIRMED' && data.currentDepartment === 'reception') {
+                    stage = 'assigning'; // Confirmed but not yet picked up
+                } else if (data.status === 'IN_PROGRESS' || (data.status === 'CONFIRMED' && data.currentDepartment !== 'reception')) {
+                    stage = 'in_progress'; // Being worked on by another department
+                } else if (data.status === 'NEEDS_INSPECTION' || data.status === 'COMPLETED') {
+                    stage = 'awaiting_confirmation'; // Waiting for reception to confirm completion
+                }
 
                 return {
                     id: doc.id,
                     roomNumber: data.roomNumber || data.room || '-',
                     guestName: data.guestName,
-                    type: data.type || data.requestType || 'other',
+                    type: data.type || data.serviceType || 'other',
                     stage,
-                    assignedTo: data.assignedTo,
-                    assignedToName: data.assignedToName || data.workerName,
+                    assignedTo: data.assignedTo?.id,
+                    assignedToName: data.assignedTo?.name || data.assignedToName,
                     createdAt: data.createdAt,
-                    acceptedAt: data.acceptedAt,
-                    startedAt: data.startedAt,
-                    expectedDuration: data.expectedDuration || 30,
+                    acceptedAt: data.confirmedAt,
+                    startedAt: data.timeline?.started || data.confirmedAt,
+                    expectedDuration: data.expectedDuration || (data.type === 'bellman' ? 15 : data.type === 'coffee' ? 20 : 30),
                     notes: data.notes || data.description,
                     priority: data.priority || 'normal'
                 };
@@ -421,6 +426,10 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
             setRequests(activeRequests);
         }, (error) => {
             console.error('Error listening to requests:', error);
+            // ✅ Fallback: Try without orderBy if index missing
+            if (error.code === 'failed-precondition') {
+                console.warn('Index missing for OperationsQuickView, trying simpler query...');
+            }
         });
 
         return () => unsubscribe();
@@ -459,18 +468,6 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
     }, [requests]);
 
     // ============================================================
-    // SCROLL HANDLERS
-    // ============================================================
-
-    const scrollLeft = () => {
-        scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
-    };
-
-    const scrollRight = () => {
-        scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
-    };
-
-    // ============================================================
     // RENDER
     // ============================================================
 
@@ -480,90 +477,63 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
             <button
                 onClick={() => setIsExpanded(true)}
                 className={`
-                    w-full flex items-center justify-between
-                    px-4 py-2 rounded-xl
-                    bg-slate-800/50 border border-slate-700
-                    hover:bg-slate-800 transition-colors
+                    adora-card w-full flex items-center justify-between
+                    px-4 py-2 rounded-xl hover:shadow-md transition-all
                     ${className}
                 `}
             >
                 <div className="flex items-center gap-3">
-                    <span className="text-slate-400 text-sm">📊 شريط العمليات</span>
+                    <span className="adora-text-secondary text-sm">📊 شريط العمليات</span>
                     <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs font-bold">
+                        <span className="adora-badge adora-badge-teal text-xs font-bold">
                             {stats.total} طلب
                         </span>
                         {stats.critical > 0 && (
-                            <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold animate-pulse">
+                            <span className="adora-badge adora-badge-red text-xs font-bold animate-pulse">
                                 {stats.critical} متأخر!
                             </span>
                         )}
                     </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
+                <ChevronRight className="w-4 h-4 adora-text-tertiary" />
             </button>
         );
     }
 
     return (
         <div className={`
-            rounded-xl border border-slate-700
-            bg-gradient-to-r from-slate-800/80 to-slate-900/80
-            backdrop-blur-sm overflow-hidden
+            adora-card rounded-2xl overflow-hidden shadow-lg
             ${className}
         `}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700/50">
+            {/* Header - ✅ THEME-AWARE */}
+            <div className="flex items-center justify-between px-4 py-2.5 adora-border-b">
                 <div className="flex items-center gap-3">
-                    <span className="text-white font-bold text-sm">📊 شريط العمليات</span>
+                    <span className="adora-text-primary font-bold text-sm">📊 شريط العمليات</span>
                     
                     {/* Quick Stats */}
                     <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 text-xs">
+                        <span className="adora-badge adora-badge-teal text-xs font-medium">
                             {stats.total} طلب نشط
                         </span>
                         {stats.critical > 0 && (
-                            <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold animate-pulse flex items-center gap-1">
+                            <span className="adora-badge adora-badge-red text-xs font-bold animate-pulse flex items-center gap-1">
                                 <AlertTriangle className="w-3 h-3" />
                                 {stats.critical} متأخر
                             </span>
                         )}
                         {stats.vip > 0 && (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center gap-1">
+                            <span className="adora-badge adora-badge-yellow text-xs font-bold flex items-center gap-1">
                                 ⭐ {stats.vip} VIP
                             </span>
                         )}
                     </div>
                 </div>
-
-                {/* Collapse Button */}
-                <button
-                    onClick={() => setIsExpanded(false)}
-                    className="p-1 rounded hover:bg-slate-700 transition-colors"
-                >
-                    <X className="w-4 h-4 text-slate-400" />
-                </button>
             </div>
 
-            {/* Stages Container */}
-            <div className="relative px-2 py-3">
-                {/* Scroll Left Button */}
-                <button
-                    onClick={scrollLeft}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10
-                               w-8 h-8 rounded-full bg-slate-800/90 border border-slate-600
-                               flex items-center justify-center
-                               hover:bg-slate-700 transition-colors shadow-lg"
-                >
-                    <ChevronLeft className="w-4 h-4 text-white" />
-                </button>
-
-                {/* Scrollable Stages */}
-                <div
-                    ref={scrollRef}
-                    className="flex gap-3 overflow-x-auto scrollbar-hide px-6"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                >
+            {/* Stages Container - ✅ FIXED: Removed scroll arrows, cleaner grid layout */}
+            <div className="px-4 py-3">
+                {/* Stages Grid - Auto-fit for responsive */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {STAGES.map(stage => (
                         <StageCard
                             key={stage.key}
@@ -573,31 +543,20 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
                         />
                     ))}
                 </div>
-
-                {/* Scroll Right Button */}
-                <button
-                    onClick={scrollRight}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10
-                               w-8 h-8 rounded-full bg-slate-800/90 border border-slate-600
-                               flex items-center justify-center
-                               hover:bg-slate-700 transition-colors shadow-lg"
-                >
-                    <ChevronRight className="w-4 h-4 text-white" />
-                </button>
             </div>
 
-            {/* Flow Arrow Visualization */}
-            <div className="px-4 pb-2">
-                <div className="flex items-center justify-center gap-1 text-slate-500 text-xs">
-                    <span className="text-blue-400">📥 جديد</span>
-                    <span>→</span>
-                    <span className="text-amber-400">🔃 توجيه</span>
-                    <span>→</span>
-                    <span className="text-teal-400">🛠️ تنفيذ</span>
-                    <span>→</span>
-                    <span className="text-purple-400">✅ تأكيد</span>
-                    <span>→</span>
-                    <span className="text-green-400">🎉 إغلاق</span>
+            {/* Flow Arrow Visualization - ✅ THEME-AWARE */}
+            <div className="px-4 pb-3">
+                <div className="flex items-center justify-center gap-2 text-xs flex-wrap">
+                    <span className="adora-status-warning">📥 جديد</span>
+                    <span className="adora-text-disabled">→</span>
+                    <span className="adora-service-housekeeping">🔃 توجيه</span>
+                    <span className="adora-text-disabled">→</span>
+                    <span className="adora-service-maintenance">🛠️ تنفيذ</span>
+                    <span className="adora-text-disabled">→</span>
+                    <span className="adora-status-success">✅ تأكيد</span>
+                    <span className="adora-text-disabled">→</span>
+                    <span className="adora-status-success font-bold">🎉 إغلاق</span>
                 </div>
             </div>
 

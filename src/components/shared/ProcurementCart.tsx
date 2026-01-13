@@ -668,7 +668,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
             'APPROVED': { text: 'تمت الموافقة', color: 'bg-blue-500/20 text-blue-400' },
             'PURCHASING': { text: 'جاري الشراء', color: 'bg-purple-500/20 text-purple-400' },
             'PURCHASED': { text: 'تم الشراء', color: 'bg-green-500/20 text-green-400' },
-            'DELIVERED': { text: 'جاهز للاستلام', color: 'bg-emerald-500/20 text-emerald-400' },
+            'DELIVERED': { text: 'جاهز للاستلام', color: 'bg-primary-500/20 text-emerald-400' },
             'RECEIVED': { text: 'تم الاستلام', color: 'bg-gray-500/20 text-gray-400' },
             'COMPLETED': { text: 'مكتمل', color: 'bg-gray-500/20 text-gray-400' }
         };
@@ -742,7 +742,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                     >
                         📦 طلباتي
                         {myOrders.filter(o => o.status === 'DELIVERED' || o.status === 'PURCHASED').length > 0 && (
-                            <span className="mr-2 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs">
+                            <span className="mr-2 px-2 py-0.5 rounded-full bg-primary-500/20 text-emerald-400 text-xs">
                                 {myOrders.filter(o => o.status === 'DELIVERED' || o.status === 'PURCHASED').length}
                             </span>
                         )}
@@ -753,23 +753,23 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {activeTab === 'cart' ? (
                         <>
-                            {/* Quick Items */}
+                            {/* Quick Items - Compact Grid */}
                             <div>
-                                <h4 className="text-sm font-semibold mb-2" style={{ color: textSecondary }}>أصناف سريعة</h4>
-                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                <h4 className="text-xs font-semibold mb-1.5" style={{ color: textSecondary }}>أصناف سريعة</h4>
+                                <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
                                     {quickItems.map((item, idx) => (
                                         <button
                                             key={idx}
                                             onClick={() => fillQuickItem(item)}
-                                            className="p-2 sm:p-3 rounded-xl transition-colors text-center hover:scale-105"
+                                            className="p-1.5 rounded-lg transition-all text-center hover:scale-105 active:scale-95"
                                             style={{ 
                                                 background: tertiaryBg, 
                                                 border: `1px solid ${borderColor}`,
                                             }}
                                         >
-                                            <div className="text-base sm:text-lg mb-1">{item.icon}</div>
-                                            <div className="text-[10px] sm:text-xs leading-tight line-clamp-2" style={{ color: textPrimary }}>{item.name}</div>
-                                            <div className="text-[9px] sm:text-xs" style={{ color: textTertiary }}>×{item.defaultQty}</div>
+                                            <div className="text-sm mb-0.5">{item.icon}</div>
+                                            <div className="text-[9px] leading-tight line-clamp-1 font-medium" style={{ color: textPrimary }}>{item.name}</div>
+                                            <div className="text-[8px]" style={{ color: textTertiary }}>×{item.defaultQty}</div>
                                         </button>
                                     ))}
                                 </div>
@@ -782,7 +782,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                                 {/* ✅ NEW: Searchable Inventory Dropdown */}
                                 <div className="relative" ref={itemDropdownRef}>
                                     <div className="relative">
-                                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/70" />
                                         <input
                                             type="text"
                                             value={itemSearchQuery}
@@ -850,7 +850,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                                <ChevronDown className="w-4 h-4 text-white/40 rotate-[-90deg]" />
+                                                                <ChevronDown className="w-4 h-4 text-white/70 rotate-[-90deg]" />
                                                             </div>
                                                         </button>
                                                     ))}
@@ -1164,7 +1164,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                                                             }));
                                                             confirmReceipt(order, receivedItems);
                                                         }}
-                                                        className="flex-1 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 text-sm font-medium hover:bg-emerald-500/30 transition-colors"
+                                                        className="flex-1 py-2 rounded-lg bg-primary-500/20 text-emerald-400 text-sm font-medium hover:bg-primary-500/30 transition-colors"
                                                     >
                                                         ✓ استلام كامل
                                                     </button>
@@ -1268,7 +1268,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                                         </div>
                                     )}
                                     {receivedQuantities[item.itemName] > item.quantity && (
-                                        <div className="mt-2 text-xs text-emerald-500">
+                                        <div className="mt-2 text-xs text-primary-500">
                                             ✓ زيادة: {receivedQuantities[item.itemName] - item.quantity}
                                         </div>
                                     )}

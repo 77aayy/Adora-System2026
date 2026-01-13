@@ -344,6 +344,83 @@ export const TenantFirebaseConfig: React.FC<TenantFirebaseConfigProps> = ({
             {/* Expandable Content */}
             {isExpanded && (
                 <div className="space-y-5 p-4 rounded-xl bg-white/5 border border-white/10">
+                    {/* ✨ Smart Paste Zone - اللصق الذكي */}
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 border-2 border-dashed border-amber-500/40">
+                        <div className="flex items-start gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                <FileJson className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-white flex items-center gap-2">
+                                    ⚡ اللصق الذكي - أسرع طريقة!
+                                </p>
+                                <p className="text-[11px] text-white/60">
+                                    الصق كود Firebase Config من Firebase Console وسيتم ملء جميع الحقول تلقائياً
+                                </p>
+                            </div>
+                        </div>
+                        <textarea
+                            placeholder={'الصق هنا كود firebaseConfig الكامل من Firebase Console...\n\nمثال:\nconst firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "...",\n  projectId: "...",\n  ...\n};'}
+                            className="w-full p-3 rounded-xl bg-black/30 border border-amber-500/30 text-white placeholder-white/30 text-xs font-mono resize-none h-24 focus:outline-none focus:border-amber-400"
+                            dir="ltr"
+                            onPaste={(e) => {
+                                e.preventDefault();
+                                const text = e.clipboardData.getData('text');
+                                
+                                // استخراج القيم من النص
+                                const apiKeyMatch = text.match(/apiKey:\s*["']([^"']+)["']/);
+                                const authDomainMatch = text.match(/authDomain:\s*["']([^"']+)["']/);
+                                const projectIdMatch = text.match(/projectId:\s*["']([^"']+)["']/);
+                                const storageBucketMatch = text.match(/storageBucket:\s*["']([^"']+)["']/);
+                                const messagingSenderIdMatch = text.match(/messagingSenderId:\s*["']([^"']+)["']/);
+                                const appIdMatch = text.match(/appId:\s*["']([^"']+)["']/);
+                                
+                                // التحقق من وجود قيم
+                                if (apiKeyMatch || projectIdMatch) {
+                                    const newConfig: ExtendedFirebaseConfig = {
+                                        ...config,
+                                        apiKey: apiKeyMatch?.[1] || config.apiKey,
+                                        authDomain: authDomainMatch?.[1] || config.authDomain,
+                                        projectId: projectIdMatch?.[1] || config.projectId,
+                                        storageBucket: storageBucketMatch?.[1] || config.storageBucket,
+                                        messagingSenderId: messagingSenderIdMatch?.[1] || config.messagingSenderId,
+                                        appId: appIdMatch?.[1] || config.appId,
+                                    };
+                                    
+                                    // Auto-fill auth domain and storage if not present
+                                    if (!newConfig.authDomain && newConfig.projectId) {
+                                        newConfig.authDomain = `${newConfig.projectId}.firebaseapp.com`;
+                                    }
+                                    if (!newConfig.storageBucket && newConfig.projectId) {
+                                        newConfig.storageBucket = `${newConfig.projectId}.appspot.com`;
+                                    }
+                                    
+                                    onChange(newConfig);
+                                    setConnectionStatus('idle');
+                                    setConnectionMessage('');
+                                    
+                                    // عرض رسالة نجاح
+                                    const extractedCount = [apiKeyMatch, projectIdMatch, appIdMatch, authDomainMatch, storageBucketMatch, messagingSenderIdMatch].filter(Boolean).length;
+                                    (e.target as HTMLTextAreaElement).value = `✅ تم استخراج ${extractedCount} حقول بنجاح!\n\nProject: ${newConfig.projectId || 'N/A'}`;
+                                    
+                                    // مسح الـ textarea بعد ثانيتين
+                                    setTimeout(() => {
+                                        (e.target as HTMLTextAreaElement).value = '';
+                                    }, 2000);
+                                } else {
+                                    (e.target as HTMLTextAreaElement).value = '❌ لم يتم العثور على بيانات Firebase صالحة في النص المُلصق';
+                                    setTimeout(() => {
+                                        (e.target as HTMLTextAreaElement).value = '';
+                                    }, 2000);
+                                }
+                            }}
+                        />
+                        <p className="text-[10px] text-amber-400/70 mt-2 flex items-center gap-1">
+                            <Info className="w-3 h-3" />
+                            💡 فقط الصق الكود هنا وسيتم ملء جميع الحقول أدناه تلقائياً!
+                        </p>
+                    </div>
+                    
                     {/* Info Banner */}
                     <div className="p-4 rounded-xl bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20">
                         <div className="flex items-start gap-3">

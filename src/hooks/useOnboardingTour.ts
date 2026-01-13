@@ -254,16 +254,27 @@ export const useOnboardingTour = (department: DepartmentTour): UseOnboardingTour
     // Get steps for this department
     const steps = TOUR_STEPS[department] || [];
 
-    // Check if user has already completed the tour
+    // ✅ FIXED: Check ONCE per session using sessionStorage + localStorage + Firestore
     useEffect(() => {
         const checkTourStatus = async () => {
             if (!user?.id || hasChecked) return;
+
+            // ✅ Session check: Don't show tour multiple times in same session
+            const sessionKey = `adora_tour_session_${department}_${user.id}`;
+            if (sessionStorage.getItem(sessionKey) === 'shown') {
+                setIsLoading(false);
+                setHasChecked(true);
+                return;
+            }
 
             setIsLoading(true);
             try {
                 const completed = await hasCompletedTour(user.id, department);
                 
                 if (!completed) {
+                    // Mark as shown in session
+                    sessionStorage.setItem(sessionKey, 'shown');
+                    
                     // Show tour after a short delay for better UX
                     setTimeout(() => {
                         setShowTour(true);

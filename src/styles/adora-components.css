@@ -1,0 +1,1213 @@
+/**
+ * ============================================================
+ * ADORA UNIFIED COMPONENTS - DESIGN SYSTEM V3
+ * ============================================================
+ * 
+ * 🎯 قواعد استخدام البالتة:
+ * - اللون الأساسي (Teal): للأزرار الرئيسية و CTAs
+ * - الألوان الدلالية: للحالات (أخضر=نجاح، أحمر=خطأ، برتقالي=تحذير)
+ * - الألوان المحايدة: للخلفيات والنصوص
+ * 
+ * 📦 هذا الملف يوفر:
+ * - مكونات موحدة تعمل في Light + Dark
+ * - لا ألوان Hard-coded
+ * - استخدام CSS Variables فقط
+ */
+
+/* ============================================================
+   🎨 ADORA BRAND COLORS - Extended Palette
+   ============================================================ */
+
+:root {
+    /* Service Colors (للأقسام) */
+    --adora-housekeeping: #06b6d4;      /* Cyan */
+    --adora-maintenance: #f97316;        /* Orange */
+    --adora-bellman: #a855f7;            /* Purple */
+    --adora-coffee: #f59e0b;             /* Amber */
+    --adora-inspection: #22c55e;         /* Green */
+    --adora-emergency: #ef4444;          /* Red */
+    
+    /* Status Colors */
+    --adora-pending: #eab308;            /* Yellow */
+    --adora-confirmed: #3b82f6;          /* Blue */
+    --adora-in-progress: #8b5cf6;        /* Purple */
+    --adora-completed: #22c55e;          /* Green */
+    --adora-waiting: #ef4444;            /* Red */
+}
+
+/* ============================================================
+   📦 ADORA CARD - الكارت الموحد
+   ============================================================ */
+
+.adora-card {
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border-primary);
+    border-radius: 1rem;
+    box-shadow: var(--theme-shadow-card);
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+.adora-card:hover {
+    border-color: var(--theme-border-hover);
+    box-shadow: var(--theme-shadow-card-hover);
+}
+
+.adora-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--theme-border-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.adora-card-body {
+    padding: 1.25rem;
+}
+
+.adora-card-footer {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--theme-border-primary);
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* ============================================================
+   🔘 ADORA BUTTON - الزر الموحد
+   ============================================================ */
+
+.adora-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.adora-btn:active {
+    transform: scale(0.97);
+}
+
+/* Primary Button - Teal Gradient */
+.adora-btn-primary {
+    background: linear-gradient(135deg, var(--theme-primary-400) 0%, var(--theme-primary-600) 100%);
+    color: white;
+    box-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
+}
+
+.adora-btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(13, 148, 136, 0.4);
+    transform: translateY(-1px);
+}
+
+/* Secondary Button */
+.adora-btn-secondary {
+    background: var(--theme-bg-tertiary);
+    color: var(--theme-text-primary);
+    border: 1px solid var(--theme-border-primary);
+}
+
+.adora-btn-secondary:hover {
+    background: var(--theme-border-hover);
+}
+
+/* Ghost Button */
+.adora-btn-ghost {
+    background: transparent;
+    color: var(--theme-text-secondary);
+}
+
+.adora-btn-ghost:hover {
+    background: var(--theme-bg-tertiary);
+    color: var(--theme-text-primary);
+}
+
+/* Success Button */
+.adora-btn-success {
+    background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+    color: white;
+    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3);
+}
+
+/* Danger Button */
+.adora-btn-danger {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    color: white;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+/* Warning Button */
+.adora-btn-warning {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: white;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+}
+
+/* Sizes */
+.adora-btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+}
+
+.adora-btn-lg {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+}
+
+/* ============================================================
+   🏷️ ADORA BADGE - الشارة الموحدة
+   ============================================================ */
+
+.adora-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+/* Badge Colors */
+.adora-badge-teal {
+    background: var(--theme-primary-100);
+    color: var(--theme-primary-600);
+}
+
+[data-theme="dark"] .adora-badge-teal {
+    background: rgba(13, 148, 136, 0.15);
+    color: var(--theme-primary-400);
+}
+
+.adora-badge-blue {
+    background: var(--theme-accent-blue-light);
+    color: var(--theme-accent-blue);
+}
+
+.adora-badge-green {
+    background: var(--theme-accent-green-light);
+    color: var(--theme-accent-green);
+}
+
+.adora-badge-orange {
+    background: var(--theme-accent-orange-light);
+    color: var(--theme-accent-orange);
+}
+
+.adora-badge-red {
+    background: var(--theme-accent-red-light);
+    color: var(--theme-accent-red);
+}
+
+.adora-badge-purple {
+    background: var(--theme-accent-purple-light);
+    color: var(--theme-accent-purple);
+}
+
+.adora-badge-yellow {
+    background: var(--theme-accent-yellow-light);
+    color: var(--theme-accent-yellow);
+}
+
+/* ============================================================
+   📋 ADORA REQUEST CARD - كارت الطلب
+   ============================================================ */
+
+.adora-request-card {
+    position: relative;
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border-primary);
+    border-radius: 1.25rem;
+    padding: 1rem;
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+.adora-request-card:hover {
+    border-color: var(--theme-primary-500);
+    box-shadow: var(--theme-shadow-card-hover);
+    transform: translateY(-2px);
+}
+
+/* Urgent Card */
+.adora-request-card.urgent {
+    border-color: var(--theme-accent-red);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+}
+
+/* QR Card */
+.adora-request-card.qr-request {
+    border-color: var(--theme-primary-500);
+    box-shadow: 0 0 20px rgba(20, 184, 166, 0.15);
+}
+
+/* Request Card Header */
+.adora-request-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.adora-request-room {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--theme-text-primary);
+}
+
+/* Service Type Icon */
+.adora-service-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.875rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--theme-border-secondary);
+    transition: transform 0.2s ease;
+}
+
+.adora-service-icon:hover {
+    transform: scale(1.05);
+}
+
+/* Service Icon Colors - Theme Aware */
+.adora-service-icon.housekeeping {
+    background: rgba(6, 182, 212, 0.1);
+    color: var(--adora-housekeeping);
+}
+
+.adora-service-icon.maintenance {
+    background: rgba(249, 115, 22, 0.1);
+    color: var(--adora-maintenance);
+}
+
+.adora-service-icon.bellman {
+    background: rgba(168, 85, 247, 0.1);
+    color: var(--adora-bellman);
+}
+
+.adora-service-icon.coffee {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--adora-coffee);
+}
+
+.adora-service-icon.inspection {
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--adora-inspection);
+}
+
+.adora-service-icon.emergency {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--adora-emergency);
+}
+
+/* ============================================================
+   ⚡ ADORA QUICK ACTIONS - أزرار الإجراء السريع
+   ============================================================ */
+
+.adora-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 0.75rem;
+}
+
+.adora-quick-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem 0.5rem;
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border-primary);
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.adora-quick-action:hover {
+    border-color: var(--theme-primary-500);
+    background: var(--theme-bg-tertiary);
+    transform: translateY(-2px);
+}
+
+.adora-quick-action:active {
+    transform: scale(0.95);
+}
+
+.adora-quick-action-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.adora-quick-action-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--theme-text-secondary);
+    text-align: center;
+}
+
+/* Quick Action Icon Colors */
+.adora-quick-action-icon.housekeeping {
+    background: rgba(6, 182, 212, 0.15);
+    color: var(--adora-housekeeping);
+}
+
+.adora-quick-action-icon.maintenance {
+    background: rgba(249, 115, 22, 0.15);
+    color: var(--adora-maintenance);
+}
+
+.adora-quick-action-icon.bellman {
+    background: rgba(168, 85, 247, 0.15);
+    color: var(--adora-bellman);
+}
+
+.adora-quick-action-icon.coffee {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--adora-coffee);
+}
+
+.adora-quick-action-icon.inspection {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--adora-inspection);
+}
+
+.adora-quick-action-icon.emergency {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--adora-emergency);
+}
+
+/* ============================================================
+   🪟 ADORA MODAL - النافذة المنبثقة الموحدة
+   ============================================================ */
+
+.adora-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: fadeIn 0.15s ease-out;
+}
+
+.adora-modal {
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border-primary);
+    border-radius: 1.5rem;
+    box-shadow: var(--theme-shadow-2xl);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: modalSlideIn 0.2s ease-out;
+}
+
+.adora-modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--theme-border-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--theme-bg-tertiary);
+}
+
+.adora-modal-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--theme-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.adora-modal-close {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.625rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border-primary);
+    color: var(--theme-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.adora-modal-close:hover {
+    background: var(--theme-accent-red-light);
+    border-color: var(--theme-accent-red);
+    color: var(--theme-accent-red);
+}
+
+.adora-modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.adora-modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--theme-border-primary);
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+/* ============================================================
+   📊 ADORA STAT CARD - كارت الإحصائيات
+   ============================================================ */
+
+.adora-stat-card {
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border-primary);
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: var(--theme-shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.adora-stat-card:hover {
+    box-shadow: var(--theme-shadow-md);
+    transform: translateY(-2px);
+}
+
+.adora-stat-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.adora-stat-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.adora-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--theme-text-primary);
+    line-height: 1.2;
+}
+
+.adora-stat-label {
+    font-size: 0.75rem;
+    color: var(--theme-text-tertiary);
+    margin-top: 0.25rem;
+}
+
+/* Stat Icon Colors */
+.adora-stat-icon.blue {
+    background: var(--theme-accent-blue-light);
+    color: var(--theme-accent-blue);
+}
+
+.adora-stat-icon.green {
+    background: var(--theme-accent-green-light);
+    color: var(--theme-accent-green);
+}
+
+.adora-stat-icon.orange {
+    background: var(--theme-accent-orange-light);
+    color: var(--theme-accent-orange);
+}
+
+.adora-stat-icon.red {
+    background: var(--theme-accent-red-light);
+    color: var(--theme-accent-red);
+}
+
+.adora-stat-icon.purple {
+    background: var(--theme-accent-purple-light);
+    color: var(--theme-accent-purple);
+}
+
+.adora-stat-icon.teal {
+    background: var(--theme-primary-100);
+    color: var(--theme-primary-600);
+}
+
+[data-theme="dark"] .adora-stat-icon.teal {
+    background: rgba(13, 148, 136, 0.15);
+    color: var(--theme-primary-400);
+}
+
+/* ============================================================
+   📝 ADORA INPUT - حقول الإدخال الموحدة
+   ============================================================ */
+
+.adora-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--theme-input-bg);
+    border: 1px solid var(--theme-input-border);
+    border-radius: 0.75rem;
+    color: var(--theme-text-primary);
+    font-size: 0.9375rem;
+    transition: all 0.15s ease;
+}
+
+.adora-input::placeholder {
+    color: var(--theme-input-placeholder);
+}
+
+.adora-input:focus {
+    outline: none;
+    border-color: var(--theme-primary-500);
+    box-shadow: 0 0 0 3px var(--theme-input-focus-ring);
+}
+
+.adora-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Select Dropdown */
+.adora-select {
+    width: 100%;
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    background: var(--theme-input-bg);
+    border: 1px solid var(--theme-input-border);
+    border-radius: 0.75rem;
+    color: var(--theme-text-primary);
+    font-size: 0.9375rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: left 0.75rem center;
+    background-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+[dir="ltr"] .adora-select {
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    background-position: right 0.75rem center;
+}
+
+.adora-select:focus {
+    outline: none;
+    border-color: var(--theme-primary-500);
+    box-shadow: 0 0 0 3px var(--theme-input-focus-ring);
+}
+
+/* ============================================================
+   🔔 ADORA STATUS LABELS - تسميات الحالة
+   ============================================================ */
+
+.adora-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid;
+}
+
+.adora-status.pending {
+    background: var(--theme-accent-yellow-light);
+    color: var(--theme-accent-yellow);
+    border-color: var(--theme-accent-yellow);
+}
+
+.adora-status.confirmed {
+    background: var(--theme-accent-blue-light);
+    color: var(--theme-accent-blue);
+    border-color: var(--theme-accent-blue);
+}
+
+.adora-status.in-progress {
+    background: var(--theme-accent-purple-light);
+    color: var(--theme-accent-purple);
+    border-color: var(--theme-accent-purple);
+}
+
+.adora-status.completed {
+    background: var(--theme-accent-green-light);
+    color: var(--theme-accent-green);
+    border-color: var(--theme-accent-green);
+}
+
+.adora-status.waiting {
+    background: var(--theme-accent-red-light);
+    color: var(--theme-accent-red);
+    border-color: var(--theme-accent-red);
+}
+
+/* ============================================================
+   📱 ADORA TABS - التبويبات الموحدة
+   ============================================================ */
+
+.adora-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    background: var(--theme-bg-tertiary);
+    border-radius: 0.75rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.adora-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.adora-tab {
+    flex: 1;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--theme-text-tertiary);
+    background: transparent;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.adora-tab:hover {
+    color: var(--theme-text-primary);
+    background: var(--theme-bg-secondary);
+}
+
+.adora-tab.active {
+    color: var(--theme-primary-600);
+    background: var(--theme-bg-secondary);
+    box-shadow: var(--theme-shadow-sm);
+}
+
+[data-theme="dark"] .adora-tab.active {
+    color: var(--theme-primary-400);
+}
+
+/* ============================================================
+   🎬 ANIMATIONS
+   ============================================================ */
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================================
+   📐 UTILITIES
+   ============================================================ */
+
+.adora-text-primary { color: var(--theme-text-primary); }
+.adora-text-secondary { color: var(--theme-text-secondary); }
+.adora-text-tertiary { color: var(--theme-text-tertiary); }
+.adora-text-disabled { color: var(--theme-text-disabled); }
+
+.adora-bg-primary { background: var(--theme-bg-primary); }
+.adora-bg-secondary { background: var(--theme-bg-secondary); }
+.adora-bg-tertiary { background: var(--theme-bg-tertiary); }
+
+.adora-border { border: 1px solid var(--theme-border-primary); }
+.adora-border-t { border-top: 1px solid var(--theme-border-primary); }
+.adora-border-b { border-bottom: 1px solid var(--theme-border-primary); }
+
+/* ============================================================
+   🖼️ ADORA PAGE - صفحة موحدة
+   ============================================================ */
+
+.adora-page {
+    min-height: 100vh;
+    background: var(--theme-bg-primary);
+    background-image: var(--theme-gradient-page);
+    color: var(--theme-text-primary);
+}
+
+/* ============================================================
+   📋 ADORA SECTION HEADER - عنوان القسم
+   ============================================================ */
+
+.adora-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.adora-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--theme-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.adora-section-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    background: var(--theme-primary-100);
+    color: var(--theme-primary-600);
+}
+
+[data-theme="dark"] .adora-section-count {
+    background: rgba(13, 148, 136, 0.15);
+    color: var(--theme-primary-400);
+}
+
+/* ============================================================
+   ⚠️ ADORA ALERT - رسائل التنبيه
+   ============================================================ */
+
+.adora-alert {
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.adora-alert-success {
+    background: var(--theme-accent-green-light);
+    border-color: var(--theme-accent-green);
+    color: var(--theme-accent-green);
+}
+
+.adora-alert-warning {
+    background: var(--theme-accent-orange-light);
+    border-color: var(--theme-accent-orange);
+    color: var(--theme-accent-orange);
+}
+
+.adora-alert-error {
+    background: var(--theme-accent-red-light);
+    border-color: var(--theme-accent-red);
+    color: var(--theme-accent-red);
+}
+
+.adora-alert-info {
+    background: var(--theme-accent-blue-light);
+    border-color: var(--theme-accent-blue);
+    color: var(--theme-accent-blue);
+}
+
+.adora-alert-teal {
+    background: var(--theme-primary-100);
+    border-color: var(--theme-primary-500);
+    color: var(--theme-primary-600);
+}
+
+[data-theme="dark"] .adora-alert-teal {
+    background: rgba(13, 148, 136, 0.1);
+    color: var(--theme-primary-400);
+}
+
+/* ============================================================
+   🧱 ADORA DIVIDER - الفاصل
+   ============================================================ */
+
+.adora-divider {
+    border: none;
+    border-top: 1px solid var(--theme-border-primary);
+    margin: 1rem 0;
+}
+
+/* ============================================================
+   📦 ADORA EMPTY STATE - الحالة الفارغة
+   ============================================================ */
+
+.adora-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+}
+
+.adora-empty-icon {
+    width: 4rem;
+    height: 4rem;
+    margin: 0 auto 1rem;
+    border-radius: 1rem;
+    background: var(--theme-bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--theme-text-disabled);
+}
+
+.adora-empty-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--theme-text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.adora-empty-description {
+    font-size: 0.875rem;
+    color: var(--theme-text-tertiary);
+}
+
+/* ============================================================
+   🎨 SERVICE COLORS - Theme Aware (Light/Dark)
+   ============================================================ */
+
+/* Service Text Colors */
+.adora-service-housekeeping { color: var(--adora-housekeeping); }
+.adora-service-maintenance { color: var(--adora-maintenance); }
+.adora-service-bellman { color: var(--adora-bellman); }
+.adora-service-coffee { color: var(--adora-coffee); }
+.adora-service-inspection { color: var(--adora-inspection); }
+.adora-service-emergency { color: var(--adora-emergency); }
+
+/* Service Background Colors */
+.adora-service-bg-housekeeping { background: rgba(6, 182, 212, 0.15); }
+.adora-service-bg-maintenance { background: rgba(249, 115, 22, 0.15); }
+.adora-service-bg-bellman { background: rgba(168, 85, 247, 0.15); }
+.adora-service-bg-coffee { background: rgba(245, 158, 11, 0.15); }
+.adora-service-bg-inspection { background: rgba(34, 197, 94, 0.15); }
+.adora-service-bg-emergency { background: rgba(239, 68, 68, 0.15); }
+
+/* ============================================================
+   📊 STATUS COLORS - Theme Aware (Light/Dark)
+   ============================================================ */
+
+/* Status Text Colors */
+.adora-status-pending { color: var(--theme-accent-yellow); }
+.adora-status-warning { color: var(--theme-accent-orange); }
+.adora-status-confirmed { color: var(--theme-accent-blue); }
+.adora-status-progress { color: var(--theme-accent-purple); }
+.adora-status-success { color: var(--theme-accent-green); }
+.adora-status-danger { color: var(--theme-accent-red); }
+
+/* Status Background Colors */
+.adora-status-bg-pending { background: var(--theme-accent-yellow-light); }
+.adora-status-bg-warning { background: var(--theme-accent-orange-light); }
+.adora-status-bg-confirmed { background: var(--theme-accent-blue-light); }
+.adora-status-bg-progress { background: var(--theme-accent-purple-light); }
+.adora-status-bg-success { background: var(--theme-accent-green-light); }
+.adora-status-bg-danger { background: var(--theme-accent-red-light); }
+
+/* ============================================================
+   📦 ADORA REQUEST CARD V2 - Theme Aware
+   ============================================================ */
+
+.adora-request-card-v2 {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border-primary);
+    box-shadow: var(--theme-shadow-card);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.adora-request-card-v2:hover {
+    border-color: var(--theme-primary-500);
+    box-shadow: var(--theme-shadow-card-hover);
+    transform: translateY(-2px);
+}
+
+.adora-request-card-v2.urgent {
+    border-color: var(--theme-accent-red);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+}
+
+.adora-request-card-v2.delayed {
+    border-color: var(--theme-accent-orange);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.15);
+}
+
+.adora-request-card-v2.adora-coffee-delivered {
+    border-color: var(--theme-accent-yellow);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+    background: var(--theme-accent-yellow-light);
+}
+
+/* ============================================================
+   🪟 ADORA MODAL V2 - Theme Aware (Reception Modals)
+   ============================================================ */
+
+.adora-modal-v2 {
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border-primary);
+    border-radius: 1rem;
+    box-shadow: var(--theme-shadow-2xl);
+    overflow: hidden;
+}
+
+.adora-modal-header-v2 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--theme-border-primary);
+}
+
+.adora-modal-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.adora-modal-title-v2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--theme-text-primary);
+}
+
+.adora-modal-subtitle {
+    font-size: 0.875rem;
+    color: var(--theme-text-tertiary);
+}
+
+.adora-modal-close-v2 {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+    background: var(--theme-bg-tertiary);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--theme-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.adora-modal-close-v2:hover {
+    background: var(--theme-accent-red-light);
+    color: var(--theme-accent-red);
+}
+
+.adora-modal-body-v2 {
+    padding: 1.5rem;
+    overflow-y: auto;
+    max-height: calc(90vh - 200px);
+}
+
+/* ============================================================
+   📋 ADORA LIST ITEM - Theme Aware
+   ============================================================ */
+
+.adora-list-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--theme-bg-tertiary);
+    border: 1px solid var(--theme-border-secondary);
+    border-radius: 0.75rem;
+    transition: all 0.15s ease;
+}
+
+.adora-list-item:hover {
+    border-color: var(--theme-primary-500);
+    background: var(--theme-bg-secondary);
+}
+
+/* ============================================================
+   🏷️ ADORA INFO BOX - Theme Aware
+   ============================================================ */
+
+.adora-info-box {
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.adora-info-box.teal {
+    background: var(--theme-primary-100);
+    border: 1px solid var(--theme-primary-500);
+    color: var(--theme-primary-600);
+}
+
+[data-theme="dark"] .adora-info-box.teal {
+    background: rgba(13, 148, 136, 0.1);
+    color: var(--theme-primary-400);
+}
+
+.adora-info-box.orange {
+    background: var(--theme-accent-orange-light);
+    border: 1px solid var(--theme-accent-orange);
+    color: var(--theme-accent-orange);
+}
+
+.adora-info-box.red {
+    background: var(--theme-accent-red-light);
+    border: 1px solid var(--theme-accent-red);
+    color: var(--theme-accent-red);
+}
+
+.adora-info-box.green {
+    background: var(--theme-accent-green-light);
+    border: 1px solid var(--theme-accent-green);
+    color: var(--theme-accent-green);
+}
+
+.adora-info-box.purple {
+    background: var(--theme-accent-purple-light);
+    border: 1px solid var(--theme-accent-purple);
+    color: var(--theme-accent-purple);
+}
+
+.adora-info-box.blue {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid #3b82f6;
+    color: #3b82f6;
+}
+
+[data-theme="dark"] .adora-info-box.blue {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.adora-info-box.cyan {
+    background: rgba(6, 182, 212, 0.1);
+    border: 1px solid #06b6d4;
+    color: #06b6d4;
+}
+
+[data-theme="dark"] .adora-info-box.cyan {
+    background: rgba(6, 182, 212, 0.15);
+    color: #22d3ee;
+}
+
+.adora-info-box.slate {
+    background: rgba(100, 116, 139, 0.1);
+    border: 1px solid #64748b;
+    color: #475569;
+}
+
+[data-theme="dark"] .adora-info-box.slate {
+    background: rgba(100, 116, 139, 0.15);
+    border: 1px solid #475569;
+    color: #94a3b8;
+}
+
+/* ============================================================
+   ⚡ ADORA QUICK ACTIONS SECTION - Reception Core
+   ============================================================ */
+
+.adora-quick-actions-section {
+    background: var(--theme-bg-secondary);
+    border: 2px solid var(--theme-primary-500);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(13, 148, 136, 0.15);
+}
+
+[data-theme="dark"] .adora-quick-actions-section {
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.05) 0%, rgba(15, 23, 42, 0.8) 100%);
+    border-color: var(--theme-primary-400);
+}
+
+.adora-quick-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem 1rem;
+    background: var(--theme-bg-tertiary);
+    border: 1px solid var(--theme-border-primary);
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 120px;
+}
+
+.adora-quick-action:hover {
+    background: var(--theme-bg-secondary);
+    border-color: var(--theme-primary-500);
+    box-shadow: 0 4px 16px rgba(13, 148, 136, 0.2);
+    transform: translateY(-4px);
+}
+
+.adora-quick-action:active {
+    transform: scale(0.98);
+}
+
+/* ============================================================
+   📊 ADDITIONAL THEME-AWARE UTILITIES
+   ============================================================ */
+
+.adora-border {
+    border: 1px solid var(--theme-border-primary);
+}
+
+.adora-border-b {
+    border-bottom: 1px solid var(--theme-border-primary);
+}
+
+.adora-bg-tertiary {
+    background: var(--theme-bg-tertiary);
+}
+
+.adora-text-primary {
+    color: var(--theme-text-primary);
+}
+
+.adora-text-secondary {
+    color: var(--theme-text-secondary);
+}
+
+.adora-text-tertiary {
+    color: var(--theme-text-tertiary);
+}
+
+.adora-text-disabled {
+    color: var(--theme-text-disabled);
+}

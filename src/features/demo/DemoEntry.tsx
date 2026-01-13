@@ -1,167 +1,132 @@
 /**
- * Demo Entry Page
- * Landing page for demo links - validates link and starts session
- * Adora Hotel Management System V3 - SaaS
+ * Demo Entry Page - V4
+ * =====================
+ * صفحة الديمو - متوافقة 100% مع بالتة أدورا الموحدة
+ * تعمل في Light + Dark Mode بسلاسة
+ * 
+ * @author Adora System
  */
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-    Play, Sparkles, Shield, Users, BarChart3, 
-    Clock, CheckCircle, AlertTriangle, Loader2,
-    ChevronRight, Building2, Zap, Globe, 
-    Phone, Mail, ArrowRight
+    Sparkles, Loader2, AlertTriangle, Building2, 
+    Clock, MessageCircle, ArrowRight, CheckCircle, Key,
+    Users, BarChart3, FileText, Settings, Hotel
 } from 'lucide-react';
-import { 
-    validateDemoLink, startDemoSession, saveDemoSessionLocally,
-    DemoLinkConfig, DemoSession 
-} from '../../services/demoLinkService';
-
-// ============================================================
-// FEATURES LIST
-// ============================================================
-
-const FEATURES = [
-    { icon: Building2, title: 'إدارة الغرف', titleEn: 'Room Management', color: 'text-blue-400' },
-    { icon: Users, title: 'إدارة الموظفين', titleEn: 'Staff Management', color: 'text-green-400' },
-    { icon: Zap, title: 'طلبات فورية', titleEn: 'Instant Requests', color: 'text-yellow-400' },
-    { icon: BarChart3, title: 'تقارير ذكية', titleEn: 'Smart Reports', color: 'text-purple-400' },
-    { icon: Globe, title: 'نظام QR للنزلاء', titleEn: 'Guest QR System', color: 'text-cyan-400' },
-    { icon: Shield, title: 'أمان متقدم', titleEn: 'Advanced Security', color: 'text-red-400' },
-];
+import { validateDemoLink, recordDemoUsage, DemoLinkConfig } from '../../services/demoLinkService';
+import { initializeDemoFirebase, saveDemoCode } from '../../services/firebaseMulti';
 
 // ============================================================
 // COMPONENT
 // ============================================================
 
-export const DemoEntry: React.FC = () => {
+const DemoEntry: React.FC = () => {
     const { code } = useParams<{ code: string }>();
     const navigate = useNavigate();
     
-    // State
     const [loading, setLoading] = useState(true);
-    const [validating, setValidating] = useState(true);
-    const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [link, setLink] = useState<DemoLinkConfig | null>(null);
+    const [initializing, setInitializing] = useState(false);
     
-    // User info form
-    const [userName, setUserName] = useState('');
-    const [userEmail, setUserEmail] = useState('');
-    const [userPhone, setUserPhone] = useState('');
-    const [showForm, setShowForm] = useState(false);
-    
-    // ============================================================
-    // VALIDATE LINK
-    // ============================================================
-    
+    // ============ Load Demo Link ============
     useEffect(() => {
-        const validateLink = async () => {
+        const loadLink = async () => {
             if (!code) {
-                setError('رابط الديمو غير صحيح');
-                setValidating(false);
+                setError('رابط الديمو غير صالح');
                 setLoading(false);
                 return;
             }
             
             try {
-                const result = await validateDemoLink(code);
+                const validation = await validateDemoLink(code);
                 
-                if (!result.valid) {
-                    setError(result.error || 'رابط الديمو غير صالح');
-                } else {
-                    setLink(result.link!);
+                if (!validation.valid || !validation.link) {
+                    setError(validation.error || 'رابط الديمو غير صالح');
+                    setLoading(false);
+                    return;
                 }
-            } catch (err) {
-                setError('حدث خطأ أثناء التحقق من الرابط');
+                
+                setLink(validation.link);
+            } catch (err: any) {
+                setError(err.message || 'حدث خطأ');
             } finally {
-                setValidating(false);
                 setLoading(false);
             }
         };
         
-        validateLink();
+        loadLink();
     }, [code]);
     
-    // ============================================================
-    // START DEMO
-    // ============================================================
-    
+    // ============ Start Demo ============
     const handleStartDemo = async () => {
-        if (!link) return;
+        if (!link || !link.demoFirebaseConfig) {
+            setError('بيانات الديمو غير مكتملة');
+            return;
+        }
         
-        setStarting(true);
+        setInitializing(true);
         
         try {
-            const session = await startDemoSession(link.linkCode, {
-                name: userName || undefined,
-                email: userEmail || undefined,
-                phone: userPhone || undefined,
-            });
+            await recordDemoUsage(link.linkCode);
+            const demoInstance = await initializeDemoFirebase(link.demoFirebaseConfig, link.linkCode);
             
-            if (session) {
-                // Save session locally
-                saveDemoSessionLocally(session);
-                
-                // Navigate to appropriate dashboard based on permissions
-                const firstScope = link.allowedScopes[0] || 'reception';
-                const routes: Record<string, string> = {
-                    'all': '/reception',
-                    'reception': '/reception',
-                    'housekeeping': '/housekeeping',
-                    'bellman': '/bellman',
-                    'maintenance': '/maintenance',
-                    'admin': '/admin',
-                    'owner': '/owner-dashboard',
-                };
-                
-                navigate(routes[firstScope] || '/reception', { 
-                    state: { demoSession: session, showTour: link.includeTour }
-                });
-            } else {
-                setError('فشل بدء جلسة الديمو. حاول مرة أخرى.');
+            if (!demoInstance) {
+                throw new Error('فشل تهيئة بيئة الديمو');
             }
-        } catch (err) {
-            setError('حدث خطأ أثناء بدء الديمو');
+            
+            saveDemoCode(link.linkCode);
+            navigate('/login');
+            
+        } catch (err: any) {
+            setError(err.message || 'فشل بدء التجربة');
         } finally {
-            setStarting(false);
+            setInitializing(false);
         }
     };
     
-    // ============================================================
-    // RENDER - LOADING
-    // ============================================================
+    // ============ WhatsApp Link ============
+    const handleSubscribe = () => {
+        if (!link?.salesWhatsAppNumber) return;
+        const message = encodeURIComponent('السلام عليكم، أنا مهتم بالاشتراك في نظام أدورا لإدارة الفنادق');
+        window.open(`https://wa.me/${link.salesWhatsAppNumber}?text=${message}`, '_blank');
+    };
     
+    // ============ Render Loading ============
     if (loading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+            <div className="adora-page min-h-screen flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center animate-pulse">
-                        <Sparkles className="w-10 h-10 text-white" />
+                    <div className="relative inline-block">
+                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[var(--theme-primary-400)] to-[var(--theme-primary-600)] flex items-center justify-center mb-6 animate-pulse shadow-lg">
+                            <Hotel className="w-10 h-10 text-white" />
+                        </div>
+                        <Loader2 className="w-8 h-8 text-[var(--theme-primary-500)] animate-spin absolute -bottom-2 -right-2" />
                     </div>
-                    <p className="text-white/60 text-lg">جاري التحقق من الرابط...</p>
-                    <Loader2 className="w-6 h-6 text-teal-400 animate-spin mx-auto mt-4" />
+                    <p className="adora-text-secondary text-lg">جاري تحميل بيانات الديمو...</p>
                 </div>
             </div>
         );
     }
     
-    // ============================================================
-    // RENDER - ERROR
-    // ============================================================
-    
+    // ============ Render Error ============
     if (error) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-                <div className="max-w-md w-full text-center">
-                    <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-red-500/20 flex items-center justify-center">
-                        <AlertTriangle className="w-10 h-10 text-red-400" />
+            <div className="adora-page min-h-screen flex items-center justify-center p-4">
+                <div className="text-center max-w-md">
+                    <div className="adora-empty-icon w-24 h-24 mx-auto mb-6" style={{ background: 'var(--theme-accent-red-light)' }}>
+                        <AlertTriangle className="w-12 h-12" style={{ color: 'var(--theme-accent-red)' }} />
                     </div>
-                    <h1 className="text-2xl font-bold text-white mb-3">رابط غير صالح</h1>
-                    <p className="text-white/60 mb-6">{error}</p>
+                    <h1 className="text-3xl font-bold adora-text-primary mb-4">
+                        رابط الديمو غير صالح
+                    </h1>
+                    <p className="adora-text-tertiary text-lg mb-8">
+                        {error}
+                    </p>
                     <button
-                        onClick={() => navigate('/')}
-                        className="px-6 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors"
+                        onClick={() => navigate('/login')}
+                        className="adora-btn adora-btn-secondary adora-btn-lg"
                     >
                         العودة للرئيسية
                     </button>
@@ -170,234 +135,146 @@ export const DemoEntry: React.FC = () => {
         );
     }
     
-    // ============================================================
-    // RENDER - DEMO WELCOME
-    // ============================================================
+    // ============ Render Demo Info ============
+    if (!link) return null;
+    
+    const expiresIn = link.expiresAt 
+        ? Math.max(0, Math.ceil((link.expiresAt.toDate().getTime() - Date.now()) / (1000 * 60 * 60)))
+        : null;
     
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" dir="rtl">
-            {/* Background Effects */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-            </div>
-            
-            <div className="relative z-10 container mx-auto px-4 py-12 max-w-4xl">
-                {/* Header */}
-                <div className="text-center mb-12">
-                    {/* Logo */}
-                    <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-2xl shadow-teal-500/30">
-                        <span className="text-4xl font-black text-white">أ</span>
+        <div className="adora-page min-h-screen flex items-center justify-center p-4" dir="rtl">
+            <div className="w-full max-w-lg">
+                {/* Logo & Title */}
+                <div className="text-center mb-8">
+                    <div className="relative inline-block">
+                        <img
+                            src="/adora-logo.png"
+                            alt="Adora"
+                            className="w-24 h-24 object-contain mx-auto mb-4"
+                            style={{ filter: 'var(--logo-filter)' }}
+                        />
+                        <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-[var(--theme-accent-purple)] to-[var(--theme-accent-purple-dark)] rounded-lg flex items-center justify-center animate-pulse shadow-lg">
+                            <Sparkles className="w-4 h-4 text-white" />
+                        </div>
                     </div>
-                    
-                    <h1 className="text-4xl md:text-5xl font-black text-white mb-4">
-                        مرحباً بك في <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">أدورا</span>
+                    <h1 className="text-4xl font-bold adora-text-primary mb-3">
+                        تجربة أدورا المجانية
                     </h1>
-                    
-                    <p className="text-xl text-white/60 max-w-2xl mx-auto">
-                        نظام إدارة الفنادق الذكي - جرب كل المميزات مجاناً
+                    <p className="adora-text-secondary text-lg">
+                        جرب نظام إدارة الفنادق بنفسك!
                     </p>
                 </div>
                 
-                {/* Link Info */}
-                {link && (
-                    <div className="mb-8 flex flex-wrap justify-center gap-4">
-                        {link.expiresAt && (
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300">
-                                <Clock className="w-4 h-4" />
-                                <span className="text-sm">
-                                    صالح حتى: {link.expiresAt.toDate().toLocaleDateString('ar-SA')}
-                                </span>
+                {/* Demo Card */}
+                <div className="adora-card overflow-hidden">
+                    {/* Header - Manager Info */}
+                    <div className="adora-card-header" style={{ background: 'var(--theme-accent-purple-light)' }}>
+                        <div className="flex items-center gap-4 w-full">
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--theme-accent-purple)] to-[var(--theme-accent-purple-dark)] flex items-center justify-center shadow-lg">
+                                <Sparkles className="w-8 h-8 text-white" />
                             </div>
-                        )}
-                        {link.maxUses > 0 && (
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300">
-                                <Users className="w-4 h-4" />
-                                <span className="text-sm">
-                                    الاستخدامات: {link.currentUses}/{link.maxUses}
-                                </span>
-                            </div>
-                        )}
-                        {link.multiLicense && (
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300">
-                                <Building2 className="w-4 h-4" />
-                                <span className="text-sm">
-                                    {link.licensesCount} ترخيص - {link.branchesPerLicense} فرع لكل ترخيص
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                )}
-                
-                {/* Features Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
-                    {FEATURES.map((feature, idx) => (
-                        <div 
-                            key={idx}
-                            className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-teal-500/30 transition-all group"
-                        >
-                            <feature.icon className={`w-8 h-8 ${feature.color} mb-3 group-hover:scale-110 transition-transform`} />
-                            <p className="text-white font-bold">{feature.title}</p>
-                        </div>
-                    ))}
-                </div>
-                
-                {/* User Info Form */}
-                {showForm ? (
-                    <div className="max-w-md mx-auto mb-8 space-y-4">
-                        <div className="p-6 rounded-3xl bg-white/5 border border-white/10">
-                            <h3 className="text-white font-bold mb-4 text-center">
-                                معلوماتك (اختياري)
-                            </h3>
-                            
-                            <div className="space-y-3">
-                                <input
-                                    type="text"
-                                    value={userName}
-                                    onChange={(e) => setUserName(e.target.value)}
-                                    placeholder="الاسم"
-                                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white placeholder-white/40 focus:border-teal-500 focus:outline-none"
-                                />
-                                <input
-                                    type="email"
-                                    value={userEmail}
-                                    onChange={(e) => setUserEmail(e.target.value)}
-                                    placeholder="البريد الإلكتروني"
-                                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white placeholder-white/40 focus:border-teal-500 focus:outline-none"
-                                    dir="ltr"
-                                />
-                                <input
-                                    type="tel"
-                                    value={userPhone}
-                                    onChange={(e) => setUserPhone(e.target.value)}
-                                    placeholder="رقم الجوال"
-                                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white placeholder-white/40 focus:border-teal-500 focus:outline-none"
-                                    dir="ltr"
-                                />
+                            <div className="flex-1">
+                                <h2 className="text-2xl font-bold adora-text-primary">
+                                    {link.demoManager?.name || 'مشترك تجريبي'}
+                                </h2>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Key className="w-4 h-4" style={{ color: 'var(--theme-primary-500)' }} />
+                                    <span className="adora-text-secondary">كود الدخول:</span>
+                                    <code className="font-mono text-xl font-bold px-3 py-0.5 rounded-lg" style={{
+                                        color: 'var(--theme-primary-500)',
+                                        background: 'var(--theme-primary-100)'
+                                    }}>
+                                        {link.demoManager?.code || '****'}
+                                    </code>
+                                </div>
                             </div>
                         </div>
                     </div>
-                ) : (
-                    <div className="text-center mb-4">
-                        <button
-                            onClick={() => setShowForm(true)}
-                            className="text-teal-400 hover:text-teal-300 text-sm underline"
-                        >
-                            أريد إدخال معلوماتي للتواصل لاحقاً
-                        </button>
-                    </div>
-                )}
-                
-                {/* Start Button */}
-                <div className="text-center">
-                    <button
-                        onClick={handleStartDemo}
-                        disabled={starting}
-                        className="group relative inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-teal-500 to-cyan-600 text-white text-xl font-bold rounded-2xl shadow-2xl shadow-teal-500/30 hover:shadow-teal-500/50 hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 transition-all"
-                    >
-                        {starting ? (
-                            <>
-                                <Loader2 className="w-6 h-6 animate-spin" />
-                                <span>جاري التحميل...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Play className="w-6 h-6" />
-                                <span>ابدأ التجربة المجانية</span>
-                                <ArrowRight className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                            </>
-                        )}
-                    </button>
                     
-                    {link?.includeTour && (
-                        <p className="text-white/40 text-sm mt-4">
-                            ستبدأ جولة تعريفية تلقائية لشرح كل الخصائص
-                        </p>
-                    )}
-                </div>
-                
-                {/* Permissions Info */}
-                {link && (
-                    <div className="mt-12 p-6 rounded-3xl bg-white/5 border border-white/10">
-                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                            <Shield className="w-5 h-5 text-teal-400" />
-                            صلاحيات هذا الديمو
-                        </h3>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div className={`p-3 rounded-xl ${link.canCreateRequests ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'} border`}>
-                                <div className="flex items-center gap-2">
-                                    {link.canCreateRequests ? (
-                                        <CheckCircle className="w-4 h-4 text-green-400" />
-                                    ) : (
-                                        <AlertTriangle className="w-4 h-4 text-red-400" />
-                                    )}
-                                    <span className={link.canCreateRequests ? 'text-green-300' : 'text-red-300'}>إنشاء طلبات</span>
-                                </div>
-                            </div>
-                            
-                            <div className={`p-3 rounded-xl ${link.canManageEmployees ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'} border`}>
-                                <div className="flex items-center gap-2">
-                                    {link.canManageEmployees ? (
-                                        <CheckCircle className="w-4 h-4 text-green-400" />
-                                    ) : (
-                                        <AlertTriangle className="w-4 h-4 text-red-400" />
-                                    )}
-                                    <span className={link.canManageEmployees ? 'text-green-300' : 'text-red-300'}>إدارة الموظفين</span>
-                                </div>
-                            </div>
-                            
-                            <div className={`p-3 rounded-xl ${link.canViewReports ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'} border`}>
-                                <div className="flex items-center gap-2">
-                                    {link.canViewReports ? (
-                                        <CheckCircle className="w-4 h-4 text-green-400" />
-                                    ) : (
-                                        <AlertTriangle className="w-4 h-4 text-red-400" />
-                                    )}
-                                    <span className={link.canViewReports ? 'text-green-300' : 'text-red-300'}>عرض التقارير</span>
-                                </div>
-                            </div>
-                            
-                            <div className={`p-3 rounded-xl ${link.canAccessSettings ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'} border`}>
-                                <div className="flex items-center gap-2">
-                                    {link.canAccessSettings ? (
-                                        <CheckCircle className="w-4 h-4 text-green-400" />
-                                    ) : (
-                                        <AlertTriangle className="w-4 h-4 text-red-400" />
-                                    )}
-                                    <span className={link.canAccessSettings ? 'text-green-300' : 'text-red-300'}>الإعدادات</span>
-                                </div>
-                            </div>
+                    {/* Info Section */}
+                    <div className="adora-card-body space-y-4">
+                        {/* Branch */}
+                        <div className="adora-alert adora-alert-teal">
+                            <Building2 className="w-6 h-6 flex-shrink-0" />
+                            <span className="text-lg">{link.demoManager?.branchName || 'فرع تجريبي'}</span>
                         </div>
                         
-                        {/* Allowed Sections */}
-                        <div className="mt-4">
-                            <p className="text-white/60 text-sm mb-2">الأقسام المتاحة:</p>
-                            <div className="flex flex-wrap gap-2">
-                                {link.allowedScopes.map(scope => (
-                                    <span 
-                                        key={scope}
-                                        className="px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 text-sm"
+                        {/* Expiry Time */}
+                        {expiresIn !== null && (
+                            <div className="adora-alert adora-alert-warning">
+                                <Clock className="w-6 h-6 flex-shrink-0" />
+                                <span className="text-lg">صالح لمدة <strong>{expiresIn}</strong> ساعة</span>
+                            </div>
+                        )}
+                        
+                        {/* Features List */}
+                        <div className="adora-border-t pt-4 mt-4">
+                            <p className="adora-text-tertiary text-sm mb-4">ستتمكن من:</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    { icon: Users, text: 'إنشاء غرف وموظفين' },
+                                    { icon: FileText, text: 'إدارة طلبات النزلاء' },
+                                    { icon: Settings, text: 'تجربة كل الأقسام' },
+                                    { icon: BarChart3, text: 'رؤية التقارير والإحصائيات' }
+                                ].map((feature, idx) => (
+                                    <div 
+                                        key={idx} 
+                                        className="flex items-center gap-2 p-3 rounded-xl"
+                                        style={{
+                                            background: 'var(--theme-bg-tertiary)',
+                                            border: '1px solid var(--theme-border-secondary)'
+                                        }}
                                     >
-                                        {scope === 'all' ? 'كل الأقسام' :
-                                         scope === 'reception' ? 'الاستقبال' :
-                                         scope === 'housekeeping' ? 'النظافة' :
-                                         scope === 'bellman' ? 'البيلمان' :
-                                         scope === 'maintenance' ? 'الصيانة' :
-                                         scope === 'admin' ? 'المدير' :
-                                         scope === 'owner' ? 'المالك' : scope}
-                                    </span>
+                                        <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--theme-accent-green)' }} />
+                                        <span className="adora-text-secondary text-sm">{feature.text}</span>
+                                    </div>
                                 ))}
                             </div>
                         </div>
                     </div>
-                )}
-                
-                {/* Footer */}
-                <div className="mt-12 text-center text-white/30 text-sm">
-                    <p>نظام أدورا لإدارة الفنادق © 2024</p>
-                    <p className="mt-1">هذه نسخة تجريبية - البيانات وهمية للعرض فقط</p>
+                    
+                    {/* Actions */}
+                    <div className="adora-card-footer flex-col">
+                        {/* Start Demo Button */}
+                        <button
+                            onClick={handleStartDemo}
+                            disabled={initializing}
+                            className="adora-btn adora-btn-primary adora-btn-lg w-full"
+                        >
+                            {initializing ? (
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                            ) : (
+                                <>
+                                    <Sparkles className="w-6 h-6" />
+                                    ابدأ التجربة الآن
+                                    <ArrowRight className="w-5 h-5" />
+                                </>
+                            )}
+                        </button>
+                        
+                        {/* Subscribe via WhatsApp */}
+                        {link.salesWhatsAppNumber && (
+                            <button
+                                onClick={handleSubscribe}
+                                className="adora-btn adora-btn-lg w-full"
+                                style={{
+                                    background: 'var(--theme-accent-green-light)',
+                                    color: 'var(--theme-accent-green)',
+                                    border: '1px solid var(--theme-accent-green)'
+                                }}
+                            >
+                                <MessageCircle className="w-5 h-5" />
+                                اشترك الآن
+                            </button>
+                        )}
+                    </div>
                 </div>
+                
+                {/* Footer Note */}
+                <p className="text-center adora-text-disabled text-sm mt-6">
+                    هذه نسخة تجريبية - البيانات معزولة وآمنة
+                </p>
             </div>
         </div>
     );

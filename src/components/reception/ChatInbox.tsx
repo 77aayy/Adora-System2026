@@ -145,7 +145,7 @@ const ChatRoomItem: React.FC<ChatRoomItemProps> = ({
                 {/* SLA Warning */}
                 {pendingRequest && (
                     <div className={`flex items-center gap-1 mt-1 text-xs ${
-                        isCritical ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-white/40'
+                        isCritical ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-white/70'
                     }`}>
                         <Clock className="w-3 h-3" />
                         <span>منذ {elapsed} دقيقة</span>
@@ -154,7 +154,7 @@ const ChatRoomItem: React.FC<ChatRoomItemProps> = ({
                 )}
             </div>
 
-            <ChevronRight className="w-4 h-4 text-white/30" />
+            <ChevronRight className="w-4 h-4 text-white/70" />
         </button>
     );
 };
@@ -237,7 +237,7 @@ const MessageView: React.FC<MessageViewProps> = ({
                             onClick={() => onApprove(pendingRequest.id)}
                             disabled={sending}
                             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
-                                       bg-green-600 hover:bg-green-700 text-white font-bold
+                                       bg-primary-600 hover:bg-green-700 text-white font-bold
                                        transition-colors disabled:opacity-50"
                         >
                             <Check className="w-5 h-5" />
@@ -293,7 +293,7 @@ const MessageView: React.FC<MessageViewProps> = ({
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                         placeholder="اكتب رسالة للنزيل..."
                         className="flex-1 bg-white/10 border border-white/10 rounded-xl
-                                   px-4 py-2.5 text-white placeholder:text-white/40
+                                   px-4 py-2.5 text-white placeholder:text-white/70
                                    focus:outline-none focus:border-teal-500/50"
                         dir="rtl"
                     />
@@ -537,26 +537,26 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
     // ============================================================
 
     return (
-        <div className={`bg-slate-900 rounded-2xl border border-white/10 overflow-hidden flex ${className}`}
-             style={{ height: '600px' }}>
+        <div className={`adora-card rounded-2xl overflow-hidden flex ${className}`}
+             style={{ height: '500px', maxHeight: '70vh' }}>
             
             {/* Sidebar - Room List */}
-            <div className="w-80 border-l border-white/10 flex flex-col">
+            <div className="w-72 sm:w-80 adora-border-l flex flex-col">
                 {/* Header */}
-                <div className="p-4 border-b border-white/10">
+                <div className="p-3 sm:p-4 adora-border-b">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-white font-bold flex items-center gap-2">
-                            <MessageCircle className="w-5 h-5 text-teal-400" />
+                        <h3 className="adora-text-primary font-bold flex items-center gap-2 text-sm sm:text-base">
+                            <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: 'var(--theme-primary-500)' }} />
                             صندوق الشات
                         </h3>
                         <div className="flex items-center gap-2">
                             {stats.totalUnread > 0 && (
-                                <span className="px-2 py-0.5 rounded-full bg-teal-500 text-white text-xs font-bold">
+                                <span className="adora-badge adora-badge-teal text-xs font-bold">
                                     {stats.totalUnread}
                                 </span>
                             )}
                             {stats.criticalCount > 0 && (
-                                <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold animate-pulse">
+                                <span className="adora-badge adora-badge-red text-xs font-bold animate-pulse">
                                     ⚠️ {stats.criticalCount}
                                 </span>
                             )}
@@ -565,15 +565,13 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
 
                     {/* Search */}
                     <div className="relative">
-                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 adora-text-tertiary" />
                         <input
                             type="text"
                             placeholder="بحث برقم الغرفة..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-white/10 border border-white/10 rounded-xl pr-10 pl-4 py-2
-                                       text-white text-sm placeholder:text-white/40
-                                       focus:outline-none focus:border-teal-500/50"
+                            className="adora-input w-full pr-10 pl-4 py-2 text-sm"
                         />
                     </div>
 
@@ -581,7 +579,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
                     <button
                         onClick={() => setShowOnlyUnread(!showOnlyUnread)}
                         className={`mt-2 flex items-center gap-2 text-xs transition-colors ${
-                            showOnlyUnread ? 'text-teal-400' : 'text-white/50'
+                            showOnlyUnread ? 'adora-service-housekeeping' : 'adora-text-tertiary'
                         }`}
                     >
                         <Filter className="w-3 h-3" />
@@ -592,7 +590,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
                 {/* Room List */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {filteredRooms.length === 0 ? (
-                        <div className="text-center text-white/40 py-8">
+                        <div className="text-center text-white/70 py-8">
                             <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
                             <p>لا توجد محادثات</p>
                         </div>
@@ -646,7 +644,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
                         />
                     </>
                 ) : (
-                    <div className="flex-1 flex items-center justify-center text-white/40">
+                    <div className="flex-1 flex items-center justify-center text-white/70">
                         <div className="text-center">
                             <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
                             <p>اختر محادثة للبدء</p>

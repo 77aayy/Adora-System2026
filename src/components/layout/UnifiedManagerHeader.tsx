@@ -20,10 +20,12 @@ import {
     Building2,
     ChevronDown,
     Settings,
+    Trophy,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
+import { PointsTracker } from '../shared/PointsTracker';
 
 interface DepartmentTab {
     id: string;
@@ -174,9 +176,9 @@ export const UnifiedManagerHeader: React.FC = () => {
                     background: #0f172a !important;
                 }
             `}</style>
-                {/* Top Bar - Logo, Branch, Actions */}
+                {/* Top Bar - Logo, Branch, User Info, Actions */}
                 <div className="px-3 lg:px-6 py-2 flex items-center justify-between">
-                    {/* Right Side - Menu Button (Mobile) + Logo */}
+                    {/* Right Side - Menu Button (Mobile) + Logo + Branch */}
                     <div className="flex items-center gap-3">
                         {/* ✅ Admin Menu Button - Mobile Only */}
                         <button
@@ -212,11 +214,11 @@ export const UnifiedManagerHeader: React.FC = () => {
                         </Link>
 
                         {/* Branch Selector */}
-                        {branches.length > 1 && (
+                        {branches.length > 0 && (
                             <div className="relative">
                                 <button
-                                    onClick={() => setShowBranchMenu(!showBranchMenu)}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all hover:bg-teal-500/10"
+                                    onClick={() => branches.length > 1 && setShowBranchMenu(!showBranchMenu)}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${branches.length > 1 ? 'hover:bg-teal-500/10 cursor-pointer' : 'cursor-default'}`}
                                     style={{
                                         background: 'var(--theme-bg-secondary)',
                                         border: '1px solid var(--theme-border-primary)',
@@ -224,12 +226,14 @@ export const UnifiedManagerHeader: React.FC = () => {
                                     }}
                                 >
                                     <Building2 className="w-4 h-4 text-teal-500" />
-                                    <span className="text-sm font-medium hidden sm:inline">{branchName}</span>
-                                    <ChevronDown className={`w-4 h-4 transition-transform ${showBranchMenu ? 'rotate-180' : ''}`} />
+                                    <span className="text-sm font-medium">{branchName}</span>
+                                    {branches.length > 1 && (
+                                        <ChevronDown className={`w-4 h-4 transition-transform ${showBranchMenu ? 'rotate-180' : ''}`} />
+                                    )}
                                 </button>
 
                                 {/* Branch Dropdown */}
-                                {showBranchMenu && (
+                                {showBranchMenu && branches.length > 1 && (
                                     <>
                                         <div 
                                             className="fixed inset-0 z-40"
@@ -267,8 +271,36 @@ export const UnifiedManagerHeader: React.FC = () => {
                         )}
                     </div>
 
+                    {/* Center - Welcome Message & User Name (Desktop) */}
+                    <div className="hidden md:flex items-center gap-2">
+                        <span className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+                            مرحباً،
+                        </span>
+                        <span className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                            {user?.name || 'المستخدم'}
+                        </span>
+                        <span className="text-lg">👋</span>
+                    </div>
+
                     {/* Left Side - Actions */}
                     <div className="flex items-center gap-2">
+                        {/* Mobile: Show user name */}
+                        <div className="md:hidden flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: 'var(--theme-bg-secondary)' }}>
+                            <span className="text-xs font-medium" style={{ color: 'var(--theme-text-primary)' }}>
+                                {user?.name?.split(' ')[0] || 'مستخدم'}
+                            </span>
+                            <span className="text-sm">👋</span>
+                        </div>
+                        
+                        {/* 🏆 Points Tracker - Golden Cup */}
+                        {user?.id && (
+                            <PointsTracker 
+                                employeeId={user.id} 
+                                inline 
+                                showHistory 
+                            />
+                        )}
+                        
                         <button
                             onClick={logout}
                             className="p-2 rounded-lg transition-all hover:bg-red-500/10 text-red-500"
@@ -303,7 +335,7 @@ export const UnifiedManagerHeader: React.FC = () => {
                             }}
                         />
 
-                        {/* Tabs */}
+                        {/* Tabs - Icons with Labels below */}
                         {departmentTabs.map((tab) => {
                             const isActive = activeTab === tab.id;
                             return (
@@ -311,8 +343,9 @@ export const UnifiedManagerHeader: React.FC = () => {
                                     key={tab.id}
                                     ref={(el) => tabRefs.current[tab.id] = el}
                                     onClick={() => handleTabClick(tab)}
+                                    title={tab.label}
                                     className={`
-                                        relative flex items-center gap-1.5 px-3 lg:px-4 py-2 rounded-lg transition-all duration-200
+                                        relative flex flex-col items-center justify-center gap-0.5 px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-lg transition-all duration-200 min-w-[44px] sm:min-w-[56px]
                                         ${isActive 
                                             ? 'text-white' 
                                             : 'hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -326,8 +359,14 @@ export const UnifiedManagerHeader: React.FC = () => {
                                         boxShadow: isActive ? `0 4px 12px ${tab.color}40` : 'none',
                                     }}
                                 >
-                                    {tab.icon}
-                                    <span className="text-xs lg:text-sm font-medium whitespace-nowrap">
+                                    {/* Icon - Always visible, larger */}
+                                    <span className="text-lg sm:text-base">
+                                        {React.cloneElement(tab.icon as React.ReactElement, {
+                                            className: 'w-5 h-5 sm:w-4 sm:h-4'
+                                        })}
+                                    </span>
+                                    {/* Label - Hidden on xs, short on sm, full on lg */}
+                                    <span className="hidden sm:block text-[10px] lg:text-xs font-medium whitespace-nowrap leading-tight">
                                         <span className="hidden lg:inline">{tab.label}</span>
                                         <span className="lg:hidden">{tab.shortLabel}</span>
                                     </span>

@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
     Users,
@@ -48,6 +48,9 @@ import {
     Archive, // ✅ Archive icon for lost items
     Package, // ✅ Package icon for lost items
     AlertTriangle, // ✅ Emergency/Other requests icon
+    CalendarClock, // ✅ Scheduled requests icon
+    ArrowRightLeft, // ✅ Department transfer icon
+    Zap, // ✅ Quick Actions header icon
     BookOpen, // ✅ General instructions icon
     MessageCircle // ✅ WhatsApp icon
 } from 'lucide-react';
@@ -93,6 +96,7 @@ import { useOnboardingTour } from '../../hooks/useOnboardingTour';
 import { OverflowAlert } from '../../components/shared/OverflowAlert'; // 🔄 Overflow Alert // ✅ Onboarding tour
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
 import { SupportTicketModal } from '../../components/shared/SupportTicketModal'; // ✅ Support ticket modal
+import { SmartBranchSetupWizard } from '../admin/SmartBranchSetupWizard'; // ✅ Smart setup wizard for new managers
 import { RequestTimer } from '../../components/shared/RequestTimer'; // ✅ Request timer
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
@@ -132,7 +136,7 @@ interface ServiceRequest {
     assignedTo?: { id: string; name: string };
     completedBy?: { id: string; name: string };
     // Department tracking - which department currently owns this request
-    currentDepartment: 'reception' | 'housekeeping' | 'maintenance' | 'bellman';
+    currentDepartment: 'reception' | 'housekeeping' | 'maintenance' | 'bellman' | 'coffee_shop';
     originDepartment?: 'reception'; // Where request was created
     // Inspection-specific
     serviceType?: string;
@@ -207,13 +211,14 @@ type TabType = 'pending' | 'active' | 'completed';
 // CONSTANTS
 // ============================================================
 
+// ✅ THEME-AWARE: Using CSS Variables for consistent Light/Dark styling
 const QUICK_ACTIONS: QuickAction[] = [
-    { type: 'cleaning', icon: <Sparkles className="w-6 h-6" />, label: 'تنظيف', color: 'text-cyan-400', bgColor: 'bg-cyan-500/20' },
-    { type: 'maintenance', icon: <Wrench className="w-6 h-6" />, label: 'صيانة', color: 'text-orange-400', bgColor: 'bg-orange-500/20' },
-    { type: 'bellman', icon: <Bell className="w-6 h-6" />, label: 'بيلمان', color: 'text-purple-400', bgColor: 'bg-purple-500/20' },
-    { type: 'coffee', icon: <Coffee className="w-6 h-6" />, label: 'مشروبات', color: 'text-amber-400', bgColor: 'bg-amber-500/20' },
-    { type: 'inspection', icon: <Eye className="w-6 h-6" />, label: 'فحص غرفة', color: 'text-green-400', bgColor: 'bg-green-500/20' }, // ✅ Add inspection QuickAction
-    { type: 'other', icon: <AlertTriangle className="w-6 h-6" />, label: 'طلبات أخرى', color: 'text-red-400', bgColor: 'bg-red-500/20' }, // ✅ Emergency/Other requests
+    { type: 'cleaning', icon: <Sparkles className="w-6 h-6" />, label: 'تنظيف', color: 'adora-service-housekeeping', bgColor: 'adora-service-bg-housekeeping' },
+    { type: 'maintenance', icon: <Wrench className="w-6 h-6" />, label: 'صيانة', color: 'adora-service-maintenance', bgColor: 'adora-service-bg-maintenance' },
+    { type: 'bellman', icon: <Bell className="w-6 h-6" />, label: 'بيلمان', color: 'adora-service-bellman', bgColor: 'adora-service-bg-bellman' },
+    { type: 'coffee', icon: <Coffee className="w-6 h-6" />, label: 'مشروبات', color: 'adora-service-coffee', bgColor: 'adora-service-bg-coffee' },
+    { type: 'inspection', icon: <Eye className="w-6 h-6" />, label: 'فحص غرفة', color: 'adora-service-inspection', bgColor: 'adora-service-bg-inspection' },
+    { type: 'other', icon: <AlertTriangle className="w-6 h-6" />, label: 'طلبات أخرى', color: 'adora-service-emergency', bgColor: 'adora-service-bg-emergency' },
 ];
 
 const SERVICE_NAMES: Record<string, string> = {
@@ -228,15 +233,16 @@ const SERVICE_NAMES: Record<string, string> = {
     other: 'طلب طارئ'
 };
 
+// ✅ THEME-AWARE: Using CSS Variables for consistent Light/Dark styling
 const STATUS_CONFIG = {
-    PENDING: { label: 'جديد', color: 'text-yellow-400', bg: 'bg-yellow-500/20', icon: AlertCircle },
-    PENDING_RECEPTION: { label: 'بانتظار التأكيد', color: 'text-orange-400', bg: 'bg-orange-500/20', icon: AlertCircle },
-    CONFIRMED: { label: 'مؤكد', color: 'text-blue-400', bg: 'bg-blue-500/20', icon: Check },
-    IN_PROGRESS: { label: 'قيد التنفيذ', color: 'text-purple-400', bg: 'bg-purple-500/20', icon: Clock },
-    COMPLETED: { label: 'مكتمل', color: 'text-green-400', bg: 'bg-green-500/20', icon: CheckCircle2 },
-    WAITING_PARTS: { label: 'بانتظار قطع', color: 'text-red-400', bg: 'bg-red-500/20', icon: Wrench },
-    NEEDS_INSPECTION: { label: 'يحتاج فحص', color: 'text-purple-400', bg: 'bg-purple-500/20', icon: Eye },
-    SCHEDULED: { label: 'مجدول', color: 'text-blue-400', bg: 'bg-blue-500/20', icon: Calendar }
+    PENDING: { label: 'جديد', color: 'adora-status-pending', bg: 'adora-status-bg-pending', icon: AlertCircle },
+    PENDING_RECEPTION: { label: 'بانتظار التأكيد', color: 'adora-status-warning', bg: 'adora-status-bg-warning', icon: AlertCircle },
+    CONFIRMED: { label: 'مؤكد', color: 'adora-status-confirmed', bg: 'adora-status-bg-confirmed', icon: Check },
+    IN_PROGRESS: { label: 'قيد التنفيذ', color: 'adora-status-progress', bg: 'adora-status-bg-progress', icon: Clock },
+    COMPLETED: { label: 'مكتمل', color: 'adora-status-success', bg: 'adora-status-bg-success', icon: CheckCircle2 },
+    WAITING_PARTS: { label: 'بانتظار قطع', color: 'adora-status-danger', bg: 'adora-status-bg-danger', icon: Wrench },
+    NEEDS_INSPECTION: { label: 'يحتاج فحص', color: 'adora-status-progress', bg: 'adora-status-bg-progress', icon: Eye },
+    SCHEDULED: { label: 'مجدول', color: 'adora-status-confirmed', bg: 'adora-status-bg-confirmed', icon: Calendar }
 };
 
 // ============================================================
@@ -377,102 +383,88 @@ const RequestCard: React.FC<{
     return (
         <div
             className={`
-                relative
-                overflow-hidden
-                rounded-[2rem]
-                p-5 sm:p-6 md:p-7
-                
-                bg-gradient-to-br from-white/6 via-white/4 to-white/3
-                border border-white/10
-                shadow-[0_2px_12px_rgba(0,0,0,0.08),0_1px_4px_rgba(0,0,0,0.04)]
-                transition-all duration-300 ease-out
-                cursor-pointer
-                touch-manipulation
+                adora-request-card-v2
                 group
-                hover:shadow-[0_4px_20px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)]
-                hover:border-primary-500/25
-                hover:-translate-y-1
-                hover:scale-[1.005]
-                active:scale-[0.99]
-                ${isUrgent ? 'ring-1 ring-red-500/40 shadow-red-500/15' : ''}
-                ${isDelayed ? 'ring-1 ring-orange-500/40 shadow-orange-500/15' : ''}
+                ${isUrgent ? 'urgent' : ''}
+                ${isDelayed ? 'delayed' : ''}
                 ${request.type === 'coffee' && request.status === 'COMPLETED' && request.currentDepartment === 'reception' 
-                    ? 'ring-2 ring-amber-500/50 shadow-amber-500/20 bg-gradient-to-br from-amber-900/20 via-amber-800/10 to-amber-700/5' 
+                    ? 'adora-coffee-delivered' 
                     : ''}
             `}
             onClick={handleClick}
         >
-            {/* Soft Background Glow - Very Subtle */}
+            {/* Soft Background Glow - Theme Aware */}
             <div className="
                 absolute -top-16 -right-16
                 w-32 h-32
                 rounded-full
-                bg-gradient-to-br from-primary-500/6 to-primary-400/4
                 blur-3xl
                 opacity-0
                 group-hover:opacity-100
                 transition-opacity duration-500
-            " />
-            {/* Header - Mobile Optimized */}
+            " style={{ background: 'linear-gradient(135deg, rgba(var(--theme-primary-500-rgb, 13, 148, 136), 0.06) 0%, rgba(var(--theme-primary-400-rgb, 45, 212, 191), 0.04) 100%)' }} />
+            {/* Header - Mobile Optimized - Theme Aware */}
             <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                    <span className="text-2xl sm:text-3xl font-semibold text-white/95 tracking-tight">غ.{request.roomNumber}</span>
+                    <span className="text-2xl sm:text-3xl font-semibold adora-text-primary tracking-tight">غ.{request.roomNumber}</span>
                     {isUrgent && (
-                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs font-bold">
+                        <span className="adora-badge adora-badge-red text-xs font-bold">
                             عاجل
                         </span>
                     )}
                     {isDelayed && (
-                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 text-xs font-bold animate-pulse">
+                        <span className="adora-badge adora-badge-orange text-xs font-bold animate-pulse">
                             متأخر
                         </span>
                     )}
                     {/* ☕ Coffee Shop Completion Badge */}
                     {request.type === 'coffee' && request.status === 'COMPLETED' && request.currentDepartment === 'reception' && (
-                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40">
+                        <span className="adora-badge adora-badge-yellow text-xs font-bold">
                             ☕ تم التوصيل
                         </span>
                     )}
                     {/* ✅ Emergency Request Badge */}
                     {request.isEmergency && (
-                        <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-red-500/30 text-red-300 text-xs font-bold animate-pulse border border-red-500/50">
+                        <span className="adora-badge adora-badge-red text-xs font-bold animate-pulse">
                             🔴 طلب طارئ
                         </span>
                     )}
                 </div>
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${statusConfig.bg} border border-white/10 flex-shrink-0 shadow-sm`}>
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${statusConfig.bg} adora-border flex-shrink-0 shadow-sm`}>
                     <StatusIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${statusConfig.color}`} />
                     <span className={`text-xs sm:text-sm font-semibold ${statusConfig.color} hidden sm:inline`}>{statusConfig.label}</span>
                 </div>
             </div>
 
-            {/* Content - Mobile Optimized */}
+            {/* Content - Mobile Optimized - Theme Aware */}
             <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-[1.25rem] flex-shrink-0 ${QUICK_ACTIONS.find(a => a.type === request.type)?.bgColor || 'bg-white/10'} flex items-center justify-center relative shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-white/8 transition-all duration-300 group-hover:scale-105`}>
-                    {QUICK_ACTIONS.find(a => a.type === request.type)?.icon || <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white/60" />}
+                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-[1.25rem] flex-shrink-0 ${QUICK_ACTIONS.find(a => a.type === request.type)?.bgColor || 'adora-bg-tertiary'} flex items-center justify-center relative shadow-sm adora-border transition-all duration-300 group-hover:scale-105`}>
+                    <span className={QUICK_ACTIONS.find(a => a.type === request.type)?.color}>
+                        {QUICK_ACTIONS.find(a => a.type === request.type)?.icon || <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 adora-text-tertiary" />}
+                    </span>
                     {/* ✅ QR Badge - Show if request is from QR */}
                     {request.source === 'QR' && (
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-teal-500 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-lg">
+                        <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border-2 shadow-lg" style={{ background: 'var(--theme-primary-500)', borderColor: 'var(--theme-bg-secondary)' }}>
                             <QrCode className="w-3 h-3 text-white" />
                         </div>
                     )}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                        <p className="text-white/95 font-medium text-sm sm:text-base truncate tracking-wide">{SERVICE_NAMES[request.type]}</p>
+                        <p className="adora-text-primary font-medium text-sm sm:text-base truncate tracking-wide">{SERVICE_NAMES[request.type]}</p>
                         {/* ✅ QR Badge - Text version */}
                         {request.source === 'QR' && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 text-xs font-bold flex items-center gap-1 flex-shrink-0">
+                            <span className="adora-badge adora-badge-teal text-xs font-bold flex items-center gap-1 flex-shrink-0">
                                 <Smartphone className="w-3 h-3" />
                                 <span className="hidden sm:inline">QR</span>
                             </span>
                         )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-white/65 text-xs sm:text-sm truncate">{request.guestName || 'نزيل'}</p>
+                        <p className="adora-text-secondary text-xs sm:text-sm truncate">{request.guestName || 'نزيل'}</p>
                         {/* ✅ Guest Info - Show identity/phone if available */}
                         {(request.guestIdentity || request.guestPhone) && (
-                            <span className="text-white/30 text-[10px] sm:text-xs flex items-center gap-1">
+                            <span className="adora-text-disabled text-xs sm:text-xs flex items-center gap-1">
                                 {request.guestIdentity && <span>• {request.guestIdentity}</span>}
                                 {request.guestPhone && <span>• {request.guestPhone}</span>}
                             </span>
@@ -494,11 +486,11 @@ const RequestCard: React.FC<{
                         />
                     )}
                     <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-                        <span className="text-white/60 text-[10px] sm:text-xs whitespace-nowrap text-right leading-tight max-w-[120px] sm:max-w-none">{lastActionText}</span>
+                        <span className="adora-text-tertiary text-xs sm:text-xs whitespace-nowrap text-right leading-tight max-w-[120px] sm:max-w-none">{lastActionText}</span>
                         {/* WhatsApp-style read receipt */}
                         <ReadReceipt request={request as any} size="sm" showPopup={false} />
                     </div>
-                    <span className="text-white/40 text-xs sm:text-sm whitespace-nowrap font-medium">منذ {timeAgo}</span>
+                    <span className="adora-text-disabled text-xs sm:text-sm whitespace-nowrap font-medium">منذ {timeAgo}</span>
                 </div>
             </div>
 
@@ -512,20 +504,20 @@ const RequestCard: React.FC<{
             })()}
             {/* We will implement the actual detection in the parent component and pass a prop */}
 
-            {/* ⚠️ SMART ALERT: Room Mismatch */}
+            {/* ⚠️ SMART ALERT: Room Mismatch - Theme Aware */}
             {potentialMismatch && (
-                <div className="mb-3 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30 flex items-start gap-2 animate-pulse">
-                    <AlertCircle className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                        <p className="text-orange-300 text-xs font-bold">تنبيه: محتمل اختلاف الغرفة</p>
-                        <p className="text-orange-400/80 text-[10px]">
+                <div className="mb-3 adora-info-box orange animate-pulse">
+                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                        <p className="text-xs font-bold">تنبيه: محتمل اختلاف الغرفة</p>
+                        <p className="text-xs opacity-80">
                             النزيل مسجل حالياً في غرفة <b>{potentialMismatch}</b>. هل تريد نقل الطلب؟
                         </p>
                     </div>
                     {onMove && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onMove(); }}
-                            className="mr-auto px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded shadow-sm"
+                            className="adora-btn adora-btn-warning adora-btn-sm"
                         >
                             نقل
                         </button>
@@ -533,49 +525,47 @@ const RequestCard: React.FC<{
                 </div>
             )}
 
-            {/* 🗑️ DELETION REQUEST ALERT */}
+            {/* 🗑️ DELETION REQUEST ALERT - Theme Aware */}
             {request.deletionRequest && (
-                <div className="mb-3 p-2 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-between animate-pulse">
-                    <div className="flex items-center gap-2">
-                        <Trash2 className="w-4 h-4 text-red-400" />
-                        <div>
-                            <p className="text-red-300 text-xs font-bold">طلب حذف معلق</p>
-                            <p className="text-red-400/60 text-[10px]">بواسطة: {request.deletionRequest.requestedBy}</p>
-                        </div>
+                <div className="mb-3 adora-info-box red animate-pulse">
+                    <Trash2 className="w-4 h-4 flex-shrink-0" />
+                    <div className="flex-1">
+                        <p className="text-xs font-bold">طلب حذف معلق</p>
+                        <p className="text-xs opacity-60">بواسطة: {request.deletionRequest.requestedBy}</p>
                     </div>
                     {/* If Manager, show Approval Badge */}
                     {['manager', 'admin', 'owner'].includes(userRole || '') && (
-                        <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full">
+                        <span className="adora-badge adora-badge-red text-xs">
                             مطلوب الموافقة
                         </span>
                     )}
                 </div>
             )}
 
-            {/* ✅ QR Request Info - Show guest verification info */}
+            {/* ✅ QR Request Info - Theme Aware */}
             {request.source === 'QR' && request.status === 'PENDING_RECEPTION' && (
-                <div className="mb-3 p-2 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-start gap-2">
-                    <QrCode className="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" />
+                <div className="mb-3 adora-info-box teal">
+                    <QrCode className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                        <p className="text-teal-300 text-xs font-bold">طلب من QR - يحتاج تأكيد</p>
-                        <p className="text-teal-400/80 text-[10px] mt-0.5">
+                        <p className="text-xs font-bold">طلب من QR - يحتاج تأكيد</p>
+                        <p className="text-xs opacity-80 mt-0.5">
                             النزيل: <b>{request.guestName || 'غير محدد'}</b>
                             {request.guestIdentity && ` • هوية: ${request.guestIdentity}`}
                             {request.guestPhone && ` • جوال: ${request.guestPhone}`}
                         </p>
-                        <p className="text-teal-400/60 text-[10px] mt-1">
+                        <p className="text-xs opacity-60 mt-1">
                             يرجى التحقق من البيانات والتأكيد قبل إرسال الطلب للقسم المختص
                         </p>
                     </div>
                 </div>
             )}
 
-            {/* ✅ Inspection Results - Show photo for damages/missing items */}
+            {/* ✅ Inspection Results - Theme Aware */}
             {request.inspectionResult && (request.inspectionResult === 'damages' || request.inspectionResult === 'missing_items') && request.inspectionPhoto && (
-                <div className="mb-3 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                <div className="mb-3 adora-info-box orange" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
                     <div className="flex items-center gap-2 mb-2">
-                        <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0" />
-                        <p className="text-orange-300 text-xs font-bold">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <p className="text-xs font-bold">
                             {request.inspectionResult === 'damages' ? '⚠️ تلفيات في الغرفة' : '📦 مفقودات من الغرفة'}
                         </p>
                     </div>
@@ -585,29 +575,28 @@ const RequestCard: React.FC<{
                         className="w-full h-32 sm:h-40 object-cover rounded-lg mb-2 cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={(e) => {
                             e.stopPropagation();
-                            // Open image in fullscreen/modal
                             window.open(request.inspectionPhoto, '_blank');
                         }}
                     />
                     {request.inspectionNotes && (
-                        <p className="text-orange-400/80 text-[10px] mt-1">{request.inspectionNotes}</p>
+                        <p className="text-xs opacity-80 mt-1">{request.inspectionNotes}</p>
                     )}
                 </div>
             )}
 
-            {/* ✅ Minibar Consumption - Show on card */}
+            {/* ✅ Minibar Consumption - Theme Aware */}
             {request.minibarConsumption && request.minibarConsumption.length > 0 && (
-                <div className="mb-3 p-2 rounded-lg bg-green-500/10 border border-green-500/30">
+                <div className="mb-3 adora-info-box green" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
                     <div className="flex items-center gap-2 mb-1.5">
-                        <ShoppingCart className="w-4 h-4 text-green-400" />
-                        <p className="text-green-300 text-xs font-bold">استهلاك الميني بار</p>
+                        <ShoppingCart className="w-4 h-4" />
+                        <p className="text-xs font-bold">استهلاك الميني بار</p>
                         {request.minibarTotal && (
-                            <span className="mr-auto text-green-400 text-xs font-bold">الإجمالي: {request.minibarTotal} ر.س</span>
+                            <span className="mr-auto text-xs font-bold">الإجمالي: {request.minibarTotal} ر.س</span>
                         )}
                     </div>
                     <div className="space-y-1">
                         {request.minibarConsumption.map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between text-[10px] text-green-400/80">
+                            <div key={idx} className="flex items-center justify-between text-xs opacity-80">
                                 <span>{item.productName}</span>
                                 <span>{item.quantity} × {item.pricePerUnit} ر.س = {item.total} ر.س</span>
                             </div>
@@ -616,59 +605,107 @@ const RequestCard: React.FC<{
                 </div>
             )}
 
-            {/* ✅ Lost Items Card - Archive Button */}
+            {/* ✅ Lost Items Card - Theme Aware */}
             {(request as any).isLostItemsCard && (request as any).lostItemsStatus === 'open' && onArchive && (
-                <div className="mb-3 p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Package className="w-5 h-5 text-purple-400" />
-                            <div>
-                                <p className="text-purple-300 text-xs font-bold">كارت مفقودات مفتوح</p>
-                                <p className="text-purple-400/60 text-[10px]">جاهز للنقل للأرشيف</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onArchive(); }}
-                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold text-sm flex items-center gap-2 hover:shadow-lg hover:shadow-purple-500/30 active:scale-95 transition-all"
-                        >
-                            <Archive className="w-4 h-4" />
-                            نقل للأرشيف
-                        </button>
+                <div className="mb-3 adora-info-box purple">
+                    <Package className="w-5 h-5 flex-shrink-0" />
+                    <div className="flex-1">
+                        <p className="text-xs font-bold">كارت مفقودات مفتوح</p>
+                        <p className="text-xs opacity-60">جاهز للنقل للأرشيف</p>
+                    </div>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onArchive(); }}
+                        className="adora-btn adora-btn-sm"
+                        style={{ background: 'linear-gradient(135deg, var(--theme-accent-purple) 0%, var(--theme-accent-purple-dark) 100%)', color: 'white' }}
+                    >
+                        <Archive className="w-4 h-4" />
+                        نقل للأرشيف
+                    </button>
+                </div>
+            )}
+
+            {/* 📝 NOTES & ADDITIONAL INFO - Always visible if exists */}
+            {request.notes && request.notes.trim() && (
+                <div className="mb-3 adora-info-box slate">
+                    <MessageSquare className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <p className="text-xs font-bold mb-1">ملاحظات الطلب</p>
+                        <p className="text-sm opacity-90 leading-relaxed whitespace-pre-wrap">{request.notes}</p>
                     </div>
                 </div>
             )}
 
-            {/* Actions - Mobile Optimized */}
+            {/* 🛒 Cart/Amenities Request - Theme Aware */}
+            {request.needsCart && (
+                <div className="mb-3 adora-info-box blue">
+                    <ShoppingCart className="w-4 h-4 flex-shrink-0" />
+                    <p className="text-xs font-bold">يحتاج عربة تنظيف</p>
+                </div>
+            )}
+
+            {/* 👥 Guest Status - Theme Aware */}
+            {request.guestStatus && (
+                <div className={`mb-3 adora-info-box ${request.guestStatus === 'in' ? 'green' : 'orange'}`}>
+                    <User className="w-4 h-4 flex-shrink-0" />
+                    <p className="text-xs font-bold">
+                        {request.guestStatus === 'in' ? '✅ النزيل موجود بالغرفة' : '🚪 الغرفة فارغة'}
+                    </p>
+                </div>
+            )}
+
+            {/* 📍 Current Department Tracking - Theme Aware */}
+            {request.currentDepartment && request.currentDepartment !== 'reception' && (
+                <div className="mb-3 adora-info-box cyan">
+                    <ArrowRightLeft className="w-4 h-4 flex-shrink-0" />
+                    <div className="flex-1">
+                        <p className="text-xs font-bold">حالياً في: {(() => {
+                            const deptNames: Record<string, string> = {
+                                housekeeping: 'الهاوس كيبنج 🧹',
+                                maintenance: 'الصيانة 🔧',
+                                bellman: 'البيلمان 🛎️',
+                                coffee_shop: 'الكافي شوب ☕'
+                            };
+                            return deptNames[request.currentDepartment] || request.currentDepartment;
+                        })()}</p>
+                        {request.assignedTo?.name && (
+                            <p className="text-xs opacity-70 mt-0.5">المسؤول: {request.assignedTo.name}</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* 📅 Scheduled Request - Theme Aware */}
+            {request.scheduledAt && (
+                <div className="mb-3 adora-info-box purple">
+                    <CalendarClock className="w-4 h-4 flex-shrink-0" />
+                    <div className="flex-1">
+                        <p className="text-xs font-bold">طلب مجدول</p>
+                        <p className="text-xs opacity-70">
+                            {(() => {
+                                const date = request.scheduledAt.toDate ? request.scheduledAt.toDate() : new Date(request.scheduledAt);
+                                return date.toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' });
+                            })()}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Actions - Mobile Optimized - Theme Aware */}
             <div className="flex gap-1.5 sm:gap-2">
                 {(request.status === 'PENDING' || request.status === 'PENDING_RECEPTION') && onConfirm && (
                     <div className="flex gap-1.5 sm:gap-2 flex-1">
                         <button
                             onClick={(e) => { e.stopPropagation(); onConfirm(); }}
-                            className="
-                                relative
-                                overflow-hidden
-                                flex-1 
-                                py-4 sm:py-5 px-6 sm:px-7 
-                                rounded-[1.5rem]
-                                bg-gradient-to-r from-green-500/95 via-emerald-500/95 to-green-600/95 
-                                text-white font-semibold text-base sm:text-lg 
-                                flex items-center justify-center gap-3 sm:gap-4 
-                                shadow-[0_2px_12px_rgba(34,197,94,0.25),0_1px_4px_rgba(34,197,94,0.15)]
-                                hover:shadow-[0_4px_20px_rgba(34,197,94,0.35),0_2px_8px_rgba(34,197,94,0.2)]
-                                hover:scale-[1.01]
-                                active:scale-[0.99]
-                                transition-all duration-300 ease-out
-                                touch-manipulation
-                                group
-                            "
+                            className="adora-btn adora-btn-success flex-1 py-4 sm:py-5 text-base sm:text-lg rounded-[1.5rem] group"
                         >
-                            <Check className="w-5 h-5 sm:w-6 sm:h-6 relative z-10 transition-transform duration-300 group-hover:scale-105" />
-                            <span className="relative z-10">تأكيد</span>
+                            <Check className="w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-300 group-hover:scale-105" />
+                            <span>تأكيد</span>
                         </button>
                         {onMove && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onMove(); }}
-                                className="px-3 rounded-xl bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all touch-manipulation flex items-center justify-center"
+                                className="adora-btn px-3 rounded-xl"
+                                style={{ background: 'var(--theme-accent-orange-light)', color: 'var(--theme-accent-orange)' }}
                                 title="نقل النزيل"
                             >
                                 <Repeat className="w-4 h-4" />
@@ -679,43 +716,28 @@ const RequestCard: React.FC<{
                 {(request.status === 'CONFIRMED' || request.status === 'IN_PROGRESS') && onComplete && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onComplete(); }}
-                        className="
-                            relative
-                            overflow-hidden
-                            flex-1 
-                            py-4 sm:py-5 px-5 sm:px-6 
-                            rounded-[1.5rem]
-                            bg-gradient-to-r from-blue-500/95 via-indigo-500/95 to-blue-600/95 
-                            text-white font-semibold text-sm sm:text-base 
-                            flex items-center justify-center gap-3 sm:gap-3.5 
-                            shadow-[0_2px_12px_rgba(59,130,246,0.25),0_1px_4px_rgba(59,130,246,0.15)]
-                            hover:shadow-[0_4px_20px_rgba(59,130,246,0.35),0_2px_8px_rgba(59,130,246,0.2)]
-                            hover:scale-[1.01]
-                            active:scale-[0.99]
-                            transition-all duration-300 ease-out
-                            touch-manipulation
-                            group
-                        "
+                        className="adora-btn flex-1 py-4 sm:py-5 text-sm sm:text-base rounded-[1.5rem] group"
+                        style={{ background: 'linear-gradient(135deg, var(--theme-accent-blue) 0%, var(--theme-accent-blue-dark) 100%)', color: 'white', boxShadow: '0 4px 14px rgba(59, 130, 246, 0.3)' }}
                     >
-                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 relative z-10 transition-transform duration-300 group-hover:scale-105" />
-                        <span className="relative z-10">إتمام</span>
+                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-300 group-hover:scale-105" />
+                        <span>إتمام</span>
                     </button>
                 )}
                 <button
                     onClick={(e) => { e.stopPropagation(); onView?.(); }}
-                    className="py-2.5 sm:py-2 px-3 sm:px-4 rounded-xl bg-white/10 text-white/70 hover:bg-white/20 active:scale-95 transition-all touch-manipulation"
+                    className="adora-btn adora-btn-secondary py-2.5 sm:py-2 px-3 sm:px-4 rounded-xl"
                 >
                     <Eye className="w-4 h-4" />
                 </button>
-                {/* ✅ Delete/Request Deletion Button */}
+                {/* ✅ Delete/Request Deletion Button - Theme Aware */}
                 {!request.deletionRequest && (
-                    // Only show delete button if there's no pending deletion request
                     <>
                         {/* Manager/Admin/Owner: Direct Delete */}
                         {['manager', 'admin', 'owner'].includes(userRole || '') && onDelete && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                                className="py-2.5 sm:py-2 px-3 sm:px-4 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 active:scale-95 transition-all touch-manipulation flex items-center gap-1.5"
+                                className="adora-btn py-2.5 sm:py-2 px-3 sm:px-4 rounded-xl"
+                                style={{ background: 'var(--theme-accent-red-light)', color: 'var(--theme-accent-red)' }}
                                 title="حذف الطلب"
                             >
                                 <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -725,7 +747,8 @@ const RequestCard: React.FC<{
                         {!['manager', 'admin', 'owner'].includes(userRole || '') && onRequestDeletion && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onRequestDeletion(); }}
-                                className="py-2.5 sm:py-2 px-3 sm:px-4 rounded-xl bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 active:scale-95 transition-all touch-manipulation flex items-center gap-1.5"
+                                className="adora-btn py-2.5 sm:py-2 px-3 sm:px-4 rounded-xl"
+                                style={{ background: 'var(--theme-accent-orange-light)', color: 'var(--theme-accent-orange)' }}
                                 title="طلب حذف (يرسل للمدير)"
                             >
                                 <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -739,7 +762,8 @@ const RequestCard: React.FC<{
                     <div className="flex gap-1.5">
                         <button
                             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                            className="px-3 py-2 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 active:scale-95 transition-all touch-manipulation flex items-center gap-1"
+                            className="adora-btn px-3 py-2 rounded-xl"
+                            style={{ background: 'var(--theme-accent-red-light)', color: 'var(--theme-accent-red)' }}
                             title="موافقة على الحذف"
                         >
                             <CheckCircle className="w-4 h-4" />
@@ -747,7 +771,7 @@ const RequestCard: React.FC<{
                         {onRequestDeletion && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onRequestDeletion(); }}
-                                className="px-3 py-2 rounded-xl bg-white/10 text-white/60 hover:bg-white/20 active:scale-95 transition-all touch-manipulation"
+                                className="adora-btn adora-btn-secondary px-3 py-2 rounded-xl"
                                 title="رفض طلب الحذف"
                             >
                                 <X className="w-4 h-4" />
@@ -839,42 +863,41 @@ const LostFoundModal: React.FC<{
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'none' }}>
-            <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl">
+        <div className="adora-modal-backdrop">
+            <div className="adora-modal-v2 w-full max-w-4xl max-h-[90vh]">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-white/10">
+                <div className="adora-modal-header-v2">
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                            <Package className="w-6 h-6 text-purple-400" />
+                        <div className="adora-modal-icon" style={{ background: 'var(--theme-accent-purple-light)', color: 'var(--theme-accent-purple)' }}>
+                            <Package className="w-6 h-6" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">المفقودات والموجودات</h2>
-                            <p className="text-white/60 text-sm">جميع العناصر المفقودة من فحص الغرف</p>
+                            <h2 className="adora-modal-title-v2">المفقودات والموجودات</h2>
+                            <p className="adora-modal-subtitle">جميع العناصر المفقودة من فحص الغرف</p>
                         </div>
                     </div>
-                    <button 
-                        onClick={onClose} 
-                        className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-colors"
-                    >
+                    <button onClick={onClose} className="adora-modal-close-v2">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div className="adora-modal-body-v2">
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
                             <AdoraLoader size="md" message="جاري التحميل..." />
                         </div>
                     ) : items.length === 0 ? (
-                        <div className="text-center py-12">
-                            <Package className="w-16 h-16 text-white/20 mx-auto mb-4" />
-                            <p className="text-white/40">لا توجد مفقودات مسجلة</p>
+                        <div className="adora-empty">
+                            <div className="adora-empty-icon">
+                                <Package className="w-8 h-8" />
+                            </div>
+                            <p className="adora-empty-description">لا توجد مفقودات مسجلة</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 3xl:grid-cols-4 4xl:grid-cols-5 gap-4 sm:gap-6 lg:gap-8 3xl:gap-12">
                             {items.map(item => (
-                                <div key={item.id} className="pro-card p-5 sm:p-6 rounded-2xl hover:shadow-xl hover:shadow-primary-500/20 transition-all duration-200 group">
+                                <div key={item.id} className="adora-card p-5 sm:p-6 hover:shadow-lg transition-all duration-200 group">
                                     {/* Header */}
                                     <div className="flex items-start gap-4 mb-4">
                                         {item.imageUrl ? (
@@ -884,20 +907,20 @@ const LostFoundModal: React.FC<{
                                                 className="w-16 h-16 rounded-xl object-cover"
                                             />
                                         ) : (
-                                            <div className="w-16 h-16 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
+                                            <div className="w-16 h-16 rounded-xl adora-bg-tertiary flex items-center justify-center text-2xl">
                                                 📦
                                             </div>
                                         )}
                                         <div className="flex-1">
-                                            <p className="text-white font-medium text-sm mb-1">{item.description}</p>
-                                            <p className="text-white/50 text-xs">غرفة {item.roomNumber || '-'}</p>
+                                            <p className="adora-text-primary font-medium text-sm mb-1">{item.description}</p>
+                                            <p className="adora-text-tertiary text-xs">غرفة {item.roomNumber || '-'}</p>
                                         </div>
-                                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                                            item.status === 'found' ? 'bg-blue-500/20 text-blue-400' :
-                                            item.status === 'claimed' ? 'bg-yellow-500/20 text-yellow-400' :
-                                            item.status === 'returned' ? 'bg-green-500/20 text-green-400' :
-                                            'bg-gray-500/20 text-gray-400'
-                                        }`}>
+                                        <span className={`adora-badge ${
+                                            item.status === 'found' ? 'adora-badge-blue' :
+                                            item.status === 'claimed' ? 'adora-badge-yellow' :
+                                            item.status === 'returned' ? 'adora-badge-green' :
+                                            'adora-badge-teal'
+                                        } text-xs font-bold`}>
                                             {item.status === 'found' ? 'موجود' :
                                              item.status === 'claimed' ? 'مطالب به' :
                                              item.status === 'returned' ? 'تم التسليم' : 'تم التخلص'}
@@ -907,28 +930,28 @@ const LostFoundModal: React.FC<{
                                     {/* Details */}
                                     <div className="space-y-2 mb-3">
                                         <div className="flex items-center justify-between text-xs">
-                                            <span className="text-white/60">تاريخ العثور:</span>
-                                            <span className="text-white/80">{formatDate(item.createdAt)}</span>
+                                            <span className="adora-text-tertiary">تاريخ العثور:</span>
+                                            <span className="adora-text-secondary">{formatDate(item.createdAt)}</span>
                                         </div>
                                         {item.foundBy && (
                                             <div className="flex items-center justify-between text-xs">
-                                                <span className="text-white/60">وجدها:</span>
-                                                <span className="text-white/80">{item.foundBy.name}</span>
+                                                <span className="adora-text-tertiary">وجدها:</span>
+                                                <span className="adora-text-secondary">{item.foundBy.name}</span>
                                             </div>
                                         )}
                                         {item.returnedBy && item.returnedAt && (
-                                            <div className="p-2 bg-green-500/10 rounded-lg border border-green-500/20">
+                                            <div className="adora-info-box green" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.25rem' }}>
                                                 <div className="flex items-center justify-between text-xs mb-1">
-                                                    <span className="text-green-400 font-bold">تم التسليم</span>
-                                                    <span className="text-green-400/80">{formatDate(item.returnedAt)}</span>
+                                                    <span className="font-bold">تم التسليم</span>
+                                                    <span className="opacity-80">{formatDate(item.returnedAt)}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-xs">
-                                                    <span className="text-green-400/60">بواسطة:</span>
-                                                    <span className="text-green-400/80">{item.returnedBy.name}</span>
+                                                    <span className="opacity-60">بواسطة:</span>
+                                                    <span className="opacity-80">{item.returnedBy.name}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-xs mt-1">
-                                                    <span className="text-green-400/60">الوقت:</span>
-                                                    <span className="text-green-400/80">{getTimeAgo(item.returnedAt)}</span>
+                                                    <span className="opacity-60">الوقت:</span>
+                                                    <span className="opacity-80">{getTimeAgo(item.returnedAt)}</span>
                                                 </div>
                                             </div>
                                         )}
@@ -938,7 +961,7 @@ const LostFoundModal: React.FC<{
                                     {item.status !== 'returned' && item.status !== 'disposed' && (
                                         <button
                                             onClick={() => handleReturnItem(item.id)}
-                                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-green-500/30 active:scale-95 transition-all"
+                                            className="adora-btn adora-btn-primary w-full"
                                         >
                                             <CheckCircle2 className="w-4 h-4" />
                                             تم التسليم
@@ -1112,10 +1135,10 @@ const RequestDetailsModal: React.FC<{
                                 <p className="text-white/60 text-sm mb-1">اسم النزيل</p>
                                 <p className="text-white font-medium">{request.guestName}</p>
                                 {request.guestIdentity && (
-                                    <p className="text-white/40 text-xs mt-1">الهوية: {request.guestIdentity}</p>
+                                    <p className="text-white/70 text-xs mt-1">الهوية: {request.guestIdentity}</p>
                                 )}
                                 {request.guestPhone && (
-                                    <p className="text-white/40 text-xs mt-1">الجوال: {request.guestPhone}</p>
+                                    <p className="text-white/70 text-xs mt-1">الجوال: {request.guestPhone}</p>
                                 )}
                             </div>
                         )}
@@ -1150,20 +1173,20 @@ const RequestDetailsModal: React.FC<{
                                                 <p className="text-white/60 text-xs mt-0.5">📍 في {event.department}</p>
                                             )}
                                             {event.by && (
-                                                <p className="text-white/40 text-[11px] mt-1">👤 بواسطة: {event.by}</p>
+                                                <p className="text-white/70 text-xs mt-1">👤 بواسطة: {event.by}</p>
                                             )}
-                                            <p className="text-white/40 text-[11px] mt-1.5 flex items-center gap-2">
+                                            <p className="text-white/70 text-xs mt-1.5 flex items-center gap-2">
                                                 <Clock className="w-3 h-3" />
                                                 {formatTime(event.time)}
                                             </p>
-                                            <p className="text-white/30 text-[10px] mt-0.5">{getTimeAgo(event.time)}</p>
+                                            <p className="text-white/70 text-xs mt-0.5">{getTimeAgo(event.time)}</p>
                                         </div>
                                     </div>
                                 ))
                             ) : (
                                 <div className="p-4 bg-white/5 rounded-xl text-center">
-                                    <p className="text-white/40 text-sm">لا توجد عمليات مسجلة</p>
-                                    <p className="text-white/30 text-xs mt-1">تم الإنشاء: {formatTime(request.createdAt)}</p>
+                                    <p className="text-white/70 text-sm">لا توجد عمليات مسجلة</p>
+                                    <p className="text-white/70 text-xs mt-1">تم الإنشاء: {formatTime(request.createdAt)}</p>
                                 </div>
                             )}
                         </div>
@@ -1239,7 +1262,7 @@ const RequestDetailsModal: React.FC<{
                                     </div>
                                 ))}
                                 {request.minibarTotal && (
-                                    <div className="p-4 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-xl flex items-center justify-between mt-4">
+                                    <div className="p-4 bg-gradient-to-r from-green-500/20 to-primary-500/20 border border-green-500/30 rounded-xl flex items-center justify-between mt-4">
                                         <p className="text-white font-bold">الإجمالي</p>
                                         <p className="text-green-400 font-bold text-xl">{request.minibarTotal} ر.س</p>
                                     </div>
@@ -1567,8 +1590,8 @@ const QuickCreateModal: React.FC<{
                                 </div>
                             )}
 
-                            {/* Manual Room Input - First */}
-                            <div className="relative">
+                            {/* Manual Room Input with Confirm Button */}
+                            <div className="space-y-3">
                                 <input
                                     type="text"
                                     value={roomNumber}
@@ -1579,24 +1602,29 @@ const QuickCreateModal: React.FC<{
                                         }
                                     }}
                                     placeholder="اكتب رقم الغرفة"
-                                    className={`input text-center text-lg transition-all ${activeStats.activeRequest && selectedType !== 'coffee'
+                                    className={`input text-center text-xl font-bold transition-all ${activeStats.activeRequest && selectedType !== 'coffee'
                                         ? 'border-orange-500/50 focus:border-orange-500 focus:ring-orange-500/20'
                                         : ''
                                         }`}
                                     autoFocus
                                 />
-                                {roomNumber && !activeStats.activeRequest && (
-                                    <button
-                                        onClick={() => handleRoomSelect(roomNumber)}
-                                        className="absolute left-2 top-1/2 -translate-y-1/2 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium"
-                                    >
-                                        تأكيد
-                                    </button>
-                                )}
+                                {/* ✅ زر تأكيد واضح ودائم */}
+                                <button
+                                    onClick={() => roomNumber && handleRoomSelect(roomNumber)}
+                                    disabled={!roomNumber}
+                                    className={`w-full py-3.5 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 ${
+                                        roomNumber 
+                                            ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/30 hover:shadow-xl hover:shadow-teal-500/40 active:scale-[0.98]'
+                                            : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                                    }`}
+                                >
+                                    <CheckCircle className="w-5 h-5" />
+                                    تأكيد رقم الغرفة
+                                </button>
                             </div>
 
                             {/* Divider */}
-                            <div className="flex items-center gap-2 text-white/30">
+                            <div className="flex items-center gap-2 text-white/70">
                                 <div className="flex-1 h-px bg-white/10"></div>
                                 <span className="text-xs">أو اختر من القائمة</span>
                                 <div className="flex-1 h-px bg-white/10"></div>
@@ -1807,7 +1835,7 @@ const QuickCreateModal: React.FC<{
                 {/* Footer */}
                 <div className="p-4 border-t border-white/10">
              {step === 'room' ? (
-    <p className="text-center text-white/40 text-sm">اضغط على رقم الغرفة للمتابعة</p>
+    <p className="text-center text-white/70 text-sm">اضغط على رقم الغرفة للمتابعة</p>
 ) : (
     <>
         {/* ✅ Validation Error Display (replaces native alert) */}
@@ -1947,6 +1975,10 @@ export const ReceptionDashboard: React.FC = () => {
     // ✅ Onboarding Tour
     const { showTour, steps: tourSteps, closeTour, completeTour } = useOnboardingTour('reception');
     const [locationWarningData, setLocationWarningData] = useState<any>(null);
+    
+    // ✅ NEW: First-Time Setup - Check if rooms exist
+    const [showSetupPrompt, setShowSetupPrompt] = useState(false);
+    const [hasCompletedSetup, setHasCompletedSetup] = useState(true); // Assume true until checked
 
     // ✅ Read tab from URL query (?tab=pending|active|completed)
     // Applies on initial load and when query changes
@@ -2020,6 +2052,9 @@ export const ReceptionDashboard: React.FC = () => {
             })).sort((a, b) => a.floor - b.floor);
 
             setRooms(formatted);
+            
+            // ✅ NEW: Check if rooms exist for first-time setup
+            setHasCompletedSetup(updatedRooms.length > 0);
 
             // ✅ Populating Active Room Details for Smart Detection
             const details: Record<string, { guestId: string; guestName: string }> = {};
@@ -2266,8 +2301,6 @@ export const ReceptionDashboard: React.FC = () => {
             const getDepartment = (type: string, emergencyDept?: string): 'reception' | 'housekeeping' | 'maintenance' | 'bellman' | 'coffee_shop' | 'procurement' => {
                 // ✅ Emergency/Other requests use the selected department
                 if (type === 'other' && emergencyDept) {
-                    // Map coffee_shop to housekeeping for now (or create separate department later)
-                    if (emergencyDept === 'coffee_shop') return 'housekeeping';
                     return emergencyDept as any;
                 }
 
@@ -2281,8 +2314,8 @@ export const ReceptionDashboard: React.FC = () => {
                     case 'bellman':
                         return 'bellman';
                     case 'coffee':
-                        // ✅ FIX: Assign coffee requests to housekeeping (or create 'kitchen' department in future)
-                        return 'housekeeping';
+                        // ✅ FIXED: Coffee requests go to coffee_shop department!
+                        return 'coffee_shop';
                     case 'inspection':
                         return 'housekeeping';
                     case 'extension':
@@ -2459,7 +2492,7 @@ export const ReceptionDashboard: React.FC = () => {
 
                 // Award points (updates both personal and team points)
                 if (user?.id) {
-                    await awardPoints('default', user.id, 5, 'تأكيد فحص غرفة');
+                    await awardPoints(tenantId || 'default', user.id, 5, 'تأكيد فحص غرفة');
                 }
 
                 haptic('success');
@@ -2524,7 +2557,7 @@ export const ReceptionDashboard: React.FC = () => {
 
                 // Award points
                 if (user?.id) {
-                    await awardPoints('default', user.id, 5, 'تأكيد طلب QR');
+                    await awardPoints(tenantId || 'default', user.id, 5, 'تأكيد طلب QR');
                 }
 
                 success('تم تأكيد الطلب وتحويله تلقائياً للقسم المختص');
@@ -2542,7 +2575,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             // Award points (updates both personal and team points)
             if (user?.id) {
-                await awardPoints('default', user.id, 5, 'تأكيد طلب');
+                await awardPoints(tenantId || 'default', user.id, 5, 'تأكيد طلب');
             }
 
             success('تم تأكيد الطلب بنجاح');
@@ -2951,12 +2984,12 @@ export const ReceptionDashboard: React.FC = () => {
                 </div>
             )}
 
-            {/* Flexible Header */}
+            {/* Flexible Header - Actions Only (Greeting in main header) */}
             <FlexibleHeader
                 title="الاستقبال"
-                showGreeting={true}
+                showGreeting={false}
                 brandName={brandName}
-                subtitle={<PointsTracker employeeId={user?.id || ''} inline showHistory />}
+                subtitle={null}
                 actions={[
                     {
                         id: 'history',
@@ -3078,39 +3111,30 @@ export const ReceptionDashboard: React.FC = () => {
                 />
             )}
 
-            {/* Stats - Enterprise Primary Status Cards (Type A) - Unified Style */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <div className="stat-card-pro-compact">
-                    <StatCard
-                        count={groupedRequests.pending.length}
-                        label="🆕 جديد"
-                        icon={AlertCircle}
-                        iconColor="orange"
-                        status={groupedRequests.pending.length > 10 ? 'warning' : 'normal'}
-                        lastUpdate={groupedRequests.pending.length > 0 ? 'آخر تحديث: الآن' : undefined}
-                    />
-                </div>
-                <div className="stat-card-pro-compact">
-                    <StatCard
-                        count={groupedRequests.active.length}
-                        label="⏳ قيد التنفيذ"
-                        icon={Clock}
-                        iconColor="blue"
-                        status={groupedRequests.active.length > 15 ? 'warning' : 'normal'}
-                        lastUpdate={groupedRequests.active.length > 0 ? 'آخر تحديث: الآن' : undefined}
-                    />
-                </div>
-                <div className="stat-card-pro-compact">
-                    <StatCard
-                        count={groupedRequests.completed.length}
-                        label="✅ مكتمل"
-                        icon={CheckCircle2}
-                        iconColor="green"
-                        status="success"
-                        lastUpdate={groupedRequests.completed.length > 0 ? 'آخر تحديث: الآن' : undefined}
-                        trend="+12%"
-                    />
-                </div>
+            {/* Stats - Mobile-First Responsive Cards */}
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-3 mb-4">
+                <StatCard
+                    count={groupedRequests.pending.length}
+                    label="جديد"
+                    icon={AlertCircle}
+                    iconColor="orange"
+                    status={groupedRequests.pending.length > 10 ? 'warning' : 'normal'}
+                />
+                <StatCard
+                    count={groupedRequests.active.length}
+                    label="قيد التنفيذ"
+                    icon={Clock}
+                    iconColor="blue"
+                    status={groupedRequests.active.length > 15 ? 'warning' : 'normal'}
+                />
+                <StatCard
+                    count={groupedRequests.completed.length}
+                    label="مكتمل"
+                    icon={CheckCircle2}
+                    iconColor="green"
+                    status="success"
+                    trend="+12%"
+                />
             </div>
 
             {/* 🆕 Guest Verification Panel */}
@@ -3123,37 +3147,46 @@ export const ReceptionDashboard: React.FC = () => {
                 />
             )}
 
-            {/* Quick Actions - Enterprise Type C: Execution Cards */}
-            <div className="mb-6 sm:mb-8 lg:mb-12" data-tour="quick-actions">
-                <h2 className="text-xs sm:text-sm text-white/50 font-normal uppercase tracking-wider mb-3 sm:mb-4 px-2">إنشاء طلب سريع</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9 gap-3 sm:gap-4">
+            {/* ⚡ Quick Actions - CORE MOTOR OF RECEPTION - Mobile First */}
+            <div className="mb-4 sm:mb-6 lg:mb-8 adora-quick-actions-section p-3 sm:p-4 lg:p-6" data-tour="quick-actions">
+                {/* Section Header - Compact on Mobile */}
+                <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--theme-primary-500), var(--theme-primary-600))' }}>
+                        <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-sm sm:text-lg lg:text-xl font-bold adora-text-primary">إنشاء طلب سريع</h2>
+                        <p className="text-xs sm:text-xs adora-text-tertiary hidden sm:block">اضغط لإنشاء طلب جديد</p>
+                    </div>
+                </div>
+                
+                {/* Action Buttons Grid - Mobile First: 3 columns on mobile */}
+                <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4">
                     {QUICK_ACTIONS.map(action => (
                         <button
                             key={action.type}
                             onClick={() => handleQuickAction(action.type)}
-                            className="
-                                pro-card-action
-                                flex flex-col items-center justify-center
-                                gap-3
-                                p-4 sm:p-5
-                                touch-manipulation
-                            "
+                            className="adora-quick-action group flex flex-col items-center p-2 sm:p-3"
                         >
-                            {/* Icon - Monotone, Small, Not Decorative */}
-                            <div className="
-                                w-10 h-10
-                                rounded-md
+                            {/* Icon Container - Small on Mobile */}
+                            <div className={`
+                                w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14
+                                rounded-xl sm:rounded-2xl
                                 flex items-center justify-center
-                                bg-white/3
-                                border border-white/5
-                            ">
-                                {React.cloneElement(action.icon as React.ReactElement, {
-                                    className: 'w-5 h-5 text-white/60'
-                                })}
+                                ${action.bgColor}
+                                transition-all duration-300
+                                group-hover:scale-110
+                                shadow-sm sm:shadow-md
+                            `}>
+                                <span className={action.color}>
+                                    {React.cloneElement(action.icon as React.ReactElement, {
+                                        className: 'w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7'
+                                    })}
+                                </span>
                             </div>
                             
-                            {/* Label - Direct, No Numbers */}
-                            <span className="text-xs sm:text-sm font-medium text-white/70 text-center uppercase tracking-wide">
+                            {/* Label - Small on Mobile */}
+                            <span className="text-xs sm:text-xs lg:text-sm font-semibold sm:font-bold adora-text-primary text-center mt-1.5 sm:mt-2 leading-tight">
                                 {action.label}
                             </span>
                         </button>
@@ -3161,7 +3194,7 @@ export const ReceptionDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Room Search Filter */}
+            {/* Room Search Filter - Theme-Aware */}
             <div className="mb-3 sm:mb-4">
                 <div className="relative" data-tour="search-box">
                     <input
@@ -3169,15 +3202,22 @@ export const ReceptionDashboard: React.FC = () => {
                         value={roomSearchQuery}
                         onChange={(e) => setRoomSearchQuery(e.target.value)}
                         placeholder="بحث برقم الغرفة..."
-                        className="w-full sm:w-64 px-4 py-2 pr-10 bg-white/10 border border-white/10 rounded-xl text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                        className="w-full sm:w-64 px-3 sm:px-4 py-2 pr-10 
+                                   bg-slate-100 dark:bg-white/10 
+                                   border border-slate-300 dark:border-white/10 
+                                   rounded-lg sm:rounded-xl 
+                                   text-slate-800 dark:text-white 
+                                   placeholder:text-slate-400 dark:placeholder:text-white/70 
+                                   focus:outline-none focus:ring-2 focus:ring-teal-500/50
+                                   text-sm sm:text-base"
                     />
-                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400 dark:text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     {roomSearchQuery && (
                         <button
                             onClick={() => setRoomSearchQuery('')}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white/60 hover:bg-white/30"
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-300 dark:bg-white/20 flex items-center justify-center text-slate-600 dark:text-white/60 hover:bg-slate-400 dark:hover:bg-white/30"
                         >
                             ×
                         </button>
@@ -3185,24 +3225,37 @@ export const ReceptionDashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* Tabs - Mobile Optimized */}
-            <div className="flex gap-1.5 sm:gap-2 mb-3 sm:mb-4 overflow-x-auto pb-1 -mx-3 sm:mx-0 px-3 sm:px-0 scrollbar-hide" data-tour="tabs">
+            {/* Tabs - Mobile First + Theme Aware */}
+            <div className="flex gap-1 sm:gap-2 mb-3 sm:mb-4 overflow-x-auto pb-1 -mx-3 sm:mx-0 px-3 sm:px-0 scrollbar-hide" data-tour="tabs">
                 {[
-                    { key: 'pending', label: 'جديد', count: groupedRequests.pending.length, color: 'yellow' },
-                    { key: 'active', label: 'قيد التنفيذ', count: groupedRequests.active.length, color: 'blue' },
-                    { key: 'completed', label: 'مكتمل', count: groupedRequests.completed.length, color: 'green' }
+                    { key: 'pending', label: 'جديد', count: groupedRequests.pending.length, activeClass: 'bg-amber-500 text-white shadow-amber-500/25', inactiveClass: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' },
+                    { key: 'active', label: 'قيد التنفيذ', count: groupedRequests.active.length, activeClass: 'bg-blue-500 text-white shadow-blue-500/25', inactiveClass: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
+                    { key: 'completed', label: 'مكتمل', count: groupedRequests.completed.length, activeClass: 'bg-green-500 text-white shadow-green-500/25', inactiveClass: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' }
                 ].map(tab => (
                     <button
                         key={tab.key}
                         onClick={() => setCurrentTab(tab.key as TabType)}
-                        className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl whitespace-nowrap transition-all active:scale-95 touch-manipulation flex-shrink-0 ${currentTab === tab.key
-                            ? `bg-${tab.color}-500 text-white shadow-lg shadow-${tab.color}-500/25`
-                            : 'bg-white/10 text-white/60 hover:bg-white/20'
-                            }`}
+                        className={`
+                            flex items-center gap-1 sm:gap-1.5 
+                            px-2.5 sm:px-4 py-1.5 sm:py-2 
+                            rounded-lg sm:rounded-xl 
+                            whitespace-nowrap transition-all 
+                            active:scale-95 touch-manipulation flex-shrink-0
+                            text-xs sm:text-sm font-medium
+                            ${currentTab === tab.key
+                                ? `${tab.activeClass} shadow-lg`
+                                : `${tab.inactiveClass} hover:opacity-80`
+                            }
+                        `}
                     >
-                        <span className="text-sm sm:text-base font-medium">{tab.label}</span>
-                        <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-bold ${currentTab === tab.key ? 'bg-white/20' : `bg-${tab.color}-500/30 text-${tab.color}-400`
-                            }`}>
+                        <span>{tab.label}</span>
+                        <span className={`
+                            px-1.5 sm:px-2 py-0.5 rounded-full text-xs sm:text-xs font-bold
+                            ${currentTab === tab.key 
+                                ? 'bg-white/25' 
+                                : 'bg-current/20'
+                            }
+                        `}>
                             {tab.count}
                         </span>
                     </button>
@@ -3222,7 +3275,7 @@ export const ReceptionDashboard: React.FC = () => {
                             <div className="p-3 bg-white/5 rounded-xl border border-white/10">
                                 <p className="text-white/60 text-sm mb-1">الغرفة الحالية</p>
                                 <p className="text-xl font-bold text-white">غرفة {selectedTransferRequest.roomNumber}</p>
-                                <p className="text-white/40 text-xs mt-1">{selectedTransferRequest.guestName}</p>
+                                <p className="text-white/70 text-xs mt-1">{selectedTransferRequest.guestName}</p>
                             </div>
 
                             <div>
@@ -3300,20 +3353,42 @@ export const ReceptionDashboard: React.FC = () => {
                                     : undefined
                             }
                             onComplete={
-                                // ⭐ CRITICAL: Don't show "Complete" button for maintenance requests
-                                // Maintenance requests must go through: Reception → Maintenance → Housekeeping → Reception
-                                // Only show Complete if:
-                                // 1. Task is owned by Reception (e.g. extension, coffee, etc.) AND currentDepartment === 'reception'
-                                // 2. OR User is manager/owner AND it's NOT a maintenance request in maintenance/housekeeping
-                                // Maintenance requests should only be completed after returning from Housekeeping inspection
-                                (request.type === 'maintenance' && request.currentDepartment !== 'reception')
-                                    ? undefined // Hide Complete button for maintenance requests in maintenance/housekeeping departments
-                                    : (
-                                        (request.currentDepartment === 'reception' && request.type !== 'maintenance') ||
-                                        ((user?.role === 'manager' || user?.role === 'owner') && request.type !== 'maintenance')
-                                    ) && ['CONFIRMED', 'IN_PROGRESS'].includes(request.status)
-                                        ? () => handleCompleteRequest(request.id)
-                                        : undefined
+                                // ⭐ CRITICAL: Complete button logic based on request type
+                                // 
+                                // 🔧 Maintenance: Must return from Maintenance → Housekeeping → Reception
+                                // 🧹 Cleaning: Must be completed by Housekeeping first
+                                // ☕ Coffee/Bellman/Other: Can be completed directly by Reception
+                                //
+                                // RULE: For cleaning/maintenance, only show "Complete" if status is already COMPLETED
+                                // (meaning the department has finished their work)
+                                (() => {
+                                    // Hide for maintenance/cleaning NOT back at reception
+                                    if ((request.type === 'maintenance' || request.type === 'cleaning') && request.currentDepartment !== 'reception') {
+                                        return undefined;
+                                    }
+                                    
+                                    // For cleaning/maintenance that ARE at reception:
+                                    // They must have status 'COMPLETED' from the other department
+                                    if ((request.type === 'maintenance' || request.type === 'cleaning') && request.currentDepartment === 'reception') {
+                                        // Only allow final confirmation if already completed by Housekeeping/Maintenance
+                                        return request.status === 'COMPLETED' ? () => handleCompleteRequest(request.id) : undefined;
+                                    }
+                                    
+                                    // For other types (coffee, bellman, extension, etc.):
+                                    // Can be completed if CONFIRMED or IN_PROGRESS and at reception
+                                    if (request.currentDepartment === 'reception' && ['CONFIRMED', 'IN_PROGRESS'].includes(request.status)) {
+                                        return () => handleCompleteRequest(request.id);
+                                    }
+                                    
+                                    // Manager/Owner override for non-maintenance/cleaning
+                                    if ((user?.role === 'manager' || user?.role === 'owner') && 
+                                        !['maintenance', 'cleaning'].includes(request.type) &&
+                                        ['CONFIRMED', 'IN_PROGRESS'].includes(request.status)) {
+                                        return () => handleCompleteRequest(request.id);
+                                    }
+                                    
+                                    return undefined;
+                                })()
                             }
                             onView={() => setSelectedRequest(request)}
                             userId={user?.id}
@@ -3516,12 +3591,36 @@ export const ReceptionDashboard: React.FC = () => {
                 rooms={rooms}
             />
 
+            {/* ✅ Smart Branch Setup Wizard - First-Time Setup */}
+            <SmartBranchSetupWizard
+                isOpen={showSetupPrompt}
+                onClose={() => setShowSetupPrompt(false)}
+                onComplete={(newBranchId) => {
+                    setShowSetupPrompt(false);
+                    // Refresh rooms after setup completes
+                    window.location.reload();
+                }}
+                isFirstTime={!hasCompletedSetup}
+            />
+
             {/* ✅ Onboarding Tour */}
             <TourGuide
                 steps={tourSteps}
                 isOpen={showTour}
-                onClose={closeTour}
-                onComplete={completeTour}
+                onClose={() => {
+                    closeTour();
+                    // Show setup prompt if no rooms after tour
+                    if (!hasCompletedSetup) {
+                        setTimeout(() => setShowSetupPrompt(true), 500);
+                    }
+                }}
+                onComplete={() => {
+                    completeTour();
+                    // Show setup prompt if no rooms after tour
+                    if (!hasCompletedSetup) {
+                        setTimeout(() => setShowSetupPrompt(true), 500);
+                    }
+                }}
             />
 
             {/* 💬 Chat Inbox Modal */}

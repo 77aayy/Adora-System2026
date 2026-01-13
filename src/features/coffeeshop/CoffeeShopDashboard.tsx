@@ -29,11 +29,13 @@ import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboar
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
 // DeveloperSignature is now in GlobalFooter (App.tsx)
 import { ProcurementCart } from '../../components/shared/ProcurementCart'; // ✅ Procurement cart
+import { PointsTracker } from '../../components/shared/PointsTracker'; // ✅ Points tracker
 import { SupportTicketModal } from '../../components/shared/SupportTicketModal'; // ✅ Support ticket modal
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
 import { useBrandName } from '../../hooks/useBrandName';
+import { ChallengeTimeline } from '../../components/features/ChallengeTimeline'; // ✅ Challenge Timeline
 
 // ============================================================
 // TYPES
@@ -148,6 +150,16 @@ export const CoffeeShopDashboard: React.FC = () => {
                 } catch (err) {
                     console.warn('Failed to award points:', err);
                 }
+
+                // ✅ Auto-check daily attendance when employee completes an order
+                try {
+                    const { checkDailyAttendance } = await import('../../services/challengeService');
+                    checkDailyAttendance(tenantId, user.id).catch(err => {
+                        console.warn('Failed to check daily attendance:', err);
+                    });
+                } catch (err) {
+                    console.warn('Could not load challengeService:', err);
+                }
             }
 
             success('تم إكمال الطلب بنجاح');
@@ -203,7 +215,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                     title="كوفي شوب"
                     showGreeting={true}
                     brandName={brandName}
-                    subtitle="إدارة طلبات المشروبات والوجبات"
+                    subtitle={<PointsTracker employeeId={user?.id || ''} inline showHistory />}
                     actions={[
                         {
                             id: 'instructions',
@@ -240,51 +252,48 @@ export const CoffeeShopDashboard: React.FC = () => {
                     <TransferNotificationBadge department="coffee_shop" />
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                    <div className="stat-card-pro-compact">
-                        <StatCard
-                            count={groupedOrders.pending.length}
-                            label="⏳ في الانتظار"
-                            icon={<AlertCircle />}
-                            iconColor="orange"
-                            status={groupedOrders.pending.length > 10 ? 'warning' : 'normal'}
-                            lastUpdate="تم التحديث الآن"
-                            trend="—"
-                        />
-                    </div>
-                    <div className="stat-card-pro-compact">
-                        <StatCard
-                            count={groupedOrders.in_progress.length}
-                            label="☕ قيد التحضير"
-                            icon={<Clock />}
-                            iconColor="blue"
-                            status={groupedOrders.in_progress.length > 15 ? 'warning' : 'normal'}
-                            lastUpdate="تم التحديث الآن"
-                            trend="—"
-                        />
-                    </div>
-                    <div className="stat-card-pro-compact">
-                        <StatCard
-                            count={groupedOrders.completed.length}
-                            label="✅ مكتمل"
-                            icon={<CheckCircle2 />}
-                            iconColor="green"
-                            status="success"
-                            lastUpdate="تم التحديث الآن"
-                            trend="—"
-                        />
-                    </div>
+                {/* Stats + Challenge Timeline في صف واحد */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4">
+                    <StatCard
+                        count={groupedOrders.pending.length}
+                        label="⏳ في الانتظار"
+                        icon={<AlertCircle />}
+                        iconColor="orange"
+                        status={groupedOrders.pending.length > 10 ? 'warning' : 'normal'}
+                        lastUpdate="تم التحديث الآن"
+                        trend="—"
+                    />
+                    <StatCard
+                        count={groupedOrders.in_progress.length}
+                        label="☕ قيد التحضير"
+                        icon={<Clock />}
+                        iconColor="blue"
+                        status={groupedOrders.in_progress.length > 15 ? 'warning' : 'normal'}
+                        lastUpdate="تم التحديث الآن"
+                        trend="—"
+                    />
+                    <StatCard
+                        count={groupedOrders.completed.length}
+                        label="✅ مكتمل"
+                        icon={<CheckCircle2 />}
+                        iconColor="green"
+                        status="success"
+                        lastUpdate="تم التحديث الآن"
+                        trend="—"
+                    />
                 </div>
+
+                {/* ✅ تايم لاين الالتزام - تصميم H Rewards */}
+                <ChallengeTimeline />
 
                 {/* Search */}
                 <div className="relative mb-4">
-                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 adora-text-tertiary" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pr-12 pl-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="adora-input w-full pr-12 pl-4 py-3 rounded-xl"
                         placeholder="بحث بالغرفة أو النزيل..."
                     />
                 </div>
@@ -301,7 +310,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                             onClick={() => setCurrentTab(tab.key as TabType)}
                             className={`flex-shrink-0 px-4 py-2.5 rounded-xl font-medium transition-all ${currentTab === tab.key
                                 ? 'bg-teal-500 text-white shadow-lg'
-                                : 'bg-white/10 text-white/60 hover:bg-white/20'
+                                : 'adora-btn-ghost'
                                 }`}
                         >
                             {tab.label} ({tab.count})
@@ -312,9 +321,9 @@ export const CoffeeShopDashboard: React.FC = () => {
                 {/* Orders List */}
                 <div className="space-y-3">
                     {currentOrders.length === 0 ? (
-                        <div className="rounded-2xl transition-colors duration-300 p-12 text-center" style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}>
-                            <Coffee className="w-16 h-16 text-white/20 mx-auto mb-4" />
-                            <p className="text-white/40">لا توجد طلبات في هذه القائمة</p>
+                        <div className="adora-card rounded-2xl transition-colors duration-300 p-12 text-center">
+                            <Coffee className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--theme-text-tertiary)' }} />
+                            <p className="adora-text-tertiary">لا توجد طلبات في هذه القائمة</p>
                         </div>
                     ) : (
                         currentOrders.map(order => (
@@ -338,7 +347,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                                             {order.guestName && (
                                                 <p className="text-white/60 text-sm">{order.guestName}</p>
                                             )}
-                                            <p className="text-white/40 text-xs flex items-center gap-1 mt-1">
+                                            <p className="adora-text-tertiary text-xs flex items-center gap-1 mt-1">
                                                 <Clock className="w-3 h-3" />
                                                 {formatDate(order.createdAt)} • {getTimeElapsed(order.createdAt)}
                                             </p>
@@ -365,7 +374,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                                 {/* Items */}
                                 <div className="space-y-2 mb-3">
                                     {order.items.map((item, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-2 bg-white/5 rounded-lg">
+                                        <div key={idx} className="adora-card flex items-center justify-between p-2 rounded-lg">
                                             <div>
                                                 <p className="text-white text-sm font-medium">{item.productName}</p>
                                                 <p className="text-white/50 text-xs">الكمية: {item.quantity} × {item.unitPrice} ر.س</p>
@@ -390,7 +399,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                                             <button
                                                 onClick={() => handleComplete(order)}
                                                 disabled={completing}
-                                                className="flex-1 py-2 rounded-xl bg-green-500 text-white font-bold hover:bg-green-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                                className="flex-1 py-2 rounded-xl bg-green-500 text-white font-bold hover:bg-primary-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                                             >
                                                 {completing ? (
                                                     <AdoraLoaderInline size={16} />
@@ -407,8 +416,8 @@ export const CoffeeShopDashboard: React.FC = () => {
 
                                 {/* Notes */}
                                 {order.notes && (
-                                    <div className="mt-3 p-2 bg-white/5 rounded-lg">
-                                        <p className="text-white/60 text-xs">ملاحظات:</p>
+                                    <div className="mt-3 p-2 adora-card rounded-lg">
+                                        <p className="adora-text-secondary text-xs">ملاحظات:</p>
                                         <p className="text-white/80 text-sm">{order.notes}</p>
                                     </div>
                                 )}

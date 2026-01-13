@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useUX } from '../../context/UXContext';
 
@@ -16,10 +16,29 @@ interface TourGuideProps {
     onComplete?: () => void;
 }
 
+// ✅ FIXED: Get absolute position of element (accounting for all scroll containers)
+const getAbsoluteRect = (element: HTMLElement): DOMRect => {
+    const rect = element.getBoundingClientRect();
+    return rect;
+};
+
 export const TourGuide: React.FC<TourGuideProps> = ({ steps, isOpen, onClose, onComplete }) => {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+    const frameRef = useRef<number>(0);
     const { playSound } = useUX();
+
+    // ✅ FIXED: Continuously update position using requestAnimationFrame
+    const updateTargetPosition = useCallback(() => {
+        const step = steps[currentStepIndex];
+        if (!step) return;
+        
+        const element = document.querySelector(step.target) as HTMLElement;
+        if (element) {
+            const rect = getAbsoluteRect(element);
+            setTargetRect(rect);
+        }
+    }, [currentStepIndex, steps]);
 
     // Reset on open
     useEffect(() => {
@@ -29,36 +48,40 @@ export const TourGuide: React.FC<TourGuideProps> = ({ steps, isOpen, onClose, on
         }
     }, [isOpen]);
 
-    // Check target element position
+    // ✅ FIXED: Use RAF for smooth tracking
     useEffect(() => {
         if (!isOpen) return;
 
-        const timer = setTimeout(() => {
-            const step = steps[currentStepIndex];
-            const element = document.querySelector(step.target);
+        const step = steps[currentStepIndex];
+        if (!step) return;
 
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                setTargetRect(element.getBoundingClientRect());
-            } else {
-                // If element not found, skip or close (simple handling)
-                console.warn(`Tour target not found: ${step.target}`);
-            }
-        }, 300); // Delay for scroll/render
+        const element = document.querySelector(step.target) as HTMLElement;
+        if (!element) {
+            console.warn(`Tour target not found: ${step.target}`);
+            return;
+        }
 
-        return () => clearTimeout(timer);
-    }, [currentStepIndex, isOpen, steps]);
+        // Scroll element into view first
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-    // Handle Resize
-    useEffect(() => {
-        const handleResize = () => {
-            const step = steps[currentStepIndex];
-            const element = document.querySelector(step.target);
-            if (element) setTargetRect(element.getBoundingClientRect());
+        // Start tracking after scroll
+        const startTracking = () => {
+            const track = () => {
+                updateTargetPosition();
+                frameRef.current = requestAnimationFrame(track);
+            };
+            frameRef.current = requestAnimationFrame(track);
         };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, [currentStepIndex, steps]);
+
+        const scrollTimer = setTimeout(startTracking, 400);
+
+        return () => {
+            clearTimeout(scrollTimer);
+            if (frameRef.current) {
+                cancelAnimationFrame(frameRef.current);
+            }
+        };
+    }, [currentStepIndex, isOpen, steps, updateTargetPosition]);
 
     if (!isOpen || !targetRect) return null;
 
@@ -82,46 +105,50 @@ export const TourGuide: React.FC<TourGuideProps> = ({ steps, isOpen, onClose, on
         }
     };
 
-    // Calculate Popover Position
+    // ✅ Mobile-first popover positioning
     const getPopoverStyle = () => {
+        const isMobile = window.innerWidth < 640;
+        const popoverWidth = isMobile ? Math.min(300, window.innerWidth - 32) : 320;
         const gap = 12;
-        const popoverWidth = 320;
 
         let top = 0;
         let left = 0;
 
-        // Simple positioning logic
-        switch (currentStep.placement) {
-            case 'bottom':
-                top = targetRect.bottom + gap;
-                left = targetRect.left + (targetRect.width / 2) - (popoverWidth / 2);
-                break;
-            case 'top':
-                top = targetRect.top - gap - 200; // Approx height
-                left = targetRect.left + (targetRect.width / 2) - (popoverWidth / 2);
-                break;
-            case 'right':
-                top = targetRect.top;
-                left = targetRect.right + gap;
-                break;
-            case 'left':
-                top = targetRect.top;
-                left = targetRect.left - gap - popoverWidth;
-                break;
-            case 'center':
-                top = window.innerHeight / 2 - 100;
-                left = window.innerWidth / 2 - 150;
-                break;
-            default: // Default to bottom
-                top = targetRect.bottom + gap;
-                left = targetRect.left;
+        // On mobile, always show at bottom center of screen
+        if (isMobile) {
+            top = Math.min(targetRect.bottom + gap, window.innerHeight - 220);
+            left = (window.innerWidth - popoverWidth) / 2;
+        } else {
+            switch (currentStep.placement) {
+                case 'bottom':
+                    top = targetRect.bottom + gap;
+                    left = targetRect.left + (targetRect.width / 2) - (popoverWidth / 2);
+                    break;
+                case 'top':
+                    top = targetRect.top - gap - 180;
+                    left = targetRect.left + (targetRect.width / 2) - (popoverWidth / 2);
+                    break;
+                case 'right':
+                    top = targetRect.top;
+                    left = targetRect.right + gap;
+                    break;
+                case 'left':
+                    top = targetRect.top;
+                    left = targetRect.left - gap - popoverWidth;
+                    break;
+                case 'center':
+                    top = window.innerHeight / 2 - 100;
+                    left = window.innerWidth / 2 - (popoverWidth / 2);
+                    break;
+                default:
+                    top = targetRect.bottom + gap;
+                    left = targetRect.left;
+            }
         }
 
-        // Boundary checks (keep on screen)
-        if (left < 10) left = 10;
-        if (left + popoverWidth > window.innerWidth) left = window.innerWidth - popoverWidth - 10;
-        if (top < 10) top = 10;
-        if (top + 200 > window.innerHeight) top = window.innerHeight - 200 - 10;
+        // Boundary checks
+        left = Math.max(16, Math.min(left, window.innerWidth - popoverWidth - 16));
+        top = Math.max(16, Math.min(top, window.innerHeight - 200));
 
         return { top, left, width: popoverWidth };
     };
@@ -129,85 +156,112 @@ export const TourGuide: React.FC<TourGuideProps> = ({ steps, isOpen, onClose, on
     const popoverStyle = getPopoverStyle();
 
     return (
-        <div className="fixed inset-0 z-[100] overflow-hidden">
-            {/* Dark Overlay with "Hole" using clip-path technically hard, so we use simpler 4-div approach or svg mask. 
-                For simplicity in React without big libs, we'll use a semi-transparent overlay 
-                and z-index trick or just a highlight box. */}
+        <div className="fixed inset-0 z-[9999] overflow-hidden pointer-events-none">
+            {/* ✅ FIXED: SVG-based overlay with cutout - pixel perfect */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-auto" style={{ zIndex: 1 }}>
+                <defs>
+                    <mask id="tour-mask">
+                        <rect x="0" y="0" width="100%" height="100%" fill="white" />
+                        <rect 
+                            x={targetRect.left - 4} 
+                            y={targetRect.top - 4} 
+                            width={targetRect.width + 8} 
+                            height={targetRect.height + 8} 
+                            rx="12"
+                            fill="black" 
+                        />
+                    </mask>
+                </defs>
+                <rect 
+                    x="0" y="0" 
+                    width="100%" height="100%" 
+                    fill="rgba(0,0,0,0.7)" 
+                    mask="url(#tour-mask)" 
+                />
+            </svg>
 
-            {/* We will use a mixed approach: A huge border around a transparent box */}
+            {/* ✅ Highlight Border - follows element exactly */}
             <div
-                className="absolute transition-all duration-300 ease-out border-black/70 pointer-events-none"
-                style={{
-                    borderWidth: '2000px', // Massive border to cover screen
-                    top: targetRect.top - 2000 - 4, // -4 for padding
-                    left: targetRect.left - 2000 - 4,
-                    width: targetRect.width + 8,
-                    height: targetRect.height + 8,
-                    borderRadius: '12px'
-                }}
-            />
-
-            {/* The Highlight Box Border (Active Focus) */}
-            <div
-                className="absolute border-2 border-white rounded-xl shadow-[0_0_0_4px_rgba(13,148,136,0.5)] transition-all duration-300 ease-out pointer-events-none animate-pulse"
+                className="absolute border-2 border-white rounded-xl pointer-events-none"
                 style={{
                     top: targetRect.top - 4,
                     left: targetRect.left - 4,
                     width: targetRect.width + 8,
                     height: targetRect.height + 8,
+                    boxShadow: '0 0 0 4px rgba(13,148,136,0.5), 0 0 20px rgba(13,148,136,0.3)',
+                    zIndex: 2,
+                    transition: 'all 0.15s ease-out'
                 }}
             />
 
-            {/* The Tooltip Card */}
+            {/* ✅ Tooltip Card - Mobile Responsive */}
             <div
-                className="absolute bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl transition-all duration-300 transform animate-in fade-in zoom-in-95"
+                className="absolute pointer-events-auto"
                 style={{
                     top: popoverStyle.top,
                     left: popoverStyle.left,
-                    width: popoverStyle.width
+                    width: popoverStyle.width,
+                    zIndex: 3,
+                    transition: 'all 0.2s ease-out'
                 }}
             >
-                {/* Arrow if needed (skipped for simplicity) */}
-
-                <div className="flex justify-between items-start mb-3">
-                    <span className="text-xs font-bold text-primary-400 uppercase tracking-wider">
-                        خطوة {currentStepIndex + 1} من {steps.length}
-                    </span>
-                    <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
-
-                <h3 className="text-lg font-bold text-white mb-2">{currentStep.title}</h3>
-                <p className="text-sm text-slate-300 leading-relaxed mb-6">
-                    {currentStep.description}
-                </p>
-
-                <div className="flex items-center justify-between">
-                    <button
-                        onClick={handlePrev}
-                        disabled={currentStepIndex === 0}
-                        className="p-2 rounded-lg hover:bg-white/10 text-white/60 disabled:opacity-30 transition-colors"
-                    >
-                        <ChevronRight className="w-5 h-5 rotate-180" /> {/* RTL flip if needed, but ChevronRight usually points > */}
-                    </button>
-
-                    <div className="flex gap-1.5">
-                        {steps.map((_, idx) => (
-                            <div
-                                key={idx}
-                                className={`w-2 h-2 rounded-full transition-colors ${idx === currentStepIndex ? 'bg-primary-500' : 'bg-white/20'}`}
-                            />
-                        ))}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-5 shadow-2xl border border-slate-200 dark:border-white/10">
+                    <div className="flex justify-between items-start mb-2 sm:mb-3">
+                        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--theme-primary-500)' }}>
+                            خطوة {currentStepIndex + 1} من {steps.length}
+                        </span>
+                        <button 
+                            onClick={onClose} 
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                            style={{ color: 'var(--theme-text-tertiary)' }}
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
                     </div>
 
-                    <button
-                        onClick={handleNext}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-medium text-sm transition-all"
-                    >
-                        {currentStepIndex === steps.length - 1 ? 'إنهاء' : 'التالي'}
-                        {currentStepIndex !== steps.length - 1 && <ChevronLeft className="w-4 h-4" />}
-                    </button>
+                    <h3 className="text-base sm:text-lg font-bold mb-1.5 sm:mb-2" style={{ color: 'var(--theme-text-primary)' }}>
+                        {currentStep.title}
+                    </h3>
+                    <p className="text-xs sm:text-sm leading-relaxed mb-4 sm:mb-5" style={{ color: 'var(--theme-text-secondary)' }}>
+                        {currentStep.description}
+                    </p>
+
+                    <div className="flex items-center justify-between gap-2">
+                        <button
+                            onClick={handlePrev}
+                            disabled={currentStepIndex === 0}
+                            className="p-2 rounded-lg disabled:opacity-30 transition-all"
+                            style={{ 
+                                background: 'var(--theme-bg-tertiary)',
+                                color: 'var(--theme-text-secondary)'
+                            }}
+                        >
+                            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 rotate-180" />
+                        </button>
+
+                        <div className="flex gap-1 sm:gap-1.5">
+                            {steps.map((_, idx) => (
+                                <div
+                                    key={idx}
+                                    className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-colors"
+                                    style={{ 
+                                        background: idx === currentStepIndex 
+                                            ? 'var(--theme-primary-500)' 
+                                            : 'var(--theme-border-primary)' 
+                                    }}
+                                />
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={handleNext}
+                            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm text-white transition-all"
+                            style={{ background: 'var(--theme-primary-500)' }}
+                        >
+                            {currentStepIndex === steps.length - 1 ? 'إنهاء' : 'التالي'}
+                            {currentStepIndex !== steps.length - 1 && <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
