@@ -283,8 +283,10 @@ export const CoffeeShopDashboard: React.FC = () => {
                     />
                 </div>
 
-                {/* ✅ تايم لاين الالتزام - تصميم H Rewards */}
-                <ChallengeTimeline />
+                {/* ✅ تايم لاين الالتزام - مصغر للكافي شوب */}
+                <div className="transform scale-75 origin-top-right -my-4">
+                    <ChallengeTimeline />
+                </div>
 
                 {/* Search */}
                 <div className="relative mb-4">

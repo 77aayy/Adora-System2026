@@ -88,31 +88,27 @@ export const ChallengeTimeline: React.FC = () => {
 
     return (
         <>
-        {/* ✅ تصميم H Rewards - تايم لاين أفقي */}
+        {/* ✅ تصميم H Rewards مصغر - بحجم الكروت الإحصائية */}
         <div 
-            className="adora-card p-4 sm:p-5 cursor-pointer hover:shadow-lg transition-all"
+            className="adora-card p-3 cursor-pointer hover:shadow-lg transition-all"
             onClick={() => setShowHistory(true)}
         >
             {/* العنوان مع عداد الأيام */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg">
-                        <Trophy className="w-5 h-5 text-white" />
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow">
+                        <Trophy className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                        <h3 className="text-sm font-bold adora-text-primary">تحدي الالتزام لشهر {currentMonth}</h3>
-                        <p className="text-[11px] adora-text-secondary">سجّل حضورك يومياً واحصل على المكافآت</p>
+                        <h3 className="text-xs font-bold adora-text-primary">سجل الالتزام</h3>
+                        <p className="text-[9px] adora-text-secondary">{daysRemaining}d متبقي</p>
                     </div>
-                </div>
-                <div className="flex flex-col items-center bg-primary-500/10 px-3 py-2 rounded-xl border border-primary-500/20">
-                    <span className="text-xl font-black text-primary-500">{daysRemaining}</span>
-                    <span className="text-[9px] font-bold adora-text-secondary">يوم متبقي</span>
                 </div>
             </div>
 
             {/* التايم لاين الأفقي مع المراحل */}
             <div className="relative overflow-x-auto scrollbar-hide" ref={scrollRef}>
-                <div className="flex items-center min-w-max px-2">
+                <div className="flex items-center min-w-max">
                     {milestones.map((milestone, index) => {
                         const status = getMilestoneStatus(milestone);
                         const isLast = index === milestones.length - 1;
@@ -122,38 +118,38 @@ export const ChallengeTimeline: React.FC = () => {
                                 {/* الدائرة */}
                                 <div className="flex flex-col items-center">
                                     <div className={`
-                                        w-14 h-14 rounded-full flex items-center justify-center border-4 transition-all relative
+                                        w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all
                                         ${status === 'claimed' 
-                                            ? 'bg-gradient-to-br from-emerald-400 to-green-600 border-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.4)]' 
+                                            ? 'bg-gradient-to-br from-emerald-400 to-green-600 border-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
                                             : status === 'unlocked'
-                                                ? 'bg-gradient-to-br from-yellow-400 to-amber-500 border-yellow-300 shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse'
+                                                ? 'bg-gradient-to-br from-yellow-400 to-amber-500 border-yellow-300 shadow-[0_0_8px_rgba(245,158,11,0.3)] animate-pulse'
                                                 : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600'
                                         }
                                     `}>
                                         {status === 'claimed' ? (
-                                            <CheckCircle2 className="w-7 h-7 text-white" />
+                                            <CheckCircle2 className="w-4 h-4 text-white" />
                                         ) : status === 'unlocked' ? (
-                                            <Gift className="w-6 h-6 text-white" />
+                                            <Gift className="w-3.5 h-3.5 text-white" />
                                         ) : (
-                                            <Lock className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                                            <Lock className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                                         )}
                                     </div>
                                     
                                     {/* معلومات المرحلة */}
-                                    <div className="mt-2 text-center min-w-[70px]">
-                                        <div className={`text-[11px] font-bold ${
+                                    <div className="mt-1 text-center min-w-[45px]">
+                                        <div className={`text-[8px] font-bold ${
                                             status === 'claimed' ? 'text-emerald-600 dark:text-emerald-400' :
                                             status === 'unlocked' ? 'text-yellow-600 dark:text-yellow-400' :
                                             'adora-text-secondary'
                                         }`}>
                                             يوم {milestone.day}
                                         </div>
-                                        <div className={`text-xs font-black ${
+                                        <div className={`text-[9px] font-black ${
                                             status === 'claimed' ? 'text-emerald-500' :
                                             status === 'unlocked' ? 'text-yellow-500' :
                                             'adora-text-tertiary'
                                         }`}>
-                                            {milestone.rewardPoints} نقطة
+                                            {milestone.rewardPoints}
                                         </div>
                                     </div>
                                 </div>
@@ -161,7 +157,7 @@ export const ChallengeTimeline: React.FC = () => {
                                 {/* الخط الرابط */}
                                 {!isLast && (
                                     <div className={`
-                                        w-8 sm:w-12 h-1 mx-1 rounded-full transition-all
+                                        w-4 sm:w-6 h-0.5 mx-0.5 rounded-full transition-all
                                         ${status === 'claimed' 
                                             ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' 
                                             : 'bg-slate-200 dark:bg-slate-700'
@@ -175,17 +171,14 @@ export const ChallengeTimeline: React.FC = () => {
             </div>
 
             {/* ملخص الالتزام الحالي */}
-            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-primary-500/20 flex items-center justify-center">
-                        <span className="text-sm font-black text-primary-500">{currentStreak}</span>
+            <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded bg-primary-500/20 flex items-center justify-center">
+                        <span className="text-[10px] font-black text-primary-500">{currentStreak}</span>
                     </div>
-                    <span className="text-xs adora-text-secondary">يوم التزام متتالي</span>
+                    <span className="text-[9px] adora-text-secondary">يوم متتالي</span>
                 </div>
-                <span className="text-[10px] text-primary-500 font-bold flex items-center gap-1">
-                    اضغط للتفاصيل
-                    <ChevronLeft className="w-3 h-3" />
-                </span>
+                <ChevronLeft className="w-3 h-3 text-primary-500" />
             </div>
         </div>
 
