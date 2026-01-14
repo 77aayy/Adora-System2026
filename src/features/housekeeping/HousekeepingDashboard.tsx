@@ -32,7 +32,7 @@ import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoa
 import { db } from '../../services/firebase';
 import {
     collection, query, where, onSnapshot, doc, updateDoc,
-    addDoc, Timestamp, orderBy, getDocs, increment, getDoc
+    addDoc, Timestamp, orderBy, getDocs, increment, getDoc, arrayUnion
 } from 'firebase/firestore';
 import { useSmartAgent } from '../../hooks/useSmartAgent';
 import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboarding tour
@@ -1147,13 +1147,26 @@ export const HousekeepingDashboard: React.FC = () => {
         }
 
         try {
+            const now = Timestamp.now();
             await updateDoc(doc(db, 'requests', startCleaningTask.id), {
                 status: 'IN_PROGRESS',
-                startedAt: Timestamp.now(),
+                startedAt: now,
                 cleaningType: data.cleaningType,
                 guestStatus: data.guestStatus,
                 roomAssignments: data.roomAssignments,
-                assignedTo: { id: user?.id, name: user?.name }
+                assignedTo: { id: user?.id, name: user?.name },
+                
+                // ✅ Workflow: Update status and add journey entry
+                'workflow.workflowStatus': 'IN_PROGRESS',
+                'workflow.startedAt': now,
+                'workflow.journey': arrayUnion({
+                    department: 'housekeeping',
+                    action: 'started',
+                    timestamp: now,
+                    userId: user?.id || '',
+                    userName: user?.name || '',
+                    notes: 'بدء التنظيف'
+                })
             });
 
             // Award points for starting - Non-blocking
@@ -1181,12 +1194,13 @@ export const HousekeepingDashboard: React.FC = () => {
     const handleCompleteCleaning = async (taskId: string) => {
         try {
             const task = tasks.find(t => t.id === taskId);
+            const now = Timestamp.now();
 
             // If checkout room, needs inspection
             if (task?.cleaningType === 'checkout') {
                 await updateDoc(doc(db, 'requests', taskId), {
                     status: 'NEEDS_INSPECTION',
-                    completedAt: Timestamp.now()
+                    completedAt: now
                 });
             } else if (task?.cleaningType === 'post_inspection') {
                 // ⭐ Post-inspection cleaning → needs RE-inspection to check for maintenance
@@ -1195,8 +1209,31 @@ export const HousekeepingDashboard: React.FC = () => {
                 // Occupied room - complete directly, return to reception
                 await updateDoc(doc(db, 'requests', taskId), {
                     status: 'COMPLETED',
-                    completedAt: Timestamp.now(),
-                    currentDepartment: 'reception' // Return to reception
+                    completedAt: now,
+                    currentDepartment: 'reception', // Return to reception
+                    
+                    // ✅ Workflow: Complete and return to origin
+                    'workflow.workflowStatus': 'COMPLETED',
+                    'workflow.completedAt': now,
+                    'workflow.returnedAt': now,
+                    'workflow.currentHolder': 'reception',
+                    'workflow.isLocked': false,
+                    'workflow.lockedBy': null,
+                    'workflow.journey': arrayUnion({
+                        department: 'housekeeping',
+                        action: 'completed',
+                        timestamp: now,
+                        userId: user?.id || '',
+                        userName: user?.name || '',
+                        notes: 'تم إكمال التنظيف'
+                    }, {
+                        department: 'housekeeping',
+                        action: 'returned',
+                        timestamp: now,
+                        userId: user?.id || '',
+                        userName: user?.name || '',
+                        notes: 'تم الإرجاع للاستقبال'
+                    })
                 });
             }
 

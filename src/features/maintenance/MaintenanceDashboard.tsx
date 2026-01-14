@@ -22,7 +22,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { usei18n } from '../../i18n/i18nContext';
 import { db } from '../../services/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, Timestamp, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, Timestamp, orderBy, getDocs, arrayUnion } from 'firebase/firestore';
 import { useSmartAgent } from '../../hooks/useSmartAgent';
 import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboarding tour
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
@@ -491,18 +491,33 @@ export const MaintenanceDashboard: React.FC = () => {
         if (!currentStartRequest) return;
 
         try {
+            const now = Timestamp.now();
             const updateData: any = {
                 status: 'IN_PROGRESS',
-                'timeline.started': Timestamp.now(),
+                'timeline.started': now,
                 startedBy: user?.id,
-                estimatedCost: getEstimatedCost(currentStartRequest.maintenanceType || 'general')
+                estimatedCost: getEstimatedCost(currentStartRequest.maintenanceType || 'general'),
+                
+                // ✅ Workflow: Update status and add journey entry
+                'workflow.workflowStatus': 'IN_PROGRESS',
+                'workflow.startedAt': now
             };
 
             if (beforePhoto) {
                 updateData.beforePhoto = beforePhoto;
             }
 
-            await updateDoc(doc(db, 'requests', currentStartRequest.id), updateData);
+            await updateDoc(doc(db, 'requests', currentStartRequest.id), {
+                ...updateData,
+                'workflow.journey': arrayUnion({
+                    department: 'maintenance',
+                    action: 'started',
+                    timestamp: now,
+                    userId: user?.id || '',
+                    userName: user?.name || '',
+                    notes: 'بدء الصيانة'
+                })
+            });
 
             closeStartModal();
             await addPointToEmployee('start_maintenance', { roomNumber: currentStartRequest.roomNumber });

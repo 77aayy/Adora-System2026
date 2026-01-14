@@ -2536,7 +2536,32 @@ export const ReceptionDashboard: React.FC = () => {
                     confirmed: Timestamp.now()
                 },
                 // 🛑 Scenario 2: Duplicate Flag
-                isPotentialDuplicate: isDuplicate
+                isPotentialDuplicate: isDuplicate,
+                
+                // ✅ Workflow fields for Smart Department Tracking
+                workflow: {
+                    originDept: 'reception',
+                    targetDept: getDepartment(data.type, data.emergencyTargetDepartment),
+                    currentHolder: getDepartment(data.type, data.emergencyTargetDepartment),
+                    workflowStatus: 'NEW',
+                    sentAt: Timestamp.now(),
+                    isLocked: true,
+                    lockedBy: getDepartment(data.type, data.emergencyTargetDepartment),
+                    journey: [{
+                        department: 'reception',
+                        action: 'created',
+                        timestamp: Timestamp.now(),
+                        userId: user.id,
+                        userName: user.name || 'مستخدم'
+                    }, {
+                        department: 'reception',
+                        action: 'sent',
+                        timestamp: Timestamp.now(),
+                        userId: user.id,
+                        userName: user.name || 'مستخدم',
+                        notes: `تم الإرسال إلى ${getDepartment(data.type, data.emergencyTargetDepartment)}`
+                    }]
+                }
             };
 
             // ✅ Emergency Request Fields
