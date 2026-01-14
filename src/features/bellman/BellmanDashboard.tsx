@@ -101,7 +101,7 @@ interface LuggageItem {
     receivedAt: any;
 }
 
-type TabType = 'rooms' | 'requests' | 'luggage';
+type TabType = 'new' | 'in_progress' | 'completed';
 
 // ============================================================
 // CONSTANTS
@@ -548,7 +548,7 @@ export const BellmanDashboard: React.FC = () => {
     const [requests, setRequests] = useState<BellmanRequest[]>([]);
     const [luggage, setLuggage] = useState<LuggageItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currentTab, setCurrentTab] = useState<TabType>('requests');
+    const [currentTab, setCurrentTab] = useState<TabType>('new');
     const [showCheckinModal, setShowCheckinModal] = useState(false);
     const [showShiftNotes, setShowShiftNotes] = useState(false);
     const [showProcurement, setShowProcurement] = useState(false);
@@ -585,14 +585,14 @@ export const BellmanDashboard: React.FC = () => {
     // ✅ Onboarding Tour
     const { showTour, steps: tourSteps, closeTour, completeTour } = useOnboardingTour('bellman');
 
-    // ✅ Read tab from URL query (?tab=requests|rooms|luggage)
+    // ✅ Read tab from URL query (?tab=new|in_progress|completed)
     try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { useSearchParams } = require('react-router-dom');
         const [searchParams] = useSearchParams();
         useEffect(() => {
             const tab = (searchParams.get('tab') || '').toLowerCase();
-            if (tab === 'requests' || tab === 'rooms' || tab === 'luggage') {
+            if (tab === 'new' || tab === 'in_progress' || tab === 'completed') {
                 setCurrentTab(tab as TabType);
             }
         }, [searchParams]);
@@ -764,8 +764,8 @@ export const BellmanDashboard: React.FC = () => {
         return availableRooms.filter(r => !occupiedRoomNumbers.includes(r));
     }, [availableRooms, occupiedRoomNumbers]);
 
-    // Active requests - filter to only show bellman's requests
-    const activeRequests = useMemo(() => {
+    // ✅ Group requests by status (new/in_progress/completed)
+    const groupedRequests = useMemo(() => {
         const now = new Date();
         
         // ✅ Helper: Check if scheduled request should be shown (only if scheduledDate <= now)
@@ -774,25 +774,30 @@ export const BellmanDashboard: React.FC = () => {
             if (!scheduledDateTime) return true; // Not scheduled - always visible
             
             const scheduledTime = scheduledDateTime?.toDate?.() || new Date(scheduledDateTime);
-            // Show only if scheduled time has passed (including now)
             return scheduledTime <= now;
         };
         
-        return requests.filter(r => {
-            // ✅ Scheduled requests: Show only if scheduledDate <= now
+        // Filter bellman-only requests
+        const bellmanRequests = requests.filter(r => {
             if (!isScheduledRequestVisible(r)) return false;
-            
-            // Filter by status
-            if (r.status === 'COMPLETED') return false;
-
             // Show if currentDepartment is bellman or legacy (no currentDepartment)
             if (r.currentDepartment && r.currentDepartment !== 'bellman') {
-                return false; // Belongs to another department
+                return false;
             }
-
             return true;
         });
+        
+        return {
+            new: bellmanRequests.filter(r => r.status === 'CONFIRMED'),
+            in_progress: bellmanRequests.filter(r => r.status === 'IN_PROGRESS'),
+            completed: bellmanRequests.filter(r => r.status === 'COMPLETED')
+        };
     }, [requests]);
+    
+    // Active requests (for backward compatibility)
+    const activeRequests = useMemo(() => {
+        return [...groupedRequests.new, ...groupedRequests.in_progress];
+    }, [groupedRequests]);
 
     // ✅ Show Points Notification for new CONFIRMED requests
     useEffect(() => {
@@ -1178,38 +1183,37 @@ export const BellmanDashboard: React.FC = () => {
                 </button>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-2 mb-4 overflow-x-auto">
+            {/* ✅ Unified Tabs - جديد / قيد التنفيذ / مكتمل */}
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
                 {[
-                    { key: 'requests', label: 'الطلبات', count: activeRequests.length },
-                    { key: 'rooms', label: 'الغرف', count: occupiedRoomNumbers.length },
-                    { key: 'luggage', label: 'الأمتعة', count: luggage.filter(l => l.status !== 'delivered').length }
+                    { key: 'new', label: 'جديد', count: groupedRequests.new.length, color: 'teal' },
+                    { key: 'in_progress', label: 'قيد التنفيذ', count: groupedRequests.in_progress.length, color: 'blue' },
+                    { key: 'completed', label: 'مكتمل', count: groupedRequests.completed.length, color: 'green' }
                 ].map(tab => {
-                    // Subtle glow for requests tab when there are pending requests
-                    const hasNewRequests = tab.key === 'requests' && tab.count > 0 && currentTab !== 'requests';
+                    const isActive = currentTab === tab.key;
+                    const hasNew = tab.key === 'new' && tab.count > 0 && !isActive;
 
                     return (
                         <button
                             key={tab.key}
                             onClick={() => setCurrentTab(tab.key as TabType)}
-                            className={`relative flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all ${currentTab === tab.key
-                                ? 'bg-purple-500 text-white'
-                                : hasNewRequests
-                                    ? 'bg-green-500/20 text-green-400 border border-green-500/40'
+                            className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all font-medium ${
+                                isActive
+                                    ? tab.key === 'new' ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30'
+                                    : tab.key === 'in_progress' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                                    : 'bg-green-500 text-white shadow-lg shadow-green-500/30'
+                                : hasNew
+                                    ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40'
                                     : 'adora-btn-ghost'
-                                }`}
+                            }`}
                         >
-                            {/* Small dot indicator for new requests */}
-                            {hasNewRequests && (
-                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />
+                            {hasNew && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-teal-400 rounded-full animate-pulse shadow-lg shadow-teal-400/50" />
                             )}
                             {tab.label}
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${currentTab === tab.key
-                                ? 'bg-white/20'
-                                : hasNewRequests
-                                    ? 'bg-green-500 text-white'
-                                    : 'adora-card'
-                                }`}>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                isActive ? 'bg-white/20' : hasNew ? 'bg-teal-500 text-white' : 'adora-card'
+                            }`}>
                                 {tab.count}
                             </span>
                         </button>
@@ -1217,45 +1221,37 @@ export const BellmanDashboard: React.FC = () => {
                 })}
             </div>
 
-            {/* Content */}
+            {/* ✅ Content - Unified Tabs (جديد / قيد التنفيذ / مكتمل) */}
             <div className="space-y-3">
-                {currentTab === 'rooms' && (
-                    <>
-                        {roomCards.filter(r => r.status === 'active').length === 0 ? (
-                            <div className="adora-card p-12 text-center">
-                                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <DoorOpen className="w-8 h-8" style={{ color: 'var(--theme-text-tertiary)' }} />
-                                </div>
-                                <p className="adora-text-tertiary">لا توجد غرف مشغولة حالياً</p>
-                            </div>
-                        ) : (
-                            roomCards.filter(r => r.status === 'active').map(room => (
-                                <RoomCardItem
-                                    key={room.id}
-                                    room={room}
-                                    onCheckout={() => handleCheckout(room)}
-                                    onTransfer={() => {
-                                        setTransferRoom(room);
-                                        setShowTransferModal(true);
-                                    }}
-                                />
-                            ))
-                        )}
-                    </>
-                )}
+                {/* Render requests based on current tab */}
+                {(() => {
+                    const currentRequests = groupedRequests[currentTab] || [];
+                    const emptyMessages = {
+                        new: 'لا توجد طلبات جديدة',
+                        in_progress: 'لا توجد طلبات قيد التنفيذ',
+                        completed: 'لا توجد طلبات مكتملة'
+                    };
+                    const emptyIcons = {
+                        new: Bell,
+                        in_progress: Clock,
+                        completed: CheckCircle
+                    };
+                    const EmptyIcon = emptyIcons[currentTab];
 
-                {currentTab === 'requests' && (
-                    <>
-                        {activeRequests.length === 0 ? (
+                    if (currentRequests.length === 0) {
+                        return (
                             <div className="adora-card p-12 text-center">
                                 <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <Bell className="w-8 h-8" style={{ color: 'var(--theme-text-tertiary)' }} />
+                                    <EmptyIcon className="w-8 h-8" style={{ color: 'var(--theme-text-tertiary)' }} />
                                 </div>
-                                <p className="adora-text-tertiary">لا توجد طلبات نشطة</p>
+                                <p className="adora-text-tertiary">{emptyMessages[currentTab]}</p>
                             </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {activeRequests.map(request => (
+                        );
+                    }
+
+                    return (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                            {currentRequests.map(request => (
                                 <div key={request.id} 
                                     className="p-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] adora-card border shadow-sm adora-border"
                                     onClick={() => handleBellmanCardClick(request.id)}>
@@ -1275,9 +1271,11 @@ export const BellmanDashboard: React.FC = () => {
                                         </div>
                                         <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                                             <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                                                request.status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'
+                                                request.status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-500' 
+                                                : request.status === 'COMPLETED' ? 'bg-green-500/20 text-green-500'
+                                                : 'bg-teal-500/20 text-teal-500'
                                             }`}>
-                                                {request.status === 'IN_PROGRESS' ? 'جاري' : 'جديد'}
+                                                {request.status === 'IN_PROGRESS' ? 'جاري' : request.status === 'COMPLETED' ? 'مكتمل' : 'جديد'}
                                             </div>
                                         </div>
                                     </div>
@@ -1297,65 +1295,63 @@ export const BellmanDashboard: React.FC = () => {
                                         </p>
                                     )}
 
-                                    {/* Row 4: Actions */}
-                                    <div className="flex gap-2 pt-2 border-t adora-border">
-                                        {request.status === 'CONFIRMED' && (
-                                            <button onClick={(e) => { e.stopPropagation(); handleStartRequest(request.id); }}
-                                                className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
-                                                <Play className="w-3 h-3" /> بدء
+                                    {/* Row 4: Actions - Only for new/in_progress */}
+                                    {currentTab !== 'completed' && (
+                                        <div className="flex gap-2 pt-2 border-t adora-border">
+                                            {request.status === 'CONFIRMED' && (
+                                                <button onClick={(e) => { e.stopPropagation(); handleStartRequest(request.id); }}
+                                                    className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                                                    <Play className="w-3 h-3" /> بدء
+                                                </button>
+                                            )}
+                                            {request.status === 'IN_PROGRESS' && (
+                                                <button onClick={(e) => { e.stopPropagation(); handleCompleteRequest(request); }}
+                                                    className="flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                                                    <CheckCircle2 className="w-3 h-3" /> إتمام
+                                                </button>
+                                            )}
+                                            <button onClick={(e) => { e.stopPropagation(); handleBellmanCardClick(request.id); }}
+                                                className="py-1.5 px-3 rounded-lg text-xs font-medium adora-bg-tertiary adora-text-secondary flex items-center gap-1">
+                                                <Eye className="w-3 h-3" />
                                             </button>
-                                        )}
-                                        {request.status === 'IN_PROGRESS' && (
-                                            <button onClick={(e) => { e.stopPropagation(); handleCompleteRequest(request); }}
-                                                className="flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1">
-                                                <CheckCircle2 className="w-3 h-3" /> إتمام
-                                            </button>
-                                        )}
-                                        <button onClick={(e) => { e.stopPropagation(); handleBellmanCardClick(request.id); }}
-                                            className="py-1.5 px-3 rounded-lg text-xs font-medium adora-bg-tertiary adora-text-secondary flex items-center gap-1">
-                                            <Eye className="w-3 h-3" />
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })()}
+
+                {/* ✅ Quick Access: Occupied Rooms Section */}
+                {roomCards.filter(r => r.status === 'active').length > 0 && (
+                    <div className="mt-6">
+                        <h3 className="text-sm font-bold adora-text-secondary mb-3 flex items-center gap-2">
+                            <DoorOpen className="w-4 h-4" />
+                            الغرف المشغولة ({roomCards.filter(r => r.status === 'active').length})
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                            {roomCards.filter(r => r.status === 'active').slice(0, 8).map(room => (
+                                <div key={room.id} className="adora-card p-3 text-center">
+                                    <span className="text-lg font-bold adora-text-primary">{room.roomNumber}</span>
+                                    <p className="text-[10px] adora-text-tertiary truncate">{room.guestName || 'نزيل'}</p>
+                                    <div className="flex gap-1 mt-2">
+                                        <button 
+                                            onClick={() => handleCheckout(room)}
+                                            className="flex-1 py-1 px-2 rounded bg-red-500/20 text-red-500 text-[10px] font-medium"
+                                        >
+                                            <LogOut className="w-3 h-3 inline mr-1" />خروج
+                                        </button>
+                                        <button 
+                                            onClick={() => { setTransferRoom(room); setShowTransferModal(true); }}
+                                            className="py-1 px-2 rounded bg-orange-500/20 text-orange-500 text-[10px]"
+                                        >
+                                            <ArrowLeftRight className="w-3 h-3" />
                                         </button>
                                     </div>
                                 </div>
                             ))}
-                            </div>
-                        )}
-                    </>
-                )}
-
-                {currentTab === 'luggage' && (
-                    <>
-                        {luggage.filter(l => l.status !== 'delivered').length === 0 ? (
-                            <div className="glass-card p-12 text-center">
-                                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-                                    <Package className="w-8 h-8 text-white/20" />
-                                </div>
-                                <p className="text-white/40">لا توجد أمتعة معلقة</p>
-                            </div>
-                        ) : (
-                            luggage.filter(l => l.status !== 'delivered').map(item => (
-                                <div key={item.id} className="glass-card p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                                                <Package className="w-6 h-6 text-orange-400" />
-                                            </div>
-                                            <div>
-                                                <p className="text-white font-medium">غرفة {item.roomNumber}</p>
-                                                <p className="text-white/50 text-sm">{item.itemCount} قطعة • {LOCATION_LABELS[item.location]}</p>
-                                            </div>
-                                        </div>
-                                        <span className={`px-2 py-1 rounded-lg text-xs ${item.status === 'stored' ? 'bg-blue-500/20 text-blue-400' :
-                                            item.status === 'received' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                'bg-green-500/20 text-green-400'
-                                            }`}>
-                                            {item.status === 'stored' ? 'مخزن' : item.status === 'received' ? 'مستلم' : 'سلّم'}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </>
+                        </div>
+                    </div>
                 )}
             </div>
 
