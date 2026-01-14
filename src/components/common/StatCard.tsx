@@ -184,13 +184,13 @@ export const StatCard: React.FC<StatCardProps> = ({
                     </div>
                 )}
                 
-                {/* Content - Compact on mobile */}
+                {/* Content - Readable on all screens */}
                 <div className="flex-1 min-w-0">
-                    {/* Value - Scales smoothly */}
+                    {/* Value - Clear and Bold */}
                     <div className={`
                         ${isStringValue 
-                            ? 'text-[10px] sm:text-xs lg:text-sm' 
-                            : 'text-sm sm:text-base lg:text-xl'
+                            ? 'text-xs sm:text-sm lg:text-base' 
+                            : 'text-lg sm:text-xl lg:text-2xl'
                         } 
                         font-bold text-slate-800 dark:text-white tracking-tight truncate leading-none
                     `}>
@@ -200,8 +200,8 @@ export const StatCard: React.FC<StatCardProps> = ({
                         }
                     </div>
                     
-                    {/* Label - Smaller on mobile */}
-                    <div className="text-[8px] sm:text-[10px] lg:text-xs text-slate-600 dark:text-slate-400 truncate mt-0.5 leading-tight">
+                    {/* Label - Readable! Minimum 11px */}
+                    <div className="text-[11px] sm:text-xs lg:text-sm text-slate-600 dark:text-slate-400 truncate mt-0.5 leading-tight font-medium">
                         {label}
                     </div>
                 </div>

@@ -146,13 +146,13 @@ export const ChallengeTimeline: React.FC = () => {
                                 {/* البيانات بين الأقفال */}
                                 {!isLast && (
                                     <div className="flex-1 flex flex-col items-center px-0.5 sm:px-1">
-                                        <span className="text-[7px] sm:text-[8px] font-bold text-slate-700 dark:text-slate-300">
+                                        <span className="text-[10px] sm:text-xs font-bold text-slate-700 dark:text-slate-300">
                                             {milestone.day}d
                                         </span>
                                         <div className={`w-full h-0.5 rounded-full my-0.5 ${
                                             status === 'claimed' ? 'bg-teal-400' : 'bg-teal-200 dark:bg-teal-700'
                                         }`} />
-                                        <span className="text-[7px] sm:text-[8px] font-bold text-teal-600 dark:text-teal-400">
+                                        <span className="text-[10px] sm:text-xs font-bold text-teal-600 dark:text-teal-400">
                                             {milestone.rewardPoints}
                                         </span>
                                     </div>
@@ -166,9 +166,9 @@ export const ChallengeTimeline: React.FC = () => {
                 <div className="mt-2 pt-2 border-t border-teal-200 dark:border-teal-500/20 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                         <TrendingUp className="w-3 h-3 text-teal-600 dark:text-teal-400" />
-                        <span className="text-[10px] sm:text-xs font-bold text-slate-700 dark:text-slate-300">{currentStreak} يوم متتالي</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300">{currentStreak} يوم متتالي</span>
                     </div>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 group-hover:text-teal-600 transition-colors">التفاصيل ←</span>
+                    <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 group-hover:text-teal-600 transition-colors">التفاصيل ←</span>
                 </div>
             </div>
         </div>
