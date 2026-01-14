@@ -1211,3 +1211,183 @@
 .adora-text-disabled {
     color: var(--theme-text-disabled);
 }
+
+/* ============================================================
+   🔄 BACKWARD COMPATIBILITY - Legacy Class Aliases
+   ============================================================
+   These classes ensure older components work with the new theme system.
+   DO NOT remove - they provide backward compatibility for 400+ usages.
+*/
+
+/* Legacy glass-card → adora-card */
+.glass-card {
+    background: var(--theme-bg-secondary);
+    border: 1px solid var(--theme-border-primary);
+    border-radius: 1rem;
+    box-shadow: var(--theme-shadow-card);
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+.glass-card:hover {
+    border-color: var(--theme-border-hover);
+    box-shadow: var(--theme-shadow-card-hover);
+}
+
+/* Legacy bg-white/X classes - Light mode fix */
+[data-theme="light"] .bg-white\/5,
+[data-theme="light"] .bg-white\/10,
+[data-theme="light"] .bg-white\/20 {
+    background: var(--theme-bg-tertiary) !important;
+}
+
+/* Legacy text-white/X classes - Light mode fix */
+[data-theme="light"] .text-white\/40,
+[data-theme="light"] .text-white\/50,
+[data-theme="light"] .text-white\/60,
+[data-theme="light"] .text-white\/70 {
+    color: var(--theme-text-secondary) !important;
+}
+
+[data-theme="light"] .text-white\/80,
+[data-theme="light"] .text-white\/90 {
+    color: var(--theme-text-primary) !important;
+}
+
+/* Legacy bg-gray-800 → Theme-aware */
+[data-theme="light"] .bg-gray-800 {
+    background: var(--theme-bg-secondary) !important;
+}
+
+[data-theme="light"] .bg-gray-900 {
+    background: var(--theme-bg-primary) !important;
+}
+
+/* Legacy border-white/X classes */
+[data-theme="light"] .border-white\/5,
+[data-theme="light"] .border-white\/10,
+[data-theme="light"] .border-white\/20 {
+    border-color: var(--theme-border-primary) !important;
+}
+
+/* Legacy hover states */
+[data-theme="light"] .hover\:bg-white\/5:hover,
+[data-theme="light"] .hover\:bg-white\/10:hover,
+[data-theme="light"] .hover\:bg-white\/20:hover {
+    background: var(--theme-bg-tertiary) !important;
+}
+
+/* ============================================================
+   🎨 UNIFIED SIDEBAR NAVIGATION
+   ============================================================ */
+
+.adora-sidebar {
+    background: var(--theme-bg-secondary);
+    border-right: 1px solid var(--theme-border-primary);
+    min-height: 100vh;
+}
+
+.adora-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    color: var(--theme-text-secondary);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.adora-sidebar-item:hover {
+    background: var(--theme-bg-tertiary);
+    color: var(--theme-text-primary);
+}
+
+.adora-sidebar-item.active {
+    background: var(--theme-primary-100);
+    color: var(--theme-primary-600);
+    font-weight: 600;
+}
+
+[data-theme="dark"] .adora-sidebar-item.active {
+    background: rgba(13, 148, 136, 0.2);
+    color: var(--theme-primary-400);
+}
+
+.adora-sidebar-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+}
+
+.adora-sidebar-label {
+    font-size: 0.875rem;
+}
+
+/* ============================================================
+   🔒 LOCK POLICY VISUAL INDICATORS
+   ============================================================ */
+
+.adora-locked-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: inherit;
+    z-index: 10;
+}
+
+.adora-locked-badge {
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.adora-action-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+/* ============================================================
+   📱 RESPONSIVE ADJUSTMENTS
+   ============================================================ */
+
+@media (max-width: 640px) {
+    .adora-sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        transform: translateX(-100%);
+        z-index: 50;
+        width: 280px;
+    }
+    
+    .adora-sidebar.open {
+        transform: translateX(0);
+    }
+    
+    .adora-sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 40;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    
+    .adora-sidebar-overlay.open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
