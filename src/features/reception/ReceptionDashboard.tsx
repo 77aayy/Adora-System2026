@@ -252,7 +252,158 @@ const STATUS_CONFIG = {
 // Stats Card - MOVED TO: components/common/StatCard.tsx
 // Using centralized version for consistency (supports both 'color' and 'bgColor' props)
 
-// Request Card - Compact and info-rich
+// ✅ COMPACT Request Card - Mobile-First with Essential Info
+// Shows: Room, Service, Guest Status, QR Info, Notes, Time
+const CompactRequestCard: React.FC<{
+    request: ServiceRequest;
+    onView: () => void;
+    onQuickAction?: (action: 'confirm' | 'complete') => void;
+}> = ({ request, onView, onQuickAction }) => {
+    const serviceConfig = QUICK_ACTIONS.find(a => a.type === request.type);
+    
+    // Calculate time ago
+    const timeAgo = useMemo(() => {
+        if (!request.createdAt) return '';
+        const date = request.createdAt.toDate ? request.createdAt.toDate() : new Date(request.createdAt);
+        const diff = Math.floor((Date.now() - date.getTime()) / 60000);
+        if (diff < 1) return 'الآن';
+        if (diff < 60) return `${diff}د`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}س`;
+        return `${Math.floor(diff / 1440)}ي`;
+    }, [request.createdAt]);
+    
+    const isUrgent = request.priority === 'urgent' || request.isEmergency;
+    const isDelayed = request.status !== 'COMPLETED' && request.createdAt && 
+        (Date.now() - (request.createdAt.toDate ? request.createdAt.toDate() : new Date(request.createdAt)).getTime()) > 30 * 60000;
+    const isQR = request.source === 'QR';
+    
+    return (
+        <div
+            onClick={onView}
+            className={`
+                p-3 rounded-xl cursor-pointer
+                transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]
+                adora-card border shadow-sm
+                ${isUrgent ? 'border-red-500/50 ring-1 ring-red-500/30' : 'adora-border'}
+                ${isDelayed ? 'border-orange-500/50 ring-1 ring-orange-500/30' : ''}
+                ${isQR ? 'border-teal-500/50' : ''}
+            `}
+        >
+            {/* Row 1: Room + Service + Status */}
+            <div className="flex items-center gap-2 mb-2">
+                {/* Service Icon */}
+                <div className={`w-8 h-8 rounded-lg flex-shrink-0 ${serviceConfig?.bgColor || 'adora-bg-tertiary'} flex items-center justify-center`}>
+                    <span className={`${serviceConfig?.color || 'adora-text-tertiary'} scale-[0.6]`}>
+                        {serviceConfig?.icon || <Sparkles className="w-4 h-4" />}
+                    </span>
+                </div>
+                
+                {/* Room & Service */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-base font-bold adora-text-primary">غ.{request.roomNumber}</span>
+                        {isUrgent && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+                        {isQR && (
+                            <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-600 dark:text-teal-400 text-[9px] font-bold flex items-center gap-0.5">
+                                <QrCode className="w-2.5 h-2.5" /> QR
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-[10px] adora-text-secondary">{SERVICE_NAMES[request.type]}</p>
+                </div>
+                
+                {/* Time & Status */}
+                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                    <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        request.status === 'COMPLETED' ? 'bg-green-500/20 text-green-600 dark:text-green-400' :
+                        request.status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400' :
+                        request.status === 'CONFIRMED' ? 'bg-teal-500/20 text-teal-600 dark:text-teal-400' :
+                        'bg-orange-500/20 text-orange-600 dark:text-orange-400'
+                    }`}>
+                        {request.status === 'COMPLETED' ? 'مكتمل' :
+                         request.status === 'IN_PROGRESS' ? 'جاري' :
+                         request.status === 'CONFIRMED' ? 'مؤكد' : 'جديد'}
+                    </div>
+                    <span className="text-[10px] adora-text-disabled">{timeAgo}</span>
+                </div>
+            </div>
+            
+            {/* Row 2: Guest Info (for QR requests) */}
+            {isQR && (request.guestIdentity || request.guestPhone || request.guestName) && (
+                <div className="flex items-center gap-2 mb-2 p-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20">
+                    <User className="w-3 h-3 text-teal-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0 text-[10px] text-teal-700 dark:text-teal-300">
+                        <span className="font-bold">{request.guestName || 'نزيل'}</span>
+                        {request.guestIdentity && <span className="mr-2">• هوية: {request.guestIdentity}</span>}
+                        {request.guestPhone && <span className="mr-2">• جوال: {request.guestPhone}</span>}
+                    </div>
+                </div>
+            )}
+            
+            {/* Row 3: Guest Status (داخل/خارج الغرفة) */}
+            {request.guestStatus && (
+                <div className={`flex items-center gap-1.5 mb-2 p-1.5 rounded-lg text-[10px] font-medium ${
+                    request.guestStatus === 'in' 
+                        ? 'bg-green-500/10 text-green-700 dark:text-green-300 border border-green-500/20' 
+                        : 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20'
+                }`}>
+                    {request.guestStatus === 'in' ? (
+                        <><User className="w-3 h-3" /> النزيل موجود بالغرفة</>
+                    ) : (
+                        <><DoorOpen className="w-3 h-3" /> الغرفة فارغة</>
+                    )}
+                </div>
+            )}
+            
+            {/* Row 4: Notes (truncated) */}
+            {request.notes && request.notes.trim() && (
+                <div className="flex items-start gap-1.5 mb-2 p-1.5 rounded-lg bg-slate-500/10 border border-slate-500/20">
+                    <MessageSquare className="w-3 h-3 adora-text-secondary flex-shrink-0 mt-0.5" />
+                    <p className="text-[10px] adora-text-secondary line-clamp-2">{request.notes}</p>
+                </div>
+            )}
+            
+            {/* Row 5: Department Tracking */}
+            {request.currentDepartment && request.currentDepartment !== 'reception' && (
+                <div className="flex items-center gap-1.5 mb-2 text-[10px] adora-text-tertiary">
+                    <ArrowRightLeft className="w-3 h-3" />
+                    <span>حالياً في: {
+                        request.currentDepartment === 'housekeeping' ? 'هاوس كيبنج 🧹' :
+                        request.currentDepartment === 'maintenance' ? 'الصيانة 🔧' :
+                        request.currentDepartment === 'bellman' ? 'البيلمان 🛎️' :
+                        request.currentDepartment === 'coffee_shop' ? 'كافي شوب ☕' :
+                        request.currentDepartment
+                    }</span>
+                </div>
+            )}
+            
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t adora-border">
+                {/* Quick Confirm (for pending) */}
+                {(request.status === 'PENDING' || request.status === 'PENDING_RECEPTION') && onQuickAction && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onQuickAction('confirm'); }}
+                        className="flex-1 py-1.5 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1 hover:bg-teal-600 transition-colors"
+                    >
+                        <Check className="w-3 h-3" /> تأكيد
+                    </button>
+                )}
+                
+                {/* View Details */}
+                <button
+                    onClick={(e) => { e.stopPropagation(); onView(); }}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-medium flex items-center gap-1 adora-bg-tertiary adora-text-secondary hover:adora-bg-secondary transition-colors ${
+                        (request.status === 'PENDING' || request.status === 'PENDING_RECEPTION') ? '' : 'flex-1 justify-center'
+                    }`}
+                >
+                    <Eye className="w-3 h-3" /> التفاصيل
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// Request Card - Full version for expanded view (kept for compatibility)
 const RequestCard: React.FC<{
     request: ServiceRequest;
     onConfirm?: () => void;
@@ -3331,98 +3482,26 @@ export const ReceptionDashboard: React.FC = () => {
             )
             }
 
-            {/* Requests List */}
-            <div className="space-y-3">
+            {/* Requests List - COMPACT GRID for Mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {currentRequests.length === 0 ? (
-                    <div className="pro-card p-12 sm:p-16 md:p-20 text-center rounded-3xl">
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-primary-500/20 to-primary-600/10 flex items-center justify-center mx-auto mb-6 shadow-lg">
-                            <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-primary-400/60" />
+                    <div className="col-span-full adora-card p-6 text-center rounded-xl">
+                        <div className="w-12 h-12 rounded-full adora-bg-tertiary flex items-center justify-center mx-auto mb-3">
+                            <CheckCircle2 className="w-6 h-6 adora-text-disabled" />
                         </div>
-                        <p className="text-lg sm:text-xl text-white/50 font-medium">لا توجد طلبات في هذه القائمة</p>
+                        <p className="text-sm adora-text-secondary">لا توجد طلبات في هذه القائمة</p>
                     </div>
                 ) : (
                     currentRequests.map(request => (
-                        <RequestCard
+                        <CompactRequestCard
                             key={request.id}
                             request={request}
-                            onConfirm={request.status === 'PENDING' || request.status === 'PENDING_RECEPTION' ? () => handleConfirmRequest(request.id) : undefined}
-                            onConfirmCompletion={
-                                // ✅ Show confirm completion button for completed requests in "completed" tab
-                                currentTab === 'completed' && request.status === 'COMPLETED' && request.currentDepartment === 'reception'
-                                    ? () => handleConfirmCompletion(request.id)
-                                    : undefined
-                            }
-                            onComplete={
-                                // ⭐ CRITICAL: Complete button logic based on request type
-                                // 
-                                // 🔧 Maintenance: Must return from Maintenance → Housekeeping → Reception
-                                // 🧹 Cleaning: Must be completed by Housekeeping first
-                                // ☕ Coffee/Bellman/Other: Can be completed directly by Reception
-                                //
-                                // RULE: For cleaning/maintenance, only show "Complete" if status is already COMPLETED
-                                // (meaning the department has finished their work)
-                                (() => {
-                                    // Hide for maintenance/cleaning NOT back at reception
-                                    if ((request.type === 'maintenance' || request.type === 'cleaning') && request.currentDepartment !== 'reception') {
-                                        return undefined;
-                                    }
-                                    
-                                    // For cleaning/maintenance that ARE at reception:
-                                    // They must have status 'COMPLETED' from the other department
-                                    if ((request.type === 'maintenance' || request.type === 'cleaning') && request.currentDepartment === 'reception') {
-                                        // Only allow final confirmation if already completed by Housekeeping/Maintenance
-                                        return request.status === 'COMPLETED' ? () => handleCompleteRequest(request.id) : undefined;
-                                    }
-                                    
-                                    // For other types (coffee, bellman, extension, etc.):
-                                    // Can be completed if CONFIRMED or IN_PROGRESS and at reception
-                                    if (request.currentDepartment === 'reception' && ['CONFIRMED', 'IN_PROGRESS'].includes(request.status)) {
-                                        return () => handleCompleteRequest(request.id);
-                                    }
-                                    
-                                    // Manager/Owner override for non-maintenance/cleaning
-                                    if ((user?.role === 'manager' || user?.role === 'owner') && 
-                                        !['maintenance', 'cleaning'].includes(request.type) &&
-                                        ['CONFIRMED', 'IN_PROGRESS'].includes(request.status)) {
-                                        return () => handleCompleteRequest(request.id);
-                                    }
-                                    
-                                    return undefined;
-                                })()
-                            }
                             onView={() => setSelectedRequest(request)}
-                            userId={user?.id}
-                            userName={user?.name}
-                            userRole={user?.role}
-                            onDelete={
-                                // ✅ Manager/Admin/Owner: Direct delete (approve if deletion request exists)
-                                ['manager', 'admin', 'owner'].includes(user?.role || '')
-                                    ? () => setDeleteConfirmation({ id: request.id, show: true })
-                                    : undefined
-                            }
-                            onRequestDeletion={
-                                // ✅ Regular employees: Request deletion
-                                !['manager', 'admin', 'owner'].includes(user?.role || '') && !request.deletionRequest
-                                    ? () => {
-                                        if (window.confirm('هل أنت متأكد من طلب حذف هذا الطلب؟ سيتم إرسال طلب للمدير للموافقة.')) {
-                                            handleRequestDeletion(request.id);
-                                        }
+                            onQuickAction={
+                                (request.status === 'PENDING' || request.status === 'PENDING_RECEPTION')
+                                    ? (action) => {
+                                        if (action === 'confirm') handleConfirmRequest(request.id);
                                     }
-                                    // ✅ Manager: Reject deletion request
-                                    : request.deletionRequest && ['manager', 'admin', 'owner'].includes(user?.role || '')
-                                        ? () => handleRejectDeletion(request.id)
-                                        : undefined
-                            }
-                            onMove={
-                                ['reception', 'front_desk', 'manager', 'owner', 'admin'].includes(user?.role || '') &&
-                                    request.status === 'PENDING_RECEPTION'
-                                    ? () => handleTransferRequest(request)
-                                    : undefined
-                            }
-                            onArchive={
-                                // ✅ Archive button for lost items cards
-                                (request as any).isLostItemsCard && (request as any).lostItemsStatus === 'open'
-                                    ? () => handleArchiveToLostFound(request.id)
                                     : undefined
                             }
                         />
