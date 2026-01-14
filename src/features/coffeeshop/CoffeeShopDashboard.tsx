@@ -41,7 +41,7 @@ import { ChallengeTimeline } from '../../components/features/ChallengeTimeline';
 // TYPES
 // ============================================================
 
-type TabType = 'pending' | 'in_progress' | 'completed';
+type TabType = 'new' | 'in_progress' | 'completed'; // ✅ Unified tabs
 
 // ============================================================
 // MAIN COMPONENT
@@ -58,7 +58,7 @@ export const CoffeeShopDashboard: React.FC = () => {
     // State
     const [orders, setOrders] = useState<CoffeeShopOrder[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currentTab, setCurrentTab] = useState<TabType>('pending');
+    const [currentTab, setCurrentTab] = useState<TabType>('new');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedOrder, setSelectedOrder] = useState<CoffeeShopOrder | null>(null);
     const [completing, setCompleting] = useState(false);
@@ -97,10 +97,10 @@ export const CoffeeShopDashboard: React.FC = () => {
         return unsubscribe;
     }, [branchId, tenantId]);
 
-    // Group orders
+    // Group orders - ✅ Unified tabs (new, in_progress, completed)
     const groupedOrders = useMemo(() => {
         return {
-            pending: orders.filter(o => o.status === 'pending' || o.status === 'confirmed'),
+            new: orders.filter(o => o.status === 'pending' || o.status === 'confirmed'),
             in_progress: orders.filter(o => o.status === 'preparing' || o.status === 'ready'),
             completed: orders.filter(o => o.status === 'delivered' || o.status === 'cancelled')
         };
@@ -255,11 +255,11 @@ export const CoffeeShopDashboard: React.FC = () => {
                 {/* Stats - الكروت الإحصائية */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3">
                     <StatCard
-                        count={groupedOrders.pending.length}
-                        label="⏳ في الانتظار"
+                        count={groupedOrders.new.length}
+                        label="🆕 جديد"
                         icon={<AlertCircle />}
                         iconColor="orange"
-                        status={groupedOrders.pending.length > 10 ? 'warning' : 'normal'}
+                        status={groupedOrders.new.length > 10 ? 'warning' : 'normal'}
                         lastUpdate="تم التحديث الآن"
                         trend="—"
                     />
@@ -303,9 +303,9 @@ export const CoffeeShopDashboard: React.FC = () => {
                 {/* Tabs */}
                 <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
                     {[
-                        { key: 'pending', label: 'في الانتظار', count: groupedOrders.pending.length },
-                        { key: 'in_progress', label: 'قيد التحضير', count: groupedOrders.in_progress.length },
-                        { key: 'completed', label: 'مكتمل', count: groupedOrders.completed.length }
+                        { key: 'new', label: 'جديد', count: groupedOrders.new.length },
+                        { key: 'in_progress', label: 'قيد التنفيذ', count: groupedOrders.in_progress.length },
+                        { key: 'completed', label: 'مكتملة', count: groupedOrders.completed.length }
                     ].map(tab => (
                         <button
                             key={tab.key}

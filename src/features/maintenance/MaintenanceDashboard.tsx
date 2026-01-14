@@ -99,7 +99,7 @@ export const MaintenanceDashboard: React.FC = () => {
     const greeting = getGreetingParts(user?.name);
 
     // State
-    const [currentTab, setCurrentTab] = useState<'active' | 'completed'>('active');
+    const [currentTab, setCurrentTab] = useState<'new' | 'in_progress' | 'completed'>('new'); // ✅ Unified tabs
     const [loading, setLoading] = useState(true);
     
     // ✅ FAST UI: Force show page after 2 seconds max
@@ -120,15 +120,19 @@ export const MaintenanceDashboard: React.FC = () => {
         const [searchParams] = useSearchParams();
         useEffect(() => {
             const tab = (searchParams.get('tab') || '').toLowerCase();
-            if (tab === 'active' || tab === 'completed') {
-                setCurrentTab(tab as 'active' | 'completed');
+            if (tab === 'new' || tab === 'in_progress' || tab === 'completed') {
+                setCurrentTab(tab as 'new' | 'in_progress' | 'completed');
             }
         }, [searchParams]);
     } catch {}
 
-    // Requests
-    const [activeRequests, setActiveRequests] = useState<MaintenanceRequest[]>([]);
+    // Requests - ✅ Unified tabs (new, in_progress, completed)
+    const [newRequests, setNewRequests] = useState<MaintenanceRequest[]>([]);
+    const [inProgressRequests, setInProgressRequests] = useState<MaintenanceRequest[]>([]);
     const [completedRequests, setCompletedRequests] = useState<MaintenanceRequest[]>([]);
+    
+    // Legacy alias for compatibility
+    const activeRequests = [...newRequests, ...inProgressRequests];
 
     // Current request modals
     const [currentStartRequest, setCurrentStartRequest] = useState<MaintenanceRequest | null>(null);
@@ -170,14 +174,25 @@ export const MaintenanceDashboard: React.FC = () => {
     const beforePhotoRef = useRef<HTMLInputElement>(null);
     const afterPhotoRef = useRef<HTMLInputElement>(null);
 
-    // Filtered requests based on issue type
-    const filteredActiveRequests = useMemo(() => {
-        if (issueTypeFilter === 'all') return activeRequests;
-        return activeRequests.filter(r =>
+    // Filtered requests based on issue type - ✅ Unified tabs
+    const filteredNewRequests = useMemo(() => {
+        if (issueTypeFilter === 'all') return newRequests;
+        return newRequests.filter(r =>
             (r.maintenanceType || '').toLowerCase().includes(issueTypeFilter) ||
             (r.description || '').toLowerCase().includes(issueTypeFilter)
         );
-    }, [activeRequests, issueTypeFilter]);
+    }, [newRequests, issueTypeFilter]);
+
+    const filteredInProgressRequests = useMemo(() => {
+        if (issueTypeFilter === 'all') return inProgressRequests;
+        return inProgressRequests.filter(r =>
+            (r.maintenanceType || '').toLowerCase().includes(issueTypeFilter) ||
+            (r.description || '').toLowerCase().includes(issueTypeFilter)
+        );
+    }, [inProgressRequests, issueTypeFilter]);
+    
+    // Legacy alias for compatibility
+    const filteredActiveRequests = [...filteredNewRequests, ...filteredInProgressRequests];
 
     const filteredCompletedRequests = useMemo(() => {
         if (issueTypeFilter === 'all') return completedRequests;
@@ -252,8 +267,16 @@ export const MaintenanceDashboard: React.FC = () => {
             setTenant(userTenantId).catch(console.error);
         }
 
-        initMaintenancePage();
-    }, [user, tenantId]);
+        // ✅ FIX: Store unsubscribe function for cleanup
+        const unsubscribe = listenToMaintenanceRequests();
+        setLoading(false);
+        console.log('✅ Maintenance page initialized');
+        
+        // ✅ Cleanup on unmount to prevent memory leaks
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [user, tenantId, branchId]);
 
     // ============================================================
     // VOICE AGENT INTEGRATION
@@ -293,12 +316,6 @@ export const MaintenanceDashboard: React.FC = () => {
         }
     });
 
-    const initMaintenancePage = async () => {
-        listenToMaintenanceRequests();
-        setLoading(false);
-        console.log('✅ Maintenance page initialized');
-    };
-
     // ============================================================
     // REALTIME LISTENERS
     // ============================================================
@@ -336,7 +353,8 @@ export const MaintenanceDashboard: React.FC = () => {
     };
 
     const processMaintenanceSnapshot = (snapshot: any, localSort = false) => {
-        const active: MaintenanceRequest[] = [];
+        const newList: MaintenanceRequest[] = [];
+        const inProgressList: MaintenanceRequest[] = [];
         const completed: MaintenanceRequest[] = [];
         const now = new Date();
 
@@ -366,18 +384,24 @@ export const MaintenanceDashboard: React.FC = () => {
                 if (isToday(request.timeline?.completed)) {
                     completed.push(request);
                 }
-            } else if (['CONFIRMED', 'IN_PROGRESS', 'WAITING_PARTS', 'SCHEDULED'].includes(request.status)) {
-                active.push(request);
+            } else if (['CONFIRMED', 'SCHEDULED'].includes(request.status)) {
+                // ✅ New tab: CONFIRMED requests waiting to start
+                newList.push(request);
+            } else if (['IN_PROGRESS', 'WAITING_PARTS'].includes(request.status)) {
+                // ✅ In Progress tab: Actively being worked on
+                inProgressList.push(request);
             }
         });
 
         // Sort by priority if local sort needed
         if (localSort) {
             const priorityOrder = { urgent: 0, normal: 1, low: 2 };
-            active.sort((a, b) => (priorityOrder[a.priority || 'normal'] || 1) - (priorityOrder[b.priority || 'normal'] || 1));
+            newList.sort((a, b) => (priorityOrder[a.priority || 'normal'] || 1) - (priorityOrder[b.priority || 'normal'] || 1));
+            inProgressList.sort((a, b) => (priorityOrder[a.priority || 'normal'] || 1) - (priorityOrder[b.priority || 'normal'] || 1));
         }
 
-        setActiveRequests(active);
+        setNewRequests(newList);
+        setInProgressRequests(inProgressList);
         setCompletedRequests(completed);
     };
 
@@ -814,7 +838,7 @@ export const MaintenanceDashboard: React.FC = () => {
     // TAB SWITCHING
     // ============================================================
 
-    const switchTab = (tabName: 'active' | 'completed') => {
+    const switchTab = (tabName: 'new' | 'in_progress' | 'completed') => {
         setCurrentTab(tabName);
     };
 
@@ -1144,20 +1168,22 @@ export const MaintenanceDashboard: React.FC = () => {
 
             {/* Tabs */}
             <div className="flex gap-2 mb-6 mt-6">
+                {/* ✅ Unified 3 tabs: new, in_progress, completed */}
                 {[
-                    { id: 'active', label: 'النشطة', count: filteredActiveRequests.length },
-                    { id: 'completed', label: 'المنجزة', count: filteredCompletedRequests.length }
+                    { id: 'new', label: 'جديد', count: filteredNewRequests.length, color: 'bg-orange-500' },
+                    { id: 'in_progress', label: 'قيد التنفيذ', count: filteredInProgressRequests.length, color: 'bg-blue-500' },
+                    { id: 'completed', label: 'مكتملة', count: filteredCompletedRequests.length, color: 'bg-teal-500' }
                 ].map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => switchTab(tab.id as any)}
                         className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${currentTab === tab.id
-                            ? 'bg-primary-500 text-white'
+                            ? `${tab.color} text-white shadow-lg`
                             : 'adora-btn-ghost'
                             }`}
                     >
                         {tab.label}
-                        <span className="ml-2 bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${currentTab === tab.id ? 'bg-white/20' : 'bg-white/10'}`}>
                             {tab.count}
                         </span>
                     </button>
@@ -1191,16 +1217,20 @@ export const MaintenanceDashboard: React.FC = () => {
                 ))}
             </div>
 
-            {/* Content */}
+            {/* Content - ✅ Unified 3 tabs */}
             <div className="space-y-4">
-                {currentTab === 'active' && filteredActiveRequests.map(renderMaintenanceCard)}
+                {currentTab === 'new' && filteredNewRequests.map(renderMaintenanceCard)}
+                {currentTab === 'in_progress' && filteredInProgressRequests.map(renderMaintenanceCard)}
                 {currentTab === 'completed' && filteredCompletedRequests.map(renderMaintenanceCard)}
 
-                {currentTab === 'active' && filteredActiveRequests.length === 0 && (
-                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات صيانة نشطة</div>
+                {currentTab === 'new' && filteredNewRequests.length === 0 && (
+                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات صيانة جديدة</div>
+                )}
+                {currentTab === 'in_progress' && filteredInProgressRequests.length === 0 && (
+                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات قيد التنفيذ</div>
                 )}
                 {currentTab === 'completed' && filteredCompletedRequests.length === 0 && (
-                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات منجزة اليوم</div>
+                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات مكتملة اليوم</div>
                 )}
             </div>
 

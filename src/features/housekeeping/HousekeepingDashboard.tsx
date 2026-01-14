@@ -102,7 +102,7 @@ interface CleaningRequest {
     currentDepartment?: 'housekeeping' | 'reception' | 'maintenance';
 }
 
-type TabType = 'assigned' | 'in_progress' | 'completed';
+type TabType = 'new' | 'in_progress' | 'completed'; // ✅ Unified tabs
 type RoomFilter = 'all' | 'occupied' | 'checkout';
 
 // ============================================================
@@ -807,7 +807,7 @@ export const HousekeepingDashboard: React.FC = () => {
         message: string;
         onUndo: () => void;
     } | null>(null);
-    const [currentTab, setCurrentTab] = useState<TabType>('assigned');
+    const [currentTab, setCurrentTab] = useState<TabType>('new');
     const [roomFilter, setRoomFilter] = useState<RoomFilter>('all');
     
     // ✅ FAST UI: Force show page after 2 seconds max
@@ -854,7 +854,7 @@ export const HousekeepingDashboard: React.FC = () => {
         const [searchParams] = useSearchParams();
         useEffect(() => {
             const tab = (searchParams.get('tab') || '').toLowerCase();
-            if (tab === 'assigned' || tab === 'in_progress' || tab === 'completed') {
+            if (tab === 'new' || tab === 'in_progress' || tab === 'completed') {
                 setCurrentTab(tab as TabType);
             }
         }, [searchParams]);
@@ -1001,17 +1001,17 @@ export const HousekeepingDashboard: React.FC = () => {
             });
         }
 
-        const assigned = filtered.filter(t => t.status === 'CONFIRMED');
+        const newTasks = filtered.filter(t => t.status === 'CONFIRMED');
         const inProgress = filtered.filter(t => t.status === 'IN_PROGRESS' || t.status === 'NEEDS_INSPECTION');
         const completed = filtered.filter(t => t.status === 'COMPLETED');
 
-        return { assigned, inProgress, completed };
+        return { new: newTasks, inProgress, completed };
     }, [tasks, roomFilter, floorFilter]);
 
     // Current list
     const currentTasks = useMemo(() => {
         switch (currentTab) {
-            case 'assigned': return groupedTasks.assigned;
+            case 'new': return groupedTasks.new;
             case 'in_progress': return groupedTasks.inProgress;
             case 'completed': return groupedTasks.completed;
             default: return [];
@@ -1021,7 +1021,7 @@ export const HousekeepingDashboard: React.FC = () => {
     // ✅ Show Points Notification for new CONFIRMED tasks
     useEffect(() => {
         // Find first CONFIRMED task that hasn't been notified yet
-        const firstConfirmed = groupedTasks.assigned.find(
+        const firstConfirmed = groupedTasks.new.find(
             task => task.status === 'CONFIRMED' && !activeNotifications.has(task.id)
         );
 
@@ -1038,7 +1038,7 @@ export const HousekeepingDashboard: React.FC = () => {
 
             return () => clearTimeout(timer);
         }
-    }, [groupedTasks.assigned, activeNotifications, tenantId]);
+    }, [groupedTasks.new, activeNotifications, tenantId]);
 
     // Calculate available floors dynamically from tasks
     const availableFloors = useMemo(() => {
@@ -1772,11 +1772,11 @@ export const HousekeepingDashboard: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 <div className="stat-card-pro-compact">
                     <StatCard
-                        count={groupedTasks.assigned.length}
+                        count={groupedTasks.new.length}
                         label="🧹 جاهز للبدء"
                         icon={AlertCircle}
                         iconColor="orange"
-                        status={groupedTasks.assigned.length > 10 ? 'warning' : 'normal'}
+                        status={groupedTasks.new.length > 10 ? 'warning' : 'normal'}
                         lastUpdate="تم التحديث الآن"
                     />
                 </div>
@@ -1849,7 +1849,7 @@ export const HousekeepingDashboard: React.FC = () => {
             {/* Tabs - Horizontal Scrollable Chips */}
             <div className="flex gap-2.5 mb-6 overflow-x-auto pb-2 scrollbar-none snap-x">
                 {[
-                    { key: 'assigned', label: 'جاهز للبدء', count: groupedTasks.assigned.length, color: 'bg-yellow-500' },
+                    { key: 'new', label: 'جديد', count: groupedTasks.new.length, color: 'bg-orange-500' },
                     { key: 'in_progress', label: 'قيد التنظيف', count: groupedTasks.inProgress.length, color: 'bg-blue-500' },
                     { key: 'completed', label: 'مكتمل', count: groupedTasks.completed.length, color: 'bg-green-500' }
                 ].map(tab => (

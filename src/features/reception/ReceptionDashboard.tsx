@@ -205,7 +205,7 @@ interface QuickAction {
 }
 
 type ViewMode = 'cards' | 'list' | 'timeline';
-type TabType = 'pending' | 'active' | 'completed';
+type TabType = 'new' | 'in_progress' | 'completed'; // ✅ Unified tabs
 
 // ============================================================
 // CONSTANTS
@@ -2081,7 +2081,7 @@ export const ReceptionDashboard: React.FC = () => {
     // State
     const [requests, setRequests] = useState<ServiceRequest[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currentTab, setCurrentTab] = useState<TabType>('pending');
+    const [currentTab, setCurrentTab] = useState<TabType>('new');
     const [selectedType, setSelectedType] = useState<ServiceRequest['type'] | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showShiftNotes, setShowShiftNotes] = useState(false);
@@ -2140,7 +2140,7 @@ export const ReceptionDashboard: React.FC = () => {
         const [searchParams] = useSearchParams();
         useEffect(() => {
             const tab = (searchParams.get('tab') || '').toLowerCase();
-            if (tab === 'pending' || tab === 'active' || tab === 'completed') {
+            if (tab === 'new' || tab === 'in_progress' || tab === 'completed') {
                 setCurrentTab(tab as TabType);
             }
         }, [searchParams]);
@@ -2319,8 +2319,8 @@ export const ReceptionDashboard: React.FC = () => {
         };
 
         return {
-            pending: newRequests.sort(sortByDate),
-            active: inProgressRequests.sort(sortByDate),
+            new: newRequests.sort(sortByDate),
+            in_progress: inProgressRequests.sort(sortByDate),
             completed: completedRequests.sort(sortByDate)
         };
     }, [requests]);
@@ -2329,8 +2329,8 @@ export const ReceptionDashboard: React.FC = () => {
     const currentRequests = useMemo(() => {
         let list: ServiceRequest[];
         switch (currentTab) {
-            case 'pending': list = groupedRequests.pending; break;
-            case 'active': list = groupedRequests.active; break;
+            case 'new': list = groupedRequests.new; break;
+            case 'in_progress': list = groupedRequests.in_progress; break;
             case 'completed': list = groupedRequests.completed; break;
             default: list = [];
         }
@@ -2345,7 +2345,7 @@ export const ReceptionDashboard: React.FC = () => {
     // ✅ Show Points Notification for new PENDING_RECEPTION or CONFIRMED requests
     useEffect(() => {
         // Find first PENDING_RECEPTION or CONFIRMED request that hasn't been notified yet
-        const firstPending = groupedRequests.pending.find(
+        const firstPending = groupedRequests.new.find(
             req => (req.status === 'PENDING_RECEPTION' || req.status === 'CONFIRMED') && !activeNotifications.has(req.id)
         );
 
@@ -2362,7 +2362,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             return () => clearTimeout(timer);
         }
-    }, [groupedRequests.pending, activeNotifications, tenantId]);
+    }, [groupedRequests.new, activeNotifications, tenantId]);
 
     // ============================================================
     // DATA LOADING
@@ -3290,18 +3290,18 @@ export const ReceptionDashboard: React.FC = () => {
             {/* Stats - Mobile-First Responsive Cards */}
             <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-3 mb-4">
                 <StatCard
-                    count={groupedRequests.pending.length}
+                    count={groupedRequests.new.length}
                     label="جديد"
                     icon={AlertCircle}
                     iconColor="orange"
-                    status={groupedRequests.pending.length > 10 ? 'warning' : 'normal'}
+                    status={groupedRequests.new.length > 10 ? 'warning' : 'normal'}
                 />
                 <StatCard
-                    count={groupedRequests.active.length}
+                    count={groupedRequests.in_progress.length}
                     label="قيد التنفيذ"
                     icon={Clock}
                     iconColor="blue"
-                    status={groupedRequests.active.length > 15 ? 'warning' : 'normal'}
+                    status={groupedRequests.in_progress.length > 15 ? 'warning' : 'normal'}
                 />
                 <StatCard
                     count={groupedRequests.completed.length}
@@ -3404,8 +3404,8 @@ export const ReceptionDashboard: React.FC = () => {
             {/* Tabs - Mobile First + Theme Aware */}
             <div className="flex gap-1 sm:gap-2 mb-3 sm:mb-4 overflow-x-auto pb-1 -mx-3 sm:mx-0 px-3 sm:px-0 scrollbar-hide" data-tour="tabs">
                 {[
-                    { key: 'pending', label: 'جديد', count: groupedRequests.pending.length, activeClass: 'bg-amber-500 text-white shadow-amber-500/25', inactiveClass: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' },
-                    { key: 'active', label: 'قيد التنفيذ', count: groupedRequests.active.length, activeClass: 'bg-blue-500 text-white shadow-blue-500/25', inactiveClass: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
+                    { key: 'new', label: 'جديد', count: groupedRequests.new.length, activeClass: 'bg-orange-500 text-white shadow-orange-500/25', inactiveClass: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' },
+                    { key: 'in_progress', label: 'قيد التنفيذ', count: groupedRequests.in_progress.length, activeClass: 'bg-blue-500 text-white shadow-blue-500/25', inactiveClass: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
                     { key: 'completed', label: 'مكتمل', count: groupedRequests.completed.length, activeClass: 'bg-green-500 text-white shadow-green-500/25', inactiveClass: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' }
                 ].map(tab => (
                     <button
