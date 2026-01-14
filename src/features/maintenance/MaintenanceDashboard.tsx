@@ -18,6 +18,7 @@ import {
 import { HeaderButton } from '../../components/common/HeaderButton';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
 import { PageTransition } from '../../components/common/PageTransition';
+import { ResponsiveActionBar } from '../../components/common/ResponsiveActionBar'; // ✅ Unified responsive actions
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { usei18n } from '../../i18n/i18nContext';
@@ -1032,62 +1033,41 @@ export const MaintenanceDashboard: React.FC = () => {
                     )}
                 </div>
 
-                {/* Mobile: Hamburger Menu | Desktop: All buttons visible */}
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                    {/* Mobile: Hamburger Menu Button */}
-                    <button
-                        onClick={() => setShowMobileMenu(true)}
-                        className="lg:hidden adora-btn-ghost w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-transform"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
-
-                    {/* Desktop: All buttons visible */}
-                    <div className="hidden lg:flex gap-2">
-                        <HeaderButton
-                            onClick={() => setShowShiftNotes(true)}
-                            icon={<MessageSquare className="w-5 h-5" />}
-                            label="ملاحظات الغرف"
-                        />
-
-                        <HeaderButton
-                            onClick={() => setShowGeneralInstructions(true)}
-                            icon={<BookOpen className="w-5 h-5" />}
-                            label="تعليمات عامة"
-                            variant="primary"
-                        />
-
-                        <HeaderButton
-                            onClick={() => setShowHistory(true)}
-                            icon={<History className="w-5 h-5" />}
-                            label="سجل العمليات"
-                            variant="primary"
-                        />
-
-                        <HeaderButton
-                            onClick={() => setShowProcurement(true)}
-                            icon={<ShoppingCart className="w-5 h-5" />}
-                            label="المشتريات"
-                        />
-
-                        <HeaderButton
-                            onClick={exportMaintenanceDataToCSV}
-                            icon={<FileText className="w-5 h-5" />}
-                            label="تصدير"
-                        />
-
-                        {!['manager', 'admin', 'owner'].includes(user?.role || '') && (
-                            <HeaderButton
-                                onClick={logout}
-                                icon={<LogOutIcon className="w-5 h-5" />}
-                                label="تسجيل خروج"
-                                variant="danger"
-                            />
-                        )}
-                    </div>
-                </div>
+                {/* ✅ Unified Responsive Action Bar - Same as Reception */}
+                <ResponsiveActionBar
+                    actions={[
+                        {
+                            id: 'history',
+                            icon: <History className="w-5 h-5" />,
+                            label: 'سجل العمليات',
+                            onClick: () => setShowHistory(true),
+                        },
+                        {
+                            id: 'notes',
+                            icon: <MessageSquare className="w-5 h-5" />,
+                            label: 'ملاحظات الغرف',
+                            onClick: () => setShowShiftNotes(true),
+                        },
+                        {
+                            id: 'procurement',
+                            icon: <ShoppingCart className="w-5 h-5" />,
+                            label: 'المشتريات',
+                            onClick: () => setShowProcurement(true),
+                        },
+                        {
+                            id: 'instructions',
+                            icon: <BookOpen className="w-5 h-5" />,
+                            label: 'تعليمات عامة',
+                            onClick: () => setShowGeneralInstructions(true),
+                        },
+                        {
+                            id: 'export',
+                            icon: <FileText className="w-5 h-5" />,
+                            label: 'تصدير',
+                            onClick: exportMaintenanceDataToCSV,
+                        },
+                    ]}
+                />
             </div>
 
             {/* ✅ Challenge Timeline - شريط الالتزام */}

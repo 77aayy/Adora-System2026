@@ -18,6 +18,7 @@ interface ActionItem {
     onClick: () => void;
     color?: string;
     badge?: number;
+    isActive?: boolean; // ✅ For highlighting active/selected state
 }
 
 interface ResponsiveActionBarProps {
@@ -59,48 +60,46 @@ export const ResponsiveActionBar: React.FC<ResponsiveActionBarProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showMenu]);
 
-    // Desktop/Tablet View - ✅ Same Style as Header Department Tabs
+    // Desktop/Tablet View - ✅ Compact, Gray by Default, Teal on Hover (Like Header)
     if (!isCollapsed) {
         return (
-            <div className={`flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide ${className}`}>
+            <div className={`flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-1 scrollbar-hide ${className}`}>
                 {actions.map((action) => (
                     <button
                         key={action.id}
                         onClick={action.onClick}
-                        className="group relative flex flex-col items-center justify-center gap-1.5
-                            min-w-[70px] sm:min-w-[80px] px-3 sm:px-4 py-2.5 sm:py-3
-                            rounded-xl sm:rounded-2xl
-                            bg-white dark:bg-slate-800/80
-                            border-2 border-slate-200 dark:border-slate-700
-                            hover:border-teal-400 dark:hover:border-teal-500
-                            hover:shadow-xl hover:shadow-teal-500/15
-                            hover:scale-105
-                            active:scale-95 transition-all duration-200"
+                        className={`group relative flex flex-col items-center justify-center gap-0.5
+                            min-w-[52px] sm:min-w-[60px] px-2 sm:px-2.5 py-1.5 sm:py-2
+                            rounded-lg sm:rounded-xl
+                            border transition-all duration-200
+                            hover:scale-105 active:scale-95
+                            ${action.isActive 
+                                ? 'bg-teal-50 dark:bg-teal-500/20 border-teal-400 dark:border-teal-500 shadow-md shadow-teal-500/20' 
+                                : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-teal-400 dark:hover:border-teal-500 hover:bg-teal-50 dark:hover:bg-teal-500/10'
+                            }`}
                     >
                         {/* Badge */}
                         {action.badge && action.badge > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow animate-pulse">
                                 {action.badge > 9 ? '9+' : action.badge}
                             </span>
                         )}
                         
-                        {/* Icon Container - Matching Header Style */}
-                        <div 
-                            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center
-                                transition-all duration-200 group-hover:scale-110"
-                            style={{ 
-                                background: `${action.color || '#14b8a6'}15`,
-                            }}
-                        >
-                            <span style={{ color: action.color || '#14b8a6' }}>
-                                {action.icon}
-                            </span>
-                        </div>
+                        {/* Icon - Gray by default, Teal when active/hover */}
+                        <span className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-200
+                            ${action.isActive 
+                                ? 'text-teal-600 dark:text-teal-400' 
+                                : 'text-slate-500 dark:text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400'
+                            }`}>
+                            {action.icon}
+                        </span>
                         
-                        {/* Label - Bold and Clear */}
-                        <span className="text-xs sm:text-sm font-semibold text-center whitespace-nowrap"
-                            style={{ color: 'var(--theme-text-primary)' }}
-                        >
+                        {/* Label - Small and Compact */}
+                        <span className={`text-[9px] sm:text-[10px] font-medium text-center whitespace-nowrap leading-tight
+                            ${action.isActive 
+                                ? 'text-teal-700 dark:text-teal-300' 
+                                : 'text-slate-600 dark:text-slate-400 group-hover:text-teal-700 dark:group-hover:text-teal-300'
+                            }`}>
                             {action.label}
                         </span>
                     </button>

@@ -151,14 +151,15 @@ export const StatCard: React.FC<StatCardProps> = ({
         <div 
             className={`
                 group relative overflow-hidden 
-                rounded-lg sm:rounded-xl
+                rounded-md sm:rounded-lg lg:rounded-xl
                 bg-gradient-to-br ${config.gradient}
-                border border-teal-200/50 dark:border-teal-500/20
+                border ${config.border}
                 backdrop-blur-sm
-                shadow-sm sm:shadow-md dark:shadow-none
-                transition-all duration-300
-                hover:scale-[1.01] sm:hover:scale-[1.02] hover:shadow-lg sm:hover:shadow-xl dark:hover:shadow-lg hover:shadow-teal-100 dark:hover:shadow-teal-500/10
-                p-2 sm:p-3 lg:p-4
+                shadow-sm ${config.shadow}
+                transition-all duration-300 ease-out
+                hover:scale-[1.02] hover:shadow-lg dark:hover:shadow-lg
+                p-1.5 sm:p-2.5 lg:p-3
+                ${compact ? 'min-w-0' : ''}
                 ${pulse || urgencyStyle ? 'ring-2 ' + (urgencyStyle?.ring || 'ring-teal-500/30') : ''}
                 ${urgencyStyle?.pulse || (pulse ? 'animate-pulse-subtle' : '')}
             `}
@@ -168,30 +169,30 @@ export const StatCard: React.FC<StatCardProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
             </div>
             
-            <div className="relative flex items-center gap-2 sm:gap-3">
-                {/* Icon - Mobile-First sizing */}
+            <div className="relative flex items-center gap-1.5 sm:gap-2 lg:gap-3">
+                {/* Icon - Super compact on mobile, grows on larger screens */}
                 {iconElement && (
                     <div className={`
-                        w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10
-                        rounded-md sm:rounded-lg ${config.iconBg}
+                        w-6 h-6 sm:w-7 sm:h-7 lg:w-9 lg:h-9
+                        rounded sm:rounded-md lg:rounded-lg ${config.iconBg}
                         flex items-center justify-center flex-shrink-0
                         transition-transform duration-300 group-hover:scale-110
                     `}>
-                        <span className={`${effectiveTextColor} [&>svg]:w-3.5 [&>svg]:h-3.5 sm:[&>svg]:w-4 sm:[&>svg]:h-4 lg:[&>svg]:w-5 lg:[&>svg]:h-5`}>
+                        <span className={`${effectiveTextColor} [&>svg]:w-3 [&>svg]:h-3 sm:[&>svg]:w-3.5 sm:[&>svg]:h-3.5 lg:[&>svg]:w-4 lg:[&>svg]:h-4`}>
                             {iconElement}
                         </span>
                     </div>
                 )}
                 
-                {/* Content */}
+                {/* Content - Compact on mobile */}
                 <div className="flex-1 min-w-0">
-                    {/* Value - Mobile-First Hero number */}
+                    {/* Value - Scales smoothly */}
                     <div className={`
                         ${isStringValue 
-                            ? 'text-xs sm:text-sm lg:text-base' 
-                            : 'text-base sm:text-lg lg:text-2xl'
+                            ? 'text-[10px] sm:text-xs lg:text-sm' 
+                            : 'text-sm sm:text-base lg:text-xl'
                         } 
-                        font-bold text-slate-800 dark:text-white tracking-tight truncate
+                        font-bold text-slate-800 dark:text-white tracking-tight truncate leading-none
                     `}>
                         {typeof displayValue === 'number' 
                             ? displayValue.toLocaleString() 
@@ -199,22 +200,22 @@ export const StatCard: React.FC<StatCardProps> = ({
                         }
                     </div>
                     
-                    {/* Label - Mobile-First */}
-                    <div className="text-[10px] sm:text-xs lg:text-sm text-slate-600 dark:text-slate-400 truncate">
+                    {/* Label - Smaller on mobile */}
+                    <div className="text-[8px] sm:text-[10px] lg:text-xs text-slate-600 dark:text-slate-400 truncate mt-0.5 leading-tight">
                         {label}
                     </div>
                 </div>
                 
-                {/* Trend indicator - Hidden on mobile */}
+                {/* Trend indicator - Hidden on small screens */}
                 {hasTrend && (
                     <div className={`
-                        hidden sm:flex items-center gap-0.5 text-xs font-semibold
+                        hidden md:flex items-center gap-0.5 text-[10px] font-semibold
                         ${isPositiveTrend ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}
                     `}>
                         {isPositiveTrend ? (
-                            <TrendingUp className="w-3 h-3" />
+                            <TrendingUp className="w-2.5 h-2.5" />
                         ) : (
-                            <TrendingDown className="w-3 h-3" />
+                            <TrendingDown className="w-2.5 h-2.5" />
                         )}
                         <span>{trend}</span>
                     </div>
