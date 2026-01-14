@@ -20,7 +20,8 @@ import {
     QrCode, // ✅ QR icon for QR requests
     Smartphone, // ✅ Alternative QR icon
     BookOpen, // ✅ General instructions icon
-    ArrowLeftRight // ✅ Room transfer icon
+    ArrowLeftRight, // ✅ Room transfer icon
+    Headphones // ✅ Support ticket icon
 } from 'lucide-react';
 import { HeaderButton } from '../../components/common/HeaderButton';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
@@ -55,6 +56,7 @@ import { BranchLocationWarning } from '../../components/auth/BranchLocationWarni
 import { checkBranchLocation } from '../../services/branchLocationService';
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
+import { SupportTicketModal } from '../../components/shared/SupportTicketModal'; // ✅ Support ticket modal
 import { ReadReceipt } from '../../components/shared/ReadReceipt';
 import { MobileMenu } from '../../components/common/MobileMenu';
 import { StatCard } from '../../components/common/StatCard';
@@ -556,6 +558,7 @@ export const BellmanDashboard: React.FC = () => {
     const [showTeam, setShowTeam] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [showGeneralInstructions, setShowGeneralInstructions] = useState(false); // ✅ General instructions modal
+    const [showSupportTicket, setShowSupportTicket] = useState(false); // ✅ Support ticket modal
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     // ✅ Room Transfer State
     const [showTransferModal, setShowTransferModal] = useState(false);
@@ -1078,13 +1081,6 @@ export const BellmanDashboard: React.FC = () => {
                 subtitle={undefined}
                 actions={[
                     {
-                        id: 'instructions',
-                        icon: <BookOpen className="w-5 h-5" />,
-                        label: 'تعليمات عامة',
-                        onClick: () => setShowGeneralInstructions(true),
-                        variant: 'primary'
-                    },
-                    {
                         id: 'history',
                         icon: <History className="w-5 h-5" />,
                         label: 'سجل العمليات',
@@ -1104,11 +1100,17 @@ export const BellmanDashboard: React.FC = () => {
                         onClick: () => setShowProcurement(true)
                     },
                     {
-                        id: 'logout',
-                        icon: <LogOut className="w-5 h-5" />,
-                        label: 'تسجيل خروج',
-                        onClick: logout,
-                        variant: 'danger'
+                        id: 'instructions',
+                        icon: <BookOpen className="w-5 h-5" />,
+                        label: 'تعليمات عامة',
+                        onClick: () => setShowGeneralInstructions(true),
+                        variant: 'primary'
+                    },
+                    {
+                        id: 'support',
+                        icon: <Headphones className="w-5 h-5" />,
+                        label: 'دعم فني',
+                        onClick: () => setShowSupportTicket(true)
                     }
                 ]}
             />
@@ -1422,6 +1424,15 @@ export const BellmanDashboard: React.FC = () => {
                 isOpen={showGeneralInstructions}
                 onClose={() => setShowGeneralInstructions(false)}
             />
+
+            {/* Support Ticket Modal */}
+            {showSupportTicket && (
+                <SupportTicketModal
+                    isOpen={showSupportTicket}
+                    onClose={() => setShowSupportTicket(false)}
+                    department="bellman"
+                />
+            )}
 
             {/* ✅ Onboarding Tour */}
             <TourGuide

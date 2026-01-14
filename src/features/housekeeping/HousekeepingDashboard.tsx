@@ -21,7 +21,8 @@ import {
     QrCode, // ✅ QR icon for QR requests
     Smartphone, // ✅ Alternative QR icon
     Package, // ✅ Package icon for missing items
-    BookOpen // ✅ General instructions icon
+    BookOpen, // ✅ General instructions icon
+    Headphones // ✅ Support ticket icon
 } from 'lucide-react';
 import { HeaderButton } from '../../components/common/HeaderButton';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
@@ -72,6 +73,7 @@ import { BranchLocationWarning } from '../../components/auth/BranchLocationWarni
 import { checkBranchLocation } from '../../services/branchLocationService';
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
+import { SupportTicketModal } from '../../components/shared/SupportTicketModal'; // ✅ Support ticket modal
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
 
 // Creative Dashboard Components
@@ -829,6 +831,7 @@ export const HousekeepingDashboard: React.FC = () => {
     const [showHistory, setShowHistory] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [showGeneralInstructions, setShowGeneralInstructions] = useState(false); // ✅ General instructions modal
+    const [showSupportTicket, setShowSupportTicket] = useState(false); // ✅ Support ticket modal
     
     // ✅ Onboarding Tour
     const { showTour, steps: tourSteps, closeTour, completeTour } = useOnboardingTour('housekeeping');
@@ -1693,28 +1696,29 @@ export const HousekeepingDashboard: React.FC = () => {
                 subtitle={undefined}
                 actions={[
                     {
+                        id: 'history',
+                        icon: <History className="w-5 h-5" />,
+                        label: 'سجل العمليات',
+                        onClick: () => setShowHistory(true),
+                        variant: 'primary'
+                    },
+                    {
                         id: 'shiftNotes',
                         icon: <MessageSquare className="w-5 h-5" />,
                         label: 'ملاحظات الغرف',
                         onClick: () => setShowShiftNotes(true)
                     },
                     {
-                        id: 'team',
-                        icon: <Users className="w-5 h-5" />,
-                        label: 'الفريق',
-                        onClick: () => {
-                            if (user?.role === 'manager' || user?.role === 'owner') {
-                                setShowTeamManager(true);
-                            } else {
-                                setShowTeam(true);
-                            }
-                        }
-                    },
-                    {
                         id: 'procurement',
                         icon: <ShoppingCart className="w-5 h-5" />,
                         label: 'المشتريات',
                         onClick: () => setShowProcurement(true)
+                    },
+                    {
+                        id: 'laundry',
+                        icon: <Clock className="w-5 h-5" />,
+                        label: 'جرد المغسلة',
+                        onClick: () => setShowLaundryInventory(true)
                     },
                     {
                         id: 'instructions',
@@ -1724,24 +1728,10 @@ export const HousekeepingDashboard: React.FC = () => {
                         variant: 'primary'
                     },
                     {
-                        id: 'history',
-                        icon: <History className="w-5 h-5" />,
-                        label: 'سجل العمليات',
-                        onClick: () => setShowHistory(true),
-                        variant: 'primary'
-                    },
-                    {
-                        id: 'laundry',
-                        icon: <Clock className="w-5 h-5" />,
-                        label: 'جرد المغسلة',
-                        onClick: () => setShowLaundryInventory(true)
-                    },
-                    {
-                        id: 'logout',
-                        icon: <LogOut className="w-5 h-5" />,
-                        label: 'تسجيل خروج',
-                        onClick: logout,
-                        variant: 'danger'
+                        id: 'support',
+                        icon: <Headphones className="w-5 h-5" />,
+                        label: 'دعم فني',
+                        onClick: () => setShowSupportTicket(true)
                     }
                 ]}
             />
@@ -2065,6 +2055,15 @@ export const HousekeepingDashboard: React.FC = () => {
                 isOpen={showGeneralInstructions}
                 onClose={() => setShowGeneralInstructions(false)}
             />
+
+            {/* Support Ticket Modal */}
+            {showSupportTicket && (
+                <SupportTicketModal
+                    isOpen={showSupportTicket}
+                    onClose={() => setShowSupportTicket(false)}
+                    department="housekeeping"
+                />
+            )}
 
             {/* ✅ Branch Location Warning */}
             {showLocationWarning && locationWarningData && branchId && (

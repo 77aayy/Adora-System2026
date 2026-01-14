@@ -75,14 +75,16 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     department: string;
-    tenantId: string;
+    tenantId?: string;
+    autoApproved?: boolean; // ✅ For manager requests - skip approval step
 }
 
 export const ProcurementCartWizard: React.FC<Props> = ({
     isOpen,
     onClose,
     department,
-    tenantId
+    tenantId,
+    autoApproved = false // ✅ Default: requires approval
 }) => {
     const { user } = useAuth();
     const { success, error: showError, haptic } = useUX();
@@ -222,11 +224,17 @@ export const ProcurementCartWizard: React.FC<Props> = ({
 
     // Submit order
     const submitOrder = async () => {
-        if (cart.length === 0 || !user || !tenantId) return;
+        if (cart.length === 0 || !user) return;
+
+        const effectiveTenantId = tenantId || (user as any)?.tenantId;
+        if (!effectiveTenantId) return;
 
         setIsSubmitting(true);
         try {
             const branchId = (user as any)?.branch || 'default';
+            
+            // ✅ If autoApproved (manager request), set status to APPROVED directly
+            const orderStatus = autoApproved ? 'APPROVED' : 'PENDING_APPROVAL';
             
             await addDoc(collection(db, 'procurementRequests'), {
                 items: cart.map(item => ({
@@ -237,16 +245,30 @@ export const ProcurementCartWizard: React.FC<Props> = ({
                 })),
                 department,
                 branch: branchId,
-                tenantId,
-                status: 'PENDING_APPROVAL',
+                tenantId: effectiveTenantId,
+                status: orderStatus,
                 createdAt: Timestamp.now(),
                 requestedBy: {
                     id: user.id,
                     name: user.name || ''
-                }
+                },
+                // ✅ Auto-approved metadata
+                ...(autoApproved && {
+                    autoApproved: true,
+                    approvedAt: Timestamp.now(),
+                    approvedBy: {
+                        id: user.id,
+                        name: user.name || '',
+                        role: 'manager'
+                    },
+                    approvalNote: 'معتمد تلقائياً - تم إرساله من الإدارة'
+                })
             });
 
-            success('تم إرسال طلب المشتريات بنجاح');
+            success(autoApproved 
+                ? '✅ تم إرسال طلب المشتريات (معتمد تلقائياً من الإدارة)'
+                : 'تم إرسال طلب المشتريات بنجاح'
+            );
             haptic('success');
             setCart([]);
             setStep('select');

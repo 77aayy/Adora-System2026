@@ -471,7 +471,7 @@ export const SmartBranchSetupWizard: React.FC<SmartBranchSetupWizardProps> = ({
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
             <div 
-                className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl animate-in zoom-in-95"
+                className="w-full max-w-md sm:max-w-lg lg:max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl animate-in zoom-in-95"
                 style={{ background: 'var(--theme-bg-primary)' }}
             >
                 {/* Resume Prompt */}

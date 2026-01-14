@@ -69,7 +69,7 @@ export const GeneralInstructionsView: React.FC<GeneralInstructionsViewProps> = (
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 lg:p-6 3xl:p-8" style={{ backdropFilter: 'none' }}>
-            <div className="glass-card w-full max-w-lg sm:max-w-2xl lg:max-w-4xl 3xl:max-w-6xl 4xl:max-w-7xl max-h-[90vh] overflow-hidden rounded-xl sm:rounded-2xl 3xl:rounded-3xl modal-enter flex flex-col">
+            <div className="glass-card w-full max-w-md sm:max-w-lg lg:max-w-2xl max-h-[90vh] overflow-hidden rounded-xl sm:rounded-2xl modal-enter flex flex-col">
                 {/* Header */}
                 <div className="p-6 border-b border-white/10 flex items-center justify-between flex-shrink-0">
                     <div className="flex items-center gap-3">

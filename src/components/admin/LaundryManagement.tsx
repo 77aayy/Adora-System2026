@@ -504,7 +504,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
         : "h-full animate-in fade-in";
 
     const cardClass = isModal
-        ? "glass-card w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl relative"
+        ? "glass-card w-full max-w-md sm:max-w-lg lg:max-w-2xl max-h-[90vh] flex flex-col rounded-2xl sm:rounded-3xl relative"
         : "w-full h-full flex flex-col space-y-6";
 
     if (!isOpen) return null;

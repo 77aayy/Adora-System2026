@@ -255,7 +255,7 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
     
     return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-2 md:p-4" dir="rtl">
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 w-full max-w-6xl max-h-[95vh] flex flex-col rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 w-full max-w-md sm:max-w-lg lg:max-w-2xl xl:max-w-3xl max-h-[95vh] flex flex-col rounded-2xl sm:rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
                 
                 {/* Header */}
                 <div className="flex-shrink-0 p-4 md:p-6 border-b border-white/10 bg-slate-900/50">

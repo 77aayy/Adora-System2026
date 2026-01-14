@@ -935,7 +935,7 @@ const RequestCard: React.FC<{
     );
 };
 
-// ✅ Lost & Found Modal - Display and Manage Lost Items
+// ✅ Lost & Found Modal - Display and Manage Lost Items with Tabs
 const LostFoundModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -947,6 +947,7 @@ const LostFoundModal: React.FC<{
     const { success, error } = useUX();
     const [items, setItems] = useState<LostFoundItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'active' | 'log'>('active');
 
     useEffect(() => {
         if (!isOpen) return;
@@ -956,6 +957,10 @@ const LostFoundModal: React.FC<{
         });
         return unsubscribe;
     }, [isOpen, branchId]);
+
+    // ✅ Filter items based on tab
+    const activeItems = useMemo(() => items.filter(i => i.status === 'found' || i.status === 'claimed'), [items]);
+    const logItems = useMemo(() => items.filter(i => i.status === 'returned' || i.status === 'disposed'), [items]);
 
     const handleReturnItem = async (itemId: string) => {
         try {
@@ -1015,7 +1020,7 @@ const LostFoundModal: React.FC<{
 
     return (
         <div className="adora-modal-backdrop">
-            <div className="adora-modal-v2 w-full max-w-4xl max-h-[90vh]">
+            <div className="adora-modal-v2 w-full max-w-md sm:max-w-lg lg:max-w-2xl max-h-[90vh]">
                 {/* Header */}
                 <div className="adora-modal-header-v2">
                     <div className="flex items-center gap-3">
@@ -1032,22 +1037,48 @@ const LostFoundModal: React.FC<{
                     </button>
                 </div>
 
+                {/* Tabs */}
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 dark:border-white/10">
+                    <button
+                        onClick={() => setActiveTab('active')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                            activeTab === 'active'
+                                ? 'bg-teal-500 text-white shadow-md'
+                                : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/20'
+                        }`}
+                    >
+                        نشطة ({activeItems.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('log')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                            activeTab === 'log'
+                                ? 'bg-teal-500 text-white shadow-md'
+                                : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/20'
+                        }`}
+                    >
+                        السجل ({logItems.length})
+                    </button>
+                </div>
+
                 {/* Content */}
                 <div className="adora-modal-body-v2">
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
                             <AdoraLoader size="md" message="جاري التحميل..." />
                         </div>
-                    ) : items.length === 0 ? (
+                    ) : (activeTab === 'active' ? activeItems : logItems).length === 0 ? (
                         <div className="adora-empty">
                             <div className="adora-empty-icon">
                                 <Package className="w-8 h-8" />
                             </div>
-                            <p className="adora-empty-description">لا توجد مفقودات مسجلة</p>
+                            <p className="adora-empty-description">
+                                {activeTab === 'active' ? 'لا توجد مفقودات نشطة' : 'السجل فارغ'}
+                            </p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 3xl:grid-cols-4 4xl:grid-cols-5 gap-4 sm:gap-6 lg:gap-8 3xl:gap-12">
-                            {items.map(item => (
+                            {(activeTab === 'active' ? activeItems : logItems).map(item => (
                                 <div key={item.id} className="adora-card p-5 sm:p-6 hover:shadow-lg transition-all duration-200 group">
                                     {/* Header */}
                                     <div className="flex items-start gap-4 mb-4">

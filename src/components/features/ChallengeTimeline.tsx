@@ -128,9 +128,9 @@ export const ChallengeTimeline: React.FC = () => {
                                 <div className={`
                                     w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center border-2 flex-shrink-0 transition-all
                                     ${status === 'claimed' 
-                                        ? 'bg-teal-500 border-teal-400 shadow-sm shadow-teal-300' 
+                                        ? 'bg-amber-500 border-amber-400 shadow-sm shadow-amber-300' 
                                         : status === 'unlocked'
-                                            ? 'bg-amber-500 border-amber-400 shadow-sm shadow-amber-300 animate-pulse'
+                                            ? 'bg-amber-400 border-amber-300 shadow-sm shadow-amber-200 animate-pulse'
                                             : 'bg-teal-100 dark:bg-teal-900/30 border-teal-400 dark:border-teal-500'
                                     }
                                 `}>
@@ -150,9 +150,11 @@ export const ChallengeTimeline: React.FC = () => {
                                             {milestone.day}d
                                         </span>
                                         <div className={`w-full h-0.5 rounded-full my-0.5 ${
-                                            status === 'claimed' ? 'bg-teal-400' : 'bg-teal-200 dark:bg-teal-700'
+                                            status === 'claimed' ? 'bg-amber-400' : 'bg-teal-200 dark:bg-teal-700'
                                         }`} />
-                                        <span className="text-[10px] sm:text-xs font-bold text-teal-600 dark:text-teal-400">
+                                        <span className={`text-[10px] sm:text-xs font-bold ${
+                                            status === 'claimed' ? 'text-amber-600 dark:text-amber-400' : 'text-teal-600 dark:text-teal-400'
+                                        }`}>
                                             {milestone.rewardPoints}
                                         </span>
                                     </div>

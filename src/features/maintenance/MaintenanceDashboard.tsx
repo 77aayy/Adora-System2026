@@ -9,11 +9,12 @@ import { useNavigate } from 'react-router-dom';
 import {
     Wrench, LogOut as LogOutIcon, ShoppingCart,
     Users, MessageSquare, History, Camera, AlertTriangle,
-    CheckCircle, Clock, Play, PauseCircle, PlayCircle, X, Image, Trash2, FileText,
+    CheckCircle, Clock, Play, PauseCircle, PlayCircle, X, Image, Trash2,
     DollarSign, Zap, Activity, Building2, Settings, Eye,
     QrCode, // ✅ QR icon for QR requests
     Smartphone, // ✅ Alternative QR icon
-    BookOpen // ✅ General instructions icon
+    BookOpen, // ✅ General instructions icon
+    Headphones // ✅ Support ticket icon
 } from 'lucide-react';
 import { HeaderButton } from '../../components/common/HeaderButton';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
@@ -51,6 +52,7 @@ import { uploadMaintenancePhoto } from '../../services/storageService'; // ✅ A
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
 import { UnifiedRequestTabs } from '../../components/shared/UnifiedRequestTabs'; // ✅ Unified tabs
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
+import { SupportTicketModal } from '../../components/shared/SupportTicketModal'; // ✅ Support ticket modal
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
 import { useBrandName } from '../../hooks/useBrandName';
 import { getGreetingParts } from '../../utils/greetings';
@@ -156,6 +158,7 @@ export const MaintenanceDashboard: React.FC = () => {
     const [showShiftNotes, setShowShiftNotes] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [showGeneralInstructions, setShowGeneralInstructions] = useState(false); // ✅ General instructions modal
+    const [showSupportTicket, setShowSupportTicket] = useState(false); // ✅ Support ticket modal
     const [showTeam, setShowTeam] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     // Issue type filter ('all' = no filter)
@@ -1033,7 +1036,7 @@ export const MaintenanceDashboard: React.FC = () => {
                     )}
                 </div>
 
-                {/* ✅ Unified Responsive Action Bar - Same as Reception */}
+                {/* ✅ Unified Responsive Action Bar - Same Order as Reception */}
                 <ResponsiveActionBar
                     actions={[
                         {
@@ -1061,10 +1064,10 @@ export const MaintenanceDashboard: React.FC = () => {
                             onClick: () => setShowGeneralInstructions(true),
                         },
                         {
-                            id: 'export',
-                            icon: <FileText className="w-5 h-5" />,
-                            label: 'تصدير',
-                            onClick: exportMaintenanceDataToCSV,
+                            id: 'support',
+                            icon: <Headphones className="w-5 h-5" />,
+                            label: 'دعم فني',
+                            onClick: () => setShowSupportTicket(true),
                         },
                     ]}
                 />
@@ -1475,10 +1478,17 @@ export const MaintenanceDashboard: React.FC = () => {
                         color: 'text-white/60'
                     },
                     {
-                        id: 'export',
-                        label: 'تصدير البيانات',
-                        icon: <FileText className="w-5 h-5" />,
-                        onClick: exportMaintenanceDataToCSV,
+                        id: 'instructions',
+                        label: 'تعليمات عامة',
+                        icon: <BookOpen className="w-5 h-5" />,
+                        onClick: () => setShowGeneralInstructions(true),
+                        color: 'text-white/60'
+                    },
+                    {
+                        id: 'support',
+                        label: 'دعم فني',
+                        icon: <Headphones className="w-5 h-5" />,
+                        onClick: () => setShowSupportTicket(true),
                         color: 'text-white/60'
                     }
                 ]}
@@ -1505,6 +1515,15 @@ export const MaintenanceDashboard: React.FC = () => {
                 isOpen={showGeneralInstructions}
                 onClose={() => setShowGeneralInstructions(false)}
             />
+
+            {/* Support Ticket Modal */}
+            {showSupportTicket && (
+                <SupportTicketModal
+                    isOpen={showSupportTicket}
+                    onClose={() => setShowSupportTicket(false)}
+                    department="maintenance"
+                />
+            )}
 
             {/* ✅ Onboarding Tour */}
             <TourGuide

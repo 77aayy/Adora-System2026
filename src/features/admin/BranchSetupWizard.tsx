@@ -372,7 +372,7 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
             style={{ background: 'rgba(0, 0, 0, 0.85)' }}
         >
             <div 
-                className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl animate-in zoom-in-95 duration-300"
+                className="w-full max-w-md sm:max-w-lg lg:max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl animate-in zoom-in-95 duration-300"
                 style={{ 
                     background: '#ffffff',
                     border: '1px solid #e2e8f0',

@@ -22,7 +22,10 @@ import {
     Calendar,
     Shirt,
     Building2,
-    ChevronDown
+    ChevronDown,
+    ShoppingCart, // 🛒 Procurement
+    Headphones, // 🆘 Support
+    History // 📊 Daily Insight
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
@@ -78,6 +81,9 @@ import { GeneralInstructionsManager } from './GeneralInstructionsManager'; // �
 import { WhatsAppTemplatesManager } from './WhatsAppTemplatesManager'; // ✅ WhatsApp templates management
 import { GamificationPage } from './GamificationPage'; // ✅ Gamification - Badges & Ranks
 import { TranslationManager } from '../../components/admin/TranslationManager'; // 🌍 Translation Management
+import { DailyOperationsInsight } from '../../components/admin/DailyOperationsInsight'; // 📊 Daily Insight
+import { ProcurementCartWizard } from '../../components/shared/ProcurementCartWizard'; // 🛒 Procurement Cart
+import { SupportTicketModal } from '../../components/shared/SupportTicketModal'; // 🆘 Support Ticket
 // DeveloperSignature is now in GlobalFooter (App.tsx)
 
 /* ============================================================
@@ -101,6 +107,11 @@ const OverviewPage: React.FC = () => {
     const { requests } = useRequests();
     // ✅ Onboarding Tour (using hook instead of local state)
     const { showTour, steps: tourSteps, closeTour, completeTour } = useOnboardingTour('admin');
+    
+    // ✅ Quick Action Modals
+    const [showDailyInsight, setShowDailyInsight] = useState(false);
+    const [showProcurement, setShowProcurement] = useState(false);
+    const [showSupportTicket, setShowSupportTicket] = useState(false);
 
     // ✅ OWNER: Redirect to multi-branch dashboard (they don't have a specific branch)
     useEffect(() => {
@@ -250,22 +261,64 @@ const OverviewPage: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* Status Badge */}
-                            <div 
-                                className="flex items-center gap-3 py-2 px-4 rounded-xl"
-                                style={{
-                                    background: 'linear-gradient(135deg, rgba(20,184,166,0.12) 0%, rgba(6,182,212,0.08) 100%)',
-                                    border: '1px solid rgba(20,184,166,0.25)',
-                                    boxShadow: '0 2px 12px rgba(20,184,166,0.15)'
-                                }}
-                            >
-                                <div className="relative">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-teal-500 block" />
-                                    <span className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping" />
+                            {/* Quick Actions + Status Badge */}
+                            <div className="flex items-center gap-3">
+                                {/* Quick Action Buttons */}
+                                <div className="flex items-center gap-2">
+                                    {/* حصاد اليوم - Daily Insight */}
+                                    <button
+                                        onClick={() => setShowDailyInsight(true)}
+                                        className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 hover:border-teal-400 hover:shadow-lg hover:shadow-teal-500/10 transition-all group"
+                                        title="حصاد اليوم"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <History className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                                        </div>
+                                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-teal-600">سجل التشغيل</span>
+                                    </button>
+
+                                    {/* المشتريات - Procurement */}
+                                    <button
+                                        onClick={() => setShowProcurement(true)}
+                                        className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 transition-all group"
+                                        title="طلب مشتريات"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                        </div>
+                                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-blue-600">المشتريات</span>
+                                    </button>
+
+                                    {/* الدعم الفني - Support */}
+                                    <button
+                                        onClick={() => setShowSupportTicket(true)}
+                                        className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 transition-all group"
+                                        title="طلب دعم فني"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <Headphones className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                        </div>
+                                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-amber-600">دعم فني</span>
+                                    </button>
                                 </div>
-                                <span className="text-sm font-medium text-teal-600 dark:text-teal-400">
-                                    النظام يعمل بكفاءة
-                                </span>
+
+                                {/* Status Badge */}
+                                <div 
+                                    className="flex items-center gap-3 py-2 px-4 rounded-xl"
+                                    style={{
+                                        background: 'linear-gradient(135deg, rgba(20,184,166,0.12) 0%, rgba(6,182,212,0.08) 100%)',
+                                        border: '1px solid rgba(20,184,166,0.25)',
+                                        boxShadow: '0 2px 12px rgba(20,184,166,0.15)'
+                                    }}
+                                >
+                                    <div className="relative">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-teal-500 block" />
+                                        <span className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping" />
+                                    </div>
+                                    <span className="text-sm font-medium text-teal-600 dark:text-teal-400">
+                                        النظام يعمل بكفاءة
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -348,6 +401,31 @@ const OverviewPage: React.FC = () => {
                     }
                 ]}
             />
+
+            {/* ✅ Daily Operations Insight Modal - حصاد اليوم */}
+            <DailyOperationsInsight
+                isOpen={showDailyInsight}
+                onClose={() => setShowDailyInsight(false)}
+            />
+
+            {/* ✅ Procurement Cart Modal - طلبات المشتريات */}
+            {showProcurement && (
+                <ProcurementCartWizard
+                    isOpen={showProcurement}
+                    onClose={() => setShowProcurement(false)}
+                    department="admin"
+                    autoApproved={true}
+                />
+            )}
+
+            {/* ✅ Support Ticket Modal - الدعم الفني */}
+            {showSupportTicket && (
+                <SupportTicketModal
+                    isOpen={showSupportTicket}
+                    onClose={() => setShowSupportTicket(false)}
+                    department="admin"
+                />
+            )}
         </div>
     );
 };

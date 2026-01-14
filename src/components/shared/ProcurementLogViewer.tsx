@@ -209,7 +209,7 @@ export const ProcurementLogViewer: React.FC<ProcurementLogViewerProps> = ({
     
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" dir="rtl">
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl shadow-2xl border border-white/10">
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 w-full max-w-md sm:max-w-lg lg:max-w-2xl max-h-[90vh] flex flex-col rounded-2xl sm:rounded-3xl shadow-2xl border border-white/10">
                 
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-white/10">

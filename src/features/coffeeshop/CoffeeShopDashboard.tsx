@@ -8,7 +8,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Coffee, Clock, CheckCircle2, AlertCircle,
     Package, Search, Filter, X, User, Building2, ShoppingCart,
-    QrCode, Check, Eye, LogOut, MessageSquare, BookOpen, Play
+    QrCode, Check, Eye, LogOut, MessageSquare, BookOpen, Play,
+    Headphones // ✅ Support ticket icon
 } from 'lucide-react';
 import { HeaderButton } from '../../components/common/HeaderButton';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
@@ -219,6 +220,12 @@ export const CoffeeShopDashboard: React.FC = () => {
                     subtitle={undefined}
                     actions={[
                         {
+                            id: 'procurement',
+                            icon: <ShoppingCart className="w-5 h-5" />,
+                            label: 'المشتريات',
+                            onClick: () => setShowProcurement(true)
+                        },
+                        {
                             id: 'instructions',
                             icon: <BookOpen className="w-5 h-5" />,
                             label: 'تعليمات عامة',
@@ -226,24 +233,10 @@ export const CoffeeShopDashboard: React.FC = () => {
                             variant: 'primary'
                         },
                         {
-                            id: 'procurement',
-                            icon: <ShoppingCart className="w-5 h-5" />,
-                            label: 'المشتريات',
-                            onClick: () => setShowProcurement(true)
-                        },
-                        {
                             id: 'support',
-                            icon: <MessageSquare className="w-5 h-5" />,
+                            icon: <Headphones className="w-5 h-5" />,
                             label: 'دعم فني',
-                            onClick: () => setShowSupportTicket(true),
-                            variant: 'warning'
-                        },
-                        {
-                            id: 'logout',
-                            icon: <LogOut className="w-5 h-5" />,
-                            label: 'تسجيل خروج',
-                            onClick: logout,
-                            variant: 'danger'
+                            onClick: () => setShowSupportTicket(true)
                         }
                     ]}
                 />

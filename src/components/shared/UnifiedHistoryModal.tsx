@@ -292,7 +292,7 @@ export const UnifiedHistoryModal: React.FC<UnifiedHistoryModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="glass-card w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl">
+            <div className="glass-card w-full max-w-md sm:max-w-lg lg:max-w-2xl max-h-[90vh] flex flex-col rounded-2xl sm:rounded-3xl">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
                     <div className="flex items-center gap-3">
