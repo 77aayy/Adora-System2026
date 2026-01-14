@@ -30,7 +30,7 @@ import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide
 import VoiceInputButton from '../../components/shared/VoiceInputButton';
 
 // Shared Components
-import { ProcurementCart } from '../../components/shared/ProcurementCart';
+import { ProcurementCartWizard } from '../../components/shared/ProcurementCartWizard';
 import { PointsTracker } from '../../components/shared/PointsTracker';
 import { ShiftNotes } from '../../components/shared/ShiftNotes';
 import { HistoryFilter } from '../../components/shared/HistoryFilter';
@@ -1411,7 +1411,7 @@ export const MaintenanceDashboard: React.FC = () => {
             )}
 
             {/* Shared Modals */}
-            <ProcurementCart department="maintenance" isOpen={showProcurement} onClose={() => setShowProcurement(false)} />
+            <ProcurementCartWizard department="maintenance" tenantId={tenantId || ''} isOpen={showProcurement} onClose={() => setShowProcurement(false)} />
             <ShiftNotes isOpen={showShiftNotes} onClose={() => setShowShiftNotes(false)} />
             <UnifiedHistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} defaultDepartment="maintenance" />
             <TeamMembers isOpen={showTeam} onClose={() => setShowTeam(false)} department="maintenance" showPoints={true} />

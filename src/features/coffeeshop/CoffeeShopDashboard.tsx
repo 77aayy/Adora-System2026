@@ -28,7 +28,7 @@ import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoa
 import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboarding tour
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
 // DeveloperSignature is now in GlobalFooter (App.tsx)
-import { ProcurementCart } from '../../components/shared/ProcurementCart'; // ✅ Procurement cart
+import { ProcurementCartWizard } from '../../components/shared/ProcurementCartWizard'; // ✅ Procurement cart wizard
 import { PointsTracker } from '../../components/shared/PointsTracker'; // ✅ Points tracker
 import { SupportTicketModal } from '../../components/shared/SupportTicketModal'; // ✅ Support ticket modal
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
@@ -429,10 +429,11 @@ export const CoffeeShopDashboard: React.FC = () => {
                 </div>
 
                 {/* Procurement Cart Modal */}
-                <ProcurementCart
+                <ProcurementCartWizard
                     isOpen={showProcurement}
                     onClose={() => setShowProcurement(false)}
                     department="coffee_shop"
+                    tenantId={tenantId || ''}
                 />
 
                 {/* Support Ticket Modal */}

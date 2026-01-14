@@ -12,10 +12,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     X, Plus, Minus, ShoppingCart, Send, Check, 
     ChevronLeft, ChevronRight, Package, Search,
-    AlertCircle, Trash2
+    AlertCircle, Trash2, Loader2, History
 } from 'lucide-react';
 import { db } from '../../services/firebase';
-import { collection, addDoc, Timestamp, query, where, onSnapshot, limit } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, query, where, orderBy, getDocs, limit as fbLimit } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -35,52 +35,40 @@ interface QuickItem {
     name: string;
     icon: string;
     defaultQty: number;
+    frequency?: number; // How many times ordered
 }
 
 type Step = 'select' | 'review' | 'confirm';
 
-// Quick items per department
-const QUICK_ITEMS: Record<string, QuickItem[]> = {
-    reception: [
-        { name: 'أوراق A4', icon: '📄', defaultQty: 5 },
-        { name: 'أقلام', icon: '🖊️', defaultQty: 10 },
-        { name: 'دباسة', icon: '📌', defaultQty: 2 },
-        { name: 'مناديل', icon: '🧻', defaultQty: 10 },
-        { name: 'أكواب ورقية', icon: '☕', defaultQty: 50 },
-        { name: 'مياه', icon: '💧', defaultQty: 24 },
-    ],
-    housekeeping: [
-        { name: 'منظف', icon: '🧹', defaultQty: 5 },
-        { name: 'فوط', icon: '🧽', defaultQty: 20 },
-        { name: 'شامبو', icon: '🧴', defaultQty: 10 },
-        { name: 'صابون', icon: '🧼', defaultQty: 20 },
-        { name: 'أكياس', icon: '🗑️', defaultQty: 50 },
-        { name: 'معطر', icon: '🌸', defaultQty: 5 },
-    ],
-    maintenance: [
-        { name: 'لمبات', icon: '💡', defaultQty: 10 },
-        { name: 'بطاريات', icon: '🔋', defaultQty: 20 },
-        { name: 'أدوات', icon: '🔧', defaultQty: 1 },
-        { name: 'شريط', icon: '📦', defaultQty: 5 },
-        { name: 'فلتر', icon: '❄️', defaultQty: 3 },
-        { name: 'سيليكون', icon: '🧴', defaultQty: 2 },
-    ],
-    bellman: [
-        { name: 'ملصقات', icon: '🏷️', defaultQty: 100 },
-        { name: 'أظرف', icon: '✉️', defaultQty: 50 },
-        { name: 'أقلام', icon: '🖊️', defaultQty: 20 },
-        { name: 'حبل', icon: '🧵', defaultQty: 3 },
-        { name: 'أكياس', icon: '🛍️', defaultQty: 30 },
-        { name: 'كروت', icon: '🗝️', defaultQty: 50 },
-    ],
-    coffee_shop: [
-        { name: 'قهوة', icon: '☕', defaultQty: 5 },
-        { name: 'شاي', icon: '🍵', defaultQty: 10 },
-        { name: 'سكر', icon: '🧊', defaultQty: 5 },
-        { name: 'حليب', icon: '🥛', defaultQty: 10 },
-        { name: 'أكواب', icon: '🥤', defaultQty: 100 },
-        { name: 'ملاعق', icon: '🥄', defaultQty: 100 },
-    ],
+// Default icon map for common items
+const ITEM_ICONS: Record<string, string> = {
+    'أوراق': '📄', 'ورق': '📄', 'A4': '📄',
+    'أقلام': '🖊️', 'قلم': '🖊️',
+    'دباسة': '📌', 'دبابيس': '📌',
+    'مناديل': '🧻', 'منديل': '🧻',
+    'أكواب': '☕', 'كوب': '☕',
+    'مياه': '💧', 'ماء': '💧',
+    'منظف': '🧹', 'منظفات': '🧹',
+    'فوط': '🧽', 'فوطة': '🧽',
+    'شامبو': '🧴', 'صابون': '🧼',
+    'أكياس': '🗑️', 'كيس': '🗑️',
+    'معطر': '🌸', 'عطر': '🌸',
+    'لمبات': '💡', 'لمبة': '💡',
+    'بطاريات': '🔋', 'بطارية': '🔋',
+    'أدوات': '🔧', 'أداة': '🔧',
+    'شريط': '📦', 'لاصق': '📦',
+    'فلتر': '❄️', 'فلاتر': '❄️',
+    'قهوة': '☕', 'شاي': '🍵',
+    'سكر': '🧊', 'حليب': '🥛',
+    'ملاعق': '🥄', 'ملعقة': '🥄',
+};
+
+// Get icon for item name
+const getItemIcon = (name: string): string => {
+    for (const [key, icon] of Object.entries(ITEM_ICONS)) {
+        if (name.includes(key)) return icon;
+    }
+    return '📦'; // Default icon
 };
 
 interface Props {
@@ -106,19 +94,76 @@ export const ProcurementCartWizard: React.FC<Props> = ({
     const [cart, setCart] = useState<CartItem[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [dynamicQuickItems, setDynamicQuickItems] = useState<QuickItem[]>([]);
+    const [loadingQuickItems, setLoadingQuickItems] = useState(true);
 
-    // Quick items for this department
-    const quickItems = useMemo(() => 
-        QUICK_ITEMS[department] || QUICK_ITEMS.reception
-    , [department]);
+    // ✅ Fetch dynamic quick items from department's recent orders
+    useEffect(() => {
+        if (!tenantId || !department || !isOpen) return;
+        
+        const fetchRecentItems = async () => {
+            setLoadingQuickItems(true);
+            try {
+                // Get recent procurement requests for this department
+                const q = query(
+                    collection(db, 'procurementRequests'),
+                    where('tenantId', '==', tenantId),
+                    where('department', '==', department),
+                    orderBy('createdAt', 'desc'),
+                    fbLimit(50) // Get last 50 orders to analyze
+                );
+                
+                const snapshot = await getDocs(q);
+                
+                // Count item frequencies
+                const itemFrequency: Record<string, { count: number; lastQty: number }> = {};
+                
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    const items = data.items || [];
+                    items.forEach((item: any) => {
+                        const name = item.itemName || item.name;
+                        if (name) {
+                            if (!itemFrequency[name]) {
+                                itemFrequency[name] = { count: 0, lastQty: item.quantity || 1 };
+                            }
+                            itemFrequency[name].count++;
+                            itemFrequency[name].lastQty = item.quantity || 1;
+                        }
+                    });
+                });
+                
+                // Sort by frequency and take top 9
+                const sortedItems = Object.entries(itemFrequency)
+                    .sort((a, b) => b[1].count - a[1].count)
+                    .slice(0, 9)
+                    .map(([name, data]) => ({
+                        name,
+                        icon: getItemIcon(name),
+                        defaultQty: data.lastQty,
+                        frequency: data.count
+                    }));
+                
+                setDynamicQuickItems(sortedItems);
+            } catch (err) {
+                console.error('Error fetching recent items:', err);
+                // Fallback to empty - user can search
+                setDynamicQuickItems([]);
+            } finally {
+                setLoadingQuickItems(false);
+            }
+        };
+        
+        fetchRecentItems();
+    }, [tenantId, department, isOpen]);
 
-    // Filtered quick items
+    // Filtered quick items (from dynamic items)
     const filteredItems = useMemo(() => {
-        if (!searchQuery) return quickItems;
-        return quickItems.filter(item => 
+        if (!searchQuery) return dynamicQuickItems;
+        return dynamicQuickItems.filter(item => 
             item.name.includes(searchQuery)
         );
-    }, [quickItems, searchQuery]);
+    }, [dynamicQuickItems, searchQuery]);
 
     // Theme colors
     const modalBg = isDark ? '#1e293b' : '#ffffff';
@@ -320,44 +365,71 @@ export const ProcurementCartWizard: React.FC<Props> = ({
                                 />
                             </div>
 
-                            {/* Quick Items - Mini Grid */}
-                            <div className="grid grid-cols-3 gap-2">
-                                {filteredItems.map((item, idx) => {
-                                    const inCart = cart.find(c => c.name === item.name);
-                                    return (
-                                        <button
-                                            key={idx}
-                                            onClick={() => addToCart(item)}
-                                            className={`p-2 rounded-lg text-center transition-all active:scale-95 ${
-                                                inCart ? 'ring-2 ring-teal-500' : ''
-                                            }`}
-                                            style={{ 
-                                                background: isDark ? '#334155' : '#f8fafc',
-                                                border: `1px solid ${borderColor}`
-                                            }}
-                                        >
-                                            <div className="text-xl mb-1">{item.icon}</div>
-                                            <div className="text-[10px] font-medium truncate" style={{ color: textPrimary }}>
-                                                {item.name}
-                                            </div>
-                                            {inCart && (
-                                                <div className="text-[9px] text-teal-500 font-bold">
-                                                    ×{inCart.quantity}
-                                                </div>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            {/* Quick Items - Dynamic from Recent Orders */}
+                            {loadingQuickItems ? (
+                                <div className="flex items-center justify-center py-6">
+                                    <Loader2 className="w-5 h-5 animate-spin text-teal-500" />
+                                    <span className="mr-2 text-sm" style={{ color: textSecondary }}>جاري تحميل الأصناف...</span>
+                                </div>
+                            ) : filteredItems.length > 0 ? (
+                                <>
+                                    <div className="flex items-center gap-1 mb-2">
+                                        <History className="w-3 h-3" style={{ color: textSecondary }} />
+                                        <span className="text-[10px]" style={{ color: textSecondary }}>الأكثر طلباً</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {filteredItems.map((item, idx) => {
+                                            const inCart = cart.find(c => c.name === item.name);
+                                            return (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => addToCart(item)}
+                                                    className={`p-2 rounded-lg text-center transition-all active:scale-95 relative ${
+                                                        inCart ? 'ring-2 ring-teal-500' : ''
+                                                    }`}
+                                                    style={{ 
+                                                        background: isDark ? '#334155' : '#f8fafc',
+                                                        border: `1px solid ${borderColor}`
+                                                    }}
+                                                >
+                                                    <div className="text-xl mb-1">{item.icon}</div>
+                                                    <div className="text-[10px] font-medium truncate" style={{ color: textPrimary }}>
+                                                        {item.name}
+                                                    </div>
+                                                    {inCart ? (
+                                                        <div className="text-[9px] text-teal-500 font-bold">
+                                                            ×{inCart.quantity}
+                                                        </div>
+                                                    ) : item.frequency && (
+                                                        <div className="text-[8px]" style={{ color: textSecondary }}>
+                                                            طُلب {item.frequency}×
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center py-4 rounded-lg" style={{ background: isDark ? '#334155' : '#f8fafc' }}>
+                                    <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                    <p className="text-xs" style={{ color: textSecondary }}>
+                                        لا توجد طلبات سابقة
+                                    </p>
+                                    <p className="text-[10px] mt-1" style={{ color: textSecondary }}>
+                                        ابحث واكتب اسم المنتج أدناه
+                                    </p>
+                                </div>
+                            )}
 
-                            {/* Custom Item */}
-                            {searchQuery && !filteredItems.some(i => i.name === searchQuery) && (
+                            {/* Custom Item - Always show if searching */}
+                            {searchQuery && (
                                 <button
                                     onClick={() => {
-                                        addToCart({ name: searchQuery, icon: '📦', defaultQty: 1 });
+                                        addToCart({ name: searchQuery, icon: getItemIcon(searchQuery), defaultQty: 1 });
                                         setSearchQuery('');
                                     }}
-                                    className="w-full p-2 rounded-lg text-sm flex items-center justify-center gap-2 bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                                    className="w-full p-2 rounded-lg text-sm flex items-center justify-center gap-2 bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20"
                                 >
                                     <Plus className="w-4 h-4" />
                                     إضافة "{searchQuery}"

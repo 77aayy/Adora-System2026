@@ -42,7 +42,7 @@ import * as ShiftNotesService from '../../services/shiftNotesService';
 // Shared Components
 import { ShiftNotes } from '../../components/shared/ShiftNotes';
 import { PointsTracker } from '../../components/shared/PointsTracker';
-import { ProcurementCart } from '../../components/shared/ProcurementCart';
+import { ProcurementCartWizard } from '../../components/shared/ProcurementCartWizard';
 import { TeamMembers } from '../../components/shared/TeamMembers';
 import { FloorRoomSelector } from '../../components/shared/FloorRoomSelector';
 // ✅ Room Transfer Components
@@ -1392,7 +1392,7 @@ export const BellmanDashboard: React.FC = () => {
             />
 
             <ShiftNotes isOpen={showShiftNotes} onClose={() => setShowShiftNotes(false)} />
-            <ProcurementCart isOpen={showProcurement} onClose={() => setShowProcurement(false)} department="bellman" />
+            <ProcurementCartWizard isOpen={showProcurement} onClose={() => setShowProcurement(false)} department="bellman" tenantId={tenantId || ''} />
             <TeamMembers isOpen={showTeam} onClose={() => setShowTeam(false)} department="bellman" />
             <UnifiedHistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} defaultDepartment="bellman" />
 

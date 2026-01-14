@@ -51,7 +51,7 @@ import { useBrandName } from '../../hooks/useBrandName';
 // Shared Components
 import { ShiftNotes } from '../../components/shared/ShiftNotes';
 import { PointsTracker } from '../../components/shared/PointsTracker';
-import { ProcurementCart } from '../../components/shared/ProcurementCart';
+import { ProcurementCartWizard } from '../../components/shared/ProcurementCartWizard';
 import { TeamMembers } from '../../components/shared/TeamMembers';
 import { HousekeepingTeamManager } from './HousekeepingTeamManager';
 import { RoomHistoryModal } from '../../components/shared/RoomHistoryModal';
@@ -1945,7 +1945,7 @@ export const HousekeepingDashboard: React.FC = () => {
             />
 
             <ShiftNotes isOpen={showShiftNotes} onClose={() => setShowShiftNotes(false)} />
-            <ProcurementCart isOpen={showProcurement} onClose={() => setShowProcurement(false)} department="housekeeping" />
+            <ProcurementCartWizard isOpen={showProcurement} onClose={() => setShowProcurement(false)} department="housekeeping" tenantId={tenantContext?.tenantId || ''} />
             <LaundryInventory isOpen={showLaundryInventory} onClose={() => setShowLaundryInventory(false)} />
             <TeamMembers isOpen={showTeam} onClose={() => setShowTeam(false)} department="housekeeping" />
             <HousekeepingTeamManager
