@@ -322,7 +322,7 @@ export const createManager = async (data: {
                 status: 'active',
                 role: 'manager',
                 department: 'admin',
-                licenseExpiry: Timestamp.fromDate(oneYearLater),
+                licenseExpiry: Timestamp.fromDate(expiryDate),
                 licenseStatus: 'active',
                 hotelName: hotelName,
                 maxBranches: data.maxBranches || 1,
