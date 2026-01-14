@@ -16,7 +16,7 @@ import {
     UserPlus, LogOut, Users, DoorOpen, Clock, Package,
     Star, MessageSquare, History, ShoppingCart,
     Bell, Check, CheckCircle2, CheckCircle, AlertCircle, Play, Search,
-    MapPin, Phone, Truck, ChevronRight, X, Plus, Minus,
+    MapPin, Phone, Truck, ChevronRight, X, Plus, Minus, Eye,
     QrCode, // ✅ QR icon for QR requests
     Smartphone, // ✅ Alternative QR icon
     BookOpen, // ✅ General instructions icon
@@ -1254,92 +1254,71 @@ export const BellmanDashboard: React.FC = () => {
                                 <p className="adora-text-tertiary">لا توجد طلبات نشطة</p>
                             </div>
                         ) : (
-                            activeRequests.map(request => (
-                                <div key={request.id} className="adora-card p-4" onClick={() => handleBellmanCardClick(request.id)}>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                                                <span className="text-lg font-bold text-white">{request.roomNumber}</span>
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <p className="text-white font-medium">
-                                                        {REQUEST_TYPE_LABELS[request.requestType || ''] || 'طلب بيلمان'}
-                                                    </p>
-                                                    {/* ✅ QR Badge - Show if request is from QR */}
-                                                    {(request as any).source === 'QR' && (
-                                                        <span className="px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 text-[10px] font-bold flex items-center gap-1 flex-shrink-0">
-                                                            <QrCode className="w-3 h-3" />
-                                                            <span>QR</span>
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                                                    <p className="text-white/50 text-sm">{request.guestName || 'نزيل'}</p>
-                                                    {/* ✅ Guest Info - Show identity/phone if available */}
-                                                    {(request as any).guestIdentity && (
-                                                        <span className="adora-text-tertiary text-xs">
-                                                            • {(request as any).guestIdentity}
-                                                        </span>
-                                                    )}
-                                                    {(request as any).guestPhone && (
-                                                        <span className="adora-text-tertiary text-xs">
-                                                            • {(request as any).guestPhone}
-                                                        </span>
-                                                    )}
-                                                    <ReadReceipt request={request as any} size="sm" showPopup={false} />
-                                                </div>
-                                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {activeRequests.map(request => (
+                                <div key={request.id} 
+                                    className="p-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] adora-card border shadow-sm adora-border"
+                                    onClick={() => handleBellmanCardClick(request.id)}>
+                                    {/* Row 1: Room + Type + Status */}
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="w-10 h-10 rounded-lg flex-shrink-0 bg-blue-500/20 flex items-center justify-center">
+                                            <span className="text-sm font-bold adora-text-primary">{request.roomNumber}</span>
                                         </div>
-                                        <div className="flex flex-col items-end gap-1">
-                                            {request.needsCart && (
-                                                <span className="px-2 py-1 rounded-lg bg-orange-500/20 text-orange-400 text-xs">
-                                                    🛒 عربة
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[10px] adora-text-secondary truncate">
+                                                    {REQUEST_TYPE_LABELS[request.requestType || ''] || 'بيلمان'}
                                                 </span>
-                                            )}
-                                            {(request as any).guestsInRoom && (
-                                                <span className="px-2 py-1 rounded-lg bg-purple-500/20 text-purple-400 text-xs">
-                                                    👥 بالغرفة
-                                                </span>
-                                            )}
+                                                {(request as any).source === 'QR' && <QrCode className="w-3 h-3 text-teal-500" />}
+                                            </div>
+                                            <p className="text-[10px] adora-text-tertiary truncate">{request.guestName || 'نزيل'}</p>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                                            <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                                request.status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'
+                                            }`}>
+                                                {request.status === 'IN_PROGRESS' ? 'جاري' : 'جديد'}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Created By Info */}
-                                    {(request as any).createdBy?.name && (
-                                        <div className="mb-3 px-3 py-2 rounded-lg adora-card">
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="adora-text-tertiary">من:</span>
-                                                <span className="text-cyan-400 font-medium">{(request as any).createdBy.name}</span>
-                                            </div>
-                                            {request.notes && (
-                                                <p className="text-white/60 text-xs mt-1">{request.notes}</p>
-                                            )}
+                                    {/* Row 2: Badges */}
+                                    {(request.needsCart || (request as any).guestsInRoom) && (
+                                        <div className="flex items-center gap-1.5 mb-2 text-[9px]">
+                                            {request.needsCart && <span className="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-500">🛒 عربة</span>}
+                                            {(request as any).guestsInRoom && <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-500">👥 موجود</span>}
                                         </div>
                                     )}
 
-                                    <div className="flex gap-2">
+                                    {/* Row 3: Notes (truncated) */}
+                                    {request.notes && (
+                                        <p className="text-[10px] adora-text-secondary line-clamp-1 mb-2 px-2 py-1 rounded adora-bg-tertiary">
+                                            💬 {request.notes}
+                                        </p>
+                                    )}
+
+                                    {/* Row 4: Actions */}
+                                    <div className="flex gap-2 pt-2 border-t adora-border">
                                         {request.status === 'CONFIRMED' && (
-                                            <button
-                                                onClick={() => handleStartRequest(request.id)}
-                                                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium flex items-center justify-center gap-2"
-                                            >
-                                                <Play className="w-5 h-5" />
-                                                بدء
+                                            <button onClick={(e) => { e.stopPropagation(); handleStartRequest(request.id); }}
+                                                className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                                                <Play className="w-3 h-3" /> بدء
                                             </button>
                                         )}
                                         {request.status === 'IN_PROGRESS' && (
-                                            <button
-                                                onClick={() => handleCompleteRequest(request)}
-                                                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-teal-600 text-white font-medium flex items-center justify-center gap-2"
-                                            >
-                                                <CheckCircle2 className="w-5 h-5" />
-                                                إتمام
+                                            <button onClick={(e) => { e.stopPropagation(); handleCompleteRequest(request); }}
+                                                className="flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                                                <CheckCircle2 className="w-3 h-3" /> إتمام
                                             </button>
                                         )}
+                                        <button onClick={(e) => { e.stopPropagation(); handleBellmanCardClick(request.id); }}
+                                            className="py-1.5 px-3 rounded-lg text-xs font-medium adora-bg-tertiary adora-text-secondary flex items-center gap-1">
+                                            <Eye className="w-3 h-3" />
+                                        </button>
                                     </div>
                                 </div>
-                            ))
+                            ))}
+                            </div>
                         )}
                     </>
                 )}

@@ -157,215 +157,131 @@ export const UnifiedRequestCard: React.FC<UnifiedRequestCardProps> = ({
             return null;
         }
 
+        // Compact button styles
+        const btnPrimary = "flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1";
+        const btnSuccess = "flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1";
+        const btnSecondary = "py-1.5 px-2 rounded-lg text-xs font-medium adora-bg-tertiary adora-text-secondary flex items-center gap-1";
+
         // Reception view
         if (viewMode === 'reception') {
             if (request.status === RequestStatus.PENDING_RECEPTION) {
-                return (
-                    <div className="flex gap-2 w-full">
-                        <button
-                            onClick={() => onAction('confirm')}
-                            className="btn-primary flex-1"
-                        >
-                            <CheckCircle className="w-4 h-4" />
-                            تأكيد الطلب
+                return (<>
+                    <button onClick={() => onAction('confirm')} className={btnPrimary}>
+                        <CheckCircle className="w-3 h-3" /> تأكيد
+                    </button>
+                    {onMove && (
+                        <button onClick={(e) => { e.stopPropagation(); onMove(); }} className={btnSecondary} title="نقل">
+                            <Repeat className="w-3 h-3" />
                         </button>
-                        {/* 🏨 Room Move Action */}
-                        {onMove && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onMove();
-                                }}
-                                className="p-2 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-colors"
-                                title="نقل النزيل (تحويل الغرفة)"
-                            >
-                                <Repeat className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
-                );
+                    )}
+                </>);
             }
         }
 
         // Housekeeping view
         if (viewMode === 'housekeeping') {
             if (request.status === RequestStatus.CONFIRMED) {
-                return (
-                    <button
-                        onClick={() => onAction('start_cleaning')}
-                        className="btn-primary w-full"
-                    >
-                        <PlayCircle className="w-4 h-4" />
-                        بدء التنظيف
-                    </button>
-                );
+                return <button onClick={() => onAction('start_cleaning')} className={btnPrimary}>
+                    <PlayCircle className="w-3 h-3" /> بدء
+                </button>;
             }
             if (request.status === RequestStatus.IN_PROGRESS) {
-                return (
-                    <button
-                        onClick={() => onAction('complete')}
-                        className="btn-success w-full"
-                    >
-                        <CheckCircle className="w-4 h-4" />
-                        إنهاء التنظيف
-                    </button>
-                );
+                return <button onClick={() => onAction('complete')} className={btnSuccess}>
+                    <CheckCircle className="w-3 h-3" /> إنهاء
+                </button>;
             }
         }
 
         // Maintenance view
         if (viewMode === 'maintenance') {
             if (request.status === RequestStatus.MAINTENANCE_PENDING) {
-                return (
-                    <button
-                        onClick={() => onAction('start_maintenance')}
-                        className="btn-primary w-full"
-                    >
-                        <Wrench className="w-4 h-4" />
-                        بدء الصيانة
-                    </button>
-                );
+                return <button onClick={() => onAction('start_maintenance')} className={btnPrimary}>
+                    <Wrench className="w-3 h-3" /> بدء
+                </button>;
             }
             if (request.status === RequestStatus.IN_PROGRESS) {
-                return (
-                    <button
-                        onClick={() => onAction('complete')}
-                        className="btn-success w-full"
-                    >
-                        <CheckCircle className="w-4 h-4" />
-                        إنهاء الصيانة
-                    </button>
-                );
+                return <button onClick={() => onAction('complete')} className={btnSuccess}>
+                    <CheckCircle className="w-3 h-3" /> إنهاء
+                </button>;
             }
         }
 
         // Bellman view
         if (viewMode === 'bellman') {
             if (request.status === RequestStatus.CONFIRMED) {
-                return (
-                    <button
-                        onClick={() => onAction('start_delivery')}
-                        className="btn-primary w-full"
-                    >
-                        <PlayCircle className="w-4 h-4" />
-                        بدء التوصيل
-                    </button>
-                );
+                return <button onClick={() => onAction('start_delivery')} className={btnPrimary}>
+                    <PlayCircle className="w-3 h-3" /> بدء
+                </button>;
             }
             if (request.status === RequestStatus.IN_PROGRESS) {
-                return (
-                    <button
-                        onClick={() => onAction('complete')}
-                        className="btn-success w-full"
-                    >
-                        <CheckCircle className="w-4 h-4" />
-                        تم التوصيل
-                    </button>
-                );
+                return <button onClick={() => onAction('complete')} className={btnSuccess}>
+                    <CheckCircle className="w-3 h-3" /> تم
+                </button>;
             }
         }
 
         return null;
     };
 
+    // Get type label
+    const getTypeLabel = () => {
+        const labels: Record<string, string> = {
+            cleaning: 'تنظيف', maintenance: 'صيانة', amenities: 'مستلزمات',
+            bellman: 'بيلمان', vip_service: 'VIP', other: 'أخرى'
+        };
+        return labels[request.type] || 'أخرى';
+    };
+
     return (
-        <div className="glass-card group animate-fade-in">
-            {/* Header: Room Number & Status */}
-            <div className="flex items-start justify-between mb-4">
-                {/* Room Info */}
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-primary-600/20 flex items-center justify-center">
-                        <DoorOpen className="w-6 h-6 text-primary-400" />
-                    </div>
-                    <div>
-                        <h3 className="text-2xl font-bold text-white">
-                            {request.roomNumber}
-                        </h3>
-                        <div className="flex items-center gap-1.5 text-white/60 text-sm">
-                            <User className="w-3.5 h-3.5" />
-                            {request.guestName}
-                        </div>
-                    </div>
+        <div className={`
+            p-3 rounded-xl cursor-pointer transition-all duration-200
+            hover:scale-[1.01] active:scale-[0.99] adora-card border shadow-sm
+            ${isDelayed ? 'border-red-500/50 ring-1 ring-red-500/30' : 'adora-border'}
+            ${isGhostOrder ? 'ring-2 ring-red-500 animate-pulse' : ''}
+        `}>
+            {/* Row 1: Room + Type + Status */}
+            <div className="flex items-center gap-2 mb-2">
+                <div className="w-10 h-10 rounded-lg flex-shrink-0 bg-primary-500/20 flex items-center justify-center">
+                    <span className="text-sm font-bold text-primary-400">{request.roomNumber}</span>
                 </div>
-
-                {/* Status Badge */}
-                <div className="flex flex-col items-end gap-1">
-                    {/* 👻 Scenario 1: Ghost Order Alert */}
-                    {isGhostOrder && (
-                        <span className="flex items-center gap-1.5 px-3 py-1 bg-red-600 animate-pulse text-white text-xs font-bold rounded-full border border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.7)]">
-                            <Repeat className="w-3.5 h-3.5" />
-                            النزيل غادر!
-                        </span>
-                    )}
-
-                    {/* 🔁 Scenario 2: Duplicate Alert */}
-                    {isPotentialDuplicate && (
-                        <span className="flex items-center gap-1.5 px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-[10px] rounded border border-yellow-500/30">
-                            <Repeat className="w-3 h-3" />
-                            مكرر محتمل
-                        </span>
-                    )}
-
-                    <span className={`badge ${isDelayed ? 'bg-red-500/20 text-red-400 border border-red-500/50' : statusInfo.badgeClass}`}>
-                        {isDelayed ? (
-                            <>
-                                <Clock className="w-3.5 h-3.5 animate-pulse" />
-                                <span>متأخر</span>
-                            </>
-                        ) : (
-                            <>
-                                {statusInfo.icon}
-                                {statusInfo.labelAr}
-                            </>
-                        )}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] adora-text-secondary">{getTypeLabel()}</span>
+                        {isGhostOrder && <span className="text-[9px] text-red-500 font-bold">النزيل غادر!</span>}
+                        {isPotentialDuplicate && <span className="text-[9px] text-yellow-500">مكرر؟</span>}
+                    </div>
+                    <p className="text-[10px] adora-text-tertiary truncate">{request.guestName}</p>
+                </div>
+                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        isDelayed ? 'bg-red-500/20 text-red-500' : statusInfo?.badgeClass || 'bg-gray-500/20 text-gray-400'
+                    }`}>
+                        {isDelayed ? 'متأخر' : statusInfo?.labelAr || 'جديد'}
                     </span>
+                    <span className="text-[10px] adora-text-disabled">{formatTime(request.timestamp)}</span>
                 </div>
             </div>
 
-            {/* Request Type & Details */}
-            <div className="flex items-center gap-2 mb-3 text-white/80">
-                {requestTypeIcons[request.type]}
-                <span className="text-sm capitalize">
-                    {request.type === 'cleaning' && 'تنظيف'}
-                    {request.type === 'maintenance' && 'صيانة'}
-                    {request.type === 'amenities' && 'مستلزمات'}
-                    {request.type === 'bellman' && 'بيلمان'}
-                    {request.type === 'vip_service' && 'خدمة VIP'}
-                    {request.type === 'other' && 'أخرى'}
-                </span>
+            {/* Row 2: Bellman Indicators */}
+            {request.type === 'bellman' && (request.needsCart || request.guestsInRoom) && (
+                <div className="flex items-center gap-2 mb-2 text-[10px]">
+                    {request.needsCart && (
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500">
+                            <ShoppingCart className="w-3 h-3" /> عربة
+                        </span>
+                    )}
+                    {request.guestsInRoom && (
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-500">
+                            <Users className="w-3 h-3" /> موجودين
+                        </span>
+                    )}
+                </div>
+            )}
 
-                {/* Bellman Specific Indicators (Human Logic) */}
-                {request.type === 'bellman' && (
-                    <div className="flex items-center gap-1.5 mr-auto pl-2 border-r border-white/10 pr-2">
-                        {request.needsCart && (
-                            <span className="p-1 rounded bg-amber-500/20 text-amber-400" title="يحتاج عربة">
-                                <ShoppingCart className="w-3.5 h-3.5" />
-                            </span>
-                        )}
-                        {request.guestsInRoom && (
-                            <span className="p-1 rounded bg-purple-500/20 text-purple-400" title="الضيوف في الغرفة">
-                                <Users className="w-3.5 h-3.5" />
-                            </span>
-                        )}
-                    </div>
-                )}
+            {/* Row 3: Actions */}
+            <div className="flex gap-2 pt-2 border-t adora-border">
+                {renderActionButtons()}
             </div>
-
-            {/* Timeline */}
-            <div className="flex items-center gap-2 text-white/50 text-xs mb-4">
-                <Clock className="w-3.5 h-3.5" />
-                <span>{formatTime(request.timestamp)}</span>
-                {request.assignedTo && (
-                    <>
-                        <span className="mx-1">•</span>
-                        <User className="w-3.5 h-3.5" />
-                        <span>{request.assignedTo}</span>
-                    </>
-                )}
-            </div>
-
-            {/* Action Buttons */}
-            {renderActionButtons()}
         </div>
     );
 };

@@ -133,7 +133,7 @@ const CLEANING_TYPE_CONFIG: any = {
 // Stat Card - MOVED TO: components/common/StatCard.tsx
 // Using centralized version for consistency across dashboards
 
-// Cleaning Task Card
+// ✅ COMPACT Cleaning Task Card - Mobile-First
 const TaskCard: React.FC<{
     task: CleaningRequest;
     onStart?: () => void;
@@ -144,136 +144,111 @@ const TaskCard: React.FC<{
 }> = ({ task, onStart, onComplete, onView, userId, userName }) => {
     const statusConfig = STATUS_CONFIG[task.status] || STATUS_CONFIG.CONFIRMED;
     const typeConfig = CLEANING_TYPE_CONFIG[task.cleaningType] || CLEANING_TYPE_CONFIG.occupied;
-    const StatusIcon = statusConfig.icon;
 
     const timeAgo = useMemo(() => {
         if (!task.createdAt) return '';
         const date = task.createdAt.toDate ? task.createdAt.toDate() : new Date(task.createdAt);
         const diff = Math.floor((Date.now() - date.getTime()) / 60000);
         if (diff < 1) return 'الآن';
-        if (diff < 60) return `${diff} د`;
-        if (diff < 1440) return `${Math.floor(diff / 60)} س`;
-        return `${Math.floor(diff / 1440)} ي`;
+        if (diff < 60) return `${diff}د`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}س`;
+        return `${Math.floor(diff / 1440)}ي`;
     }, [task.createdAt]);
 
     const elapsedTime = useMemo(() => {
         if (!task.startedAt) return null;
         const started = task.startedAt.toDate ? task.startedAt.toDate() : new Date(task.startedAt);
-        const diff = Math.floor((Date.now() - started.getTime()) / 60000);
-        return diff;
+        return Math.floor((Date.now() - started.getTime()) / 60000);
     }, [task.startedAt]);
 
     const isDelayed = task.status === 'IN_PROGRESS' && elapsedTime && elapsedTime > 45;
+    const isUrgent = task.priority === 'urgent';
+    const isQR = (task as any).source === 'QR';
 
-    // Handle click with markAsViewed
     const handleClick = async () => {
         if (userId && userName && task.id) {
-            try {
-                await markAsViewed(task.id, userId, userName, 'housekeeping');
-            } catch (e) {
-                // Silent fail
-            }
+            try { await markAsViewed(task.id, userId, userName, 'housekeeping'); } catch {}
         }
         if (onView) onView();
     };
 
     return (
         <div
-            className={`adora-card p-3 sm:p-4 transition-all hover:scale-[1.02] active:scale-[0.98] touch-manipulation ${task.priority === 'urgent' ? 'ring-2 ring-red-500/50' : ''
-                } ${isDelayed ? 'ring-2 ring-orange-500/50' : ''}`}
             onClick={handleClick}
+            className={`
+                p-3 rounded-xl cursor-pointer transition-all duration-200 
+                hover:scale-[1.01] active:scale-[0.99] adora-card border shadow-sm
+                ${isUrgent ? 'border-red-500/50 ring-1 ring-red-500/30' : 'adora-border'}
+                ${isDelayed ? 'border-orange-500/50 ring-1 ring-orange-500/30' : ''}
+            `}
         >
-            {/* Header - Mobile Optimized */}
-            <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--theme-accent-cyan) 0%, var(--theme-accent-blue) 100%)', opacity: 0.9 }}>
-                        <span className="text-xl sm:text-2xl font-bold text-white">{task.roomNumber}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                            <span className={`adora-badge px-1.5 sm:px-2 py-0.5 rounded-lg text-xs font-medium ${typeConfig.bg} ${typeConfig.color}`}>
-                                {typeConfig.label}
-                            </span>
-                            {task.priority === 'urgent' && (
-                                <span className="adora-badge adora-badge-danger px-1.5 sm:px-2 py-0.5 text-xs font-bold">
-                                    عاجل
-                                </span>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <p className="adora-text-secondary text-xs sm:text-sm truncate">{task.guestName || 'نزيل'}</p>
-                            {/* ✅ QR Badge - Show if request is from QR */}
-                            {(task as any).source === 'QR' && (
-                                <span className="adora-badge adora-badge-primary px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-1 flex-shrink-0">
-                                    <QrCode className="w-3 h-3" />
-                                    <span>QR</span>
-                                </span>
-                            )}
-                        </div>
-                    </div>
+            {/* Row 1: Room + Type + Status */}
+            <div className="flex items-center gap-2 mb-2">
+                <div className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center" 
+                     style={{ background: 'linear-gradient(135deg, var(--theme-accent-cyan) 0%, var(--theme-accent-blue) 100%)' }}>
+                    <span className="text-sm font-bold text-white">{task.roomNumber}</span>
                 </div>
-                <div className="text-left">
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${statusConfig.bg}`}>
-                        <StatusIcon className={`w-4 h-4 ${statusConfig.color}`} />
-                        <span className={`text-xs ${statusConfig.color}`}>{statusConfig.label}</span>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${typeConfig.bg} ${typeConfig.color}`}>
+                            {typeConfig.label}
+                        </span>
+                        {isUrgent && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+                        {isQR && <QrCode className="w-3 h-3 text-teal-500" />}
                     </div>
-                    <div className="flex items-center gap-1 mt-1 justify-center">
-                        <p className="adora-text-tertiary text-xs">{timeAgo}</p>
-                        <ReadReceipt request={task as any} size="sm" showPopup={false} />
+                    <p className="text-[10px] adora-text-secondary truncate">{task.guestName || 'نزيل'}</p>
+                </div>
+                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                    <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${statusConfig.bg} ${statusConfig.color}`}>
+                        {statusConfig.label}
                     </div>
+                    <span className="text-[10px] adora-text-disabled">{timeAgo}</span>
                 </div>
             </div>
 
-            {/* Progress (if in progress) */}
+            {/* Row 2: Progress Bar (if in progress) */}
             {task.status === 'IN_PROGRESS' && elapsedTime !== null && (
-                <div className="mb-3">
-                    <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs adora-text-secondary">الوقت المنقضي</span>
-                        <span className={`text-xs font-bold ${isDelayed ? 'text-orange-400' : 'adora-text-primary'}`}>
-                            {elapsedTime} دقيقة
+                <div className="mb-2">
+                    <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[9px] adora-text-tertiary">الوقت</span>
+                        <span className={`text-[9px] font-bold ${isDelayed ? 'text-orange-500' : 'adora-text-primary'}`}>
+                            {elapsedTime}د
                         </span>
                     </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                        <div
-                            className={`h-full transition-all ${isDelayed ? 'bg-orange-500' : ''}`}
-                            style={{ 
-                                width: `${Math.min(100, (elapsedTime / 45) * 100)}%`,
-                                background: isDelayed ? undefined : 'var(--theme-accent-blue)'
-                            }}
-                        />
+                    <div className="h-1 rounded-full overflow-hidden adora-bg-tertiary">
+                        <div className={`h-full transition-all ${isDelayed ? 'bg-orange-500' : 'bg-blue-500'}`}
+                             style={{ width: `${Math.min(100, (elapsedTime / 45) * 100)}%` }} />
                     </div>
                 </div>
             )}
 
-            {/* Notes */}
+            {/* Row 3: Notes (truncated) */}
             {task.notes && (
-                <p className="adora-text-secondary text-sm mb-3 p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                <p className="text-[10px] adora-text-secondary line-clamp-1 mb-2 px-2 py-1 rounded adora-bg-tertiary">
                     💬 {task.notes}
                 </p>
             )}
 
-            {/* Actions */}
-            <div className="flex gap-2">
+            {/* Row 4: Actions */}
+            <div className="flex gap-2 pt-2 border-t adora-border">
                 {task.status === 'CONFIRMED' && onStart && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onStart(); }}
-                        className="adora-btn-primary flex-1 py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
-                        style={{ background: 'linear-gradient(135deg, var(--theme-accent-blue) 0%, var(--theme-accent-indigo) 100%)' }}
-                    >
-                        <Play className="w-5 h-5" />
-                        بدء التنظيف
+                    <button onClick={(e) => { e.stopPropagation(); onStart(); }}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                        <Play className="w-3 h-3" /> بدء
                     </button>
                 )}
                 {task.status === 'IN_PROGRESS' && onComplete && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onComplete(); }}
-                        className="adora-btn-primary flex-1 py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2"
-                        style={{ background: 'linear-gradient(135deg, var(--theme-primary-500) 0%, var(--theme-primary-600) 100%)' }}
-                    >
-                        <CheckCircle2 className="w-5 h-5" />
-                        إتمام التنظيف
+                    <button onClick={(e) => { e.stopPropagation(); onComplete(); }}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> إتمام
                     </button>
                 )}
+                <button onClick={(e) => { e.stopPropagation(); onView?.(); }}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-medium adora-bg-tertiary adora-text-secondary ${
+                        task.status === 'COMPLETED' ? 'flex-1 justify-center' : ''
+                    } flex items-center gap-1`}>
+                    <Eye className="w-3 h-3" /> التفاصيل
+                </button>
             </div>
         </div>
     );
@@ -1862,14 +1837,14 @@ export const HousekeepingDashboard: React.FC = () => {
                 ))}
             </div>
 
-            {/* Tasks List */}
-            <div className="space-y-3">
+            {/* Tasks List - Grid for Mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {currentTasks.length === 0 ? (
-                    <div className="adora-card p-12 text-center">
-                        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                            <Sparkles className="w-8 h-8" style={{ color: 'var(--theme-text-tertiary)' }} />
+                    <div className="col-span-full adora-card p-8 text-center">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 adora-bg-tertiary">
+                            <Sparkles className="w-6 h-6 adora-text-disabled" />
                         </div>
-                        <p className="adora-text-tertiary">لا توجد مهام في هذه القائمة</p>
+                        <p className="text-sm adora-text-secondary">لا توجد مهام في هذه القائمة</p>
                     </div>
                 ) : (
                     currentTasks.map(task => (

@@ -8,7 +8,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
     Coffee, Clock, CheckCircle2, AlertCircle,
     Package, Search, Filter, X, User, Building2, ShoppingCart,
-    QrCode, Check, Eye, LogOut, MessageSquare, BookOpen
+    QrCode, Check, Eye, LogOut, MessageSquare, BookOpen, Play
 } from 'lucide-react';
 import { HeaderButton } from '../../components/common/HeaderButton';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
@@ -328,103 +328,63 @@ export const CoffeeShopDashboard: React.FC = () => {
                             <p className="adora-text-tertiary">لا توجد طلبات في هذه القائمة</p>
                         </div>
                     ) : (
-                        currentOrders.map(order => (
-                            <div
-                                key={order.id}
-                                className="rounded-2xl transition-colors duration-300 p-4 hover:scale-[1.01] transition-all"
-                                style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}
-                            >
-                                {/* Header */}
-                                <div className="flex items-start justify-between mb-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                                            {order.source === 'qr' ? (
-                                                <QrCode className="w-6 h-6 text-amber-400" />
-                                            ) : (
-                                                <ShoppingCart className="w-6 h-6 text-amber-400" />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <p className="text-white font-bold text-lg">غرفة {order.roomNumber}</p>
-                                            {order.guestName && (
-                                                <p className="text-white/60 text-sm">{order.guestName}</p>
-                                            )}
-                                            <p className="adora-text-tertiary text-xs flex items-center gap-1 mt-1">
-                                                <Clock className="w-3 h-3" />
-                                                {formatDate(order.createdAt)} • {getTimeElapsed(order.createdAt)}
-                                            </p>
-                                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {currentOrders.map(order => (
+                            <div key={order.id} className="p-3 rounded-xl adora-card border adora-border shadow-sm hover:scale-[1.01] transition-all">
+                                {/* Row 1: Room + Items Count + Status */}
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-10 h-10 rounded-lg flex-shrink-0 bg-amber-500/20 flex items-center justify-center">
+                                        {order.source === 'qr' ? <QrCode className="w-4 h-4 text-amber-400" /> : <Coffee className="w-4 h-4 text-amber-400" />}
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-teal-400 font-bold text-lg">{order.totalAmount} ر.س</p>
-                                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                                            order.status === 'pending' || order.status === 'confirmed' ? 'bg-yellow-500/20 text-yellow-400' :
-                                            order.status === 'preparing' || order.status === 'ready' ? 'bg-blue-500/20 text-blue-400' :
-                                            order.status === 'delivered' ? 'bg-green-500/20 text-green-400' :
-                                            'bg-gray-500/20 text-gray-400'
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold adora-text-primary">غ.{order.roomNumber}</p>
+                                        <p className="text-[10px] adora-text-tertiary truncate">{order.guestName || 'نزيل'} • {order.items.length} صنف</p>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                                        <span className="text-xs font-bold text-teal-500">{order.totalAmount} ر.س</span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                            order.status === 'pending' || order.status === 'confirmed' ? 'bg-yellow-500/20 text-yellow-500' :
+                                            order.status === 'preparing' || order.status === 'ready' ? 'bg-blue-500/20 text-blue-500' :
+                                            order.status === 'delivered' ? 'bg-green-500/20 text-green-500' : 'bg-gray-500/20 text-gray-400'
                                         }`}>
-                                            {order.status === 'pending' ? 'في الانتظار' :
-                                             order.status === 'confirmed' ? 'مؤكد' :
-                                             order.status === 'preparing' ? 'قيد التحضير' :
-                                             order.status === 'ready' ? 'جاهز' :
-                                             order.status === 'delivered' ? 'تم التسليم' :
-                                             'ملغى'}
+                                            {order.status === 'pending' ? 'انتظار' : order.status === 'confirmed' ? 'مؤكد' :
+                                             order.status === 'preparing' ? 'تحضير' : order.status === 'ready' ? 'جاهز' :
+                                             order.status === 'delivered' ? 'تسليم' : 'ملغى'}
                                         </span>
                                     </div>
                                 </div>
 
-                                {/* Items */}
-                                <div className="space-y-2 mb-3">
-                                    {order.items.map((item, idx) => (
-                                        <div key={idx} className="adora-card flex items-center justify-between p-2 rounded-lg">
-                                            <div>
-                                                <p className="text-white text-sm font-medium">{item.productName}</p>
-                                                <p className="text-white/50 text-xs">الكمية: {item.quantity} × {item.unitPrice} ر.س</p>
-                                            </div>
-                                            <p className="text-teal-400 font-bold">{item.totalPrice} ر.س</p>
-                                        </div>
-                                    ))}
+                                {/* Row 2: Items Summary (First 2) */}
+                                <div className="text-[10px] adora-text-secondary mb-2 px-2 py-1 rounded adora-bg-tertiary line-clamp-2">
+                                    {order.items.slice(0, 2).map(i => `${i.productName} (${i.quantity})`).join(' • ')}
+                                    {order.items.length > 2 && ` +${order.items.length - 2}`}
                                 </div>
 
-                                {/* Actions */}
+                                {/* Row 3: Notes */}
+                                {order.notes && (
+                                    <p className="text-[10px] adora-text-secondary line-clamp-1 mb-2">💬 {order.notes}</p>
+                                )}
+
+                                {/* Row 4: Actions */}
                                 {order.status !== 'delivered' && order.status !== 'cancelled' && (
-                                    <div className="flex gap-2 pt-3 border-t border-white/10">
+                                    <div className="flex gap-2 pt-2 border-t adora-border">
                                         {(order.status === 'pending' || order.status === 'confirmed') && (
-                                            <button
-                                                onClick={() => updateOrderStatus(order.id, 'preparing')}
-                                                className="flex-1 py-2 rounded-xl bg-blue-500/20 text-blue-400 font-medium hover:bg-blue-500/30 transition-all"
-                                            >
-                                                بدء التحضير
+                                            <button onClick={() => updateOrderStatus(order.id, 'preparing')}
+                                                className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                                                <Play className="w-3 h-3" /> تحضير
                                             </button>
                                         )}
                                         {(order.status === 'preparing' || order.status === 'ready') && (
-                                            <button
-                                                onClick={() => handleComplete(order)}
-                                                disabled={completing}
-                                                className="flex-1 py-2 rounded-xl bg-green-500 text-white font-bold hover:bg-primary-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                            >
-                                                {completing ? (
-                                                    <AdoraLoaderInline size={16} />
-                                                ) : (
-                                                    <>
-                                                        <Check className="w-4 h-4" />
-                                                        تم الإنهاء
-                                                    </>
-                                                )}
+                                            <button onClick={() => handleComplete(order)} disabled={completing}
+                                                className="flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">
+                                                {completing ? <AdoraLoaderInline size={12} /> : <><Check className="w-3 h-3" /> إنهاء</>}
                                             </button>
                                         )}
                                     </div>
                                 )}
-
-                                {/* Notes */}
-                                {order.notes && (
-                                    <div className="mt-3 p-2 adora-card rounded-lg">
-                                        <p className="adora-text-secondary text-xs">ملاحظات:</p>
-                                        <p className="text-white/80 text-sm">{order.notes}</p>
-                                    </div>
-                                )}
                             </div>
-                        ))
+                        ))}
+                        </div>
                     )}
                 </div>
 

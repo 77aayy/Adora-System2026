@@ -102,6 +102,7 @@ type TabType = 'pending' | 'approved' | 'all';
 // REQUEST CARD
 // ============================================================
 
+// ✅ COMPACT Procurement Request Card - Mobile-First
 const RequestCard: React.FC<{
     request: ProcurementRequest;
     onApprove?: () => void;
@@ -114,112 +115,72 @@ const RequestCard: React.FC<{
 }> = ({ request, onApprove, onReject, onStartPurchase, onComplete, isManager, isRep, currentUserId }) => {
     const status = STATUS_CONFIG[request.status] || STATUS_CONFIG.PENDING_APPROVAL;
     const StatusIcon = status.icon;
+    const isUrgent = request.items.some(i => i.priority === 'urgent');
 
     const timeAgo = (() => {
         if (!request.createdAt) return '';
         const date = request.createdAt.toDate ? request.createdAt.toDate() : new Date(request.createdAt);
         const diff = Math.floor((Date.now() - date.getTime()) / 60000);
         if (diff < 1) return 'الآن';
-        if (diff < 60) return `${diff} د`;
-        if (diff < 1440) return `${Math.floor(diff / 60)} س`;
-        return `${Math.floor(diff / 1440)} ي`;
+        if (diff < 60) return `${diff}د`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}س`;
+        return `${Math.floor(diff / 1440)}ي`;
     })();
 
     return (
-        <div 
-            className="p-3 sm:p-4 hover:scale-[1.02] active:scale-[0.98] transition-all touch-manipulation rounded-2xl shadow-lg"
-            style={{ 
-                background: 'var(--theme-bg-secondary)', 
-                border: '1px solid var(--theme-border-primary)',
-            }}
-        >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center">
-                        <ShoppingCart className="w-6 h-6 text-indigo-400" />
-                    </div>
-                    <div>
-                        <p className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{DEPARTMENT_NAMES[request.department]}</p>
-                        <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{request.requestedBy.name}</p>
-                    </div>
+        <div className={`p-3 rounded-xl adora-card border shadow-sm hover:scale-[1.01] transition-all
+            ${isUrgent ? 'border-red-500/50 ring-1 ring-red-500/30' : 'adora-border'}`}>
+            
+            {/* Row 1: Department + Requester + Status */}
+            <div className="flex items-center gap-2 mb-2">
+                <div className="w-10 h-10 rounded-lg flex-shrink-0 bg-indigo-500/20 flex items-center justify-center">
+                    <ShoppingCart className="w-4 h-4 text-indigo-400" />
                 </div>
-                <div className="text-left">
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${status.color}`}>
-                        <StatusIcon className="w-4 h-4" />
-                        <span className="text-xs">{status.label}</span>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-medium adora-text-primary truncate">{DEPARTMENT_NAMES[request.department]}</span>
+                        {isUrgent && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
                     </div>
-                    <p className="text-xs mt-1 text-center" style={{ color: 'var(--theme-text-tertiary)' }}>{timeAgo}</p>
+                    <p className="text-[10px] adora-text-tertiary truncate">{request.requestedBy.name}</p>
+                </div>
+                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                    <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${status.color}`}>
+                        <StatusIcon className="w-3 h-3" />
+                        <span>{status.label}</span>
+                    </div>
+                    <span className="text-[10px] adora-text-disabled">{timeAgo}</span>
                 </div>
             </div>
 
-            {/* Items */}
-            <div className="mb-3 rounded-xl p-3" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                <p className="text-xs mb-2" style={{ color: 'var(--theme-text-secondary)' }}>العناصر ({request.items.length})</p>
-                <div className="space-y-1">
-                    {request.items.slice(0, 3).map((item, i) => (
-                        <div key={i} className="flex justify-between text-sm">
-                            <span style={{ color: 'var(--theme-text-primary)' }}>{item.itemName}</span>
-                            <span style={{ color: 'var(--theme-text-secondary)' }}>{item.quantity}</span>
-                        </div>
-                    ))}
-                    {request.items.length > 3 && (
-                        <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>+{request.items.length - 3} عناصر أخرى</p>
-                    )}
-                </div>
+            {/* Row 2: Items Summary */}
+            <div className="text-[10px] adora-text-secondary mb-2 px-2 py-1 rounded adora-bg-tertiary">
+                <span className="font-medium">{request.items.length} عناصر:</span> {request.items.slice(0, 2).map(i => `${i.itemName} (${i.quantity})`).join(' • ')}
+                {request.items.length > 2 && ` +${request.items.length - 2}`}
             </div>
 
-            {/* Priority Badge */}
-            {request.items.some(i => i.priority === 'urgent') && (
-                <div className="mb-3 px-2 py-1 rounded-lg bg-red-500/20 text-red-400 text-xs inline-block">
-                    ⚡ يحتوي على عناصر عاجلة
-                </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex gap-2">
+            {/* Row 3: Actions */}
+            <div className="flex gap-2 pt-2 border-t adora-border">
                 {isManager && request.status === 'PENDING_APPROVAL' && request.requestedBy.id !== currentUserId && (
                     <>
-                        <button
-                            onClick={onApprove}
-                            className="adora-btn-primary flex-1 py-3 flex items-center justify-center gap-2"
-                        >
-                            <Check className="w-5 h-5" />
-                            تعميد
+                        <button onClick={onApprove} className="flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                            <Check className="w-3 h-3" /> تعميد
                         </button>
-                        <button
-                            onClick={onReject}
-                            className="adora-btn-danger py-3 px-4"
-                            title="رفض الطلب"
-                        >
-                            <X className="w-5 h-5" />
+                        <button onClick={onReject} className="py-1.5 px-2 rounded-lg bg-red-500/20 text-red-500 text-xs font-bold" title="رفض">
+                            <X className="w-3 h-3" />
                         </button>
                     </>
                 )}
-                {/* ℹ️ Show message if self-approval is blocked */}
                 {isManager && request.status === 'PENDING_APPROVAL' && request.requestedBy.id === currentUserId && (
-                    <div className="adora-info-box teal flex-1 justify-center text-xs">
-                        بانتظار تعميد من مدير آخر
-                    </div>
+                    <div className="flex-1 text-center text-[10px] adora-text-secondary py-1.5">بانتظار تعميد</div>
                 )}
                 {isRep && request.status === 'APPROVED' && (
-                    <button
-                        onClick={onStartPurchase}
-                        className="adora-btn flex-1 py-3 flex items-center justify-center gap-2"
-                        style={{ background: 'linear-gradient(to right, #a855f7, #6366f1)', color: 'white' }}
-                    >
-                        <ShoppingCart className="w-5 h-5" />
-                        بدء الشراء
+                    <button onClick={onStartPurchase} className="flex-1 py-1.5 px-2 rounded-lg bg-purple-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                        <ShoppingCart className="w-3 h-3" /> شراء
                     </button>
                 )}
                 {isRep && request.status === 'PURCHASING' && (
-                    <button
-                        onClick={onComplete}
-                        className="adora-btn flex-1 py-3 flex items-center justify-center gap-2"
-                        style={{ background: 'linear-gradient(to right, #06b6d4, #3b82f6)', color: 'white' }}
-                    >
-                        <Package className="w-5 h-5" />
-                        تم الشراء
+                    <button onClick={onComplete} className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
+                        <Package className="w-3 h-3" /> تم
                     </button>
                 )}
             </div>
@@ -717,8 +678,8 @@ export const ProcurementDashboard: React.FC = () => {
                 ))}
             </div>
 
-            {/* Requests List */}
-            <div className="space-y-3">
+            {/* Requests List - Grid for Mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {currentRequests.length === 0 ? (
                     <div 
                         className="p-12 text-center rounded-2xl shadow-lg"
