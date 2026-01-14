@@ -242,6 +242,7 @@ export interface User {
     id: string;
     name: string;
     phone?: string; // ✅ رقم هاتف المستخدم/المدير
+    phoneBackup?: string; // ✅ رقم الهاتف الاحتياطي
     code: string;
     department: string;
     role: UserRole;

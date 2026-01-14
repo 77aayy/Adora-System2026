@@ -65,8 +65,8 @@ import { confirm as customConfirm } from '../../services/customConfirmService';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { LicenseNotificationWidget } from '../../components/dashboard/LicenseNotificationWidget';
 import { BillingDashboard } from './BillingDashboard'; // ✅ Import for embedded billing tab
-import { 
-    AuditLog, 
+import {
+    AuditLog,
     fetchActivityLogs,
     forceRefreshActivity,
     isCacheValid,
@@ -173,25 +173,25 @@ export const EnhancedOwnerDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { success, error } = useUX();
-    
+
     // ✅ SaaS Integration: Get all branches dynamically
     // ✅ Memoize to prevent unnecessary re-renders
     const { branches: allBranches, loading: branchesLoading } = useAllBranchesForOwner();
     const memoizedBranches = useMemo(() => allBranches, [allBranches.length]); // ✅ Only re-compute if length changes
-    
+
     // ✅ Read active tab from URL (synced with navbar)
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = (searchParams.get('tab') || 'overview') as TabType;
-    
+
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [loadingHeavyData, setLoadingHeavyData] = useState(false);
-    
+
     // System Settings State
     const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
     const [analytics, setAnalytics] = useState<any>(null);
     const [tenants, setTenants] = useState<TenantAnalytics[]>([]);
-    
+
     // Revenue & Subscription Data
     const [mrr, setMrr] = useState(0);
     const [arr, setArr] = useState(0);
@@ -202,7 +202,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         branchName?: string;
         tenantName?: string;
     } | null>(null);
-    
+
     // Multi-Branch Data (from MultiBranchDashboard)
     const [multiBranchData, setMultiBranchData] = useState<{
         totalUsers: number;
@@ -210,7 +210,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         totalRooms: number;
         revenue: number;
     } | null>(null);
-    
+
     // ✅ Manager Status Stats (Active, Suspended, Deleted, Expired)
     const [managerStats, setManagerStats] = useState<{
         active: number;
@@ -219,22 +219,22 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         expired: number;
         total: number;
     }>({ active: 0, suspended: 0, deleted: 0, expired: 0, total: 0 });
-    
+
     // ✅ Live Activity Feed (On-demand updates only)
     const [activityLogs, setActivityLogs] = useState<AuditLog[]>([]);
     const [activityLoading, setActivityLoading] = useState(false);
-    
+
     // ✅ Demo Stats (separate from main stats)
     const [demoStats, setDemoStats] = useState<{
         total: number;
         nearestExpiry: Date | null;
         farthestExpiry: Date | null;
     }>({ total: 0, nearestExpiry: null, farthestExpiry: null });
-    
+
     // ✅ Progressive Loading: Show "data updated" indicator
     const [dataJustUpdated, setDataJustUpdated] = useState(false);
     const [backgroundLoading, setBackgroundLoading] = useState(false);
-    
+
     // Modals
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const [showBroadcastModal, setShowBroadcastModal] = useState(false);
@@ -242,7 +242,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
     const [showAddManagerModal, setShowAddManagerModal] = useState(false);
     const [showManagerDetailsModal, setShowManagerDetailsModal] = useState(false);
     const [selectedManager, setSelectedManager] = useState<TenantAnalytics | null>(null);
-    
+
     // Sidebar
     const [showSidebar, setShowSidebar] = useState(false);
 
@@ -255,7 +255,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             loadDataCalledRef.current = true;
             loadData();
         }
-        
+
         // ✅ FAST UI: Force show page after 2 seconds max - rest loads in background
         const fastUITimeout = setTimeout(() => {
             if (loading) {
@@ -264,19 +264,19 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setBackgroundLoading(true);
             }
         }, 2000); // ⚡ 2 seconds max wait
-        
+
         // ✅ AUTO-STOP: Force stop background loading after 10 seconds (covers error cases)
         const bgLoadingTimeout = setTimeout(() => {
             setBackgroundLoading(false);
             setLoadingHeavyData(false);
         }, 10000); // ⚡ 10 seconds max for background loading
-        
+
         return () => {
             clearTimeout(fastUITimeout);
             clearTimeout(bgLoadingTimeout);
         };
     }, []); // ✅ Empty deps - only run once
-    
+
     // ✅ Fetch activity when entering overview tab (ON-DEMAND only, no real-time)
     // 🔥 SAVES FIREBASE QUOTA: Only fetches on page load/refresh, manual refresh button available
     useEffect(() => {
@@ -288,12 +288,12 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 console.error('Failed to fetch activity logs:', err);
                 setActivityLogs([]);
             });
-            
+
             // ✅ Load demo stats separately (doesn't affect main calculations)
             loadDemoStats();
         }
     }, [activeTab]);
-    
+
     // ✅ Load demo stats separately (doesn't affect main calculations)
     // ✅ FIX: Uses service function - follows architecture rules
     const loadDemoStats = async () => {
@@ -312,10 +312,10 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             console.log('⏸️ loadData already in progress, skipping...');
             return;
         }
-        
+
         loadDataRef.current = true;
         console.log(forceRefresh ? '🔄 Force refresh requested' : '📦 Loading with cache...');
-        
+
         // ✅ FIX: Clear ALL caches when force refresh requested
         if (forceRefresh) {
             console.log('🗑️ Clearing all cached data...');
@@ -329,7 +329,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             // Clear in-memory request cache
             clearRequestCache();
         }
-        
+
         // ✅ PHASE 0: Show cached data IMMEDIATELY (instant UI)
         if (!forceRefresh) {
             const cachedSettings = getCachedData('settings');
@@ -338,7 +338,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             const cachedTenants = getCachedData('tenants');
             const cachedMultiBranch = getCachedData('multiBranch');
             const cachedManagerStats = getCachedData('managerStats');
-            
+
             // Apply cached data immediately - user sees page instantly!
             if (cachedSettings) setSystemSettings(cachedSettings);
             if (cachedAnalytics) setAnalytics(cachedAnalytics);
@@ -351,27 +351,27 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setMonthlyRenewalRevenue(cachedRevenue.monthlyRenewal || 0);
                 setNearestExpiring(cachedRevenue.nearestExpiring || null);
             }
-            
+
             // If we have all cached data, stop loading immediately
             if (cachedSettings && cachedAnalytics && cachedTenants) {
                 console.log('✅ All data from cache - showing page instantly');
                 setLoading(false);
                 loadDataRef.current = false;
-                
+
                 // Still fetch fresh data in background (silent update)
                 setBackgroundLoading(true);
                 fetchFreshDataInBackground();
                 return;
             }
         }
-        
+
         // ✅ PHASE 1: Fetch fresh data from Firebase (once per page load or refresh)
         try {
             const [settings, analyticsData] = await Promise.all([
                 getSystemSettings().catch(() => null),
                 getSystemAnalytics().catch(() => null)
             ]);
-            
+
             if (settings) {
                 setSystemSettings(settings);
                 setCachedData('settings', settings);
@@ -380,7 +380,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setAnalytics(analyticsData);
                 setCachedData('analytics', analyticsData);
             }
-            
+
             // ✅ PHASE 2: Load revenue data
             const [monthlyRev, annualRev, renewalRev, nearest] = await Promise.all([
                 calculateMonthlyRecurringRevenue().catch(() => 0),
@@ -388,12 +388,12 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 calculateMonthlyRenewalRevenue().catch(() => 0),
                 getNearestExpiringSubscription().catch(() => null)
             ]);
-            
+
             setMrr(monthlyRev);
             setArr(annualRev);
             setMonthlyRenewalRevenue(renewalRev);
             setNearestExpiring(nearest);
-            
+
             // Cache revenue data
             setCachedData('revenue', {
                 mrr: monthlyRev,
@@ -401,13 +401,13 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 monthlyRenewal: renewalRev,
                 nearestExpiring: nearest
             });
-            
+
         } catch (err: any) {
             console.error('Error loading data:', err);
         } finally {
             setLoading(false);
             loadDataRef.current = false;
-            
+
             // Show "updated" indicator if this was a refresh
             if (forceRefresh || backgroundLoading) {
                 setBackgroundLoading(false);
@@ -415,13 +415,13 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setTimeout(() => setDataJustUpdated(false), 3000);
             }
         }
-        
+
         // ✅ PHASE 3: Load heavy data in background
         if (!loadingHeavyData) {
             loadHeavyDataInBackground();
         }
     };
-    
+
     // ✅ Background data fetcher - runs silently without blocking UI
     const fetchFreshDataInBackground = async () => {
         try {
@@ -430,7 +430,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 getSystemSettings().catch(() => null),
                 getSystemAnalytics().catch(() => null)
             ]);
-            
+
             if (settings) {
                 setSystemSettings(settings);
                 setCachedData('settings', settings);
@@ -439,7 +439,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setAnalytics(analyticsData);
                 setCachedData('analytics', analyticsData);
             }
-            
+
             // Revenue
             const [monthlyRev, annualRev, renewalRev, nearest] = await Promise.all([
                 calculateMonthlyRecurringRevenue().catch(() => 0),
@@ -447,16 +447,16 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 calculateMonthlyRenewalRevenue().catch(() => 0),
                 getNearestExpiringSubscription().catch(() => null)
             ]);
-            
+
             setMrr(monthlyRev);
             setArr(annualRev);
             setMonthlyRenewalRevenue(renewalRev);
             setNearestExpiring(nearest);
             setCachedData('revenue', { mrr: monthlyRev, arr: annualRev, monthlyRenewal: renewalRev, nearestExpiring: nearest });
-            
+
             // Heavy data
             await loadHeavyDataInBackground();
-            
+
         } catch (err) {
             console.warn('Background refresh error:', err);
         } finally {
@@ -465,28 +465,28 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             setTimeout(() => setDataJustUpdated(false), 3000);
         }
     };
-    
+
     // ✅ Load manager status statistics
     const loadManagerStats = async () => {
         try {
             const managers = await getAllManagers();
             const deletedManagers = await getDeletedManagers().catch(() => []);
-            
+
             let active = 0;
             let suspended = 0;
             let expired = 0;
-            
+
             managers.forEach((m: any) => {
                 const status = m.status || 'active';
                 const isDeleted = m.isDeleted === true || m.deletedAt;
-                
+
                 if (isDeleted) return; // Skip soft-deleted in main list
-                
+
                 if (status === 'active') active++;
                 else if (status === 'suspended') suspended++;
                 else if (status === 'expired' || status === 'inactive') expired++;
             });
-            
+
             const stats = {
                 active,
                 suspended,
@@ -494,27 +494,27 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 expired,
                 total: active + suspended + expired + deletedManagers.length
             };
-            
+
             setManagerStats(stats);
             setCachedData('managerStats', stats); // ✅ Cache locally
         } catch (err) {
             console.warn('Error loading manager stats:', err);
         }
     };
-    
+
     // ✅ Load heavy data in background (non-blocking) - WITH CACHING
     const loadHeavyDataInBackground = async () => {
         // ✅ PERFORMANCE: Check cache first
         const cachedTenants = getCachedData('tenants');
         const cachedMultiBranch = getCachedData('multiBranch');
-        
+
         if (cachedTenants && cachedMultiBranch) {
             setTenants(cachedTenants);
             setMultiBranchData(cachedMultiBranch);
             loadManagerStats(); // ✅ Still load manager stats for accurate counts
             return; // Use cached data, skip Firebase
         }
-        
+
         setLoadingHeavyData(true);
         try {
             // Load tenant analytics, multi-branch data, and manager stats in parallel - with error handling
@@ -523,10 +523,10 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     if (err?.code === 'resource-exhausted') return [];
                     return [];
                 }) : Promise.resolve(cachedTenants),
-                !cachedMultiBranch ? loadMultiBranchData().catch(() => {}) : Promise.resolve(),
+                !cachedMultiBranch ? loadMultiBranchData().catch(() => { }) : Promise.resolve(),
                 loadManagerStats() // ✅ Load manager statistics
             ]);
-            
+
             if (tenantAnalytics && tenantAnalytics.length > 0) {
                 setTenants(tenantAnalytics);
                 setCachedData('tenants', tenantAnalytics);
@@ -535,13 +535,13 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             // Silent fail for background loading
         } finally {
             setLoadingHeavyData(false);
-            
+
             // ✅ Show "data updated" pulse when background loading completes
             setDataJustUpdated(true);
             setTimeout(() => setDataJustUpdated(false), 3000);
         }
     };
-    
+
     // ✅ Load multi-branch aggregated data - SIMPLIFIED & CACHED
     const loadMultiBranchData = async () => {
         // ✅ PERFORMANCE: Check cache first
@@ -550,10 +550,10 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             setMultiBranchData(cachedMultiBranch);
             return;
         }
-        
+
         try {
             const managers = await getAllManagers();
-            
+
             // ✅ FIX: Filter out deleted, suspended, and expired managers for accurate stats
             // Only count ACTIVE managers with valid licenses
             const activeManagers = managers.filter(m => {
@@ -563,7 +563,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 if (status === 'suspended' || status === 'inactive' || status === 'expired') return false;
                 return true;
             });
-            
+
             // ✅ PERFORMANCE: Use ESTIMATED counts from manager info instead of N queries
             // This avoids the heavy getCountFromServer calls that cause quota exhaustion
             const aggregated = activeManagers
@@ -573,31 +573,31 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     totalRooms: acc.totalRooms + (manager.cachedStats?.totalRooms || 10), // Estimate
                     revenue: acc.revenue + (manager.cachedStats?.revenue || 0)
                 }), { totalUsers: 0, totalRequests: 0, totalRooms: 0, revenue: 0 });
-            
+
             // Cache and set
             setCachedData('multiBranch', aggregated);
             setMultiBranchData(aggregated);
-            
+
         } catch (error: any) {
             // Silent fail - use defaults
             const defaultData = { totalUsers: 0, totalRequests: 0, totalRooms: 0, revenue: 0 };
             setMultiBranchData(defaultData);
         }
     };
-    
+
     // ✅ LEGACY: Heavy data loader (only called when explicitly refreshing)
     const loadMultiBranchDataHeavy = async () => {
         try {
             const managers = await getAllManagers();
-            
+
             // ✅ Process in batches of 3 to avoid quota exhaustion
             const BATCH_SIZE = 3;
             let aggregated = { totalUsers: 0, totalRequests: 0, totalRooms: 0, revenue: 0 };
-            
+
             const validManagers = managers.filter(m => m.tenantId);
             for (let i = 0; i < validManagers.length; i += BATCH_SIZE) {
                 const batch = validManagers.slice(i, i + BATCH_SIZE);
-                
+
                 const batchResults = await Promise.all(batch.map(async (manager) => {
                     const tenantId = manager.tenantId!;
                     try {
@@ -609,7 +609,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             getCountFromServer(query(collection(db, 'users'), where('tenantId', '==', tenantId))).catch(() => ({ data: () => ({ count: 0 }) })),
                             getCountFromServer(query(collection(db, 'requests'), where('tenantId', '==', tenantId))).catch(() => ({ data: () => ({ count: 0 }) }))
                         ]);
-                        
+
                         return {
                             users: usersCount.data().count,
                             requests: requestsCount.data().count,
@@ -620,33 +620,33 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         return { users: 0, requests: 0, rooms: 0, revenue: 0 };
                     }
                 }));
-                
+
                 batchResults.forEach(result => {
                     aggregated.totalUsers += result.users;
                     aggregated.totalRequests += result.requests;
                     aggregated.totalRooms += result.rooms;
                     aggregated.revenue += result.revenue;
                 });
-                
+
                 // Small delay between batches to avoid rate limiting
                 if (i + BATCH_SIZE < validManagers.length) {
                     await new Promise(resolve => setTimeout(resolve, 200));
                 }
             }
-            
+
             setCachedData('multiBranch', aggregated);
             setMultiBranchData(aggregated);
         } catch {
             setMultiBranchData({ totalUsers: 0, totalRequests: 0, totalRooms: 0, revenue: 0 });
         }
     };
-    
+
 
     const handleToggleFeature = async (featureKey: keyof SystemSettings['features'], enabled: boolean) => {
         setSaving(true);
         try {
             await toggleFeature(featureKey, enabled, user?.id || 'system');
-            
+
             // ✅ Update local state immediately (no page reload needed)
             if (systemSettings) {
                 setSystemSettings({
@@ -657,7 +657,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     }
                 });
             }
-            
+
             // ✅ Cleanup feature data when disabled
             if (!enabled) {
                 try {
@@ -669,7 +669,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     // Don't block the toggle if cleanup fails
                 }
             }
-            
+
             // ✅ No need to reload all data - just update the feature state
             // Components using useFeatureGate will automatically re-check and hide/show
             success(`تم ${enabled ? 'تفعيل' : 'تعطيل'} الميزة بنجاح${!enabled ? ' - سيتم إخفاؤها من جميع الفروع تلقائياً' : ''}`);
@@ -707,7 +707,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         setSaving(true);
         try {
             await updateSystemSettings(updates, user?.id || 'system');
-            
+
             // ✅ Update local state immediately (no page reload needed)
             if (systemSettings) {
                 const updatedSettings = {
@@ -715,17 +715,17 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     ...updates
                 };
                 setSystemSettings(updatedSettings);
-                
+
                 // ✅ FIX: Update BOTH caches so settings persist on refresh
                 setCachedData('settings', updatedSettings);
-                
+
                 // ✅ Also update the system localStorage directly (synced with systemSettingsService)
                 const localKey = 'adora_system_settings';
                 const localData = localStorage.getItem(localKey);
                 const existing = localData ? JSON.parse(localData) : {};
                 localStorage.setItem(localKey, JSON.stringify({ ...existing, ...updates, updatedAt: new Date().toISOString() }));
             }
-            
+
             success('تم حفظ الإعدادات بنجاح');
         } catch (err: any) {
             error('حدث خطأ في حفظ الإعدادات');
@@ -736,13 +736,13 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
     if (loading) {
         return (
-            <div 
+            <div
                 className="min-h-screen flex items-center justify-center transition-colors duration-300"
                 style={{ background: 'var(--theme-gradient-page)' }}
             >
                 <div className="text-center">
-                    <AdoraLoader 
-                        size="xl" 
+                    <AdoraLoader
+                        size="xl"
                         message="جاري تحميل البيانات الأساسية..."
                         showMessage={true}
                     />
@@ -775,7 +775,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
     return (
         <PageTransition>
             {/* ✅ Schedulers are already in GlobalServicesProvider - no need to duplicate */}
-            <div 
+            <div
                 className="min-h-screen transition-colors duration-300"
                 style={{ background: 'var(--theme-gradient-page)' }}
             >
@@ -798,9 +798,9 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
                 <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
                     {/* ✅ Navigation Bar - Responsive */}
-                    <div 
+                    <div
                         className="solid-modal rounded-xl sm:rounded-2xl p-2 overflow-hidden md:overflow-x-auto scrollbar-hide"
-                        style={{ 
+                        style={{
                             background: 'var(--theme-bg-secondary)',
                             border: '1px solid var(--theme-border-primary)'
                         }}
@@ -822,7 +822,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                     <span className="block w-3 h-0.5 bg-white rounded-full transition-all duration-200 group-hover:w-5"></span>
                                 </div>
                             </button>
-                            
+
                             {/* 📱 MOBILE: Show current tab name only */}
                             <div className="flex md:hidden items-center gap-2 flex-1">
                                 {(() => {
@@ -847,55 +847,54 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 })()}
                                 <span className="text-xs text-white/40 mr-auto">اختر من القائمة ←</span>
                             </div>
-                            
+
                             {/* 🖥️ DESKTOP: Show all tabs */}
                             <div className="hidden md:flex items-center gap-3 min-w-max">
                                 {/* Divider */}
                                 <div className="w-px h-8 bg-white/10"></div>
-                                
+
                                 {/* Tabs */}
                                 <div className="flex gap-1 sm:gap-2">
-                                {[
-                                    { id: 'overview' as TabType, label: 'الرئيسية', icon: LayoutDashboard },
-                                    { id: 'tenants' as TabType, label: 'المشتركين', icon: Users },
-                                    { id: 'billing' as TabType, label: 'الفواتير', icon: CreditCard },
-                                    { id: 'settings' as TabType, label: 'الإعدادات', icon: Settings },
-                                    // { id: 'analytics' as TabType, label: 'التحليلات', icon: BarChart3 }, // ✅ دُمج في الرئيسية
-                                    { id: 'broadcasts' as TabType, label: 'الرسائل', icon: MessageSquare },
-                                    { id: 'demo' as TabType, label: 'روابط الديمو', icon: Share2 },
-                                    { id: 'core-config' as TabType, label: '🔐 التأسيس', icon: Shield, hidden: true },
-                                ].map(tab => {
-                                    const Icon = tab.icon;
-                                    const isActive = activeTab === tab.id;
-                                    const isHidden = (tab as any).hidden;
-                                    
-                                    return (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => setSearchParams({ tab: tab.id })}
-                                            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm font-medium ${
-                                                isActive
-                                                    ? isHidden 
-                                                        ? 'bg-red-500/20 text-red-400 shadow-sm ring-1 ring-red-500/30'
-                                                        : 'bg-teal-500/20 text-teal-400 shadow-sm'
-                                                    : isHidden
-                                                        ? 'hover:bg-red-500/10 opacity-60 hover:opacity-100'
-                                                        : 'hover:bg-white/5'
-                                            }`}
-                                            style={{
-                                                color: isActive 
-                                                    ? isHidden 
-                                                        ? 'rgb(248, 113, 113)' 
-                                                        : 'var(--theme-primary-400, #2dd4bf)' 
-                                                    : 'var(--theme-text-secondary)',
-                                            }}
-                                            title={isHidden ? 'صفحة مخفية - للمالك فقط' : undefined}
-                                        >
-                                            <Icon className="w-4 h-4" />
-                                            <span>{tab.label}</span>
-                                        </button>
-                                    );
-                                })}
+                                    {[
+                                        { id: 'overview' as TabType, label: 'الرئيسية', icon: LayoutDashboard },
+                                        { id: 'tenants' as TabType, label: 'المشتركين', icon: Users },
+                                        { id: 'billing' as TabType, label: 'الفواتير', icon: CreditCard },
+                                        { id: 'settings' as TabType, label: 'الإعدادات', icon: Settings },
+                                        // { id: 'analytics' as TabType, label: 'التحليلات', icon: BarChart3 }, // ✅ دُمج في الرئيسية
+                                        { id: 'broadcasts' as TabType, label: 'الرسائل', icon: MessageSquare },
+                                        { id: 'demo' as TabType, label: 'روابط الديمو', icon: Share2 },
+                                        { id: 'core-config' as TabType, label: '🔐 التأسيس', icon: Shield, hidden: true },
+                                    ].map(tab => {
+                                        const Icon = tab.icon;
+                                        const isActive = activeTab === tab.id;
+                                        const isHidden = (tab as any).hidden;
+
+                                        return (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setSearchParams({ tab: tab.id })}
+                                                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm font-medium ${isActive
+                                                        ? isHidden
+                                                            ? 'bg-red-500/20 text-red-400 shadow-sm ring-1 ring-red-500/30'
+                                                            : 'bg-teal-500/20 text-teal-400 shadow-sm'
+                                                        : isHidden
+                                                            ? 'hover:bg-red-500/10 opacity-60 hover:opacity-100'
+                                                            : 'hover:bg-white/5'
+                                                    }`}
+                                                style={{
+                                                    color: isActive
+                                                        ? isHidden
+                                                            ? 'rgb(248, 113, 113)'
+                                                            : 'var(--theme-primary-400, #2dd4bf)'
+                                                        : 'var(--theme-text-secondary)',
+                                                }}
+                                                title={isHidden ? 'صفحة مخفية - للمالك فقط' : undefined}
+                                            >
+                                                <Icon className="w-4 h-4" />
+                                                <span>{tab.label}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -903,11 +902,11 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
                     {/* ✅ Background Loading Indicator - Subtle, non-blocking */}
                     {(loadingHeavyData || backgroundLoading) && (
-                        <div 
+                        <div
                             className="solid-modal rounded-xl p-2 sm:p-3 flex items-center gap-2 sm:gap-3 animate-pulse"
-                            style={{ 
-                                border: '1px solid var(--theme-primary-500)', 
-                                background: 'var(--theme-bg-secondary)' 
+                            style={{
+                                border: '1px solid var(--theme-primary-500)',
+                                background: 'var(--theme-bg-secondary)'
                             }}
                         >
                             <AdoraLoader size="sm" showMessage={false} />
@@ -916,14 +915,14 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             </span>
                         </div>
                     )}
-                    
+
                     {/* ✅ Data Updated Toast - Shows when background loading completes */}
                     {dataJustUpdated && !loadingHeavyData && !backgroundLoading && (
-                        <div 
+                        <div
                             className="solid-modal rounded-xl p-2 sm:p-3 flex items-center justify-between gap-2 sm:gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
-                            style={{ 
-                                border: '1px solid var(--theme-success-500, #22c55e)', 
-                                background: 'var(--theme-bg-secondary)' 
+                            style={{
+                                border: '1px solid var(--theme-success-500, #22c55e)',
+                                background: 'var(--theme-bg-secondary)'
                             }}
                         >
                             <div className="flex items-center gap-2">
@@ -932,7 +931,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                     ✅ تم تحديث البيانات بنجاح
                                 </span>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setDataJustUpdated(false)}
                                 className="p-1 rounded-full hover:bg-white/10 transition-colors"
                             >
@@ -940,7 +939,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             </button>
                         </div>
                     )}
-                    
+
                     {/* ✅ TABS MOVED TO NAVBAR - More space for content */}
 
                     {/* License Notifications Widget - Always visible */}
@@ -965,10 +964,10 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 demoStats={demoStats} // ✅ Demo stats (separate from main stats)
                             />
                         )}
-                        
+
                         {activeTab === 'tenants' && (
-                            <TenantsTab 
-                                tenants={tenants} 
+                            <TenantsTab
+                                tenants={tenants}
                                 onRefresh={() => loadData(true)}  // ✅ FIX: Force refresh to clear cache
                                 onAddManager={() => setShowAddManagerModal(true)}
                                 onViewDetails={(tenant) => {
@@ -980,7 +979,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 }}
                             />
                         )}
-                        
+
                         {activeTab === 'settings' && (
                             <SettingsTab
                                 systemSettings={effectiveSettings}
@@ -990,25 +989,25 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 onToggleFeature={handleToggleFeature}
                             />
                         )}
-                        
+
                         {activeTab === 'updates' && (
                             <UpdatesTab
                                 updates={(effectiveSettings as any).systemUpdates || []}
                                 onAddUpdate={() => setShowUpdateModal(true)}
                             />
                         )}
-                        
+
                         {activeTab === 'broadcasts' && (
                             <BroadcastsTab
                                 broadcasts={effectiveSettings.broadcastMessages || []}
                                 onAddBroadcast={() => setShowBroadcastModal(true)}
                             />
                         )}
-                        
+
                         {activeTab === 'billing' && (
                             <BillingDashboard embedded />
                         )}
-                        
+
                         {/* 🎯 Demo Links Management */}
                         {activeTab === 'demo' && (
                             <DemoLinkManager
@@ -1017,10 +1016,10 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 ownerName={user?.name || ''}
                             />
                         )}
-                        
+
                         {/* 🔐 Hidden Core Config Tab - Only for Super Admin */}
                         {activeTab === 'core-config' && (
-                            <CoreConfigTemplate 
+                            <CoreConfigTemplate
                                 onSave={() => success('تم حفظ قوالب التأسيس بنجاح')}
                             />
                         )}
@@ -1056,13 +1055,13 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 {showSidebar && (
                     <>
                         {/* Backdrop */}
-                        <div 
+                        <div
                             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-in fade-in duration-200"
                             onClick={() => setShowSidebar(false)}
                         />
                         {/* Sidebar */}
                         <div className="fixed top-0 right-0 h-full z-50 animate-in slide-in-from-right duration-300">
-                            <AdminSidebar 
+                            <AdminSidebar
                                 onClose={() => setShowSidebar(false)}
                                 isOwner={true}
                             />
@@ -1071,7 +1070,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 )}
 
                 {/* 📝 Developer Signature is in GlobalFooter (App.tsx) */}
-                
+
             </div>
 
             {/* ✅ Add Manager Modal - Rendered OUTSIDE main container */}
@@ -1333,13 +1332,12 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                     </div>
                                     <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
                                         <span className="text-slate-700 dark:text-white/80">الأيام المتبقية</span>
-                                        <span className={`font-bold ${
-                                            selectedManager.daysUntilExpiry <= 7 
-                                                ? 'text-red-600 dark:text-red-400' 
+                                        <span className={`font-bold ${selectedManager.daysUntilExpiry <= 7
+                                                ? 'text-red-600 dark:text-red-400'
                                                 : selectedManager.daysUntilExpiry <= 30
-                                                ? 'text-yellow-600 dark:text-yellow-400'
-                                                : 'text-green-600 dark:text-green-400'
-                                        }`}>
+                                                    ? 'text-yellow-600 dark:text-yellow-400'
+                                                    : 'text-green-600 dark:text-green-400'
+                                            }`}>
                                             {selectedManager.daysUntilExpiry} يوم
                                         </span>
                                     </div>
@@ -1351,22 +1349,22 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 <p className="text-sm text-slate-500 dark:text-white/60 mb-1">آخر نشاط</p>
                                 <p className="text-slate-800 dark:text-white">
                                     {(() => {
-                                        const lastDate = selectedManager.lastActivity instanceof Date 
-                                            ? selectedManager.lastActivity 
+                                        const lastDate = selectedManager.lastActivity instanceof Date
+                                            ? selectedManager.lastActivity
                                             : new Date(selectedManager.lastActivity);
                                         const now = new Date();
                                         const diffMs = now.getTime() - lastDate.getTime();
                                         const diffMins = Math.floor(diffMs / (1000 * 60));
                                         const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
                                         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                                        
+
                                         if (diffMins < 1) return 'الآن';
                                         if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
                                         if (diffHours < 24) return `منذ ${diffHours} ساعة`;
                                         if (diffDays === 1) return 'أمس';
                                         if (diffDays < 7) return `منذ ${diffDays} أيام`;
                                         if (diffDays < 30) return `منذ ${Math.floor(diffDays / 7)} أسبوع`;
-                                        
+
                                         return lastDate.toLocaleDateString('ar-SA', {
                                             year: 'numeric',
                                             month: 'long',
@@ -1436,10 +1434,10 @@ const OverviewTab: React.FC<{
         nearestExpiry: Date | null;
         farthestExpiry: Date | null;
     }; // ✅ Demo stats (separate from main stats)
-}> = ({ 
-    systemSettings, 
-    analytics, 
-    onMaintenanceToggle, 
+}> = ({
+    systemSettings,
+    analytics,
+    onMaintenanceToggle,
     allBranches = [],
     mrr = 0,
     arr = 0,
@@ -1451,520 +1449,520 @@ const OverviewTab: React.FC<{
     onActivityRefresh,
     demoStats = { total: 0, nearestExpiry: null, farthestExpiry: null }
 }) => {
-    const { user } = useAuth(); // ✅ Get user for DataHealthReportCard
-    const [isBranchesExpanded, setIsBranchesExpanded] = useState(false); // ✅ Collapsed by default, show 5 only
-    const [isActivityExpanded, setIsActivityExpanded] = useState(true); // ✅ Activity feed expanded by default
-    const [refreshingActivity, setRefreshingActivity] = useState(false);
-    const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
-    
-    // Manual refresh handler - ONLY way to fetch new data
-    const handleRefreshActivity = async () => {
-        setRefreshingActivity(true);
-        try {
-            const logs = await forceRefreshActivity();
-            onActivityRefresh?.(logs);
-            setLastRefreshTime(new Date());
-        } catch (error) {
-            console.error('Failed to refresh activity:', error);
-        }
-        setRefreshingActivity(false);
-    };
-    return (
-        <div className="space-y-4 sm:space-y-6">
-            {/* ✅ Export Buttons - Compact Design */}
-            <div className="flex gap-2 justify-end">
-                <button
-                    onClick={() => {
-                        if (!analytics || Object.keys(analytics).length === 0) {
-                            alert('لا توجد بيانات للتصدير. انتظر حتى يتم تحميل البيانات.');
-                            return;
-                        }
-                        try {
-                            // ✅ Prepare comprehensive export data
-                            const exportData = {
-                                ...analytics,
-                                totalTenants: analytics.totalTenants || 0,
-                                activeTenants: analytics.activeTenants || 0,
-                                totalUsers: analytics.totalUsers || 0,
-                                totalBranches: analytics.totalBranches || 0,
-                                totalRooms: analytics.totalRooms || 0,
-                                totalRequests: analytics.totalRequests || 0,
-                                exportDate: new Date().toISOString()
-                            };
-                            exportToPDF(exportData, 'adora-dashboard-report.pdf');
-                        } catch (err) {
-                            console.error('PDF export failed:', err);
-                            alert('فشل في تصدير PDF. حاول مرة أخرى.');
-                        }
-                    }}
-                    disabled={!analytics}
-                    className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title={analytics ? "تصدير PDF" : "انتظر تحميل البيانات..."}
-                >
-                    <FileText className="w-4 h-4" />
-                    <span className="hidden sm:inline text-xs">PDF</span>
-                </button>
-                <button
-                    onClick={() => {
-                        if (!analytics || Object.keys(analytics).length === 0) {
-                            alert('لا توجد بيانات للتصدير. انتظر حتى يتم تحميل البيانات.');
-                            return;
-                        }
-                        try {
-                            // ✅ Prepare comprehensive export data
-                            const exportData = {
-                                ...analytics,
-                                totalTenants: analytics.totalTenants || 0,
-                                activeTenants: analytics.activeTenants || 0,
-                                totalUsers: analytics.totalUsers || 0,
-                                totalBranches: analytics.totalBranches || 0,
-                                totalRooms: analytics.totalRooms || 0,
-                                totalRequests: analytics.totalRequests || 0,
-                                exportDate: new Date().toISOString()
-                            };
-                            exportToExcel(exportData, 'adora-dashboard-report.xlsx');
-                        } catch (err) {
-                            console.error('Excel export failed:', err);
-                            alert('فشل في تصدير Excel. حاول مرة أخرى.');
-                        }
-                    }}
-                    disabled={!analytics}
-                    className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title={analytics ? "تصدير Excel" : "انتظر تحميل البيانات..."}
-                >
-                    <Download className="w-4 h-4" />
-                    <span className="hidden sm:inline text-xs">Excel</span>
-                </button>
-            </div>
-            
-            {/* Critical Alerts - Mobile First */}
-            {systemSettings.maintenanceMode && (
-                <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-yellow-500/30 bg-yellow-500/10">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-                        <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                            <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 flex-shrink-0 mt-0.5 sm:mt-0" />
-                            <div className="min-w-0 flex-1">
-                                <h3 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-0">وضع الصيانة مفعّل</h3>
-                                <p className="text-sm sm:text-base text-white/60 leading-relaxed">{systemSettings.maintenanceMessage}</p>
+        const { user } = useAuth(); // ✅ Get user for DataHealthReportCard
+        const [isBranchesExpanded, setIsBranchesExpanded] = useState(false); // ✅ Collapsed by default, show 5 only
+        const [isActivityExpanded, setIsActivityExpanded] = useState(true); // ✅ Activity feed expanded by default
+        const [refreshingActivity, setRefreshingActivity] = useState(false);
+        const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+
+        // Manual refresh handler - ONLY way to fetch new data
+        const handleRefreshActivity = async () => {
+            setRefreshingActivity(true);
+            try {
+                const logs = await forceRefreshActivity();
+                onActivityRefresh?.(logs);
+                setLastRefreshTime(new Date());
+            } catch (error) {
+                console.error('Failed to refresh activity:', error);
+            }
+            setRefreshingActivity(false);
+        };
+        return (
+            <div className="space-y-4 sm:space-y-6">
+                {/* ✅ Export Buttons - Compact Design */}
+                <div className="flex gap-2 justify-end">
+                    <button
+                        onClick={() => {
+                            if (!analytics || Object.keys(analytics).length === 0) {
+                                alert('لا توجد بيانات للتصدير. انتظر حتى يتم تحميل البيانات.');
+                                return;
+                            }
+                            try {
+                                // ✅ Prepare comprehensive export data
+                                const exportData = {
+                                    ...analytics,
+                                    totalTenants: analytics.totalTenants || 0,
+                                    activeTenants: analytics.activeTenants || 0,
+                                    totalUsers: analytics.totalUsers || 0,
+                                    totalBranches: analytics.totalBranches || 0,
+                                    totalRooms: analytics.totalRooms || 0,
+                                    totalRequests: analytics.totalRequests || 0,
+                                    exportDate: new Date().toISOString()
+                                };
+                                exportToPDF(exportData, 'adora-dashboard-report.pdf');
+                            } catch (err) {
+                                console.error('PDF export failed:', err);
+                                alert('فشل في تصدير PDF. حاول مرة أخرى.');
+                            }
+                        }}
+                        disabled={!analytics}
+                        className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={analytics ? "تصدير PDF" : "انتظر تحميل البيانات..."}
+                    >
+                        <FileText className="w-4 h-4" />
+                        <span className="hidden sm:inline text-xs">PDF</span>
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (!analytics || Object.keys(analytics).length === 0) {
+                                alert('لا توجد بيانات للتصدير. انتظر حتى يتم تحميل البيانات.');
+                                return;
+                            }
+                            try {
+                                // ✅ Prepare comprehensive export data
+                                const exportData = {
+                                    ...analytics,
+                                    totalTenants: analytics.totalTenants || 0,
+                                    activeTenants: analytics.activeTenants || 0,
+                                    totalUsers: analytics.totalUsers || 0,
+                                    totalBranches: analytics.totalBranches || 0,
+                                    totalRooms: analytics.totalRooms || 0,
+                                    totalRequests: analytics.totalRequests || 0,
+                                    exportDate: new Date().toISOString()
+                                };
+                                exportToExcel(exportData, 'adora-dashboard-report.xlsx');
+                            } catch (err) {
+                                console.error('Excel export failed:', err);
+                                alert('فشل في تصدير Excel. حاول مرة أخرى.');
+                            }
+                        }}
+                        disabled={!analytics}
+                        className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={analytics ? "تصدير Excel" : "انتظر تحميل البيانات..."}
+                    >
+                        <Download className="w-4 h-4" />
+                        <span className="hidden sm:inline text-xs">Excel</span>
+                    </button>
+                </div>
+
+                {/* Critical Alerts - Mobile First */}
+                {systemSettings.maintenanceMode && (
+                    <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-yellow-500/30 bg-yellow-500/10">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                            <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                                <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-0">وضع الصيانة مفعّل</h3>
+                                    <p className="text-sm sm:text-base text-white/60 leading-relaxed">{systemSettings.maintenanceMessage}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => onMaintenanceToggle(false)}
+                                className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-500/20 text-green-400 rounded-lg sm:rounded-xl hover:bg-green-500/30 transition-colors border border-green-500/20 text-sm whitespace-nowrap"
+                            >
+                                إلغاء الصيانة
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Quick Stats - ✅ COMPACT PREMIUM DESIGN */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                    <StatCard
+                        icon={Building2}
+                        iconColor="teal"
+                        label="إجمالي الفروع"
+                        count={allBranches.length}
+                    />
+                    <StatCard
+                        icon={Users}
+                        iconColor="blue"
+                        label="إجمالي المستخدمين"
+                        count={multiBranchData?.totalUsers || analytics?.totalUsers || 0}
+                    />
+                    <StatCard
+                        icon={Activity}
+                        iconColor="orange"
+                        label="إجمالي الطلبات"
+                        count={multiBranchData?.totalRequests || analytics?.totalRequestsToday || 0}
+                    />
+                    <StatCard
+                        icon={DoorOpen}
+                        iconColor="green"
+                        label="إجمالي الغرف"
+                        count={multiBranchData?.totalRooms || 0}
+                    />
+                </div>
+
+                {/* ✅ Demo Stats Card - Separate from main stats */}
+                {demoStats.total > 0 && (
+                    <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-purple-500/30 bg-purple-500/10">
+                        <div className="flex items-start gap-3 sm:gap-4">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-500/20 flex items-center justify-center shadow-lg shadow-purple-500/10 flex-shrink-0">
+                                <Sparkles className="w-4 h-4 text-purple-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="text-base sm:text-lg font-bold text-white mb-1">
+                                    حسابات الديمو
+                                </h3>
+                                <p className="text-xl sm:text-2xl font-bold text-purple-400 mb-2">
+                                    {demoStats.total} حساب
+                                </p>
+                                <div className="space-y-1 text-xs sm:text-sm text-white/60">
+                                    {demoStats.nearestExpiry && (
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                                            <span>أقرب انتهاء: {demoStats.nearestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                        </div>
+                                    )}
+                                    {demoStats.farthestExpiry && demoStats.farthestExpiry.getTime() !== demoStats.nearestExpiry?.getTime() && (
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                                            <span>أبعد انتهاء: {demoStats.farthestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        <button
-                            onClick={() => onMaintenanceToggle(false)}
-                            className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-500/20 text-green-400 rounded-lg sm:rounded-xl hover:bg-green-500/30 transition-colors border border-green-500/20 text-sm whitespace-nowrap"
+                    </div>
+                )}
+
+                {/* ✅ Manager Status Cards - Small badges for quick overview */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                    <div className="glass rounded-xl p-3 sm:p-4 border border-green-500/30 bg-green-500/10">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
+                            </div>
+                            <div>
+                                <p className="text-lg sm:text-xl font-bold text-green-400">{managerStats.active}</p>
+                                <p className="text-xs text-white/60">مشترك نشط</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="glass rounded-xl p-3 sm:p-4 border border-yellow-500/30 bg-yellow-500/10">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                                <Pause className="w-4 h-4 text-yellow-400" />
+                            </div>
+                            <div>
+                                <p className="text-lg sm:text-xl font-bold text-yellow-400">{managerStats.suspended}</p>
+                                <p className="text-xs text-white/60">موقوف مؤقتاً</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="glass rounded-xl p-3 sm:p-4 border border-red-500/30 bg-red-500/10">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                                <X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+                            </div>
+                            <div>
+                                <p className="text-lg sm:text-xl font-bold text-red-400">{managerStats.expired}</p>
+                                <p className="text-xs text-white/60">منتهي الترخيص</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="glass rounded-xl p-3 sm:p-4 border border-gray-500/30 bg-gray-500/10">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-500/20 flex items-center justify-center">
+                                <Trash2 className="w-4 h-4 text-gray-400" />
+                            </div>
+                            <div>
+                                <p className="text-lg sm:text-xl font-bold text-gray-400">{managerStats.deleted}</p>
+                                <p className="text-xs text-white/60">محذوف</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Revenue Cards - ✅ COMPACT PREMIUM DESIGN */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                    <StatCard
+                        icon={DollarSign}
+                        iconColor="purple"
+                        label="إجمالي الإيرادات"
+                        value={`${(multiBranchData?.revenue || 0).toLocaleString()} ر.س`}
+                    />
+                    <StatCard
+                        icon={TrendingUp}
+                        iconColor="green"
+                        label="MRR الشهرية"
+                        value={`${mrr.toLocaleString()} ر.س`}
+                    />
+                    <StatCard
+                        icon={DollarSign}
+                        iconColor="blue"
+                        label="ARR السنوية"
+                        value={`${arr.toLocaleString()} ر.س`}
+                    />
+                    <StatCard
+                        icon={Calendar}
+                        iconColor="yellow"
+                        label="تجديدات الشهر"
+                        value={`${monthlyRenewalRevenue.toLocaleString()} ر.س`}
+                    />
+                </div>
+
+                {/* Expiring Subscription Alert - Mobile First */}
+                {nearestExpiring && (
+                    <div className="stat-card-pro-compact glass rounded-lg sm:rounded-xl p-3 sm:p-4 border border-yellow-500/30 bg-yellow-500/10">
+                        <div className="flex items-start gap-2 sm:gap-3">
+                            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-[10px] sm:text-xs text-white/60 mb-1">أقرب اشتراك سوف ينتهي</div>
+                                <div className="text-xs sm:text-sm font-bold text-white mb-1 truncate">
+                                    {nearestExpiring.branchName || nearestExpiring.tenantName || 'فرع'}
+                                </div>
+                                <div className="text-[10px] sm:text-xs text-yellow-400">
+                                    باقي له {nearestExpiring.daysUntilExpiry} يوم
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* System Status - Mobile First */}
+                <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
+                    <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4" style={{ color: 'var(--theme-text-primary)' }}>حالة النظام</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                        <StatusItem
+                            label="الإصدار"
+                            value={systemSettings.systemVersion}
+                            icon={Zap}
+                            color="blue"
+                        />
+                        <StatusItem
+                            label="معدل الأداء"
+                            value={`${analytics?.uptime || 99.9}%`}
+                            icon={CheckCircle}
+                            color="green"
+                        />
+                        <StatusItem
+                            label="معدل الخطأ"
+                            value={`${analytics?.errorRate || 0}%`}
+                            icon={AlertTriangle}
+                            color={analytics?.errorRate > 1 ? 'red' : 'yellow'}
+                        />
+                    </div>
+                </div>
+
+                {/* Branches Summary - Compact from MultiBranchDashboard - Collapsible - Mobile First */}
+                {allBranches.length > 0 && (
+                    <div className="glass rounded-xl sm:rounded-2xl overflow-hidden">
+                        {/* Header - Clickable */}
+                        <div
+                            onClick={() => setIsBranchesExpanded(!isBranchesExpanded)}
+                            className="flex items-center justify-between p-4 sm:p-6 cursor-pointer hover:bg-white/5 transition-colors"
                         >
-                            إلغاء الصيانة
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Quick Stats - ✅ COMPACT PREMIUM DESIGN */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <StatCard
-                    icon={Building2}
-                    iconColor="teal"
-                    label="إجمالي الفروع"
-                    count={allBranches.length}
-                />
-                <StatCard
-                    icon={Users}
-                    iconColor="blue"
-                    label="إجمالي المستخدمين"
-                    count={multiBranchData?.totalUsers || analytics?.totalUsers || 0}
-                />
-                <StatCard
-                    icon={Activity}
-                    iconColor="orange"
-                    label="إجمالي الطلبات"
-                    count={multiBranchData?.totalRequests || analytics?.totalRequestsToday || 0}
-                />
-                <StatCard
-                    icon={DoorOpen}
-                    iconColor="green"
-                    label="إجمالي الغرف"
-                    count={multiBranchData?.totalRooms || 0}
-                />
-            </div>
-            
-            {/* ✅ Demo Stats Card - Separate from main stats */}
-            {demoStats.total > 0 && (
-                <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-purple-500/30 bg-purple-500/10">
-                    <div className="flex items-start gap-3 sm:gap-4">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-500/20 flex items-center justify-center shadow-lg shadow-purple-500/10 flex-shrink-0">
-                            <Sparkles className="w-4 h-4 text-purple-400" />
+                            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-500/20 flex items-center justify-center shadow-lg shadow-blue-500/10 flex-shrink-0">
+                                    <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">جميع الفروع ({allBranches.length})</h3>
+                                    <p className="text-xs sm:text-sm text-white/50 hidden sm:block">
+                                        عرض جميع فروع جميع المشتركين في النظام
+                                    </p>
+                                </div>
+                            </div>
+                            <div className={`p-2 rounded-lg bg-white/5 transition-transform duration-300 flex-shrink-0 ${isBranchesExpanded ? '' : 'rotate-180'}`}>
+                                <ChevronDown className="w-4 h-4 text-white/60" />
+                            </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="text-base sm:text-lg font-bold text-white mb-1">
-                                حسابات الديمو
-                            </h3>
-                            <p className="text-xl sm:text-2xl font-bold text-purple-400 mb-2">
-                                {demoStats.total} حساب
-                            </p>
-                            <div className="space-y-1 text-xs sm:text-sm text-white/60">
-                                {demoStats.nearestExpiry && (
-                                    <div className="flex items-center gap-2">
-                                        <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                                        <span>أقرب انتهاء: {demoStats.nearestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+
+                        {/* Collapsible Content */}
+                        <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isBranchesExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+                            <div className="p-6">
+                                <div className="space-y-2">
+                                    {allBranches.slice(0, isBranchesExpanded ? allBranches.length : 5).map((branch: any) => (
+                                        <div
+                                            key={branch.id || `${branch.tenantId}_${branch.id}`}
+                                            className="bg-white/5 rounded-lg p-3 hover:bg-white/10 transition-all border border-white/5"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="font-medium text-white text-sm truncate">{branch.name || branch.id}</h4>
+                                                        {branch.managerName && (
+                                                            <p className="text-xs text-white/50 truncate">
+                                                                المدير: {branch.managerName}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {!isBranchesExpanded && allBranches.length > 5 && (
+                                    <div className="text-center pt-4 mt-4 border-t border-white/5">
+                                        <p className="text-xs text-white/40">
+                                            و {allBranches.length - 5} فرع آخر
+                                        </p>
                                     </div>
                                 )}
-                                {demoStats.farthestExpiry && demoStats.farthestExpiry.getTime() !== demoStats.nearestExpiry?.getTime() && (
-                                    <div className="flex items-center gap-2">
-                                        <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                                        <span>أبعد انتهاء: {demoStats.farthestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                {isBranchesExpanded && allBranches.length > 5 && (
+                                    <div className="text-center pt-4 mt-4 border-t border-white/5">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsBranchesExpanded(false);
+                                            }}
+                                            className="text-xs text-white/60 hover:text-white transition-colors"
+                                        >
+                                            إخفاء
+                                        </button>
                                     </div>
                                 )}
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-            
-            {/* ✅ Manager Status Cards - Small badges for quick overview */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                <div className="glass rounded-xl p-3 sm:p-4 border border-green-500/30 bg-green-500/10">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                            <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
-                        </div>
-                        <div>
-                            <p className="text-lg sm:text-xl font-bold text-green-400">{managerStats.active}</p>
-                            <p className="text-xs text-white/60">مشترك نشط</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="glass rounded-xl p-3 sm:p-4 border border-yellow-500/30 bg-yellow-500/10">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-                            <Pause className="w-4 h-4 text-yellow-400" />
-                        </div>
-                        <div>
-                            <p className="text-lg sm:text-xl font-bold text-yellow-400">{managerStats.suspended}</p>
-                            <p className="text-xs text-white/60">موقوف مؤقتاً</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="glass rounded-xl p-3 sm:p-4 border border-red-500/30 bg-red-500/10">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                            <X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
-                        </div>
-                        <div>
-                            <p className="text-lg sm:text-xl font-bold text-red-400">{managerStats.expired}</p>
-                            <p className="text-xs text-white/60">منتهي الترخيص</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="glass rounded-xl p-3 sm:p-4 border border-gray-500/30 bg-gray-500/10">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-500/20 flex items-center justify-center">
-                            <Trash2 className="w-4 h-4 text-gray-400" />
-                        </div>
-                        <div>
-                            <p className="text-lg sm:text-xl font-bold text-gray-400">{managerStats.deleted}</p>
-                            <p className="text-xs text-white/60">محذوف</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            {/* Revenue Cards - ✅ COMPACT PREMIUM DESIGN */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <StatCard
-                    icon={DollarSign}
-                    iconColor="purple"
-                    label="إجمالي الإيرادات"
-                    value={`${(multiBranchData?.revenue || 0).toLocaleString()} ر.س`}
-                />
-                <StatCard
-                    icon={TrendingUp}
-                    iconColor="green"
-                    label="MRR الشهرية"
-                    value={`${mrr.toLocaleString()} ر.س`}
-                />
-                <StatCard
-                    icon={DollarSign}
-                    iconColor="blue"
-                    label="ARR السنوية"
-                    value={`${arr.toLocaleString()} ر.س`}
-                />
-                <StatCard
-                    icon={Calendar}
-                    iconColor="yellow"
-                    label="تجديدات الشهر"
-                    value={`${monthlyRenewalRevenue.toLocaleString()} ر.س`}
-                />
-            </div>
-            
-            {/* Expiring Subscription Alert - Mobile First */}
-            {nearestExpiring && (
-                <div className="stat-card-pro-compact glass rounded-lg sm:rounded-xl p-3 sm:p-4 border border-yellow-500/30 bg-yellow-500/10">
-                    <div className="flex items-start gap-2 sm:gap-3">
-                        <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                            <div className="text-[10px] sm:text-xs text-white/60 mb-1">أقرب اشتراك سوف ينتهي</div>
-                            <div className="text-xs sm:text-sm font-bold text-white mb-1 truncate">
-                                {nearestExpiring.branchName || nearestExpiring.tenantName || 'فرع'}
-                            </div>
-                            <div className="text-[10px] sm:text-xs text-yellow-400">
-                                باقي له {nearestExpiring.daysUntilExpiry} يوم
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+                )}
 
-            {/* System Status - Mobile First */}
-            <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
-                <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4" style={{ color: 'var(--theme-text-primary)' }}>حالة النظام</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                    <StatusItem
-                        label="الإصدار"
-                        value={systemSettings.systemVersion}
-                        icon={Zap}
-                        color="blue"
-                    />
-                    <StatusItem
-                        label="معدل الأداء"
-                        value={`${analytics?.uptime || 99.9}%`}
-                        icon={CheckCircle}
-                        color="green"
-                    />
-                    <StatusItem
-                        label="معدل الخطأ"
-                        value={`${analytics?.errorRate || 0}%`}
-                        icon={AlertTriangle}
-                        color={analytics?.errorRate > 1 ? 'red' : 'yellow'}
-                    />
-                </div>
-            </div>
+                {/* ✅ Data Health Report - Weekly System Health */}
+                <DataHealthReportCard
+                    tenantId={user?.id || ''}
+                    onViewDetails={(report) => {
+                        console.log('View report details:', report.id);
+                        // Could open a detailed modal here
+                    }}
+                />
 
-            {/* Branches Summary - Compact from MultiBranchDashboard - Collapsible - Mobile First */}
-            {allBranches.length > 0 && (
-                <div className="glass rounded-xl sm:rounded-2xl overflow-hidden">
+                {/* ✅ Live Activity Feed - Ultra-efficient polling (1 read/min max) */}
+                <div className="solid-modal rounded-xl sm:rounded-2xl overflow-hidden">
                     {/* Header - Clickable */}
                     <div
-                        onClick={() => setIsBranchesExpanded(!isBranchesExpanded)}
+                        onClick={() => setIsActivityExpanded(!isActivityExpanded)}
                         className="flex items-center justify-between p-4 sm:p-6 cursor-pointer hover:bg-white/5 transition-colors"
                     >
                         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-500/20 flex items-center justify-center shadow-lg shadow-blue-500/10 flex-shrink-0">
-                                <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-500/20 flex items-center justify-center shadow-lg shadow-purple-500/10 flex-shrink-0">
+                                <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">جميع الفروع ({allBranches.length})</h3>
-                                <p className="text-xs sm:text-sm text-white/50 hidden sm:block">
-                                    عرض جميع فروع جميع المشتركين في النظام
+                                <h3 className="text-base sm:text-xl font-bold mb-0.5 sm:mb-1" style={{ color: 'var(--theme-text-primary)' }}>
+                                    📡 البث الحي للنشاط
+                                </h3>
+                                <p className="text-xs sm:text-sm hidden sm:block" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    سجل كل الأحداث • اضغط 🔄 للتحديث
                                 </p>
                             </div>
                         </div>
-                        <div className={`p-2 rounded-lg bg-white/5 transition-transform duration-300 flex-shrink-0 ${isBranchesExpanded ? '' : 'rotate-180'}`}>
-                            <ChevronDown className="w-4 h-4 text-white/60" />
+                        <div className="flex items-center gap-2">
+                            {/* Manual Refresh Button */}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRefreshActivity();
+                                }}
+                                disabled={refreshingActivity}
+                                className="p-2 rounded-lg transition-colors"
+                                style={{
+                                    background: 'var(--theme-bg-tertiary)',
+                                    border: '1px solid var(--theme-border-primary)',
+                                }}
+                                title="تحديث يدوي"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${refreshingActivity ? 'animate-spin' : ''}`} style={{ color: 'var(--theme-text-secondary)' }} />
+                            </button>
+                            <div className={`p-2 rounded-lg transition-transform duration-300 flex-shrink-0 ${isActivityExpanded ? '' : 'rotate-180'}`}
+                                style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                <ChevronDown className="w-4 h-4" style={{ color: 'var(--theme-text-secondary)' }} />
+                            </div>
                         </div>
                     </div>
 
                     {/* Collapsible Content */}
-                    <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isBranchesExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-                        <div className="p-6">
-                            <div className="space-y-2">
-                                {allBranches.slice(0, isBranchesExpanded ? allBranches.length : 5).map((branch: any) => (
-                                    <div
-                                        key={branch.id || `${branch.tenantId}_${branch.id}`}
-                                        className="bg-white/5 rounded-lg p-3 hover:bg-white/10 transition-all border border-white/5"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-medium text-white text-sm truncate">{branch.name || branch.id}</h4>
-                                                    {branch.managerName && (
-                                                        <p className="text-xs text-white/50 truncate">
-                                                            المدير: {branch.managerName}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            {!isBranchesExpanded && allBranches.length > 5 && (
-                                <div className="text-center pt-4 mt-4 border-t border-white/5">
-                                    <p className="text-xs text-white/40">
-                                        و {allBranches.length - 5} فرع آخر
+                    <div className={`transition-all duration-300 ease-in-out border-t ${isActivityExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}
+                        style={{ borderColor: 'var(--theme-border-primary)', background: 'var(--theme-bg-tertiary)' }}>
+                        <div className="p-4 sm:p-6">
+                            {activityLogs.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <Activity className="w-12 h-12 mx-auto mb-3 opacity-20" style={{ color: 'var(--theme-text-primary)' }} />
+                                    <p style={{ color: 'var(--theme-text-secondary)' }}>لا يوجد نشاط حديث</p>
+                                    <p className="text-xs mt-2" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                        سيظهر هنا كل ما يحدث في النظام
                                     </p>
                                 </div>
-                            )}
-                            {isBranchesExpanded && allBranches.length > 5 && (
-                                <div className="text-center pt-4 mt-4 border-t border-white/5">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsBranchesExpanded(false);
-                                        }}
-                                        className="text-xs text-white/60 hover:text-white transition-colors"
-                                    >
-                                        إخفاء
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ✅ Data Health Report - Weekly System Health */}
-            <DataHealthReportCard
-                tenantId={user?.id || ''}
-                onViewDetails={(report) => {
-                    console.log('View report details:', report.id);
-                    // Could open a detailed modal here
-                }}
-            />
-
-            {/* ✅ Live Activity Feed - Ultra-efficient polling (1 read/min max) */}
-            <div className="solid-modal rounded-xl sm:rounded-2xl overflow-hidden">
-                {/* Header - Clickable */}
-                <div
-                    onClick={() => setIsActivityExpanded(!isActivityExpanded)}
-                    className="flex items-center justify-between p-4 sm:p-6 cursor-pointer hover:bg-white/5 transition-colors"
-                >
-                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-500/20 flex items-center justify-center shadow-lg shadow-purple-500/10 flex-shrink-0">
-                            <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h3 className="text-base sm:text-xl font-bold mb-0.5 sm:mb-1" style={{ color: 'var(--theme-text-primary)' }}>
-                                📡 البث الحي للنشاط
-                            </h3>
-                            <p className="text-xs sm:text-sm hidden sm:block" style={{ color: 'var(--theme-text-secondary)' }}>
-                                سجل كل الأحداث • اضغط 🔄 للتحديث
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {/* Manual Refresh Button */}
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleRefreshActivity();
-                            }}
-                            disabled={refreshingActivity}
-                            className="p-2 rounded-lg transition-colors"
-                            style={{
-                                background: 'var(--theme-bg-tertiary)',
-                                border: '1px solid var(--theme-border-primary)',
-                            }}
-                            title="تحديث يدوي"
-                        >
-                            <RefreshCw className={`w-4 h-4 ${refreshingActivity ? 'animate-spin' : ''}`} style={{ color: 'var(--theme-text-secondary)' }} />
-                        </button>
-                        <div className={`p-2 rounded-lg transition-transform duration-300 flex-shrink-0 ${isActivityExpanded ? '' : 'rotate-180'}`}
-                            style={{ background: 'var(--theme-bg-tertiary)' }}>
-                            <ChevronDown className="w-4 h-4" style={{ color: 'var(--theme-text-secondary)' }} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Collapsible Content */}
-                <div className={`transition-all duration-300 ease-in-out border-t ${isActivityExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}
-                    style={{ borderColor: 'var(--theme-border-primary)', background: 'var(--theme-bg-tertiary)' }}>
-                    <div className="p-4 sm:p-6">
-                        {activityLogs.length === 0 ? (
-                            <div className="text-center py-8">
-                                <Activity className="w-12 h-12 mx-auto mb-3 opacity-20" style={{ color: 'var(--theme-text-primary)' }} />
-                                <p style={{ color: 'var(--theme-text-secondary)' }}>لا يوجد نشاط حديث</p>
-                                <p className="text-xs mt-2" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                    سيظهر هنا كل ما يحدث في النظام
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
-                                {activityLogs.map((log, index) => (
-                                    <div
-                                        key={log.id || index}
-                                        className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:bg-white/5"
-                                        style={{
-                                            background: 'var(--theme-bg-secondary)',
-                                            border: '1px solid var(--theme-border-primary)',
-                                        }}
-                                    >
-                                        {/* Icon */}
-                                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-lg"
-                                            style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                            {getActionIcon(log.action)}
-                                        </div>
-                                        
-                                        {/* Content */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className={`font-medium text-sm ${getActionColor(log.action)}`}>
-                                                    {getActionLabel(log.action)}
-                                                </span>
-                                                {log.targetName && (
-                                                    <span className="text-xs px-2 py-0.5 rounded-full"
-                                                        style={{
-                                                            background: 'var(--theme-bg-tertiary)',
-                                                            color: 'var(--theme-text-secondary)',
-                                                        }}>
-                                                        {log.targetName}
-                                                    </span>
-                                                )}
+                            ) : (
+                                <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
+                                    {activityLogs.map((log, index) => (
+                                        <div
+                                            key={log.id || index}
+                                            className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:bg-white/5"
+                                            style={{
+                                                background: 'var(--theme-bg-secondary)',
+                                                border: '1px solid var(--theme-border-primary)',
+                                            }}
+                                        >
+                                            {/* Icon */}
+                                            <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-lg"
+                                                style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                                {getActionIcon(log.action)}
                                             </div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
-                                                    👤 {log.userName || 'النظام'}
-                                                </span>
-                                                {log.department && log.department !== 'system' && (
-                                                    <span className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                                        • {log.department}
+
+                                            {/* Content */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={`font-medium text-sm ${getActionColor(log.action)}`}>
+                                                        {getActionLabel(log.action)}
                                                     </span>
-                                                )}
-                                            </div>
-                                            {/* Details if available */}
-                                            {log.details && Object.keys(log.details).length > 0 && (
-                                                <div className="mt-1 text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                                    {log.details.message && <span>{String(log.details.message)}</span>}
-                                                    {log.details.oldValue !== undefined && log.details.newValue !== undefined && (
-                                                        <span>
-                                                            {String(log.details.oldValue)} → {String(log.details.newValue)}
+                                                    {log.targetName && (
+                                                        <span className="text-xs px-2 py-0.5 rounded-full"
+                                                            style={{
+                                                                background: 'var(--theme-bg-tertiary)',
+                                                                color: 'var(--theme-text-secondary)',
+                                                            }}>
+                                                            {log.targetName}
                                                         </span>
                                                     )}
                                                 </div>
-                                            )}
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                                                        👤 {log.userName || 'النظام'}
+                                                    </span>
+                                                    {log.department && log.department !== 'system' && (
+                                                        <span className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                                            • {log.department}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {/* Details if available */}
+                                                {log.details && Object.keys(log.details).length > 0 && (
+                                                    <div className="mt-1 text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                                        {log.details.message && <span>{String(log.details.message)}</span>}
+                                                        {log.details.oldValue !== undefined && log.details.newValue !== undefined && (
+                                                            <span>
+                                                                {String(log.details.oldValue)} → {String(log.details.newValue)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Time */}
+                                            <div className="flex-shrink-0 text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                                {formatTimeAgo(log.timestamp)}
+                                            </div>
                                         </div>
-                                        
-                                        {/* Time */}
-                                        <div className="flex-shrink-0 text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                            {formatTimeAgo(log.timestamp)}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        
-                        {/* Footer info - Shows on-demand status */}
-                        <div className="mt-4 pt-3 border-t flex items-center justify-between flex-wrap gap-2"
-                            style={{ borderColor: 'var(--theme-border-primary)' }}>
-                            <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                🔋 وضع التوفير: تحديث يدوي فقط (صفر استهلاك تلقائي)
-                            </p>
-                            <div className="flex items-center gap-3">
-                                {lastRefreshTime && (
-                                    <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                        آخر تحديث: {formatTimeAgo(lastRefreshTime)}
-                                    </p>
-                                )}
-                                <p className="text-xs font-medium" style={{ color: 'var(--theme-text-secondary)' }}>
-                                    {activityLogs.length} سجل
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Footer info - Shows on-demand status */}
+                            <div className="mt-4 pt-3 border-t flex items-center justify-between flex-wrap gap-2"
+                                style={{ borderColor: 'var(--theme-border-primary)' }}>
+                                <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                    🔋 وضع التوفير: تحديث يدوي فقط (صفر استهلاك تلقائي)
                                 </p>
+                                <div className="flex items-center gap-3">
+                                    {lastRefreshTime && (
+                                        <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                            آخر تحديث: {formatTimeAgo(lastRefreshTime)}
+                                        </p>
+                                    )}
+                                    <p className="text-xs font-medium" style={{ color: 'var(--theme-text-secondary)' }}>
+                                        {activityLogs.length} سجل
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    );
-};
+        );
+    };
 
 type FilterType = 'all' | 'active' | 'suspended' | 'expired' | 'deleted' | 'expiring';
 
@@ -1993,7 +1991,7 @@ const TenantsTab: React.FC<{
         };
         loadDeleted();
     }, []);
-    
+
     // ✅ Helper function to map deleted manager to TenantAnalytics format
     // Used in BOTH "deleted" and "all" filters to avoid code duplication
     const mapDeletedManagerToTenant = useCallback((manager: any): TenantAnalytics & { isDeleted: true } => {
@@ -2010,11 +2008,11 @@ const TenantsTab: React.FC<{
         } else {
             licenseExpiryDate = new Date();
         }
-        
+
         // Calculate days until expiry
         const now = new Date();
         const daysUntilExpiry = Math.ceil((licenseExpiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        
+
         return {
             tenantId: manager.tenantId || manager.id,
             tenantName: manager.hotelName || manager.tenantBackup?.info?.name || manager.name || 'غير محدد',
@@ -2066,7 +2064,7 @@ const TenantsTab: React.FC<{
                     if (t.daysUntilExpiry !== undefined && t.daysUntilExpiry !== null) {
                         return t.daysUntilExpiry <= 0 || t.status === 'expired';
                     }
-                    
+
                     // Otherwise calculate from licenseExpiryDate
                     let expiry: Date;
                     if (t.licenseExpiryDate instanceof Date) {
@@ -2078,13 +2076,13 @@ const TenantsTab: React.FC<{
                     } else {
                         expiry = new Date(t.licenseExpiryDate);
                     }
-                    
+
                     // Check if date is valid
                     if (isNaN(expiry.getTime())) {
                         console.warn('Invalid expiry date for tenant:', t.tenantId, t.licenseExpiryDate);
                         return t.status === 'expired';
                     }
-                    
+
                     const now = new Date();
                     now.setHours(0, 0, 0, 0);
                     expiry.setHours(0, 0, 0, 0);
@@ -2123,7 +2121,7 @@ const TenantsTab: React.FC<{
                     return false; // Filter out errors
                 }
             });
-            
+
             // Sort by days until expiry (ascending - closest first)
             filtered.sort((a, b) => {
                 // Helper function to get days until expiry
@@ -2155,7 +2153,7 @@ const TenantsTab: React.FC<{
             // ✅ REFACTORED: Use helper function to avoid code duplication
             return deletedManagers.map(mapDeletedManagerToTenant);
         }
-        
+
         // ✅ REFACTORED: For "all" filter, include deleted managers with special marking
         // Uses the same helper function to ensure consistent data
         if (activeFilter === 'all' && deletedManagers.length > 0) {
@@ -2168,8 +2166,8 @@ const TenantsTab: React.FC<{
 
         // Apply search filter (by name or code)
         if (searchCode) {
-            filtered = filtered.filter(tenant => 
-                tenant.tenantId?.includes(searchCode) || 
+            filtered = filtered.filter(tenant =>
+                tenant.tenantId?.includes(searchCode) ||
                 tenant.tenantName?.toLowerCase().includes(searchCode.toLowerCase()) ||
                 tenant.managerName?.toLowerCase().includes(searchCode.toLowerCase())
             );
@@ -2185,7 +2183,7 @@ const TenantsTab: React.FC<{
             // Get manager user data
             const managers = await getAllManagers();
             const manager = managers.find(m => m.tenantId === tenant.tenantId);
-            
+
             if (!manager) {
                 error('لم يتم العثور على بيانات المدير');
                 return;
@@ -2223,7 +2221,7 @@ const TenantsTab: React.FC<{
                     );
                     const requestsSnapshot = await getDocs(requestsQuery);
                     const requests = requestsSnapshot.docs.map(d => d.data());
-                    
+
                     // Count requests by department
                     const departmentCounts: Record<string, number> = {};
                     requests.forEach(req => {
@@ -2237,7 +2235,7 @@ const TenantsTab: React.FC<{
                     const settingsRef = doc(db, `tenants/${tenant.tenantId}/branches/${branch.id}/settings`, 'branch');
                     const settingsSnap = await getDoc(settingsRef);
                     const branchSettings = settingsSnap.exists() ? settingsSnap.data() : {};
-                    
+
                     // Get system settings for enabled features
                     const systemSettings = await getSystemSettings();
                     const enabledFeatures = Object.entries(systemSettings.features)
@@ -2274,7 +2272,7 @@ const TenantsTab: React.FC<{
         <>
             {/* 📍 Contextual Help for Owner */}
             <CreateManagerHelp />
-            
+
             <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
                     <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">قائمة المستأجرين</h3>
@@ -2303,66 +2301,64 @@ const TenantsTab: React.FC<{
                             const isActive = activeFilter === filter.id;
                             // ✅ FIX: قائمة IDs المحذوفين لاستثنائهم من الإحصاء
                             const deletedTenantIds = new Set(deletedManagers.map((m: any) => m.tenantId || m.id));
-                            const count = filter.id === 'all' 
-                                ? tenants.length 
+                            const count = filter.id === 'all'
+                                ? tenants.length
                                 : filter.id === 'deleted'
-                                ? deletedManagers.length
-                                : filter.id === 'expiring'
-                                ? tenants.filter(t => 
-                                    t.status !== 'deleted' && 
-                                    !(t as any).isDeleted && 
-                                    !deletedTenantIds.has(t.tenantId)
-                                  ).length // ✅ FIX: استثناء المحذوفين بكل الطرق
-                                : tenants.filter(t => {
-                                    if (filter.id === 'active') return t.status === 'active';
-                                    if (filter.id === 'suspended') return t.status === 'suspended';
-                                    if (filter.id === 'expired') {
-                                        // Use daysUntilExpiry if available
-                                        if (t.daysUntilExpiry !== undefined && t.daysUntilExpiry !== null) {
-                                            return t.daysUntilExpiry <= 0 || t.status === 'expired';
-                                        }
-                                        // Otherwise calculate
-                                        try {
-                                            let expiry: Date;
-                                            if (t.licenseExpiryDate instanceof Date) {
-                                                expiry = t.licenseExpiryDate;
-                                            } else if (t.licenseExpiryDate && typeof t.licenseExpiryDate === 'object' && 'toDate' in t.licenseExpiryDate) {
-                                                expiry = (t.licenseExpiryDate as any).toDate();
-                                            } else if (typeof t.licenseExpiryDate === 'string') {
-                                                expiry = new Date(t.licenseExpiryDate);
-                                            } else {
-                                                expiry = new Date(t.licenseExpiryDate);
+                                    ? deletedManagers.length
+                                    : filter.id === 'expiring'
+                                        ? tenants.filter(t =>
+                                            t.status !== 'deleted' &&
+                                            !(t as any).isDeleted &&
+                                            !deletedTenantIds.has(t.tenantId)
+                                        ).length // ✅ FIX: استثناء المحذوفين بكل الطرق
+                                        : tenants.filter(t => {
+                                            if (filter.id === 'active') return t.status === 'active';
+                                            if (filter.id === 'suspended') return t.status === 'suspended';
+                                            if (filter.id === 'expired') {
+                                                // Use daysUntilExpiry if available
+                                                if (t.daysUntilExpiry !== undefined && t.daysUntilExpiry !== null) {
+                                                    return t.daysUntilExpiry <= 0 || t.status === 'expired';
+                                                }
+                                                // Otherwise calculate
+                                                try {
+                                                    let expiry: Date;
+                                                    if (t.licenseExpiryDate instanceof Date) {
+                                                        expiry = t.licenseExpiryDate;
+                                                    } else if (t.licenseExpiryDate && typeof t.licenseExpiryDate === 'object' && 'toDate' in t.licenseExpiryDate) {
+                                                        expiry = (t.licenseExpiryDate as any).toDate();
+                                                    } else if (typeof t.licenseExpiryDate === 'string') {
+                                                        expiry = new Date(t.licenseExpiryDate);
+                                                    } else {
+                                                        expiry = new Date(t.licenseExpiryDate);
+                                                    }
+                                                    if (isNaN(expiry.getTime())) return t.status === 'expired';
+                                                    const now = new Date();
+                                                    now.setHours(0, 0, 0, 0);
+                                                    expiry.setHours(0, 0, 0, 0);
+                                                    return expiry < now || t.status === 'expired';
+                                                } catch {
+                                                    return t.status === 'expired';
+                                                }
                                             }
-                                            if (isNaN(expiry.getTime())) return t.status === 'expired';
-                                            const now = new Date();
-                                            now.setHours(0, 0, 0, 0);
-                                            expiry.setHours(0, 0, 0, 0);
-                                            return expiry < now || t.status === 'expired';
-                                        } catch {
-                                            return t.status === 'expired';
-                                        }
-                                    }
-                                    return false;
-                                }).length;
+                                            return false;
+                                        }).length;
 
                             return (
                                 <button
                                     key={filter.id}
                                     onClick={() => setActiveFilter(filter.id)}
-                                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm flex-shrink-0 ${
-                                        isActive
+                                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm flex-shrink-0 ${isActive
                                             ? 'bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/40 shadow-lg shadow-teal-500/10'
                                             : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-300 dark:border-white/10'
-                                    }`}
+                                        }`}
                                 >
                                     <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                                     <span>{filter.label}</span>
                                     {count > 0 && (
-                                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                            isActive 
-                                                ? 'bg-teal-500/30 text-teal-700 dark:text-teal-300' 
+                                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive
+                                                ? 'bg-teal-500/30 text-teal-700 dark:text-teal-300'
                                                 : 'bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-white/70'
-                                        }`}>
+                                            }`}>
                                             {count}
                                         </span>
                                     )}
@@ -2387,35 +2383,35 @@ const TenantsTab: React.FC<{
                 <div className="space-y-3">
                     {filteredTenants.length === 0 ? (
                         <p className="text-center text-slate-500 dark:text-white/40 py-8">
-                            {searchCode || activeFilter !== 'all' 
-                                ? 'لا توجد نتائج للبحث أو الفلتر المحدد' 
+                            {searchCode || activeFilter !== 'all'
+                                ? 'لا توجد نتائج للبحث أو الفلتر المحدد'
                                 : 'لا يوجد مستأجرون'}
                         </p>
                     ) : (
                         filteredTenants.map((tenant: TenantAnalytics & { isDeleted?: boolean }) => {
                             // ✅ Check if this is a deleted manager
-                            const isDeletedManager = (tenant as any).isDeleted === true || 
-                                                     tenant.status === 'deleted' || 
-                                                     activeFilter === 'deleted';
-                            
+                            const isDeletedManager = (tenant as any).isDeleted === true ||
+                                tenant.status === 'deleted' ||
+                                activeFilter === 'deleted';
+
                             const statusLabel =
                                 isDeletedManager
                                     ? 'محذوف'
                                     : tenant.status === 'active'
-                                    ? 'نشط'
-                                    : tenant.status === 'suspended'
-                                    ? 'موقوف مؤقتاً'
-                                    : 'منتهي / غير فعّال';
+                                        ? 'نشط'
+                                        : tenant.status === 'suspended'
+                                            ? 'موقوف مؤقتاً'
+                                            : 'منتهي / غير فعّال';
 
                             const statusClasses =
                                 isDeletedManager
                                     ? 'bg-gray-200 dark:bg-gray-500/20 text-gray-600 dark:text-gray-300 border-gray-400 dark:border-gray-500/50'
                                     : tenant.status === 'active'
-                                    ? 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-300 border-green-500'
-                                    : tenant.status === 'suspended'
-                                    ? 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500'
-                                    : 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-500';
-                            
+                                        ? 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-300 border-green-500'
+                                        : tenant.status === 'suspended'
+                                            ? 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500'
+                                            : 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-500';
+
                             // ✅ Special card styling for deleted managers
                             const cardClasses = isDeletedManager
                                 ? 'bg-gradient-to-r from-red-100 via-gray-100 to-red-100 dark:from-red-950/30 dark:via-gray-900/40 dark:to-red-950/30 rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all border-2 border-dashed border-red-400 dark:border-red-500/40 relative overflow-hidden opacity-80 hover:opacity-100'
@@ -2463,8 +2459,8 @@ const TenantsTab: React.FC<{
                                             {/* ✅ Branches with codes */}
                                             {(() => {
                                                 // Use branches if available, otherwise fallback to branchCodes
-                                                const branchList = tenant.branches && tenant.branches.length > 0 
-                                                    ? tenant.branches 
+                                                const branchList = tenant.branches && tenant.branches.length > 0
+                                                    ? tenant.branches
                                                     : ((tenant as any).branchCodes || []).map((code: string) => ({
                                                         id: `branch-${code}`,
                                                         name: `فرع ${code}`,
@@ -2473,7 +2469,7 @@ const TenantsTab: React.FC<{
                                                 return branchList.length > 0 ? (
                                                     <div className="flex flex-wrap gap-1.5 mt-2">
                                                         {branchList.map((branch: any) => (
-                                                            <span 
+                                                            <span
                                                                 key={branch.id}
                                                                 className="text-[10px] bg-teal-100 dark:bg-primary-500/15 text-teal-700 dark:text-primary-300 border border-teal-400 dark:border-primary-500/30 rounded-lg px-2 py-0.5 flex items-center gap-1"
                                                             >
@@ -2488,17 +2484,17 @@ const TenantsTab: React.FC<{
                                             <p className="text-[10px] sm:text-xs text-slate-500 dark:text-white/40 mt-1 leading-relaxed">
                                                 انتهاء الترخيص:{' '}
                                                 <span className="block sm:inline">
-                                                {new Date(tenant.licenseExpiryDate).toLocaleDateString('ar-SA-u-ca-islamic', {
-                                                    year: 'numeric',
-                                                    month: 'long',
-                                                    day: 'numeric'
-                                                })}
-                                                {' - '}
-                                                {new Date(tenant.licenseExpiryDate).toLocaleDateString('ar-EG', {
-                                                    year: 'numeric',
-                                                    month: 'short',
-                                                    day: 'numeric'
-                                                })}م
+                                                    {new Date(tenant.licenseExpiryDate).toLocaleDateString('ar-SA-u-ca-islamic', {
+                                                        year: 'numeric',
+                                                        month: 'long',
+                                                        day: 'numeric'
+                                                    })}
+                                                    {' - '}
+                                                    {new Date(tenant.licenseExpiryDate).toLocaleDateString('ar-EG', {
+                                                        year: 'numeric',
+                                                        month: 'short',
+                                                        day: 'numeric'
+                                                    })}م
                                                 </span>
                                                 <span className="hidden sm:inline"> • </span>
                                                 <span className="block sm:inline">
@@ -2506,290 +2502,290 @@ const TenantsTab: React.FC<{
                                                 </span>
                                             </p>
                                         </div>
-                                    <div className="flex gap-2 self-start sm:self-auto">
-                                        {isDeletedManager ? (
-                                            // Restore button for deleted managers (in any filter)
-                                            <button
-                                                onClick={async () => {
-                                                    const deletedManager = deletedManagers.find((m: any) => 
-                                                        (m.tenantId || m.id) === tenant.tenantId
-                                                    );
-                                                    if (!deletedManager) {
-                                                        error('لم يتم العثور على المدير المحذوف');
-                                                        return;
-                                                    }
-                                                    const confirmed = await customConfirm({
-                                                        type: 'info',
-                                                        title: 'تأكيد الاستعادة',
-                                                        message: 'هل أنت متأكد من استعادة هذا المدير؟',
-                                                        confirmText: 'استعادة',
-                                                        cancelText: 'إلغاء'
-                                                    });
-                                                    if (!confirmed) {
-                                                        return;
-                                                    }
-                                                    setProcessing(tenant.tenantId);
-                                                    try {
-                                                        await restoreManager(deletedManager.id);
-                                                        success('تم استعادة المدير بنجاح');
-                                                        await onRefresh();
-                                                        const updatedDeleted = await getDeletedManagers();
-                                                        setDeletedManagers(updatedDeleted);
-                                                    } catch (err: any) {
-                                                        error(err.message || 'حدث خطأ في الاستعادة');
-                                                    } finally {
-                                                        setProcessing(null);
-                                                    }
-                                                }}
-                                                disabled={processing === tenant.tenantId}
-                                                className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                                                title="استعادة المدير"
-                                            >
-                                                {processing === tenant.tenantId ? (
-                                                    <AdoraLoaderInline size={16} />
-                                                ) : (
-                                                    <Upload className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                                )}
-                                                <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">استعادة</span>
-                                            </button>
-                                        ) : (
-                                            <>
-                                        <button
-                                            onClick={() => onViewDetails?.(tenant)}
-                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group"
-                                            title="عرض التفاصيل الكاملة"
-                                        >
-                                            <Eye className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                            <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">عرض</span>
-                                        </button>
-                                                {/* ✅ Check if manager is deleted before showing action buttons */}
-                                                {(() => {
-                                                    const isDeleted = deletedManagers.some((m: any) => 
-                                                        (m.tenantId || m.id) === tenant.tenantId
-                                                    );
-                                                    
-                                                    if (isDeleted) {
-                                                        // Manager is deleted - show restore button instead
-                                                        return (
-                                                            <button
-                                                                onClick={async () => {
-                                                                    const deletedManager = deletedManagers.find((m: any) => 
-                                                                        (m.tenantId || m.id) === tenant.tenantId
-                                                                    );
-                                                                    if (!deletedManager) {
-                                                                        error('لم يتم العثور على المدير المحذوف');
-                                                                        return;
-                                                                    }
-                                                                    const confirmed = await customConfirm({
-                                                                        type: 'info',
-                                                                        title: 'تأكيد الاستعادة',
-                                                                        message: 'هل أنت متأكد من استعادة هذا المدير؟',
-                                                                        confirmText: 'استعادة',
-                                                                        cancelText: 'إلغاء'
-                                                                    });
-                                                                    if (!confirmed) {
-                                                                        return;
-                                                                    }
-                                                                    setProcessing(tenant.tenantId);
-                                                                    try {
-                                                                        await restoreManager(deletedManager.id);
-                                                                        success('تم استعادة المدير بنجاح');
-                                                                        await onRefresh();
-                                                                        const updatedDeleted = await getDeletedManagers();
-                                                                        setDeletedManagers(updatedDeleted);
-                                                                    } catch (err: any) {
-                                                                        error(err.message || 'حدث خطأ في الاستعادة');
-                                                                    } finally {
-                                                                        setProcessing(null);
-                                                                    }
-                                                                }}
-                                                                disabled={processing === tenant.tenantId}
-                                                                className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                                                                title="استعادة المدير"
-                                                            >
-                                                                {processing === tenant.tenantId ? (
-                                                                    <AdoraLoaderInline size={16} />
-                                                                ) : (
-                                                                    <Upload className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                                                )}
-                                                                <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">استعادة</span>
-                                                            </button>
+                                        <div className="flex gap-2 self-start sm:self-auto">
+                                            {isDeletedManager ? (
+                                                // Restore button for deleted managers (in any filter)
+                                                <button
+                                                    onClick={async () => {
+                                                        const deletedManager = deletedManagers.find((m: any) =>
+                                                            (m.tenantId || m.id) === tenant.tenantId
                                                         );
-                                                    }
-                                                    
-                                                    // Manager is not deleted - show normal action buttons
-                                                    return (
-                                                        <>
-                                        <button
-                                            onClick={async () => {
-                                                const managers = await getAllManagers();
-                                                const manager = managers.find(m => m.tenantId === tenant.tenantId);
-                                                if (!manager) {
-                                                    error('لم يتم العثور على المدير');
-                                                    return;
-                                                }
-                                                setProcessing(tenant.tenantId);
-                                                try {
-                                                    await toggleLicenseStatus(manager.id, tenant.tenantId, tenant.status === 'active');
-                                                    success(tenant.status === 'active' ? 'تم إيقاف المدير مؤقتاً' : 'تم تفعيل المدير');
-                                                    // Refresh data to update statistics and cards
-                                                    await onRefresh();
-                                                } catch (err: any) {
-                                                    error(err.message || 'حدث خطأ');
-                                                } finally {
-                                                    setProcessing(null);
-                                                }
-                                            }}
-                                            disabled={processing === tenant.tenantId}
-                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                                            title={tenant.status === 'active' ? 'إيقاف مؤقت' : 'تفعيل'}
-                                        >
-                                            {tenant.status === 'active' ? (
-                                                <Pause className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                        if (!deletedManager) {
+                                                            error('لم يتم العثور على المدير المحذوف');
+                                                            return;
+                                                        }
+                                                        const confirmed = await customConfirm({
+                                                            type: 'info',
+                                                            title: 'تأكيد الاستعادة',
+                                                            message: 'هل أنت متأكد من استعادة هذا المدير؟',
+                                                            confirmText: 'استعادة',
+                                                            cancelText: 'إلغاء'
+                                                        });
+                                                        if (!confirmed) {
+                                                            return;
+                                                        }
+                                                        setProcessing(tenant.tenantId);
+                                                        try {
+                                                            await restoreManager(deletedManager.id);
+                                                            success('تم استعادة المدير بنجاح');
+                                                            await onRefresh();
+                                                            const updatedDeleted = await getDeletedManagers();
+                                                            setDeletedManagers(updatedDeleted);
+                                                        } catch (err: any) {
+                                                            error(err.message || 'حدث خطأ في الاستعادة');
+                                                        } finally {
+                                                            setProcessing(null);
+                                                        }
+                                                    }}
+                                                    disabled={processing === tenant.tenantId}
+                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                    title="استعادة المدير"
+                                                >
+                                                    {processing === tenant.tenantId ? (
+                                                        <AdoraLoaderInline size={16} />
+                                                    ) : (
+                                                        <Upload className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                    )}
+                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">استعادة</span>
+                                                </button>
                                             ) : (
-                                                <Play className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                <>
+                                                    <button
+                                                        onClick={() => onViewDetails?.(tenant)}
+                                                        className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group"
+                                                        title="عرض التفاصيل الكاملة"
+                                                    >
+                                                        <Eye className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                        <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">عرض</span>
+                                                    </button>
+                                                    {/* ✅ Check if manager is deleted before showing action buttons */}
+                                                    {(() => {
+                                                        const isDeleted = deletedManagers.some((m: any) =>
+                                                            (m.tenantId || m.id) === tenant.tenantId
+                                                        );
+
+                                                        if (isDeleted) {
+                                                            // Manager is deleted - show restore button instead
+                                                            return (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const deletedManager = deletedManagers.find((m: any) =>
+                                                                            (m.tenantId || m.id) === tenant.tenantId
+                                                                        );
+                                                                        if (!deletedManager) {
+                                                                            error('لم يتم العثور على المدير المحذوف');
+                                                                            return;
+                                                                        }
+                                                                        const confirmed = await customConfirm({
+                                                                            type: 'info',
+                                                                            title: 'تأكيد الاستعادة',
+                                                                            message: 'هل أنت متأكد من استعادة هذا المدير؟',
+                                                                            confirmText: 'استعادة',
+                                                                            cancelText: 'إلغاء'
+                                                                        });
+                                                                        if (!confirmed) {
+                                                                            return;
+                                                                        }
+                                                                        setProcessing(tenant.tenantId);
+                                                                        try {
+                                                                            await restoreManager(deletedManager.id);
+                                                                            success('تم استعادة المدير بنجاح');
+                                                                            await onRefresh();
+                                                                            const updatedDeleted = await getDeletedManagers();
+                                                                            setDeletedManagers(updatedDeleted);
+                                                                        } catch (err: any) {
+                                                                            error(err.message || 'حدث خطأ في الاستعادة');
+                                                                        } finally {
+                                                                            setProcessing(null);
+                                                                        }
+                                                                    }}
+                                                                    disabled={processing === tenant.tenantId}
+                                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                                    title="استعادة المدير"
+                                                                >
+                                                                    {processing === tenant.tenantId ? (
+                                                                        <AdoraLoaderInline size={16} />
+                                                                    ) : (
+                                                                        <Upload className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                                    )}
+                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">استعادة</span>
+                                                                </button>
+                                                            );
+                                                        }
+
+                                                        // Manager is not deleted - show normal action buttons
+                                                        return (
+                                                            <>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const managers = await getAllManagers();
+                                                                        const manager = managers.find(m => m.tenantId === tenant.tenantId);
+                                                                        if (!manager) {
+                                                                            error('لم يتم العثور على المدير');
+                                                                            return;
+                                                                        }
+                                                                        setProcessing(tenant.tenantId);
+                                                                        try {
+                                                                            await toggleLicenseStatus(manager.id, tenant.tenantId, tenant.status === 'active');
+                                                                            success(tenant.status === 'active' ? 'تم إيقاف المدير مؤقتاً' : 'تم تفعيل المدير');
+                                                                            // Refresh data to update statistics and cards
+                                                                            await onRefresh();
+                                                                        } catch (err: any) {
+                                                                            error(err.message || 'حدث خطأ');
+                                                                        } finally {
+                                                                            setProcessing(null);
+                                                                        }
+                                                                    }}
+                                                                    disabled={processing === tenant.tenantId}
+                                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                                    title={tenant.status === 'active' ? 'إيقاف مؤقت' : 'تفعيل'}
+                                                                >
+                                                                    {tenant.status === 'active' ? (
+                                                                        <Pause className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                                    ) : (
+                                                                        <Play className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                                    )}
+                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">
+                                                                        {tenant.status === 'active' ? 'إيقاف' : 'تفعيل'}
+                                                                    </span>
+                                                                </button>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const managers = await getAllManagers();
+                                                                        const manager = managers.find(m => m.tenantId === tenant.tenantId);
+                                                                        if (!manager) {
+                                                                            error('لم يتم العثور على المدير');
+                                                                            return;
+                                                                        }
+                                                                        setProcessing(tenant.tenantId);
+                                                                        try {
+                                                                            const systemSettings = await getSystemSettings();
+                                                                            const defaultPrice = systemSettings.defaultSubscriptionPrice || 0;
+
+                                                                            // Get current subscription price
+                                                                            const subscription = await getSubscription(tenant.tenantId);
+                                                                            const currentPrice = subscription?.pricePerMonth || 0;
+
+                                                                            // Renew license and check for price warning
+                                                                            const result = await renewLicense(manager.id, tenant.tenantId, 1, currentPrice, defaultPrice);
+
+                                                                            // Show warning if price is below default
+                                                                            if (result.warning) {
+                                                                                await customConfirm({
+                                                                                    title: 'تنبيه',
+                                                                                    message: result.warning,
+                                                                                    confirmText: 'حسناً',
+                                                                                    showCancel: false,
+                                                                                    type: 'warning'
+                                                                                });
+                                                                            }
+
+                                                                            // Use default price if set, otherwise use current price
+                                                                            const renewalPrice = defaultPrice > 0 ? defaultPrice : currentPrice;
+
+                                                                            // Renew subscription with price
+                                                                            await renewSubscription(tenant.tenantId, 'yearly', renewalPrice);
+
+                                                                            // Create invoice and payment if price > 0
+                                                                            if (renewalPrice > 0 && subscription) {
+                                                                                const invoiceId = await createInvoice({
+                                                                                    tenantId: tenant.tenantId,
+                                                                                    subscriptionId: subscription.id,
+                                                                                    amount: renewalPrice,
+                                                                                    currency: 'SAR',
+                                                                                    status: 'paid',
+                                                                                    issueDate: new Date(),
+                                                                                    dueDate: new Date(),
+                                                                                    paidDate: new Date(),
+                                                                                    items: [{
+                                                                                        description: 'تجديد اشتراك سنوي',
+                                                                                        quantity: 1,
+                                                                                        price: renewalPrice
+                                                                                    }],
+                                                                                    paymentMethod: 'cash',
+                                                                                    notes: 'تجديد تلقائي من قبل المالك'
+                                                                                });
+
+                                                                                await recordPayment({
+                                                                                    tenantId: tenant.tenantId,
+                                                                                    invoiceId: invoiceId,
+                                                                                    amount: renewalPrice,
+                                                                                    currency: 'SAR',
+                                                                                    method: 'cash',
+                                                                                    status: 'completed',
+                                                                                    paidAt: new Date(),
+                                                                                    notes: 'تجديد تلقائي'
+                                                                                });
+                                                                            }
+
+                                                                            success('تم تجديد الاشتراك بنجاح');
+                                                                            // Refresh data to update statistics, billing cards, and revenue
+                                                                            await onRefresh();
+                                                                        } catch (err: any) {
+                                                                            error(err.message || 'حدث خطأ في التجديد');
+                                                                        } finally {
+                                                                            setProcessing(null);
+                                                                        }
+                                                                    }}
+                                                                    disabled={processing === tenant.tenantId}
+                                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                                    title="تجديد الاشتراك (سنة)"
+                                                                >
+                                                                    {processing === tenant.tenantId ? (
+                                                                        <AdoraLoaderInline size={16} />
+                                                                    ) : (
+                                                                        <RefreshCw className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                                    )}
+                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">تجديد</span>
+                                                                </button>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const confirmed = await customConfirm({
+                                                                            type: 'danger',
+                                                                            title: 'تأكيد الحذف',
+                                                                            message: `هل أنت متأكد من حذف المدير "${tenant.managerName || tenant.tenantName}" نهائياً؟\n\nسيتم نقل بياناته لقائمة المحذوفين ويمكن استعادته لاحقاً.`,
+                                                                            confirmText: 'حذف',
+                                                                            cancelText: 'إلغاء'
+                                                                        });
+                                                                        if (!confirmed) {
+                                                                            return;
+                                                                        }
+                                                                        const managers = await getAllManagers();
+                                                                        const manager = managers.find(m => m.tenantId === tenant.tenantId);
+                                                                        if (!manager) {
+                                                                            error('لم يتم العثور على المدير');
+                                                                            return;
+                                                                        }
+                                                                        setProcessing(tenant.tenantId);
+                                                                        try {
+                                                                            await softDeleteManager(manager.id, tenant.tenantId);
+                                                                            success('تم حذف المدير ونقله لقائمة المحذوفين');
+                                                                            // Refresh data to update statistics
+                                                                            await onRefresh();
+                                                                            const deleted = await getDeletedManagers();
+                                                                            setDeletedManagers(deleted);
+                                                                        } catch (err: any) {
+                                                                            error(err.message || 'حدث خطأ في الحذف');
+                                                                        } finally {
+                                                                            setProcessing(null);
+                                                                        }
+                                                                    }}
+                                                                    disabled={processing === tenant.tenantId}
+                                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                                    title="حذف نهائي"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">حذف</span>
+                                                                </button>
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </>
                                             )}
-                                            <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">
-                                                {tenant.status === 'active' ? 'إيقاف' : 'تفعيل'}
-                                            </span>
-                                        </button>
-                                        <button
-                                            onClick={async () => {
-                                                const managers = await getAllManagers();
-                                                const manager = managers.find(m => m.tenantId === tenant.tenantId);
-                                                if (!manager) {
-                                                    error('لم يتم العثور على المدير');
-                                                    return;
-                                                }
-                                                setProcessing(tenant.tenantId);
-                                                try {
-                                                    const systemSettings = await getSystemSettings();
-                                                    const defaultPrice = systemSettings.defaultSubscriptionPrice || 0;
-                                                    
-                                                    // Get current subscription price
-                                                    const subscription = await getSubscription(tenant.tenantId);
-                                                    const currentPrice = subscription?.pricePerMonth || 0;
-                                                    
-                                                    // Renew license and check for price warning
-                                                    const result = await renewLicense(manager.id, tenant.tenantId, 1, currentPrice, defaultPrice);
-                                                    
-                                                    // Show warning if price is below default
-                                                    if (result.warning) {
-                                                        await customConfirm({
-                                                            title: 'تنبيه',
-                                                            message: result.warning,
-                                                            confirmText: 'حسناً',
-                                                            showCancel: false,
-                                                            type: 'warning'
-                                                        });
-                                                    }
-                                                    
-                                                    // Use default price if set, otherwise use current price
-                                                    const renewalPrice = defaultPrice > 0 ? defaultPrice : currentPrice;
-                                                    
-                                                    // Renew subscription with price
-                                                    await renewSubscription(tenant.tenantId, 'yearly', renewalPrice);
-                                                    
-                                                    // Create invoice and payment if price > 0
-                                                    if (renewalPrice > 0 && subscription) {
-                                                        const invoiceId = await createInvoice({
-                                                            tenantId: tenant.tenantId,
-                                                            subscriptionId: subscription.id,
-                                                            amount: renewalPrice,
-                                                            currency: 'SAR',
-                                                            status: 'paid',
-                                                            issueDate: new Date(),
-                                                            dueDate: new Date(),
-                                                            paidDate: new Date(),
-                                                            items: [{
-                                                                description: 'تجديد اشتراك سنوي',
-                                                                quantity: 1,
-                                                                price: renewalPrice
-                                                            }],
-                                                            paymentMethod: 'cash',
-                                                            notes: 'تجديد تلقائي من قبل المالك'
-                                                        });
-                                                        
-                                                        await recordPayment({
-                                                            tenantId: tenant.tenantId,
-                                                            invoiceId: invoiceId,
-                                                            amount: renewalPrice,
-                                                            currency: 'SAR',
-                                                            method: 'cash',
-                                                            status: 'completed',
-                                                            paidAt: new Date(),
-                                                            notes: 'تجديد تلقائي'
-                                                        });
-                                                    }
-                                                    
-                                                    success('تم تجديد الاشتراك بنجاح');
-                                                    // Refresh data to update statistics, billing cards, and revenue
-                                                    await onRefresh();
-                                                } catch (err: any) {
-                                                    error(err.message || 'حدث خطأ في التجديد');
-                                                } finally {
-                                                    setProcessing(null);
-                                                }
-                                            }}
-                                            disabled={processing === tenant.tenantId}
-                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                                            title="تجديد الاشتراك (سنة)"
-                                        >
-                                            {processing === tenant.tenantId ? (
-                                                <AdoraLoaderInline size={16} />
-                                            ) : (
-                                                <RefreshCw className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                            )}
-                                            <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">تجديد</span>
-                                        </button>
-                                        <button
-                                            onClick={async () => {
-                                                                    const confirmed = await customConfirm({
-                                                                        type: 'danger',
-                                                                        title: 'تأكيد الحذف',
-                                                                        message: `هل أنت متأكد من حذف المدير "${tenant.managerName || tenant.tenantName}" نهائياً؟\n\nسيتم نقل بياناته لقائمة المحذوفين ويمكن استعادته لاحقاً.`,
-                                                                        confirmText: 'حذف',
-                                                                        cancelText: 'إلغاء'
-                                                                    });
-                                                                    if (!confirmed) {
-                                                    return;
-                                                }
-                                                const managers = await getAllManagers();
-                                                const manager = managers.find(m => m.tenantId === tenant.tenantId);
-                                                if (!manager) {
-                                                    error('لم يتم العثور على المدير');
-                                                    return;
-                                                }
-                                                setProcessing(tenant.tenantId);
-                                                try {
-                                                    await softDeleteManager(manager.id, tenant.tenantId);
-                                                    success('تم حذف المدير ونقله لقائمة المحذوفين');
-                                                    // Refresh data to update statistics
-                                                    await onRefresh();
-                                                    const deleted = await getDeletedManagers();
-                                                    setDeletedManagers(deleted);
-                                                } catch (err: any) {
-                                                    error(err.message || 'حدث خطأ في الحذف');
-                                                } finally {
-                                                    setProcessing(null);
-                                                }
-                                            }}
-                                            disabled={processing === tenant.tenantId}
-                                            className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                                            title="حذف نهائي"
-                                        >
-                                            <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                            <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">حذف</span>
-                                        </button>
-                                                        </>
-                                                    );
-                                                })()}
-                                            </>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
+                            );
                         })
                     )}
                 </div>
@@ -2821,7 +2817,7 @@ const SettingsTab: React.FC<{
 }> = ({ systemSettings, onSave, saving, features, onToggleFeature }) => {
     const [isFeaturesCollapsed, setIsFeaturesCollapsed] = useState(true);
     const [isCompanyInfoCollapsed, setIsCompanyInfoCollapsed] = useState(true);
-    
+
     // ✅ FIXED: Initialize from localStorage first, then systemSettings
     const [localPrice, setLocalPrice] = useState<number>(() => {
         // Check localStorage for cached settings
@@ -2832,7 +2828,7 @@ const SettingsTab: React.FC<{
                 if (parsed.defaultSubscriptionPrice !== undefined) {
                     return parsed.defaultSubscriptionPrice;
                 }
-            } catch {}
+            } catch { }
         }
         return systemSettings.defaultSubscriptionPrice ?? 0;
     });
@@ -2844,21 +2840,21 @@ const SettingsTab: React.FC<{
                 if (parsed.defaultTaxRate !== undefined) {
                     return parsed.defaultTaxRate;
                 }
-            } catch {}
+            } catch { }
         }
         return systemSettings.defaultTaxRate ?? 15;
     });
-    
+
     // ✅ Display values are now directly from local state
     const displayPrice = localPrice;
     const displayTax = localTax;
-    
+
     // ✅ Sync from systemSettings if it gets updated externally (but don't overwrite user edits)
     const prevSettingsRef = useRef({ price: systemSettings.defaultSubscriptionPrice, tax: systemSettings.defaultTaxRate });
     useEffect(() => {
         const prevPrice = prevSettingsRef.current.price;
         const prevTax = prevSettingsRef.current.tax;
-        
+
         // Only update if systemSettings actually changed (not on initial mount)
         if (systemSettings.defaultSubscriptionPrice !== prevPrice && systemSettings.defaultSubscriptionPrice !== undefined) {
             setLocalPrice(systemSettings.defaultSubscriptionPrice);
@@ -2866,10 +2862,10 @@ const SettingsTab: React.FC<{
         if (systemSettings.defaultTaxRate !== prevTax && systemSettings.defaultTaxRate !== undefined) {
             setLocalTax(systemSettings.defaultTaxRate);
         }
-        
+
         prevSettingsRef.current = { price: systemSettings.defaultSubscriptionPrice, tax: systemSettings.defaultTaxRate };
     }, [systemSettings.defaultSubscriptionPrice, systemSettings.defaultTaxRate]);
-    
+
     // ✅ Local state for company information
     const [localCompanyName, setLocalCompanyName] = useState(systemSettings.companyName ?? '');
     const [localCompanyTaxNumber, setLocalCompanyTaxNumber] = useState(systemSettings.companyTaxNumber ?? '');
@@ -3067,7 +3063,7 @@ const SettingsTab: React.FC<{
                     <div className="p-4 sm:p-6">
                         <div className="space-y-3 sm:space-y-4">
                             {/* Company Name */}
-                        <div>
+                            <div>
                                 <label className="block text-xs font-medium text-white/70 mb-1.5">
                                     اسم الشركة *
                                 </label>
@@ -3079,7 +3075,7 @@ const SettingsTab: React.FC<{
                                     placeholder="مثال: شركة أدورا لإدارة الفنادق"
                                 />
                             </div>
-                            
+
                             {/* Tax Number */}
                             <div>
                                 <label className="block text-xs font-medium text-white/70 mb-1.5">
@@ -3093,7 +3089,7 @@ const SettingsTab: React.FC<{
                                     placeholder="مثال: 302003322600003"
                                 />
                             </div>
-                            
+
                             {/* Commercial Registration */}
                             <div>
                                 <label className="block text-xs font-medium text-white/70 mb-1.5">
@@ -3107,7 +3103,7 @@ const SettingsTab: React.FC<{
                                     placeholder="مثال: 4030284941"
                                 />
                             </div>
-                            
+
                             {/* Address */}
                             <div>
                                 <label className="block text-xs font-medium text-white/70 mb-1.5">
@@ -3121,7 +3117,7 @@ const SettingsTab: React.FC<{
                                     placeholder="مثال: جدة - الرويس، شارع الجزيرة بجوار الأطباء المتحدون"
                                 />
                             </div>
-                            
+
                             {/* Contact Phone */}
                             <div>
                                 <label className="block text-xs font-medium text-white/70 mb-1.5">
@@ -3135,7 +3131,7 @@ const SettingsTab: React.FC<{
                                     placeholder="مثال: +966 12 6076060، +966 570707121"
                                 />
                             </div>
-                            
+
                             {/* Contact Email */}
                             <div>
                                 <label className="block text-xs font-medium text-white/70 mb-1.5">
@@ -3149,7 +3145,7 @@ const SettingsTab: React.FC<{
                                     placeholder="مثال: info@adora.com"
                                 />
                             </div>
-                            
+
                             {/* Contact Website */}
                             <div>
                                 <label className="block text-xs font-medium text-white/70 mb-1.5">
@@ -3163,7 +3159,7 @@ const SettingsTab: React.FC<{
                                     placeholder="مثال: https://www.adora.com"
                                 />
                             </div>
-                            
+
                             {/* Save Button */}
                             <button
                                 type="button"
@@ -3220,44 +3216,41 @@ const SettingsTab: React.FC<{
                 <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isFeaturesCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
                     <div className="p-4 sm:p-6">
                         <div className="space-y-3 sm:space-y-4">
-                    {featureOrder.map((key) => {
-                        if (key === 'experimentalFeatures') return null;
-                        const enabled = features[key] as boolean;
-                        const description = featureDescriptions[key] || 'ميزة متاحة في النظام';
-                        return (
-                            <div
-                                key={key}
-                                className="flex items-start justify-between p-3 sm:p-4 bg-white/5 rounded-lg sm:rounded-xl hover:bg-white/10 transition-all gap-3 sm:gap-4"
-                            >
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-1">
-                                        <h4 className="font-medium text-white text-sm sm:text-base">{featureLabels[key] || key}</h4>
-                                        <span className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
-                                            enabled 
-                                                ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                                                : 'bg-gray-600/20 text-gray-400 border border-gray-600/30'
-                                        }`}>
-                                            {enabled ? 'مفعّلة' : 'معطّلة'}
-                                        </span>
+                            {featureOrder.map((key) => {
+                                if (key === 'experimentalFeatures') return null;
+                                const enabled = features[key] as boolean;
+                                const description = featureDescriptions[key] || 'ميزة متاحة في النظام';
+                                return (
+                                    <div
+                                        key={key}
+                                        className="flex items-start justify-between p-3 sm:p-4 bg-white/5 rounded-lg sm:rounded-xl hover:bg-white/10 transition-all gap-3 sm:gap-4"
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-1">
+                                                <h4 className="font-medium text-white text-sm sm:text-base">{featureLabels[key] || key}</h4>
+                                                <span className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${enabled
+                                                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                                        : 'bg-gray-600/20 text-gray-400 border border-gray-600/30'
+                                                    }`}>
+                                                    {enabled ? 'مفعّلة' : 'معطّلة'}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs sm:text-sm text-white/50 leading-relaxed mt-2">{description}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => onToggleFeature(key, !enabled)}
+                                            disabled={saving}
+                                            className={`relative w-12 h-7 sm:w-14 sm:h-8 rounded-full transition-colors flex-shrink-0 ${enabled ? 'bg-green-500' : 'bg-gray-600'
+                                                }`}
+                                        >
+                                            <span
+                                                className={`absolute top-0.5 left-0.5 sm:top-1 sm:left-1 w-6 h-6 bg-white rounded-full transition-transform ${enabled ? 'translate-x-5 sm:translate-x-6' : ''
+                                                    }`}
+                                            />
+                                        </button>
                                     </div>
-                                    <p className="text-xs sm:text-sm text-white/50 leading-relaxed mt-2">{description}</p>
-                                </div>
-                                <button
-                                    onClick={() => onToggleFeature(key, !enabled)}
-                                    disabled={saving}
-                                    className={`relative w-12 h-7 sm:w-14 sm:h-8 rounded-full transition-colors flex-shrink-0 ${
-                                        enabled ? 'bg-green-500' : 'bg-gray-600'
-                                    }`}
-                                >
-                                    <span
-                                        className={`absolute top-0.5 left-0.5 sm:top-1 sm:left-1 w-6 h-6 bg-white rounded-full transition-transform ${
-                                            enabled ? 'translate-x-5 sm:translate-x-6' : ''
-                                        }`}
-                                    />
-                                </button>
-                            </div>
-                        );
-                    })}
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -3295,11 +3288,11 @@ const DynamicBrandingSection: React.FC = () => {
         localStorage.setItem('adora_platform_logo', logoUrl);
         localStorage.setItem('adora_primary_color', primaryColor);
         localStorage.setItem('adora_secondary_color', secondaryColor);
-        
+
         // Apply theme immediately via CSS variables
         document.documentElement.style.setProperty('--color-primary', primaryColor);
         document.documentElement.style.setProperty('--color-secondary', secondaryColor);
-        
+
         setTimeout(() => {
             setSaving(false);
             setSaved(true);
@@ -3337,148 +3330,147 @@ const DynamicBrandingSection: React.FC = () => {
                         🎨 هذه الإعدادات تغير شكل المنصة بالكامل. اللوجو والألوان ستظهر في صفحة الدخول وجميع الواجهات.
                     </p>
 
-                {/* Logo URL */}
-                <div>
-                    <label className="block text-xs font-medium text-white/70 mb-1.5">
-                        رابط اللوجو (Logo URL)
-                    </label>
-                    <input
-                        type="url"
-                        value={logoUrl}
-                        onChange={(e) => setLogoUrl(e.target.value)}
-                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-purple-400 transition-colors text-sm sm:text-base"
-                        placeholder="https://example.com/logo.png"
-                        dir="ltr"
-                    />
-                    {logoUrl && (
-                        <div className="mt-2 p-3 bg-slate-800/50 rounded-xl flex items-center justify-center">
-                            <img 
-                                src={logoUrl} 
-                                alt="معاينة اللوجو" 
-                                className="max-h-20 max-w-full object-contain"
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).src = '/adora-logo.png';
-                                }}
-                            />
-                        </div>
-                    )}
-                </div>
-
-                {/* Theme Colors */}
-                <div>
-                    <label className="block text-xs font-medium text-white/70 mb-2">
-                        ألوان الثيم
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
-                        {presetColors.map((preset) => (
-                            <button
-                                key={preset.name}
-                                onClick={() => {
-                                    setPrimaryColor(preset.primary);
-                                    setSecondaryColor(preset.secondary);
-                                }}
-                                className={`p-2 rounded-lg border transition-all flex items-center gap-2 ${
-                                    primaryColor === preset.primary 
-                                        ? 'border-white/30 bg-white/10' 
-                                        : 'border-white/10 hover:border-white/20'
-                                }`}
-                            >
-                                <div 
-                                    className="w-6 h-6 rounded-full shadow-lg" 
-                                    style={{ background: `linear-gradient(135deg, ${preset.primary}, ${preset.secondary})` }}
-                                />
-                                <span className="text-white/60 text-xs flex-1 text-right">{preset.name}</span>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Custom Color Picker */}
-                    <div className="flex gap-3">
-                        <div className="flex-1">
-                            <label className="block text-xs text-white/50 mb-1">اللون الأساسي</label>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="color"
-                                    value={primaryColor}
-                                    onChange={(e) => setPrimaryColor(e.target.value)}
-                                    className="w-10 h-10 rounded-lg cursor-pointer border-0"
-                                />
-                                <input
-                                    type="text"
-                                    value={primaryColor}
-                                    onChange={(e) => setPrimaryColor(e.target.value)}
-                                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs font-mono"
-                                    dir="ltr"
+                    {/* Logo URL */}
+                    <div>
+                        <label className="block text-xs font-medium text-white/70 mb-1.5">
+                            رابط اللوجو (Logo URL)
+                        </label>
+                        <input
+                            type="url"
+                            value={logoUrl}
+                            onChange={(e) => setLogoUrl(e.target.value)}
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-purple-400 transition-colors text-sm sm:text-base"
+                            placeholder="https://example.com/logo.png"
+                            dir="ltr"
+                        />
+                        {logoUrl && (
+                            <div className="mt-2 p-3 bg-slate-800/50 rounded-xl flex items-center justify-center">
+                                <img
+                                    src={logoUrl}
+                                    alt="معاينة اللوجو"
+                                    className="max-h-20 max-w-full object-contain"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = '/adora-logo.png';
+                                    }}
                                 />
                             </div>
+                        )}
+                    </div>
+
+                    {/* Theme Colors */}
+                    <div>
+                        <label className="block text-xs font-medium text-white/70 mb-2">
+                            ألوان الثيم
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+                            {presetColors.map((preset) => (
+                                <button
+                                    key={preset.name}
+                                    onClick={() => {
+                                        setPrimaryColor(preset.primary);
+                                        setSecondaryColor(preset.secondary);
+                                    }}
+                                    className={`p-2 rounded-lg border transition-all flex items-center gap-2 ${primaryColor === preset.primary
+                                            ? 'border-white/30 bg-white/10'
+                                            : 'border-white/10 hover:border-white/20'
+                                        }`}
+                                >
+                                    <div
+                                        className="w-6 h-6 rounded-full shadow-lg"
+                                        style={{ background: `linear-gradient(135deg, ${preset.primary}, ${preset.secondary})` }}
+                                    />
+                                    <span className="text-white/60 text-xs flex-1 text-right">{preset.name}</span>
+                                </button>
+                            ))}
                         </div>
-                        <div className="flex-1">
-                            <label className="block text-xs text-white/50 mb-1">اللون الثانوي</label>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="color"
-                                    value={secondaryColor}
-                                    onChange={(e) => setSecondaryColor(e.target.value)}
-                                    className="w-10 h-10 rounded-lg cursor-pointer border-0"
-                                />
-                                <input
-                                    type="text"
-                                    value={secondaryColor}
-                                    onChange={(e) => setSecondaryColor(e.target.value)}
-                                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs font-mono"
-                                    dir="ltr"
-                                />
+
+                        {/* Custom Color Picker */}
+                        <div className="flex gap-3">
+                            <div className="flex-1">
+                                <label className="block text-xs text-white/50 mb-1">اللون الأساسي</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={primaryColor}
+                                        onChange={(e) => setPrimaryColor(e.target.value)}
+                                        className="w-10 h-10 rounded-lg cursor-pointer border-0"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={primaryColor}
+                                        onChange={(e) => setPrimaryColor(e.target.value)}
+                                        className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs font-mono"
+                                        dir="ltr"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-xs text-white/50 mb-1">اللون الثانوي</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="color"
+                                        value={secondaryColor}
+                                        onChange={(e) => setSecondaryColor(e.target.value)}
+                                        className="w-10 h-10 rounded-lg cursor-pointer border-0"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={secondaryColor}
+                                        onChange={(e) => setSecondaryColor(e.target.value)}
+                                        className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-xs font-mono"
+                                        dir="ltr"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Preview */}
+                        <div className="mt-3 p-4 rounded-xl border border-white/10" style={{
+                            background: `linear-gradient(135deg, ${primaryColor}20, ${secondaryColor}10)`
+                        }}>
+                            <p className="text-white/60 text-xs mb-2">معاينة الألوان:</p>
+                            <div className="flex gap-2">
+                                <button
+                                    className="px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg transition-transform hover:scale-105"
+                                    style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
+                                >
+                                    زرار رئيسي
+                                </button>
+                                <button
+                                    className="px-4 py-2 rounded-lg text-sm font-medium"
+                                    style={{
+                                        background: `${primaryColor}20`,
+                                        color: primaryColor,
+                                        border: `1px solid ${primaryColor}40`
+                                    }}
+                                >
+                                    زرار ثانوي
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Preview */}
-                    <div className="mt-3 p-4 rounded-xl border border-white/10" style={{ 
-                        background: `linear-gradient(135deg, ${primaryColor}20, ${secondaryColor}10)` 
-                    }}>
-                        <p className="text-white/60 text-xs mb-2">معاينة الألوان:</p>
-                        <div className="flex gap-2">
-                            <button 
-                                className="px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg transition-transform hover:scale-105"
-                                style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
-                            >
-                                زرار رئيسي
-                            </button>
-                            <button 
-                                className="px-4 py-2 rounded-lg text-sm font-medium"
-                                style={{ 
-                                    background: `${primaryColor}20`, 
-                                    color: primaryColor,
-                                    border: `1px solid ${primaryColor}40`
-                                }}
-                            >
-                                زرار ثانوي
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Save Button */}
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="w-full px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                    style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
-                >
-                    {saving ? (
-                        <AdoraLoaderInline size={16} />
-                    ) : saved ? (
-                        <>
-                            <CheckCircle className="w-4 h-4" />
-                            تم الحفظ ✓
-                        </>
-                    ) : (
-                        <>
-                            <Save className="w-4 h-4" />
-                            حفظ الهوية البصرية
-                        </>
-                    )}
-                </button>
+                    {/* Save Button */}
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="w-full px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                        style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
+                    >
+                        {saving ? (
+                            <AdoraLoaderInline size={16} />
+                        ) : saved ? (
+                            <>
+                                <CheckCircle className="w-4 h-4" />
+                                تم الحفظ ✓
+                            </>
+                        ) : (
+                            <>
+                                <Save className="w-4 h-4" />
+                                حفظ الهوية البصرية
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         </div>
@@ -3726,11 +3718,10 @@ const UpdatesTab: React.FC<{
                     <button
                         onClick={handleBroadcastUpdate}
                         disabled={broadcasting || updates.length === 0}
-                        className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${
-                            broadcastSent 
-                                ? 'bg-green-500/20 text-green-400' 
+                        className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50 ${broadcastSent
+                                ? 'bg-green-500/20 text-green-400'
                                 : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
-                        }`}
+                            }`}
                     >
                         {broadcasting ? (
                             <AdoraLoaderInline size={16} />
@@ -3748,7 +3739,7 @@ const UpdatesTab: React.FC<{
                     </button>
                 </div>
             </div>
-            
+
             {/* ✅ Broadcast Info Banner */}
             <div className="mb-4 p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
                 <p className="text-purple-300 text-xs flex items-center gap-2">
@@ -3764,7 +3755,7 @@ const UpdatesTab: React.FC<{
                         <Activity className="w-12 h-12 sm:w-16 sm:h-16 text-white/10 mx-auto mb-4" />
                         <p className="text-white/60 font-medium mb-2 text-sm sm:text-base">لا توجد تحديثات مسجلة حالياً</p>
                         <p className="text-xs sm:text-sm text-white/40 max-w-md mx-auto leading-relaxed">
-                            يمكنك إضافة سجلات التحديثات لإعلام المستخدمين بالإصدارات الجديدة والميزات المضافة. 
+                            يمكنك إضافة سجلات التحديثات لإعلام المستخدمين بالإصدارات الجديدة والميزات المضافة.
                             التحديثات الحرجة ستظهر بشكل بارز للمستخدمين.
                         </p>
                     </div>
@@ -3775,11 +3766,11 @@ const UpdatesTab: React.FC<{
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
                                         <h4 className="font-bold text-white text-sm sm:text-base">الإصدار {update.version}</h4>
-                                {update.critical && (
+                                        {update.critical && (
                                             <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-[10px] sm:text-xs whitespace-nowrap">
-                                        حرج
-                                    </span>
-                                )}
+                                                حرج
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-xs sm:text-sm text-white/60 leading-relaxed">{update.changelog}</p>
                                     <p className="text-[10px] sm:text-xs text-white/40 mt-1.5 sm:mt-1">
@@ -3822,7 +3813,7 @@ const BroadcastsTab: React.FC<{
                         <MessageSquare className="w-12 h-12 sm:w-16 sm:h-16 text-white/10 mx-auto mb-4" />
                         <p className="text-white/60 font-medium mb-2 text-sm sm:text-base">لا توجد رسائل عامة حالياً</p>
                         <p className="text-xs sm:text-sm text-white/40 max-w-md mx-auto leading-relaxed">
-                            يمكنك إضافة رسائل عامة لإعلام جميع المستخدمين أو مستأجرين محددين بأخبار مهمة، تحديثات النظام، أو تنبيهات خاصة. 
+                            يمكنك إضافة رسائل عامة لإعلام جميع المستخدمين أو مستأجرين محددين بأخبار مهمة، تحديثات النظام، أو تنبيهات خاصة.
                             الرسائل ستظهر في لوحة التحكم للمستخدمين المستهدفين.
                         </p>
                     </div>
@@ -3830,12 +3821,11 @@ const BroadcastsTab: React.FC<{
                     broadcasts.map(broadcast => (
                         <div
                             key={broadcast.id}
-                            className={`bg-white/5 rounded-lg sm:rounded-xl p-3 sm:p-4 border-l-4 ${
-                                broadcast.type === 'error' ? 'border-red-500' :
-                                broadcast.type === 'warning' ? 'border-yellow-500' :
-                                broadcast.type === 'success' ? 'border-green-500' :
-                                'border-blue-500'
-                            }`}
+                            className={`bg-white/5 rounded-lg sm:rounded-xl p-3 sm:p-4 border-l-4 ${broadcast.type === 'error' ? 'border-red-500' :
+                                    broadcast.type === 'warning' ? 'border-yellow-500' :
+                                        broadcast.type === 'success' ? 'border-green-500' :
+                                            'border-blue-500'
+                                }`}
                         >
                             <h4 className="font-bold text-white text-sm sm:text-base">{broadcast.title}</h4>
                             <p className="text-xs sm:text-sm text-white/60 mt-1 leading-relaxed">{broadcast.message}</p>
@@ -3995,14 +3985,14 @@ const TenantMultiSelect: React.FC<{
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white/80 hover:bg-white/10 focus:outline-none focus:border-yellow-400 transition-all flex items-center justify-between"
                 >
                     <span className="text-sm">
-                        {loading ? 'جاري التحميل...' : 
-                         selectedTenants.length === 0 ? 'اختر المستأجرين' :
-                         selectedTenants.length === 1 ? selectedNames[0] :
-                         `تم اختيار ${selectedTenants.length} مستأجر`}
+                        {loading ? 'جاري التحميل...' :
+                            selectedTenants.length === 0 ? 'اختر المستأجرين' :
+                                selectedTenants.length === 1 ? selectedNames[0] :
+                                    `تم اختيار ${selectedTenants.length} مستأجر`}
                     </span>
                     <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                 </button>
-                
+
                 {isOpen && (
                     <div className="absolute z-50 w-full mt-2 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-2xl max-h-[250px] overflow-y-auto">
                         {loading ? (
@@ -4033,7 +4023,7 @@ const TenantMultiSelect: React.FC<{
                     </div>
                 )}
             </div>
-            
+
             {selectedTenants.length > 0 && (
                 <div className="text-xs text-white/60 bg-blue-500/10 p-2 rounded-lg">
                     تم اختيار {selectedTenants.length} مستأجر: {selectedNames.join('، ')}
@@ -4056,7 +4046,7 @@ const BroadcastModal: React.FC<{
     const [selectedTenants, setSelectedTenants] = useState<string[]>([]);
     const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
     const [loadingTenants, setLoadingTenants] = useState(false);
-    
+
     // Scheduled message options
     const [isScheduled, setIsScheduled] = useState(false);
     const [scheduleType, setScheduleType] = useState<'license_expiry'>('license_expiry');
@@ -4086,7 +4076,7 @@ const BroadcastModal: React.FC<{
     }, []);
 
     const handleTenantToggle = (tenantId: string) => {
-        setSelectedTenants(prev => 
+        setSelectedTenants(prev =>
             prev.includes(tenantId)
                 ? prev.filter(id => id !== tenantId)
                 : [...prev, tenantId]
@@ -4094,7 +4084,7 @@ const BroadcastModal: React.FC<{
     };
 
     const handleRoleToggle = (role: 'manager' | 'employee' | 'staff') => {
-        setTargetRoles(prev => 
+        setTargetRoles(prev =>
             prev.includes(role)
                 ? prev.filter(r => r !== role)
                 : [...prev, role]
@@ -4103,28 +4093,28 @@ const BroadcastModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // ✅ Validate dates before submission
         if (!startDate || !endDate) {
             alert('يرجى تحديد تاريخ البدء وتاريخ الانتهاء');
             return;
         }
-        
+
         const parsedStartDate = new Date(startDate);
         const parsedEndDate = new Date(endDate);
-        
+
         // ✅ Check if dates are valid
         if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
             alert('تاريخ غير صالح. يرجى التحقق من تنسيق التاريخ');
             return;
         }
-        
+
         // ✅ Ensure end date is after start date
         if (parsedEndDate <= parsedStartDate) {
             alert('يجب أن يكون تاريخ الانتهاء بعد تاريخ البدء');
             return;
         }
-        
+
         onSave({
             id: `broadcast-${Date.now()}`,
             title,
@@ -4187,7 +4177,7 @@ const BroadcastModal: React.FC<{
                         required
                         className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400"
                     />
-                    
+
                     {/* Scheduled Message Option */}
                     <div className="space-y-3">
                         <label className="flex items-center gap-3 cursor-pointer">
@@ -4199,7 +4189,7 @@ const BroadcastModal: React.FC<{
                             />
                             <span className="text-sm text-white/80">رسالة مجدولة (تظهر قبل انتهاء الترخيص)</span>
                         </label>
-                        
+
                         {isScheduled && (
                             <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
                                 <div>
@@ -4213,7 +4203,7 @@ const BroadcastModal: React.FC<{
                                         className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-yellow-400"
                                     />
                                 </div>
-                                
+
                                 <div>
                                     <label className="text-sm text-white/80 mb-2 block">الأدوار المستهدفة</label>
                                     <div className="flex flex-wrap gap-2">
@@ -4232,14 +4222,14 @@ const BroadcastModal: React.FC<{
                                         ))}
                                     </div>
                                 </div>
-                                
+
                                 <div className="text-xs text-white/60 bg-blue-500/10 p-2 rounded-lg">
                                     💡 هذه الرسالة ستظهر تلقائياً قبل انتهاء الترخيص بعدد الأيام المحدد لجميع المستأجرين المحددين
                                 </div>
                             </div>
                         )}
                     </div>
-                    
+
                     {/* Target Selection */}
                     <div className="space-y-3">
                         <label className="text-sm font-medium text-white/80">الوجهة</label>
@@ -4247,27 +4237,25 @@ const BroadcastModal: React.FC<{
                             <button
                                 type="button"
                                 onClick={() => setTargetMode('all')}
-                                className={`flex-1 px-4 py-2 rounded-xl transition-all ${
-                                    targetMode === 'all'
+                                className={`flex-1 px-4 py-2 rounded-xl transition-all ${targetMode === 'all'
                                         ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                                         : 'bg-white/5 text-white/60 border border-white/10 hover:bg-white/10'
-                                }`}
+                                    }`}
                             >
                                 جميع المستأجرين
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setTargetMode('specific')}
-                                className={`flex-1 px-4 py-2 rounded-xl transition-all ${
-                                    targetMode === 'specific'
+                                className={`flex-1 px-4 py-2 rounded-xl transition-all ${targetMode === 'specific'
                                         ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                                         : 'bg-white/5 text-white/60 border border-white/10 hover:bg-white/10'
-                                }`}
+                                    }`}
                             >
                                 مستأجرين محددين
                             </button>
                         </div>
-                        
+
                         {targetMode === 'specific' && (
                             <TenantMultiSelect
                                 tenants={tenants}
@@ -4277,7 +4265,7 @@ const BroadcastModal: React.FC<{
                             />
                         )}
                     </div>
-                    
+
                     <div className="flex gap-3 pt-4">
                         <button
                             type="button"
@@ -4308,23 +4296,23 @@ const AddManagerModal: React.FC<{
     // ✅ Wizard Step State
     const [currentStep, setCurrentStep] = useState(1);
     const TOTAL_STEPS = 4;
-    
+
     // ✅ Step 1: Basic Info
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [phoneBackup, setPhoneBackup] = useState(''); // ✅ رقم الهاتف الاحتياطي
     const [code, setCode] = useState('');
     const [hotelName, setHotelName] = useState('');
-    
+
     // ✅ Step 2: Branches
     const [branchCodes, setBranchCodes] = useState<Array<{ code: string; name: string }>>([]);
     const [currentBranchCode, setCurrentBranchCode] = useState('');
     const [currentBranchName, setCurrentBranchName] = useState('');
-    
+
     // ✅ Step 3: Subscription & Payment
     const [subscriptionDuration, setSubscriptionDuration] = useState<1 | 2>(1);
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'bank_transfer' | 'deferred'>('cash');
-    
+
     // ✅ Firebase Config for Isolated Tenant Database (SaaS)
     const [firebaseConfig, setFirebaseConfig] = useState<FirebaseConfig>({
         apiKey: '',
@@ -4335,7 +4323,7 @@ const AddManagerModal: React.FC<{
         appId: ''
     });
     const [firebaseTestPassed, setFirebaseTestPassed] = useState(false);
-    
+
     // ✅ General State
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -4343,7 +4331,7 @@ const AddManagerModal: React.FC<{
     const { success: showSuccess, error: showError } = useUX();
     const [conflictingCodes, setConflictingCodes] = useState<Set<string>>(new Set());
     const [checkingCodes, setCheckingCodes] = useState(false);
-    
+
     // ✅ Wizard Navigation
     const canGoNext = () => {
         switch (currentStep) {
@@ -4359,21 +4347,21 @@ const AddManagerModal: React.FC<{
                 return false;
         }
     };
-    
+
     const handleNext = () => {
         if (currentStep < TOTAL_STEPS && canGoNext()) {
             setError('');
             setCurrentStep(prev => prev + 1);
         }
     };
-    
+
     const handleBack = () => {
         if (currentStep > 1) {
             setError('');
             setCurrentStep(prev => prev - 1);
         }
     };
-    
+
     // Step Titles
     const stepTitles = {
         1: 'البيانات الأساسية',
@@ -4409,13 +4397,13 @@ const AddManagerModal: React.FC<{
 
     const handleAddBranch = async () => {
         console.log('🔵 handleAddBranch called', { currentBranchCode, currentBranchName, authReady, user: user?.email });
-        
+
         if (!currentBranchCode.trim() || !currentBranchName.trim()) {
             console.log('🔴 Empty branch code or name');
             return;
         }
         const bCode = currentBranchCode.trim();
-        
+
         // ✅ التحقق من كود الفرع:
         // 1. أرقام فقط (بدون حروف)
         // 2. من 1 إلى 4 أرقام
@@ -4435,7 +4423,7 @@ const AddManagerModal: React.FC<{
             setError('كود الفرع يجب أن يختلف عن كود المدير الرئيسي');
             return;
         }
-        
+
         console.log('🟢 Validation passed, checking PIN availability...');
         setLoading(true);
         setCheckingCodes(true);
@@ -4520,10 +4508,10 @@ const AddManagerModal: React.FC<{
             branchCodes.forEach(b => {
                 branchNamesMap[b.code] = b.name;
             });
-            
+
             // ✅ Create manager with optional isolated Firebase config
             const hasCustomFirebase = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
-            
+
             // ✅ FIX: Build clean firebaseConfig object without undefined values
             // Firebase WriteBatch.set() doesn't accept undefined values!
             const cleanFirebaseConfig = hasCustomFirebase ? (() => {
@@ -4542,7 +4530,7 @@ const AddManagerModal: React.FC<{
                 }
                 return config;
             })() : undefined;
-            
+
             const managerResult = await createManager({
                 name: name.trim() || 'مدير جديد',
                 phone: phone.trim(), // ✅ رقم هاتف المدير (إجباري)
@@ -4555,19 +4543,19 @@ const AddManagerModal: React.FC<{
                 // ✅ SaaS: Store Firebase config if provided (Isolated Multi-Tenancy)
                 firebaseConfig: cleanFirebaseConfig,
             });
-            
+
             // ✅ Get tenantId from manager result
             const tenantId = managerResult.tenantId;
-            
+
             // ✅ Create receipt vouchers for each branch
             const createdVoucherIds: string[] = [];
             if (tenantId && systemSettings) {
                 const subscriptionPrice = systemSettings.defaultSubscriptionPrice || 0;
                 const taxRate = systemSettings.defaultTaxRate || 15;
-                
+
                 // ✅ المبلغ للفرع الواحد × مدة الاشتراك (سنة واحدة = 1x، سنتين = 2x)
                 const pricePerBranch = subscriptionPrice * subscriptionDuration;
-                
+
                 // إنشاء سند قبض لكل فرع
                 for (const branch of branchCodes) {
                     const voucherId = await createReceiptVoucher({
@@ -4588,19 +4576,19 @@ const AddManagerModal: React.FC<{
                     createdVoucherIds.push(voucherId);
                 }
             }
-            
+
             showSuccess('تم إضافة المدير وإنشاء سندات القبض بنجاح');
-            
+
             // ✅ Print vouchers automatically
             if (createdVoucherIds.length > 0) {
                 try {
                     // Wait a bit for Firestore to update
                     await new Promise(resolve => setTimeout(resolve, 500));
-                    
+
                     // Get the created vouchers
                     const allVouchers = await getAllReceiptVouchers();
                     const vouchersToPrint = allVouchers.filter((v) => createdVoucherIds.includes(v.id));
-                    
+
                     if (vouchersToPrint.length > 0) {
                         // Print function (same as in BillingDashboard)
                         const paymentMethodLabels = {
@@ -4609,10 +4597,10 @@ const AddManagerModal: React.FC<{
                             'bank_transfer': 'تحويل بنكي',
                             'deferred': 'مؤجل الدفع'
                         };
-                        
+
                         const printContent = vouchersToPrint.map((voucher) => {
-                            const createdAtDate = voucher.createdAt instanceof Date 
-                                ? voucher.createdAt 
+                            const createdAtDate = voucher.createdAt instanceof Date
+                                ? voucher.createdAt
                                 : (voucher.createdAt as Timestamp)?.toDate?.() || new Date();
                             const formattedDate = createdAtDate.toLocaleDateString('ar-SA', {
                                 year: 'numeric',
@@ -4621,12 +4609,12 @@ const AddManagerModal: React.FC<{
                                 hour: '2-digit',
                                 minute: '2-digit'
                             });
-                            
+
                             // ✅ Calculate tax and subtotal
                             const taxRate = 15; // 15% VAT
                             const subtotal = voucher.totalAmount / (1 + taxRate / 100);
                             const taxAmount = voucher.totalAmount - subtotal;
-                            
+
                             return `
                                 <div style="page-break-after: always; padding: 0; margin: 0; max-width: 100%;">
                                     <!-- Header Section -->
@@ -4716,7 +4704,7 @@ const AddManagerModal: React.FC<{
                                 </div>
                             `;
                         }).join('');
-                        
+
                         const printWindow = window.open('', '_blank');
                         if (printWindow) {
                             printWindow.document.write(`
@@ -4764,13 +4752,13 @@ const AddManagerModal: React.FC<{
                     // ✅ AUTO-PRINT INVOICES AFTER VOUCHERS
                     // Wait for invoices to be created
                     await new Promise(resolve => setTimeout(resolve, 800));
-                    
+
                     // Get the invoices linked to these vouchers
                     const allInvoices = await getAllInvoices();
-                    const invoicesToPrint = allInvoices.filter((inv: Invoice) => 
+                    const invoicesToPrint = allInvoices.filter((inv: Invoice) =>
                         createdVoucherIds.includes(inv.receiptVoucherId || '')
                     );
-                    
+
                     if (invoicesToPrint.length > 0) {
                         const paymentMethodLabels = {
                             'cash': 'كاش',
@@ -4778,10 +4766,10 @@ const AddManagerModal: React.FC<{
                             'bank_transfer': 'تحويل بنكي',
                             'deferred': 'مؤجل الدفع'
                         };
-                        
+
                         const invoicePrintContent = invoicesToPrint.map((invoice: Invoice) => {
-                            const issueDateObj = invoice.issueDate instanceof Date 
-                                ? invoice.issueDate 
+                            const issueDateObj = invoice.issueDate instanceof Date
+                                ? invoice.issueDate
                                 : (invoice.issueDate as any)?.toDate?.() || new Date();
                             const formattedDate = issueDateObj.toLocaleDateString('ar-SA', {
                                 year: 'numeric',
@@ -4790,11 +4778,11 @@ const AddManagerModal: React.FC<{
                                 hour: '2-digit',
                                 minute: '2-digit'
                             });
-                            
+
                             const taxRate = 15;
                             const subtotal = invoice.amount / (1 + taxRate / 100);
                             const taxAmount = invoice.amount - subtotal;
-                            
+
                             return `
                                 <div style="page-break-after: always; padding: 0; margin: 0; max-width: 100%;">
                                     <!-- Header Section - Invoice Style -->
@@ -4876,7 +4864,7 @@ const AddManagerModal: React.FC<{
                                 </div>
                             `;
                         }).join('');
-                        
+
                         const invoicePrintWindow = window.open('', '_blank');
                         if (invoicePrintWindow) {
                             invoicePrintWindow.document.write(`
@@ -4913,7 +4901,7 @@ const AddManagerModal: React.FC<{
                     console.error('Error printing vouchers/invoices:', printError);
                 }
             }
-            
+
             onSuccess();
         } catch (err: any) {
             setError(err.message || 'حدث خطأ');
@@ -4927,7 +4915,7 @@ const AddManagerModal: React.FC<{
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             {/* Main Card - Uses existing glass-card pattern */}
             <div className="glass-card relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl overflow-hidden !p-0">
-                
+
                 {/* Header */}
                 <div className="p-4 flex items-center justify-between border-b border-theme">
                     <div className="flex items-center gap-3">
@@ -4943,23 +4931,22 @@ const AddManagerModal: React.FC<{
                         <X className="w-5 h-5" />
                     </button>
                 </div>
-                
+
                 {/* Step Progress */}
                 <div className="px-4 py-3 flex gap-2 border-b border-theme">
                     {[1, 2, 3, 4].map((step) => (
                         <div key={step} className="flex-1">
-                            <div className={`h-1.5 rounded-full mb-1 ${
-                                step < currentStep ? 'bg-teal-500' : 
-                                step === currentStep ? 'bg-yellow-500' : 
-                                'bg-gray-300 dark:bg-white/10'
-                            }`} />
+                            <div className={`h-1.5 rounded-full mb-1 ${step < currentStep ? 'bg-teal-500' :
+                                    step === currentStep ? 'bg-yellow-500' :
+                                        'bg-gray-300 dark:bg-white/10'
+                                }`} />
                             <span className="text-[9px] block text-center" style={{ color: step <= currentStep ? 'var(--theme-text-primary)' : 'var(--theme-text-disabled)' }}>
                                 {step === 1 ? 'الأساسية' : step === 2 ? 'الفروع' : step === 3 ? 'الاشتراك' : 'المراجعة'}
                             </span>
                         </div>
                     ))}
                 </div>
-                
+
                 {/* Step Content */}
                 <div className="p-4 overflow-y-auto flex-1">
                     {/* ==================== STEP 1: Basic Info ==================== */}
@@ -4974,7 +4961,7 @@ const AddManagerModal: React.FC<{
                                 </label>
                                 <input type="text" value={name} onChange={e => setName(e.target.value)} className="input" placeholder="محمد أحمد" required />
                             </div>
-                            
+
                             {/* Phone Numbers - Grid Layout */}
                             <div className="grid grid-cols-2 gap-3">
                                 {/* Primary Phone */}
@@ -4985,7 +4972,7 @@ const AddManagerModal: React.FC<{
                                         <span className="text-red-500">*</span>
                                     </label>
                                     <div className="relative">
-                                        <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9+]/g, ''))} className="input text-left" placeholder="05xxxxxxxx" dir="ltr" />
+                                        <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9+]/g, ''))} className="input text-left" placeholder="05xxxxxxxx" dir="ltr" required />
                                         {phone.length >= 9 && (
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2">
                                                 <CheckCircle className="w-5 h-5 text-green-500" />
@@ -4993,7 +4980,7 @@ const AddManagerModal: React.FC<{
                                         )}
                                     </div>
                                 </div>
-                                
+
                                 {/* Backup Phone */}
                                 <div>
                                     <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--theme-text-secondary)' }}>
@@ -5012,7 +4999,7 @@ const AddManagerModal: React.FC<{
                                 </div>
                             </div>
                             <p className="text-xs -mt-2 mb-2" style={{ color: 'var(--theme-text-disabled)' }}>💡 للتواصل عند نسيان الكود</p>
-                            
+
                             {/* Manager Code */}
                             <div>
                                 <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--theme-text-secondary)' }}>
@@ -5026,10 +5013,9 @@ const AddManagerModal: React.FC<{
                                         type="text"
                                         value={code}
                                         onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                        className={`input text-center text-2xl font-mono tracking-[0.4em] ${
-                                            conflictingCodes.has(code) ? '!border-red-500 !bg-red-500/10' : 
-                                            code.length === 4 ? '!border-green-500 !bg-green-500/10' : ''
-                                        }`}
+                                        className={`input text-center text-2xl font-mono tracking-[0.4em] ${conflictingCodes.has(code) ? '!border-red-500 !bg-red-500/10' :
+                                                code.length === 4 ? '!border-green-500 !bg-green-500/10' : ''
+                                            }`}
                                         placeholder="• • • •"
                                         maxLength={4}
                                     />
@@ -5044,7 +5030,7 @@ const AddManagerModal: React.FC<{
                                     </div>
                                 )}
                             </div>
-                            
+
                             {/* Hotel/Brand Name */}
                             <div>
                                 <label className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--theme-text-secondary)' }}>
@@ -5055,7 +5041,7 @@ const AddManagerModal: React.FC<{
                             </div>
                         </div>
                     )}
-                    
+
                     {/* ==================== STEP 2: Branches ==================== */}
                     {currentStep === 2 && (
                         <div className="space-y-4">
@@ -5066,7 +5052,7 @@ const AddManagerModal: React.FC<{
                                     أضف فروع الفندق. كل فرع يحتاج <strong>كود رقمي فريد</strong> من 1-4 أرقام.
                                 </p>
                             </div>
-                            
+
                             {/* Add Branch Form */}
                             <div className="glass rounded-xl p-4">
                                 <label className="flex items-center gap-2 text-sm mb-3" style={{ color: 'var(--theme-text-secondary)' }}>
@@ -5110,7 +5096,7 @@ const AddManagerModal: React.FC<{
                                     </div>
                                 )}
                             </div>
-                            
+
                             {/* Branch List */}
                             <div>
                                 <label className="flex items-center justify-between text-sm mb-3" style={{ color: 'var(--theme-text-secondary)' }}>
@@ -5139,7 +5125,7 @@ const AddManagerModal: React.FC<{
                             </div>
                         </div>
                     )}
-                    
+
                     {/* ==================== STEP 3: Subscription & Payment ==================== */}
                     {currentStep === 3 && (
                         <div className="space-y-4">
@@ -5159,9 +5145,8 @@ const AddManagerModal: React.FC<{
                                             key={m.value}
                                             type="button"
                                             onClick={() => setPaymentMethod(m.value as any)}
-                                            className={`p-3 rounded-xl font-medium transition-all flex items-center gap-2 border ${
-                                                paymentMethod === m.value ? 'border-teal-500 bg-teal-500/10' : 'border-theme glass'
-                                            }`}
+                                            className={`p-3 rounded-xl font-medium transition-all flex items-center gap-2 border ${paymentMethod === m.value ? 'border-teal-500 bg-teal-500/10' : 'border-theme glass'
+                                                }`}
                                             style={{ color: 'var(--theme-text-primary)' }}
                                         >
                                             <span className="text-lg">{m.icon}</span>
@@ -5170,7 +5155,7 @@ const AddManagerModal: React.FC<{
                                     ))}
                                 </div>
                             </div>
-                            
+
                             {/* Subscription Duration */}
                             <div>
                                 <label className="flex items-center gap-2 text-sm mb-3" style={{ color: 'var(--theme-text-secondary)' }}>
@@ -5190,7 +5175,7 @@ const AddManagerModal: React.FC<{
                                     </button>
                                 </div>
                             </div>
-                            
+
                             {/* Price Summary */}
                             {systemSettings && (
                                 <div className="glass rounded-xl p-4">
@@ -5210,12 +5195,12 @@ const AddManagerModal: React.FC<{
                                     </div>
                                 </div>
                             )}
-                            
+
                             {/* Firebase Config */}
                             <TenantFirebaseConfig config={firebaseConfig} onChange={setFirebaseConfig} disabled={loading} compact={true} showTestButton={true} onTestResult={(success) => setFirebaseTestPassed(success)} />
                         </div>
                     )}
-                    
+
                     {/* ==================== STEP 4: Review & Save ==================== */}
                     {currentStep === 4 && (
                         <div className="space-y-3">
@@ -5224,7 +5209,7 @@ const AddManagerModal: React.FC<{
                                 <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                                 <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>راجع البيانات قبل <strong>الحفظ النهائي</strong></p>
                             </div>
-                            
+
                             {/* Summary Cards */}
                             <div className="space-y-2">
                                 {/* Basic Info */}
@@ -5237,7 +5222,7 @@ const AddManagerModal: React.FC<{
                                         <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>البراند</span><span style={{ color: 'var(--theme-text-primary)' }}>{hotelName || '-'}</span></div>
                                     </div>
                                 </div>
-                                
+
                                 {/* Branches */}
                                 <div className="glass rounded-xl p-3">
                                     <h4 className="text-xs font-bold mb-2 flex items-center gap-2 text-purple-500"><Building2 className="w-3.5 h-3.5" />الفروع ({branchCodes.length})</h4>
@@ -5247,7 +5232,7 @@ const AddManagerModal: React.FC<{
                                         ))}
                                     </div>
                                 </div>
-                                
+
                                 {/* Subscription */}
                                 <div className="glass rounded-xl p-3 border-yellow-500/30">
                                     <h4 className="text-xs font-bold mb-2 flex items-center gap-2 text-yellow-500"><DollarSign className="w-3.5 h-3.5" />تفاصيل الاشتراك</h4>
@@ -5260,19 +5245,19 @@ const AddManagerModal: React.FC<{
                                         <span className="text-lg font-bold text-teal-500">{((systemSettings?.defaultSubscriptionPrice || 0) * branchCodes.length * subscriptionDuration).toLocaleString()} ر.س</span>
                                     </div>
                                 </div>
-                                
+
                                 {firebaseConfig.apiKey && (
                                     <div className="glass rounded-xl p-3">
                                         <div className="text-sm flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" /><span style={{ color: 'var(--theme-text-secondary)' }}>Firebase منفصل</span></div>
                                     </div>
                                 )}
                             </div>
-                            
+
                             {error && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30"><p className="text-sm flex items-center gap-2 text-red-500"><AlertTriangle className="w-4 h-4" />{error}</p></div>}
                         </div>
                     )}
                 </div>
-                
+
                 {/* Footer */}
                 <div className="p-4 border-t border-theme">
                     <div className="flex gap-3">
@@ -5326,11 +5311,11 @@ const ManagerDetailsModal: React.FC<{
         smsNotifications: 'إشعارات SMS'
     };
 
-    const createdAt = managerDetails.createdAt?.toDate 
-        ? managerDetails.createdAt.toDate() 
-        : managerDetails.createdAt instanceof Timestamp 
-        ? managerDetails.createdAt.toDate() 
-        : new Date(managerDetails.createdAt || Date.now());
+    const createdAt = managerDetails.createdAt?.toDate
+        ? managerDetails.createdAt.toDate()
+        : managerDetails.createdAt instanceof Timestamp
+            ? managerDetails.createdAt.toDate()
+            : new Date(managerDetails.createdAt || Date.now());
 
     // ✅ Print subscription report
     const handlePrint = () => {
@@ -5449,14 +5434,14 @@ const ManagerDetailsModal: React.FC<{
                         <div>
                             <h3 className="text-xl font-bold text-slate-800 dark:text-white">{tenant.tenantName}</h3>
                             <p className="text-sm text-slate-600 dark:text-white/60">
-                                كود المدير: {managerDetails.manager.code || 'غير متوفر'} • 
+                                كود المدير: {managerDetails.manager.code || 'غير متوفر'} •
                                 {managerDetails.branches.length} فرع
                             </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         {/* Print Button */}
-                        <button 
+                        <button
                             onClick={handlePrint}
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-500/30 transition-colors border border-teal-300 dark:border-teal-500/30"
                             title="طباعة تقرير الاشتراك"
@@ -5465,7 +5450,7 @@ const ManagerDetailsModal: React.FC<{
                             <span className="hidden sm:inline">طباعة</span>
                         </button>
                         {/* Close Button */}
-                        <button 
+                        <button
                             onClick={onClose}
                             className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/10 flex items-center justify-center text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:text-white transition-colors"
                         >
@@ -5492,9 +5477,9 @@ const ManagerDetailsModal: React.FC<{
                                     <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
                                         <p className="text-sm text-slate-500 dark:text-white/60 mb-1">تاريخ إنشاء الحساب</p>
                                         <p className="text-slate-800 dark:text-white font-medium">
-                                            {createdAt.toLocaleDateString('ar-SA', { 
-                                                year: 'numeric', 
-                                                month: 'long', 
+                                            {createdAt.toLocaleDateString('ar-SA', {
+                                                year: 'numeric',
+                                                month: 'long',
                                                 day: 'numeric',
                                                 hour: '2-digit',
                                                 minute: '2-digit'
@@ -5532,11 +5517,10 @@ const ManagerDetailsModal: React.FC<{
                                             <button
                                                 key={branch.id}
                                                 onClick={() => setActiveBranchTab(branch.id)}
-                                                className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
-                                                    activeBranchTab === branch.id
+                                                className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap ${activeBranchTab === branch.id
                                                         ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-500/30'
                                                         : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10'
-                                                }`}
+                                                    }`}
                                             >
                                                 {branch.name || branch.id}
                                             </button>
@@ -5553,7 +5537,7 @@ const ManagerDetailsModal: React.FC<{
                                             <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                             {activeBranch.name || activeBranch.id}
                                         </h4>
-                                        
+
                                         {/* Branch Stats */}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                             <div className="bg-blue-50 dark:bg-white/5 rounded-xl p-4 border border-blue-200 dark:border-transparent">
@@ -5614,7 +5598,7 @@ const ManagerDetailsModal: React.FC<{
                                         <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                         {activeBranch.name || activeBranch.id}
                                     </h4>
-                                    
+
                                     {/* Same content as above */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                         <div className="bg-blue-50 dark:bg-white/5 rounded-xl p-4 border border-blue-200 dark:border-transparent">

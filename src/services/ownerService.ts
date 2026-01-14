@@ -228,8 +228,8 @@ export const createManager = async (data: {
     const managerData: User = {
         id: managerId,
         name: data.name,
-        phone: data.phone, // ✅ رقم هاتف المدير (إجباري)
-        phoneBackup: data.phoneBackup || undefined, // ✅ رقم الهاتف الاحتياطي (اختياري)
+        phone: data.phone || "", // ✅ رقم هاتف المدير (إجباري)
+        phoneBackup: data.phoneBackup || "", // ✅ رقم الهاتف الاحتياطي (اختياري)
         code: data.code,
         department: 'admin',
         role: 'manager',
@@ -288,12 +288,12 @@ export const createManager = async (data: {
         createdBy: 'owner',
         // ✅ Store essential user data for login (avoids reading from users collection)
         name: data.name,
-        phone: data.phone, // ✅ رقم هاتف المدير
-        phoneBackup: data.phoneBackup || undefined, // ✅ رقم الهاتف الاحتياطي
+        phone: data.phone || "", // ✅ رقم هاتف المدير
+        phoneBackup: data.phoneBackup || "", // ✅ رقم الهاتف الاحتياطي
         status: 'active',
         role: 'manager',
         department: 'admin',
-        licenseExpiry: Timestamp.fromDate(oneYearLater),
+        licenseExpiry: Timestamp.fromDate(expiryDate),
         licenseStatus: 'active',
         hotelName: hotelName,
         maxBranches: data.maxBranches || 1,
@@ -335,7 +335,7 @@ export const createManager = async (data: {
     }
 
     await batch.commit();
-    
+
     // ✅ Auto-seed default achievements/ranks for gamification
     try {
         const { seedTenantAchievements } = await import('./tenantSeedingService');
@@ -345,14 +345,14 @@ export const createManager = async (data: {
         console.warn('Could not seed achievements (will be created on first access):', seedErr);
         // Continue - achievements can be created manually by manager
     }
-    
+
     // ✅ AUDIT: Log manager creation
     quickAudit('MANAGER_CREATE', 'manager', managerId, {
         managerName: data.name,
         hotelName: hotelName,
         maxBranches: data.maxBranches || 1
     }, data.name);
-    
+
     return { managerId, tenantId };
 };
 
@@ -362,7 +362,7 @@ export const createManager = async (data: {
  */
 export const getAllManagers = async (forceRefresh: boolean = false): Promise<User[]> => {
     const { cachedFetch } = await import('../utils/requestCache');
-    
+
     return cachedFetch<User[]>(
         'owners:all_managers',
         async () => {
@@ -457,7 +457,7 @@ export const toggleLicenseStatus = async (managerId: string, tenantId: string, s
     }
 
     await batch.commit();
-    
+
     // ✅ AUDIT: Log manager suspend/activate
     quickAudit(
         suspend ? 'MANAGER_SUSPEND' : 'MANAGER_ACTIVATE',
@@ -471,7 +471,7 @@ export const toggleLicenseStatus = async (managerId: string, tenantId: string, s
 // ✅ Renew manager license (extend by 1 or 2 years)
 // Returns warning if price is below default
 export const renewLicense = async (
-    managerId: string, 
+    managerId: string,
     tenantId: string,
     duration: 1 | 2 = 1, // ✅ مدة التجديد: 1 = سنة، 2 = سنتين
     currentPrice?: number,
@@ -537,7 +537,7 @@ export const renewLicense = async (
     }
 
     await batch.commit();
-    
+
     // ✅ AUDIT: Log subscription renewal
     quickAudit('SUBSCRIPTION_RENEW', 'subscription', managerId, {
         tenantId,
@@ -599,10 +599,10 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
             console.log('✅ Backup created successfully:', backupId);
         } catch (err: any) {
             // ✅ Check if it's a permission error - continue deletion anyway
-            const isPermissionError = err?.code === 'permission-denied' || 
-                                       err?.message?.includes('permission-denied') ||
-                                       err?.message?.includes('Missing or insufficient permissions');
-            
+            const isPermissionError = err?.code === 'permission-denied' ||
+                err?.message?.includes('permission-denied') ||
+                err?.message?.includes('Missing or insufficient permissions');
+
             if (isPermissionError) {
                 console.warn('⚠️ Backup skipped due to permission issues. Continuing with deletion...');
                 backupId = 'BACKUP_SKIPPED_PERMISSIONS';
@@ -638,7 +638,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
             if (tenantSnap.exists()) {
                 tenantData = tenantSnap.data();
                 branchCodes = tenantData?.info?.branchCodes || [];
-                
+
                 // ✅ Suspend tenant
                 batch.set(tenantRef, {
                     info: {
@@ -788,7 +788,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
     try {
         await batch.commit();
         console.log('✅ Manager deleted successfully:', managerId);
-        
+
         // ✅ AUDIT: Log manager deletion
         quickAudit('MANAGER_DELETE', 'manager', managerId, {
             tenantId,
@@ -798,16 +798,16 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
         }, managerData?.name || 'مدير');
     } catch (commitError: any) {
         console.error('❌ Failed to commit batch deletion:', commitError);
-        
+
         // Check if it's a permission error
-        const isPermissionError = commitError?.code === 'permission-denied' || 
-                                   commitError?.message?.includes('permission-denied') ||
-                                   commitError?.message?.includes('Missing or insufficient permissions');
-        
+        const isPermissionError = commitError?.code === 'permission-denied' ||
+            commitError?.message?.includes('permission-denied') ||
+            commitError?.message?.includes('Missing or insufficient permissions');
+
         if (isPermissionError) {
             throw new Error('فشل في الحذف: صلاحيات Firebase غير كافية. يرجى نشر قواعد الأمان المحدثة.');
         }
-        
+
         throw new Error(commitError.message || 'فشل في تنفيذ عملية الحذف');
     }
 };
@@ -831,7 +831,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
     // 2. Restore manager - Check if exists first
     const managerRef = doc(db, 'users', managerId);
     const managerSnap = await getDoc(managerRef);
-    
+
     if (managerSnap.exists()) {
         batch.update(managerRef, {
             status: 'active',
@@ -854,7 +854,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
     if (tenantId) {
         const tenantRef = doc(db, 'tenants', tenantId);
         const tenantSnap = await getDoc(tenantRef);
-        
+
         let tenantData = null;
         if (tenantSnap.exists()) {
             tenantData = tenantSnap.data();
@@ -878,14 +878,14 @@ export const restoreManager = async (managerId: string): Promise<void> => {
         if (managerCode) {
             const masterCodeRef = doc(db, 'globalCodes', managerCode);
             const masterCodeSnap = await getDoc(masterCodeRef);
-            
+
             if (masterCodeSnap.exists()) {
                 const codeData = masterCodeSnap.data();
                 // ✅ Check if code is used by another manager
                 if (codeData.status === 'active' && codeData.userId !== managerId && codeData.tenantId !== tenantId) {
                     throw new Error(`الكود ${managerCode} مستخدم حالياً من قبل مدير آخر. لا يمكن الاستعادة.`);
                 }
-                
+
                 // Update if exists
                 batch.update(masterCodeRef, {
                     status: 'active',
@@ -913,12 +913,12 @@ export const restoreManager = async (managerId: string): Promise<void> => {
             // Restore branch codes if tenant data exists - with conflict check
             if (tenantData) {
                 const branchCodes = tenantData?.info?.branchCodes || [];
-                
+
                 for (const bCode of branchCodes) {
                     if (bCode && bCode !== managerCode) {
                         const bCodeRef = doc(db, 'globalCodes', bCode);
                         const bCodeSnap = await getDoc(bCodeRef);
-                        
+
                         if (bCodeSnap.exists()) {
                             const branchCodeData = bCodeSnap.data();
                             // ✅ Check if branch code is used by another tenant
@@ -926,7 +926,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
                                 console.warn(`Branch code ${bCode} is used by another tenant. Skipping restoration.`);
                                 continue; // Skip this branch code
                             }
-                            
+
                             batch.update(bCodeRef, {
                                 status: 'active',
                                 licenseStatus: 'active',
@@ -995,7 +995,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
     batch.delete(deletedRef);
 
     await batch.commit();
-    
+
     // ✅ AUDIT: Log manager restoration
     quickAudit('MANAGER_RESTORE', 'manager', managerId, {
         tenantId,
@@ -1140,35 +1140,35 @@ export const getDemoStats = async (): Promise<{
         if (!db) {
             return { total: 0, nearestExpiry: null, farthestExpiry: null };
         }
-        
+
         const managers = await getAllManagers();
-        const demoManagers = managers.filter((m: any) => 
-            m.isDemo === true && 
-            m.status === 'active' && 
-            !m.isDeleted && 
+        const demoManagers = managers.filter((m: any) =>
+            m.isDemo === true &&
+            m.status === 'active' &&
+            !m.isDeleted &&
             !m.deletedAt
         );
-        
+
         if (demoManagers.length === 0) {
             return { total: 0, nearestExpiry: null, farthestExpiry: null };
         }
-        
+
         const expiryDates: Date[] = [];
         demoManagers.forEach((manager: any) => {
             if (manager.licenseExpiry) {
-                const expiry = manager.licenseExpiry instanceof Timestamp 
-                    ? manager.licenseExpiry.toDate() 
+                const expiry = manager.licenseExpiry instanceof Timestamp
+                    ? manager.licenseExpiry.toDate()
                     : new Date(manager.licenseExpiry);
                 if (!isNaN(expiry.getTime())) {
                     expiryDates.push(expiry);
                 }
             }
         });
-        
+
         if (expiryDates.length === 0) {
             return { total: demoManagers.length, nearestExpiry: null, farthestExpiry: null };
         }
-        
+
         const sortedDates = expiryDates.sort((a, b) => a.getTime() - b.getTime());
         return {
             total: demoManagers.length,
