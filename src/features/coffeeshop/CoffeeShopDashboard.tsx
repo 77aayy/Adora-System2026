@@ -36,6 +36,7 @@ import { GeneralInstructionsView } from '../../components/shared/GeneralInstruct
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
 import { useBrandName } from '../../hooks/useBrandName';
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline'; // ✅ Challenge Timeline
+import { UnifiedRequestTabs } from '../../components/shared/UnifiedRequestTabs'; // ✅ Unified tabs
 
 // ============================================================
 // TYPES
@@ -300,25 +301,14 @@ export const CoffeeShopDashboard: React.FC = () => {
                     />
                 </div>
 
-                {/* Tabs */}
-                <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                    {[
-                        { key: 'new', label: 'جديد', count: groupedOrders.new.length },
-                        { key: 'in_progress', label: 'قيد التنفيذ', count: groupedOrders.in_progress.length },
-                        { key: 'completed', label: 'مكتملة', count: groupedOrders.completed.length }
-                    ].map(tab => (
-                        <button
-                            key={tab.key}
-                            onClick={() => setCurrentTab(tab.key as TabType)}
-                            className={`flex-shrink-0 px-4 py-2.5 rounded-xl font-medium transition-all ${currentTab === tab.key
-                                ? 'bg-teal-500 text-white shadow-lg'
-                                : 'adora-btn-ghost'
-                                }`}
-                        >
-                            {tab.label} ({tab.count})
-                        </button>
-                    ))}
-                </div>
+                {/* ✅ Unified Tabs - Same as Reception */}
+                <UnifiedRequestTabs
+                    currentTab={currentTab}
+                    onTabChange={(tab) => setCurrentTab(tab)}
+                    newCount={groupedOrders.new.length}
+                    inProgressCount={groupedOrders.in_progress.length}
+                    completedCount={groupedOrders.completed.length}
+                />
 
                 {/* Orders List */}
                 <div className="space-y-3">

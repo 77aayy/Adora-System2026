@@ -58,6 +58,7 @@ import { RoomHistoryModal } from '../../components/shared/RoomHistoryModal';
 import { LaundryInventory } from '../../components/shared/LaundryInventory';
 import { UnifiedHistoryModal } from '../../components/shared/UnifiedHistoryModal';
 import { ReadReceipt } from '../../components/shared/ReadReceipt';
+import { UnifiedRequestTabs } from '../../components/shared/UnifiedRequestTabs'; // ✅ Unified tabs
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline';
 import { GoldenAlertDisplay } from '../../components/shared/GoldenAlert';
 import { awardPoints, awardPerformancePoints } from '../../services/pointsService';
@@ -1846,33 +1847,17 @@ export const HousekeepingDashboard: React.FC = () => {
                 ))}
             </div>
 
-            {/* Tabs - Horizontal Scrollable Chips */}
-            <div className="flex gap-2.5 mb-6 overflow-x-auto pb-2 scrollbar-none snap-x">
-                {[
-                    { key: 'new', label: 'جديد', count: groupedTasks.new.length, color: 'bg-orange-500' },
-                    { key: 'in_progress', label: 'قيد التنظيف', count: groupedTasks.inProgress.length, color: 'bg-blue-500' },
-                    { key: 'completed', label: 'مكتمل', count: groupedTasks.completed.length, color: 'bg-green-500' }
-                ].map(tab => (
-                    <button
-                        key={tab.key}
-                        onClick={() => {
-                            setCurrentTab(tab.key as TabType);
-                            haptic('light');
-                        }}
-                        className={`flex-shrink-0 snap-start flex items-center gap-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all border ${currentTab === tab.key
-                            ? 'adora-card border-primary-500/30 adora-text-primary shadow-lg'
-                            : 'adora-card border-transparent adora-text-secondary hover:opacity-80'
-                            }`}
-                    >
-                        <span className={`w-2 h-2 rounded-full ${tab.color} ${currentTab === tab.key ? 'animate-pulse' : ''}`} />
-                        <span className="font-medium text-sm">{tab.label}</span>
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${currentTab === tab.key ? 'bg-white/20' : 'bg-white/5'
-                            }`}>
-                            {tab.count}
-                        </span>
-                    </button>
-                ))}
-            </div>
+            {/* ✅ Unified Tabs - Same as Reception */}
+            <UnifiedRequestTabs
+                currentTab={currentTab}
+                onTabChange={(tab) => {
+                    setCurrentTab(tab);
+                    haptic('light');
+                }}
+                newCount={groupedTasks.new.length}
+                inProgressCount={groupedTasks.inProgress.length}
+                completedCount={groupedTasks.completed.length}
+            />
 
             {/* Tasks List - Grid for Mobile */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">

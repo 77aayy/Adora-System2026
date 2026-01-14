@@ -48,6 +48,7 @@ import { BranchLocationWarning } from '../../components/auth/BranchLocationWarni
 import { checkBranchLocation } from '../../services/branchLocationService';
 import { uploadMaintenancePhoto } from '../../services/storageService'; // ✅ Add uploadMaintenancePhoto for ImgBB
 import { ManagerAnnouncementBanner } from '../../components/shared/ManagerAnnouncementBanner'; // ✅ Manager announcements banner
+import { UnifiedRequestTabs } from '../../components/shared/UnifiedRequestTabs'; // ✅ Unified tabs
 import { GeneralInstructionsView } from '../../components/shared/GeneralInstructionsView'; // ✅ General instructions view
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
 import { useBrandName } from '../../hooks/useBrandName';
@@ -1166,28 +1167,15 @@ export const MaintenanceDashboard: React.FC = () => {
                 />
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-2 mb-6 mt-6">
-                {/* ✅ Unified 3 tabs: new, in_progress, completed */}
-                {[
-                    { id: 'new', label: 'جديد', count: filteredNewRequests.length, color: 'bg-orange-500' },
-                    { id: 'in_progress', label: 'قيد التنفيذ', count: filteredInProgressRequests.length, color: 'bg-blue-500' },
-                    { id: 'completed', label: 'مكتملة', count: filteredCompletedRequests.length, color: 'bg-teal-500' }
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => switchTab(tab.id as any)}
-                        className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${currentTab === tab.id
-                            ? `${tab.color} text-white shadow-lg`
-                            : 'adora-btn-ghost'
-                            }`}
-                    >
-                        {tab.label}
-                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${currentTab === tab.id ? 'bg-white/20' : 'bg-white/10'}`}>
-                            {tab.count}
-                        </span>
-                    </button>
-                ))}
+            {/* ✅ Unified Tabs - Same as Reception */}
+            <div className="mt-6">
+                <UnifiedRequestTabs
+                    currentTab={currentTab}
+                    onTabChange={(tab) => switchTab(tab)}
+                    newCount={filteredNewRequests.length}
+                    inProgressCount={filteredInProgressRequests.length}
+                    completedCount={filteredCompletedRequests.length}
+                />
             </div>
 
             {/* Issue Type Filter */}

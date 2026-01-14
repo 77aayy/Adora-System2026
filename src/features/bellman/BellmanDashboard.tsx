@@ -58,6 +58,7 @@ import { GeneralInstructionsView } from '../../components/shared/GeneralInstruct
 import { ReadReceipt } from '../../components/shared/ReadReceipt';
 import { MobileMenu } from '../../components/common/MobileMenu';
 import { StatCard } from '../../components/common/StatCard';
+import { UnifiedRequestTabs } from '../../components/shared/UnifiedRequestTabs'; // ✅ Unified tabs
 import { AdoraLoader } from '../../components/common/AdoraLoader';
 import { awardPoints, awardPerformancePoints } from '../../services/pointsService';
 import { markAsViewed } from '../../services/requestService';
@@ -1183,43 +1184,14 @@ export const BellmanDashboard: React.FC = () => {
                 </button>
             </div>
 
-            {/* ✅ Unified Tabs - جديد / قيد التنفيذ / مكتمل */}
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-                {[
-                    { key: 'new', label: 'جديد', count: groupedRequests.new.length, color: 'teal' },
-                    { key: 'in_progress', label: 'قيد التنفيذ', count: groupedRequests.in_progress.length, color: 'blue' },
-                    { key: 'completed', label: 'مكتمل', count: groupedRequests.completed.length, color: 'green' }
-                ].map(tab => {
-                    const isActive = currentTab === tab.key;
-                    const hasNew = tab.key === 'new' && tab.count > 0 && !isActive;
-
-                    return (
-                        <button
-                            key={tab.key}
-                            onClick={() => setCurrentTab(tab.key as TabType)}
-                            className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all font-medium ${
-                                isActive
-                                    ? tab.key === 'new' ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30'
-                                    : tab.key === 'in_progress' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                                    : 'bg-green-500 text-white shadow-lg shadow-green-500/30'
-                                : hasNew
-                                    ? 'bg-teal-500/20 text-teal-400 border border-teal-500/40'
-                                    : 'adora-btn-ghost'
-                            }`}
-                        >
-                            {hasNew && (
-                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-teal-400 rounded-full animate-pulse shadow-lg shadow-teal-400/50" />
-                            )}
-                            {tab.label}
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                                isActive ? 'bg-white/20' : hasNew ? 'bg-teal-500 text-white' : 'adora-card'
-                            }`}>
-                                {tab.count}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
+            {/* ✅ Unified Tabs - Same as Reception */}
+            <UnifiedRequestTabs
+                currentTab={currentTab}
+                onTabChange={(tab) => setCurrentTab(tab)}
+                newCount={groupedRequests.new.length}
+                inProgressCount={groupedRequests.in_progress.length}
+                completedCount={groupedRequests.completed.length}
+            />
 
             {/* ✅ Content - Unified Tabs (جديد / قيد التنفيذ / مكتمل) */}
             <div className="space-y-3">
