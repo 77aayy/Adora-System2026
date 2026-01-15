@@ -88,6 +88,7 @@ interface BranchSettingsProps {
 
 const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: propTenantId }) => {
     const { tenantId: contextTenantId } = useTenant();
+    const { user } = useAuth(); // ✅ Get current user for createdBy
     // ✅ Dynamic: Use prop tenantId (for owner) or context tenantId (for manager)
     const tenantId = propTenantId || contextTenantId;
     const [roomNumber, setRoomNumber] = useState('');
@@ -104,7 +105,9 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
         if (!roomNumber) return;
         setGenerating(true);
         try {
-            const roomRef = doc(db, `tenants/${tenantId}/branches/${branchId}/rooms`, roomNumber);
+            // ✅ FIX 1: Use correct path - rooms are stored at tenants/{tenantId}/rooms/{branchId}_{roomNumber}
+            const roomDocId = `${branchId}_${roomNumber}`;
+            const roomRef = doc(db, `tenants/${tenantId}/rooms`, roomDocId);
             const snap = await getDoc(roomRef);
 
             if (!snap.exists()) {
@@ -119,19 +122,77 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 return;
             }
 
-            const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            // ✅ FIX 2: Check for active room card with QR enabled (Bellman check-in required)
+            const { getActiveRoomCard } = await import('../../services/roomCardService');
+            const roomCard = await getActiveRoomCard(roomNumber, tenantId);
 
-            await updateDoc(roomRef, {
-                qrToken: token,
-                branchId: branchId
+            if (!roomCard) {
+                await customConfirm({
+                    title: 'الغرفة غير نشطة',
+                    message: 'عذراً، هذه الغرفة غير نشطة حالياً. يجب أن يقوم البيلمان بتسجيل دخول النزيل أولاً.',
+                    confirmText: 'حسناً',
+                    showCancel: false,
+                    type: 'warning'
+                });
+                setGenerating(false);
+                return;
+            }
+
+            // ✅ FIX 3: Check if QR is active (qrActive field)
+            if (roomCard.qrActive === false) {
+                await customConfirm({
+                    title: 'QR غير مفعل',
+                    message: 'عذراً، خدمة QR غير مفعلة لهذه الغرفة حالياً. يرجى تفعيلها من البيلمان.',
+                    confirmText: 'حسناً',
+                    showCancel: false,
+                    type: 'warning'
+                });
+                setGenerating(false);
+                return;
+            }
+
+            // ✅ FIX 4: Verify branch match
+            if (roomCard.branch !== branchId) {
+                await customConfirm({
+                    title: 'الفرع غير متطابق',
+                    message: `عذراً، هذه الغرفة تتبع لفرع آخر (${roomCard.branch}). يرجى اختيار الفرع الصحيح.`,
+                    confirmText: 'حسناً',
+                    showCancel: false,
+                    type: 'warning'
+                });
+                setGenerating(false);
+                return;
+            }
+
+            // ✅ FIX 5: Use secure access token service instead of random token
+            const { generateSecureAccessToken } = await import('../../services/secureAccessService');
+            const result = await generateSecureAccessToken(
+                roomNumber,
+                branchId,
+                tenantId,
+                user?.id || 'system', // createdBy
+                {
+                    roomCardId: roomCard.id,
+                    maxDevices: 2, // Default max devices per room
+                    expiresInHours: null // Never expires (until checkout)
+                }
+            );
+
+            setSecureToken(result.token);
+            
+            // Show success message
+            await customConfirm({
+                title: 'تم توليد الرابط بنجاح',
+                message: 'تم إنشاء رابط آمن للغرفة. يمكنك نسخ الرابط أو طباعة QR code.',
+                confirmText: 'حسناً',
+                showCancel: false,
+                type: 'success'
             });
-
-            setSecureToken(token);
         } catch (error) {
             console.error('Error generating token:', error);
             await customConfirm({
                 title: 'خطأ',
-                message: 'حدث خطأ أثناء توليد الرابط',
+                message: `حدث خطأ أثناء توليد الرابط: ${(error as any).message || 'خطأ غير معروف'}`,
                 confirmText: 'حسناً',
                 showCancel: false,
                 type: 'danger'

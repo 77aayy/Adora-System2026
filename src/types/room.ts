@@ -99,6 +99,9 @@ export interface RoomCard {
     // Inspection
     inspectionCompletedAt?: Timestamp;
     inspectionStatus?: 'pending' | 'clean' | 'needs_attention';
+
+    // QR Access
+    qrActive?: boolean; // ✅ QR access enabled/disabled for this room card
 }
 
 export interface Floor {
