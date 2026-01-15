@@ -38,17 +38,19 @@ export const GuestLayout: React.FC<GuestLayoutProps> = ({ children }) => {
     const [searchParams] = useSearchParams();
     const [guestName, setGuestName] = useState('ضيف');
 
-    // Read room from URL params
-    const roomNumber = searchParams.get('room');
-    // ✅ FIX: Also check for token - if token exists, let GuestDashboard handle it
+    // 🛡️ SECURITY: Ignore room from URL - it can be manipulated!
+    // Only check for token - token is the ONLY source of truth
     const token = searchParams.get('t') || searchParams.get('token');
     
-    console.log('🔍 [GuestLayout] URL params:', { roomNumber, token: token ? `${token.substring(0, 8)}...` : 'NOT FOUND' });
+    console.log('🔍 [GuestLayout] SECURITY: Token-only validation - ignoring room param:', {
+        token: token ? `${token.substring(0, 8)}...` : 'NOT FOUND',
+        urlRoom: searchParams.get('room') // Logged for debugging only - NOT used
+    });
 
-    // ✅ FIX: Only show QR scan prompt if NO room AND NO token
-    // If token exists, GuestDashboard will handle validation and show appropriate message
-    if (!roomNumber && !token) {
-        console.log('⚠️ [GuestLayout] No room and no token - showing QR scan prompt');
+    // 🛡️ SECURITY: Only show QR scan prompt if NO token
+    // If token exists, GuestDashboard will validate it and extract room data from token
+    if (!token) {
+        console.log('⚠️ [GuestLayout] No token - showing QR scan prompt');
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-teal-50 via-cyan-50 to-emerald-50">
                 {/* Background decorations */}
@@ -87,11 +89,11 @@ export const GuestLayout: React.FC<GuestLayoutProps> = ({ children }) => {
         );
     }
 
-    // ✅ GuestDashboard has its own complete design - just provide context
-    // ✅ FIX: Pass roomNumber even if null - GuestDashboard will resolve it from token
-    console.log('✅ [GuestLayout] Rendering GuestDashboard (roomNumber:', roomNumber, ', token:', token ? 'exists' : 'none', ')');
+    // 🛡️ SECURITY: GuestDashboard will extract roomNumber from token validation
+    // Pass null for roomNumber - it will be set after token validation
+    console.log('✅ [GuestLayout] SECURITY: Rendering GuestDashboard - roomNumber will be extracted from token validation');
     return (
-        <RoomContext.Provider value={{ roomNumber, guestName, setGuestName }}>
+        <RoomContext.Provider value={{ roomNumber: null, guestName, setGuestName }}>
             {children}
         </RoomContext.Provider>
     );

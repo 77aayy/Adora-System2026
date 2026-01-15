@@ -359,16 +359,25 @@ export const GuestDashboard: React.FC = () => {
             return searchParams.get(key) || hashParams.get(key);
         };
 
-        let roomNum = getParam('room');
-        let branchId = getParam('branch');
-        // ✅ Unify to tenantId
-        let tenantId = getParam('tenantId') || getParam('hotelId');
-        // 🔐 NEW: Support both 't' (short) and 'token' (legacy)
+        // 🛡️ SECURITY: Ignore room/branch/tenant from URL - they can be manipulated!
+        // Only trust data from Token validation
+        const urlRoomNum = getParam('room'); // For logging only - NOT used for security
+        const urlBranchId = getParam('branch'); // For logging only - NOT used for security
+        const urlTenantId = getParam('tenantId') || getParam('hotelId'); // For logging only - NOT used for security
+        
+        // 🔐 SECURITY: Token is the ONLY source of truth
         const token = getParam('t') || getParam('token');
         console.log('🔍 [GuestDashboard] Token from URL:', token ? `${token.substring(0, 8)}...` : 'NOT FOUND');
-        console.log('🔍 [GuestDashboard] Room from URL:', roomNum);
-        console.log('🔍 [GuestDashboard] Branch from URL:', branchId);
-        console.log('🔍 [GuestDashboard] Tenant from URL:', tenantId);
+        console.log('⚠️ [GuestDashboard] SECURITY: Ignoring URL params (can be manipulated):', {
+            room: urlRoomNum,
+            branch: urlBranchId,
+            tenant: urlTenantId
+        });
+        
+        // Initialize as null - will be set from Token validation only
+        let roomNum: string | null = null;
+        let branchId: string | null = null;
+        let tenantId: string | null = null;
         
         // ✅ Check for Demo Mode (for trial buyers)
         const demo = getParam('demo');
@@ -377,18 +386,19 @@ export const GuestDashboard: React.FC = () => {
             console.log('🎮 Demo Mode Activated - Requests will NOT be sent');
         }
 
-        // 🔐 SECURITY CHECK: Detect legacy insecure access (IDOR vulnerability)
+        // 🛡️ SECURITY CHECK: Detect legacy insecure access (IDOR vulnerability)
+        // Block access if room/branch/tenant are in URL but NO token (insecure direct access)
         const searchParams = new URLSearchParams(window.location.search);
         if (isLegacyInsecureAccess(searchParams) && !demo) {
-            console.warn('🚨 SECURITY: Legacy insecure access detected - blocking');
+            console.warn('🚨 [GuestDashboard] SECURITY: Legacy insecure access detected - blocking');
             
             // Log suspicious activity
             const fingerprint = getSavedDeviceFingerprint() || generateDeviceFingerprint();
             logSecurityEvent({
                 action: 'SUSPICIOUS_ACTIVITY',
-                roomNumber: roomNum || undefined,
-                branchId: branchId || undefined,
-                tenantId: tenantId || undefined,
+                roomNumber: urlRoomNum || undefined,
+                branchId: urlBranchId || undefined,
+                tenantId: urlTenantId || undefined,
                 deviceFingerprint: fingerprint,
                 userAgent: navigator.userAgent,
                 reason: 'Attempted access with direct room parameter without secure token'
@@ -434,10 +444,86 @@ export const GuestDashboard: React.FC = () => {
                     return;
                 }
                 
-                // Token is valid - extract data
+                // 🛡️ SECURITY: Token is valid - extract data FROM TOKEN ONLY (ignore URL params)
+                // This is the ONLY source of truth - URL params can be manipulated!
                 roomNum = validationResult.data!.roomNumber;
                 branchId = validationResult.data!.branchId;
                 tenantId = validationResult.data!.tenantId;
+                
+                // 🛡️ DOUBLE VALIDATION: If URL has room param, verify it matches token data
+                // This detects IDOR (Insecure Direct Object Reference) attacks
+                if (urlRoomNum && urlRoomNum !== roomNum) {
+                    console.error('🚨 [GuestDashboard] SECURITY BREACH DETECTED: Room mismatch!', {
+                        urlRoom: urlRoomNum,
+                        tokenRoom: roomNum,
+                        action: 'BLOCKED'
+                    });
+                    // Log security event
+                    logSecurityEvent({
+                        action: 'ROOM_MISMATCH_ATTEMPT',
+                        roomNumber: urlRoomNum,
+                        tokenRoomNumber: roomNum,
+                        branchId: branchId || undefined,
+                        tenantId: tenantId || undefined,
+                        deviceFingerprint: fingerprint,
+                        userAgent: navigator.userAgent,
+                        reason: 'User attempted to access different room by manipulating URL parameter'
+                    });
+                    // Show error and block access
+                    setAuthError('عذراً، تم اكتشاف محاولة غير مصرح بها للوصول.\n\nيرجى استخدام الرابط الصحيح الموجود في غرفتك. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال.');
+                    setLoading(false);
+                    return;
+                }
+                
+                // 🛡️ DOUBLE VALIDATION: If URL has branch param, verify it matches token data
+                if (urlBranchId && urlBranchId !== branchId) {
+                    console.error('🚨 [GuestDashboard] SECURITY BREACH DETECTED: Branch mismatch!', {
+                        urlBranch: urlBranchId,
+                        tokenBranch: branchId,
+                        action: 'BLOCKED'
+                    });
+                    logSecurityEvent({
+                        action: 'BRANCH_MISMATCH_ATTEMPT',
+                        branchId: urlBranchId,
+                        tokenBranchId: branchId,
+                        roomNumber: roomNum || undefined,
+                        tenantId: tenantId || undefined,
+                        deviceFingerprint: fingerprint,
+                        userAgent: navigator.userAgent,
+                        reason: 'User attempted to access different branch by manipulating URL parameter'
+                    });
+                    setAuthError('عذراً، تم اكتشاف محاولة غير مصرح بها للوصول.\n\nيرجى استخدام الرابط الصحيح الموجود في غرفتك. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال.');
+                    setLoading(false);
+                    return;
+                }
+                
+                // 🛡️ DOUBLE VALIDATION: If URL has tenant param, verify it matches token data
+                if (urlTenantId && urlTenantId !== tenantId) {
+                    console.error('🚨 [GuestDashboard] SECURITY BREACH DETECTED: Tenant mismatch!', {
+                        urlTenant: urlTenantId,
+                        tokenTenant: tenantId,
+                        action: 'BLOCKED'
+                    });
+                    logSecurityEvent({
+                        action: 'TENANT_MISMATCH_ATTEMPT',
+                        tenantId: urlTenantId,
+                        tokenTenantId: tenantId,
+                        roomNumber: roomNum || undefined,
+                        branchId: branchId || undefined,
+                        deviceFingerprint: fingerprint,
+                        userAgent: navigator.userAgent,
+                        reason: 'User attempted to access different tenant by manipulating URL parameter'
+                    });
+                    setAuthError('عذراً، تم اكتشاف محاولة غير مصرح بها للوصول.\n\nيرجى استخدام الرابط الصحيح الموجود في غرفتك. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال.');
+                    setLoading(false);
+                    return;
+                }
+                
+                console.log('✅ [GuestDashboard] SECURITY: Token validated - using data from token ONLY (URL params ignored):', {
+                    room: roomNum,
+                    branch: branchId,
+                    tenant: tenantId
+                });
                 
                 setResolvedRoom(roomNum);
                 setResolvedBranch(branchId);
