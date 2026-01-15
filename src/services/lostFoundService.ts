@@ -17,14 +17,19 @@ import {
     orderBy,
     Timestamp,
     onSnapshot,
+    runTransaction,
+    serverTimestamp,
+    limit,
 } from 'firebase/firestore';
 import { uploadFileToImgBB } from './imageUploadService'; // ✅ Use ImgBB instead of Firebase Storage
+import { sendWhatsApp } from './communicationService';
 
 // ============================================================
 // TYPES
 // ============================================================
 
-export type ItemStatus = 'found' | 'claimed' | 'returned' | 'disposed';
+// ✅ Updated Status Flow: FOUND -> CLAIMED -> RETURNED/DONATED
+export type ItemStatus = 'found' | 'claimed' | 'returned' | 'donated' | 'disposed';
 export type ItemCategory = 'electronics' | 'documents' | 'jewelry' | 'clothing' | 'bags' | 'keys' | 'other';
 
 export interface LostFoundItem {
@@ -40,7 +45,16 @@ export interface LostFoundItem {
     imageUrl?: string;
     storageLocation?: string; // Where item is stored
     foundBy?: { id: string; name: string };
-    claimedBy?: { name: string; contact: string; idType?: string; idNumber?: string };
+    claimedBy?: { 
+        name: string; 
+        contact: string; 
+        idType?: string; 
+        idNumber?: string;
+        // ✅ Proof of Delivery fields
+        guestIdentityURL?: string; // URL to guest ID document (ImgBB)
+        signatureData?: string; // Base64 signature data
+        signatureUrl?: string; // ImgBB URL for signature image
+    };
     returnedBy?: { id: string; name: string };
     createdAt: any;
     updatedAt: any;
@@ -49,6 +63,7 @@ export interface LostFoundItem {
     disposedAt?: any;
     notes?: string;
     branch: string;
+    tenantId?: string; // ✅ SaaS isolation
 }
 
 export const CATEGORY_NAMES: Record<ItemCategory, string> = {
@@ -65,6 +80,7 @@ export const STATUS_NAMES: Record<ItemStatus, string> = {
     found: 'موجود',
     claimed: 'تم المطالبة',
     returned: 'تم الإرجاع',
+    donated: 'تم التبرع',
     disposed: 'تم التخلص',
 };
 
@@ -190,33 +206,166 @@ export const updateLostFoundItem = async (
 };
 
 /**
- * Mark item as claimed
+ * 🔐 ATOMIC: Mark item as claimed
+ * Uses runTransaction to ensure atomic update with guest identity and signature
+ * Status Flow: FOUND -> CLAIMED
  */
 export const claimItem = async (
     itemId: string,
-    claimedBy: { name: string; contact: string; idType?: string; idNumber?: string }
+    claimedBy: { 
+        name: string; 
+        contact: string; 
+        idType?: string; 
+        idNumber?: string;
+        guestIdentityURL?: string; // 🔐 Proof of Identity
+    },
+    signatureData?: string, // 🔐 Digital signature (Base64 or ImgBB URL)
+    signatureUrl?: string // 🔐 Signature image URL
 ): Promise<void> => {
-    await updateDoc(doc(db, 'lost_found', itemId), {
-        status: 'claimed',
-        claimedBy,
-        claimedAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-    });
+    if (!db) throw new Error('Firebase not initialized');
+    
+    const itemRef = doc(db, 'lost_found', itemId);
+    
+    try {
+        await runTransaction(db, async (transaction) => {
+            // 1. Re-read item to ensure latest data (prevents race conditions)
+            const itemDoc = await transaction.get(itemRef);
+            if (!itemDoc.exists()) {
+                throw new Error('العنصر غير موجود في النظام');
+            }
+            
+            const currentData = itemDoc.data() as LostFoundItem;
+            
+            // 2. Validate status flow: Only FOUND items can be claimed
+            if (currentData.status !== 'found') {
+                throw new Error(`لا يمكن المطالبة بعنصر بحالة: ${STATUS_NAMES[currentData.status] || currentData.status}`);
+            }
+            
+            // 3. ATOMIC UPDATE: Update status + Link guest identity + Save signature
+            transaction.update(itemRef, {
+                status: 'claimed',
+                claimedBy: {
+                    ...claimedBy,
+                    guestIdentityURL: claimedBy.guestIdentityURL || null
+                },
+                signatureData: signatureData || null,
+                signatureUrl: signatureUrl || null,
+                claimedAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
+            
+            console.log(`✅ ATOMIC: Item ${itemId} claimed by ${claimedBy.name} with identity verification`);
+        });
+    } catch (error: any) {
+        console.error('❌ ATOMIC TRANSACTION FAILED (claimItem):', error);
+        throw new Error(`فشل المطالبة بالعنصر: ${error.message || 'خطأ غير معروف'}`);
+    }
 };
 
 /**
- * Mark item as returned
+ * 🔐 ATOMIC: Mark item as returned
+ * Uses runTransaction to ensure atomic update
+ * Status Flow: CLAIMED -> RETURNED
+ * 
+ * ⚠️ PROOF OF DELIVERY REQUIRED:
+ * - GuestIdentityURL: Must be provided (proof of identity)
+ * - SignatureData: Must be provided (digital signature)
  */
 export const returnItem = async (
     itemId: string,
-    returnedBy: { id: string; name: string }
+    returnedBy: { id: string; name: string },
+    guestIdentityURL?: string, // 🔐 REQUIRED: Proof of Identity
+    signatureData?: string, // 🔐 REQUIRED: Digital signature
+    signatureUrl?: string // 🔐 Optional: Signature image URL
 ): Promise<void> => {
-    await updateDoc(doc(db, 'lost_found', itemId), {
-        status: 'returned',
-        returnedBy,
-        returnedAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-    });
+    if (!db) throw new Error('Firebase not initialized');
+    
+    // 🛡️ PROOF OF DELIVERY VALIDATION
+    if (!guestIdentityURL || !signatureData) {
+        throw new Error('يجب توفير إثبات الهوية والتوقيع الرقمي لإتمام عملية الإرجاع');
+    }
+    
+    const itemRef = doc(db, 'lost_found', itemId);
+    
+    try {
+        await runTransaction(db, async (transaction) => {
+            // 1. Re-read item to ensure latest data (prevents race conditions)
+            const itemDoc = await transaction.get(itemRef);
+            if (!itemDoc.exists()) {
+                throw new Error('العنصر غير موجود في النظام');
+            }
+            
+            const currentData = itemDoc.data() as LostFoundItem;
+            
+            // 2. Validate status flow: Only CLAIMED items can be returned
+            if (currentData.status !== 'claimed') {
+                throw new Error(`لا يمكن إرجاع عنصر بحالة: ${STATUS_NAMES[currentData.status] || currentData.status}. يجب أن يكون العنصر في حالة "تم المطالبة" أولاً.`);
+            }
+            
+            // 3. ATOMIC UPDATE: Update status + Save delivery proof
+            transaction.update(itemRef, {
+                status: 'returned',
+                returnedBy,
+                signatureData: signatureData, // 🔐 Store signature
+                signatureUrl: signatureUrl || null,
+                claimedBy: {
+                    ...currentData.claimedBy,
+                    guestIdentityURL: guestIdentityURL // 🔐 Store identity proof
+                },
+                returnedAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
+            
+            console.log(`✅ ATOMIC: Item ${itemId} returned by ${returnedBy.name} with proof of delivery`);
+        });
+    } catch (error: any) {
+        console.error('❌ ATOMIC TRANSACTION FAILED (returnItem):', error);
+        throw new Error(`فشل إرجاع العنصر: ${error.message || 'خطأ غير معروف'}`);
+    }
+};
+
+/**
+ * 🔐 ATOMIC: Mark item as donated
+ * Uses runTransaction to ensure atomic update
+ * Status Flow: CLAIMED -> DONATED
+ */
+export const donateItem = async (
+    itemId: string,
+    donatedBy: { id: string; name: string },
+    notes?: string
+): Promise<void> => {
+    if (!db) throw new Error('Firebase not initialized');
+    
+    const itemRef = doc(db, 'lost_found', itemId);
+    
+    try {
+        await runTransaction(db, async (transaction) => {
+            const itemDoc = await transaction.get(itemRef);
+            if (!itemDoc.exists()) {
+                throw new Error('العنصر غير موجود في النظام');
+            }
+            
+            const currentData = itemDoc.data() as LostFoundItem;
+            
+            // Validate status flow: Only CLAIMED items can be donated
+            if (currentData.status !== 'claimed') {
+                throw new Error(`لا يمكن التبرع بعنصر بحالة: ${STATUS_NAMES[currentData.status] || currentData.status}`);
+            }
+            
+            transaction.update(itemRef, {
+                status: 'donated',
+                returnedBy: donatedBy, // Reuse returnedBy field for consistency
+                returnedAt: serverTimestamp(), // Reuse returnedAt field
+                updatedAt: serverTimestamp(),
+                notes: notes || currentData.notes || null,
+            });
+            
+            console.log(`✅ ATOMIC: Item ${itemId} donated by ${donatedBy.name}`);
+        });
+    } catch (error: any) {
+        console.error('❌ ATOMIC TRANSACTION FAILED (donateItem):', error);
+        throw new Error(`فشل التبرع بالعنصر: ${error.message || 'خطأ غير معروف'}`);
+    }
 };
 
 /**
@@ -238,10 +387,15 @@ export const disposeItem = async (
 // STATISTICS
 // ============================================================
 
-export const getLostFoundStats = async (branchId: string) => {
+export const getLostFoundStats = async (branchId: string, tenantId?: string) => {
+    const constraints: any[] = [where('branch', '==', branchId)];
+    if (tenantId) {
+        constraints.push(where('tenantId', '==', tenantId));
+    }
+    
     const q = query(
         collection(db, 'lost_found'),
-        where('branch', '==', branchId)
+        ...constraints
     );
 
     const snapshot = await getDocs(q);
@@ -249,6 +403,7 @@ export const getLostFoundStats = async (branchId: string) => {
     let found = 0;
     let claimed = 0;
     let returned = 0;
+    let donated = 0;
     let disposed = 0;
     const byCategory: Record<string, number> = {};
 
@@ -260,6 +415,7 @@ export const getLostFoundStats = async (branchId: string) => {
             case 'found': found++; break;
             case 'claimed': claimed++; break;
             case 'returned': returned++; break;
+            case 'donated': donated++; break;
             case 'disposed': disposed++; break;
         }
 
@@ -271,6 +427,7 @@ export const getLostFoundStats = async (branchId: string) => {
         found,
         claimed,
         returned,
+        donated,
         disposed,
         byCategory,
     };
