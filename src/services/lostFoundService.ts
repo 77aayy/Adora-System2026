@@ -147,15 +147,68 @@ export const getLostFoundItem = async (itemId: string): Promise<LostFoundItem | 
 };
 
 /**
+ * 🔍 Get last checked-out guest from room
+ * Searches roomCards for the most recent checkout for a given room
+ */
+const getLastCheckedOutGuest = async (
+    roomNumber: string,
+    branchId: string,
+    tenantId?: string
+): Promise<{ name?: string; phone?: string } | null> => {
+    if (!db) return null;
+    
+    try {
+        const roomCardsRef = collection(db, 'roomCards');
+        const constraints: any[] = [
+            where('roomNumber', '==', roomNumber),
+            where('status', 'in', ['checkout_pending', 'checked_out', 'completed'])
+        ];
+        
+        if (branchId) {
+            constraints.push(where('branch', '==', branchId));
+        }
+        if (tenantId) {
+            constraints.push(where('tenantId', '==', tenantId));
+        }
+        
+        const q = query(
+            roomCardsRef,
+            ...constraints,
+            orderBy('checkOutTime', 'desc'),
+            limit(1)
+        );
+        
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            console.warn(`⚠️ [Lost & Found] No checked-out guest found for Room ${roomNumber}`);
+            return null;
+        }
+        
+        const cardData = snapshot.docs[0].data();
+        return {
+            name: cardData.guestName || cardData.guest_name,
+            phone: cardData.guestPhone || cardData.guest_phone || cardData.phone
+        };
+    } catch (error) {
+        console.error('Error fetching last checked-out guest:', error);
+        return null;
+    }
+};
+
+/**
  * Add new lost/found item
+ * 📱 WhatsApp Automation: If room number provided, automatically notify last checked-out guest
  * @param item - Item data (without id, createdAt, updatedAt, status)
  * @param imageFile - Optional: File to upload
  * @param imageUrl - Optional: Direct URL (e.g., from inspection photo)
+ * @param foundBy - Optional: Employee who found the item
  */
 export const addLostFoundItem = async (
     item: Omit<LostFoundItem, 'id' | 'createdAt' | 'updatedAt' | 'status'>,
     imageFile?: File,
-    imageUrl?: string // ✅ Support direct URL (e.g., from inspection)
+    imageUrl?: string, // ✅ Support direct URL (e.g., from inspection)
+    foundBy?: { id: string; name: string }
 ): Promise<string> => {
     let finalImageUrl: string | undefined = imageUrl; // ✅ Use provided URL if available
 
@@ -184,9 +237,43 @@ export const addLostFoundItem = async (
         ...item,
         imageUrl: finalImageUrl,
         status: 'found',
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
+        foundBy: foundBy || (auth.currentUser ? { 
+            id: auth.currentUser.uid, 
+            name: auth.currentUser.displayName || 'موظف' 
+        } : undefined),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
     });
+
+    // 📱 WhatsApp Automation: If room number provided, notify last checked-out guest
+    if (item.roomNumber && item.branch) {
+        try {
+            const lastGuest = await getLastCheckedOutGuest(
+                item.roomNumber,
+                item.branch,
+                item.tenantId
+            );
+            
+            if (lastGuest?.phone) {
+                const itemName = item.description || 'عنصر مفقود';
+                const message = `مرحباً بك في فندق أدورا 🌟\n\nتم العثور على ${itemName} في الغرفة ${item.roomNumber}.\n\nهل ترغب في استلامه شخصياً أم تفضّل شحنه إليك؟\n\nنحن في خدمتك دائماً.`;
+                
+                await sendWhatsApp(
+                    lastGuest.phone,
+                    message,
+                    undefined,
+                    item.tenantId
+                );
+                
+                console.log(`✅ WhatsApp notification sent to ${lastGuest.phone} for Room ${item.roomNumber}`);
+            } else {
+                console.warn(`⚠️ [Lost & Found] Could not find phone number for last guest in Room ${item.roomNumber}`);
+            }
+        } catch (whatsappError: any) {
+            // Don't fail item creation if WhatsApp fails
+            console.warn('⚠️ WhatsApp notification failed (non-critical):', whatsappError.message);
+        }
+    }
 
     return docRef.id;
 };
