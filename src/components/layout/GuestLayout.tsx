@@ -40,9 +40,12 @@ export const GuestLayout: React.FC<GuestLayoutProps> = ({ children }) => {
 
     // Read room from URL params
     const roomNumber = searchParams.get('room');
+    // ✅ FIX: Also check for token - if token exists, let GuestDashboard handle it
+    const token = searchParams.get('t') || searchParams.get('token');
 
-    // No room provided - show QR scan prompt (Premium Design matching GuestDashboard)
-    if (!roomNumber) {
+    // ✅ FIX: Only show QR scan prompt if NO room AND NO token
+    // If token exists, GuestDashboard will handle validation and show appropriate message
+    if (!roomNumber && !token) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-teal-50 via-cyan-50 to-emerald-50">
                 {/* Background decorations */}
@@ -82,6 +85,7 @@ export const GuestLayout: React.FC<GuestLayoutProps> = ({ children }) => {
     }
 
     // ✅ GuestDashboard has its own complete design - just provide context
+    // ✅ FIX: Pass roomNumber even if null - GuestDashboard will resolve it from token
     return (
         <RoomContext.Provider value={{ roomNumber, guestName, setGuestName }}>
             {children}
