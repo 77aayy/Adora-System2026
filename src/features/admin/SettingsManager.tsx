@@ -183,7 +183,7 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 tenantId,
                 user?.id || 'system', // createdBy
                 {
-                    roomCardId: roomCard.id,
+                    roomCardId: roomCardId, // ✅ Use document ID from snapshot
                     maxDevices: 2, // Default max devices per room
                     expiresInHours: null // Never expires (until checkout)
                 }
