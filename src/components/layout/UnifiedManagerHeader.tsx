@@ -22,10 +22,13 @@ import {
     Settings,
     Trophy,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { PointsTracker } from '../shared/PointsTracker';
+import { ThemeToggleButton } from '../common/ThemeToggle';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
 
 interface DepartmentTab {
     id: string;
@@ -51,61 +54,61 @@ export const UnifiedManagerHeader: React.FC = () => {
     const currentBranch = branches.find(b => b.id === branchId);
     const branchName = currentBranch?.name || 'الفرع';
 
-    // Define department tabs
+    // Define department tabs (i18n-aware)
     const departmentTabs: DepartmentTab[] = [
         {
             id: 'admin',
             path: '/admin',
-            label: 'لوحة التحكم',
-            shortLabel: 'التحكم',
+            label: t('sidebar.dashboard') || 'لوحة التحكم',
+            shortLabel: t('departments.admin') || 'التحكم',
             icon: <LayoutDashboard className="w-4 h-4" />,
             color: '#14B8A6',
         },
         {
             id: 'reception',
             path: '/reception',
-            label: 'الاستقبال',
-            shortLabel: 'استقبال',
+            label: t('departments.reception') || 'الاستقبال',
+            shortLabel: t('departments.reception') || 'استقبال',
             icon: <Phone className="w-4 h-4" />,
             color: '#3B82F6',
         },
         {
             id: 'housekeeping',
             path: '/housekeeping',
-            label: 'الهاوس كيبنج',
-            shortLabel: 'هاوس',
+            label: t('departments.housekeeping') || 'الهاوس كيبنج',
+            shortLabel: t('departments.housekeeping') || 'هاوس',
             icon: <Sparkles className="w-4 h-4" />,
             color: '#8B5CF6',
         },
         {
             id: 'bellman',
             path: '/bellman',
-            label: 'البيلمان',
-            shortLabel: 'بيلمان',
+            label: t('departments.bellman') || 'البيلمان',
+            shortLabel: t('departments.bellman') || 'بيلمان',
             icon: <BellRing className="w-4 h-4" />,
             color: '#F59E0B',
         },
         {
             id: 'coffeeshop',
             path: '/coffeeshop',
-            label: 'الكافي شوب',
-            shortLabel: 'كافي',
+            label: t('departments.coffeeshop') || 'الكافي شوب',
+            shortLabel: t('departments.coffeeshop') || 'كافي',
             icon: <Coffee className="w-4 h-4" />,
             color: '#78350F',
         },
         {
             id: 'maintenance',
             path: '/maintenance',
-            label: 'الصيانة',
-            shortLabel: 'صيانة',
+            label: t('departments.maintenance') || 'الصيانة',
+            shortLabel: t('departments.maintenance') || 'صيانة',
             icon: <Wrench className="w-4 h-4" />,
             color: '#EF4444',
         },
         ...(isProcurementEnabled ? [{
             id: 'procurement',
             path: '/procurement',
-            label: 'المشتريات',
-            shortLabel: 'مشتريات',
+            label: t('departments.procurement') || 'المشتريات',
+            shortLabel: t('departments.procurement') || 'مشتريات',
             icon: <ShoppingCart className="w-4 h-4" />,
             color: '#10B981',
         }] : []),
@@ -274,10 +277,10 @@ export const UnifiedManagerHeader: React.FC = () => {
                     {/* Center - Welcome Message & User Name (Desktop) */}
                     <div className="hidden md:flex items-center gap-2">
                         <span className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
-                            مرحباً،
+                            {t('common.welcome') || 'مرحباً'}،
                         </span>
                         <span className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>
-                            {user?.name || 'المستخدم'}
+                            {user?.name || t('common.user') || 'المستخدم'}
                         </span>
                         <span className="text-lg">👋</span>
                     </div>
@@ -287,7 +290,7 @@ export const UnifiedManagerHeader: React.FC = () => {
                         {/* Mobile: Show user name */}
                         <div className="md:hidden flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: 'var(--theme-bg-secondary)' }}>
                             <span className="text-xs font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                                {user?.name?.split(' ')[0] || 'مستخدم'}
+                                {user?.name?.split(' ')[0] || t('common.user') || 'مستخدم'}
                             </span>
                             <span className="text-sm">👋</span>
                         </div>
@@ -301,10 +304,16 @@ export const UnifiedManagerHeader: React.FC = () => {
                             />
                         )}
                         
+                        {/* 🌍 Language Switcher */}
+                        <LanguageSwitcher />
+                        
+                        {/* 🌙 Dark Mode Toggle */}
+                        <ThemeToggleButton />
+                        
                         <button
                             onClick={logout}
                             className="p-2 rounded-lg transition-all hover:bg-red-500/10 text-red-500"
-                            title="تسجيل الخروج"
+                            title={t('auth.logout') || 'تسجيل الخروج'}
                         >
                             <LogOut className="w-5 h-5" />
                         </button>

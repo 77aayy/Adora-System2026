@@ -74,11 +74,18 @@ export async function detectDNAPatterns(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
+    // 🔐 SECURITY: tenantId is required for SaaS isolation
+    if (!tenantId) {
+        console.warn('⚠️ [ExceptionDashboard] getExceptionPatterns called without tenantId');
+        return [];
+    }
+
     try {
         const requestsRef = collection(db, 'requests');
         const q = query(
             requestsRef,
             where('branch', '==', branchId),
+            where('tenantId', '==', tenantId), // 🔐 CRITICAL: Tenant isolation
             where('serviceType', '==', 'maintenance'),
             where('createdAt', '>=', Timestamp.fromDate(startDate))
         );

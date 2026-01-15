@@ -282,20 +282,20 @@ export const PayoutsManager: React.FC = () => {
                             <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center mb-6">
                                 <AlertCircle className="w-10 h-10 text-red-500" />
                             </div>
-                            <h3 className="text-2xl font-black text-white mb-2">رفض طلب الصرف</h3>
-                            <p className="text-white/40 text-sm mb-6">سيتم إعادة النقاط تلقائياً لمحفظة الموظف. يرجى توضيح سبب الرفض.</p>
+                            <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">رفض طلب الصرف</h3>
+                            <p className="text-slate-600 dark:text-white/40 text-sm mb-6">سيتم إعادة النقاط تلقائياً لمحفظة الموظف. يرجى توضيح سبب الرفض.</p>
 
                             <textarea
                                 value={rejectionReason}
                                 onChange={(e) => setRejectionReason(e.target.value)}
                                 placeholder="مثال: البيانات المالية غير مكتملة، يرجى مراجعة الإدارة..."
-                                className="w-full bg-white/5 border border-white/5 rounded-2xl p-4 text-white text-sm focus:outline-none focus:border-red-500/50 h-32 resize-none"
+                                className="w-full bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/5 rounded-2xl p-4 text-slate-800 dark:text-white text-sm focus:outline-none focus:border-red-500/50 h-32 resize-none"
                             ></textarea>
 
                             <div className="grid grid-cols-2 gap-4 mt-8">
                                 <button
                                     onClick={() => setShowRejectModal(null)}
-                                    className="py-4 rounded-2xl bg-white/5 text-white/40 font-bold hover:bg-white/10 transition-all"
+                                    className="py-4 rounded-2xl bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-white/40 font-bold hover:bg-slate-300 dark:hover:bg-white/10 transition-all"
                                 >
                                     تراجع
                                 </button>

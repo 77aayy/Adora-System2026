@@ -67,11 +67,18 @@ export function startOverdueMonitoring(
     // Stop existing monitoring
     stopOverdueMonitoring();
 
+    // 🔐 SECURITY: Added tenantId filter for multi-tenant isolation
+    if (!tenantId) {
+        console.warn('⚠️ [OverdueAlert] subscribeToOverdueAlerts called without tenantId');
+        return () => { };
+    }
+
     // Listen to pending requests
     const requestsRef = collection(db, 'requests');
     const q = query(
         requestsRef,
         where('branch', '==', branchId),
+        where('tenantId', '==', tenantId), // 🔐 CRITICAL: Tenant isolation
         where('status', 'in', ['PENDING', 'CONFIRMED', 'IN_PROGRESS'])
     );
 

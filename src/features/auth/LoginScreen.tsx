@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
   Building2, Fingerprint, User, Crown, Shield, 
   CheckCircle, AlertCircle, Eye, EyeOff, Sun, Moon, Sunrise, Sunset
@@ -29,39 +30,39 @@ import {
 } from '../../components/ui/KeypadComponents';
 
 // ============================================================
-// DYNAMIC GREETING BASED ON TIME OF DAY
+// DYNAMIC GREETING BASED ON TIME OF DAY (i18n-aware)
 // ============================================================
-const getDynamicGreeting = () => {
+const getDynamicGreeting = (t: (key: string) => string) => {
   const hour = new Date().getHours();
   
   if (hour >= 5 && hour < 12) {
     return {
-      greeting: 'صباح الخير',
-      message: 'ابدأ يومك بإنتاجية عالية',
+      greeting: t('greetings.morning'),
+      message: t('auth.morningMessage') || 'ابدأ يومك بإنتاجية عالية',
       icon: Sunrise,
       iconColor: 'text-amber-500',
       emoji: '☀️'
     };
   } else if (hour >= 12 && hour < 17) {
     return {
-      greeting: 'مساء النور',
-      message: 'استمر في تحقيق النجاح',
+      greeting: t('greetings.afternoon'),
+      message: t('auth.afternoonMessage') || 'استمر في تحقيق النجاح',
       icon: Sun,
       iconColor: 'text-yellow-500',
       emoji: '🌤️'
     };
   } else if (hour >= 17 && hour < 21) {
     return {
-      greeting: 'مساء الخير',
-      message: 'نهاية يوم مميز',
+      greeting: t('greetings.evening'),
+      message: t('auth.eveningMessage') || 'نهاية يوم مميز',
       icon: Sunset,
       iconColor: 'text-orange-500',
       emoji: '🌅'
     };
   } else {
     return {
-      greeting: 'مساء النجوم',
-      message: 'وقت للراحة أو إنهاء المهام',
+      greeting: t('greetings.night'),
+      message: t('auth.nightMessage') || 'وقت للراحة أو إنهاء المهام',
       icon: Moon,
       iconColor: 'text-indigo-400',
       emoji: '🌙'
@@ -163,8 +164,8 @@ const LoginScreen: React.FC = () => {
     };
   }, []);
 
-  // Dynamic greeting based on time of day
-  const greeting = useMemo(() => getDynamicGreeting(), []);
+  // Dynamic greeting based on time of day (i18n-aware)
+  const greeting = useMemo(() => getDynamicGreeting(t), [t]);
   const GreetingIcon = greeting.icon;
 
   // Animation on mount
@@ -658,7 +659,7 @@ const LoginScreen: React.FC = () => {
               <GreetingIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${greeting.iconColor} animate-bounce-gentle`} />
             </p>
             <p className={`text-xs sm:text-base font-medium ${isDark ? 'text-slate-300' : 'text-teal-600'}`}>
-              مرحباً بك في منظومة إدارة الفنادق
+              {t('auth.welcomeMessage') || 'مرحباً بك في منظومة إدارة الفنادق'}
             </p>
             <p className={`text-[10px] sm:text-sm italic hidden sm:block ${isDark ? 'text-slate-400' : 'text-teal-500/80'}`}>
               ✨ {greeting.message} ✨
@@ -690,7 +691,7 @@ const LoginScreen: React.FC = () => {
               active={userType === 'manager'}
               onClick={() => setUserType('manager')}
               icon={<Shield className="w-4 h-4" />}
-              label="مدير"
+              label={t('auth.manager') || 'مدير'}
               color="from-blue-500 to-blue-600 shadow-blue-500/30"
               isDark={isDark}
             />

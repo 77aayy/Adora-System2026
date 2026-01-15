@@ -203,7 +203,7 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
                 </div>
 
                 {/* Content */}
-                <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[1000px] opacity-100 overflow-y-auto'}`}>
+                <div className={`transition-all duration-300 ease-in-out border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20 ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[1000px] opacity-100 overflow-y-auto'}`}>
                     <div className="p-6 space-y-4">
                         {/* Quick Templates */}
                         <div>
@@ -312,8 +312,8 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
                                                  '⚠️'}
                                             </div>
                                             <div>
-                                                <div className="text-white font-medium">{alert.titleAr || alert.title}</div>
-                                                <div className="text-white/50 text-xs">
+                                                <div className="text-slate-800 dark:text-white font-medium">{alert.titleAr || alert.title}</div>
+                                                <div className="text-slate-600 dark:text-white/50 text-xs">
                                                     {alert.targetRooms && alert.targetRooms.length > 0
                                                         ? `${alert.targetRooms.length} غرفة`
                                                         : 'جميع الغرف'}
@@ -372,7 +372,7 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
                             ))}
 
                             {alerts.length === 0 && (
-                                <div className="text-center py-8 text-white/40">
+                                <div className="text-center py-8 text-slate-500 dark:text-white/40">
                                     <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-20" />
                                     <p>لا توجد تنبيهات طارئة</p>
                                     <p className="text-xs mt-1">استخدم القوالب السريعة أو أضف تنبيه مخصص</p>
@@ -440,21 +440,21 @@ const AlertModal: React.FC<{
                         {/* Basic Info */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">العنوان بالعربية *</label>
+                                <label className="block text-sm text-slate-600 dark:text-white/60 mb-2">العنوان بالعربية *</label>
                                 <input
                                     type="text"
                                     value={formData.titleAr || ''}
                                     onChange={e => setFormData({ ...formData, titleAr: e.target.value })}
                                     placeholder="حالة حريق - إخلاء فوري"
-                                    className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white focus:border-primary-500 focus:outline-none"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white focus:border-primary-500 focus:outline-none"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">نوع التنبيه</label>
+                                <label className="block text-sm text-slate-600 dark:text-white/60 mb-2">نوع التنبيه</label>
                                 <select
                                     value={formData.type || 'general'}
                                     onChange={e => setFormData({ ...formData, type: e.target.value as any })}
-                                    className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white focus:border-primary-500 focus:outline-none"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white focus:border-primary-500 focus:outline-none"
                                 >
                                     <option value="fire">حريق</option>
                                     <option value="evacuation">إخلاء</option>
@@ -482,11 +482,11 @@ const AlertModal: React.FC<{
                         {/* Settings */}
                         <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">الأولوية</label>
+                                <label className="block text-sm text-slate-600 dark:text-white/60 mb-2">الأولوية</label>
                                 <select
                                     value={formData.severity || 'high'}
                                     onChange={e => setFormData({ ...formData, severity: e.target.value as any })}
-                                    className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white focus:border-primary-500 focus:outline-none"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white focus:border-primary-500 focus:outline-none"
                                 >
                                     <option value="critical">حرج</option>
                                     <option value="high">مهم</option>
@@ -494,11 +494,11 @@ const AlertModal: React.FC<{
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">نوع الصوت</label>
+                                <label className="block text-sm text-slate-600 dark:text-white/60 mb-2">نوع الصوت</label>
                                 <select
                                     value={formData.soundType || 'alert'}
                                     onChange={e => setFormData({ ...formData, soundType: e.target.value as any })}
-                                    className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white focus:border-primary-500 focus:outline-none"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white focus:border-primary-500 focus:outline-none"
                                 >
                                     <option value="alert">تنبيه</option>
                                     <option value="siren">صافرة</option>
@@ -526,57 +526,57 @@ const AlertModal: React.FC<{
 
                         {/* Toggles */}
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10">
                                 <label className="flex items-center justify-between cursor-pointer">
-                                    <span className="text-sm text-white/60">تشغيل الصوت</span>
+                                    <span className="text-sm text-slate-700 dark:text-white/60">تشغيل الصوت</span>
                                     <button
                                         onClick={() => setFormData({ ...formData, showSound: !formData.showSound })}
                                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${formData.showSound
-                                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                            : 'bg-white/10 text-white/60 border border-white/10'
-                                            }`}
+                                            ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30'
+                                            : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 border border-slate-300 dark:border-white/10'
+                                        }`}
                                     >
                                         {formData.showSound ? 'مفعّل' : 'معطّل'}
                                     </button>
                                 </label>
                             </div>
-                            <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10">
                                 <label className="flex items-center justify-between cursor-pointer">
-                                    <span className="text-sm text-white/60">إشعار المتصفح</span>
+                                    <span className="text-sm text-slate-700 dark:text-white/60">إشعار المتصفح</span>
                                     <button
                                         onClick={() => setFormData({ ...formData, showNotification: !formData.showNotification })}
                                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${formData.showNotification
-                                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                            : 'bg-white/10 text-white/60 border border-white/10'
-                                            }`}
+                                            ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30'
+                                            : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 border border-slate-300 dark:border-white/10'
+                                        }`}
                                     >
                                         {formData.showNotification ? 'مفعّل' : 'معطّل'}
                                     </button>
                                 </label>
                             </div>
-                            <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10">
                                 <label className="flex items-center justify-between cursor-pointer">
-                                    <span className="text-sm text-white/60">عرض تلقائي</span>
+                                    <span className="text-sm text-slate-700 dark:text-white/60">عرض تلقائي</span>
                                     <button
                                         onClick={() => setFormData({ ...formData, autoShow: !formData.autoShow })}
                                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${formData.autoShow
-                                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                            : 'bg-white/10 text-white/60 border border-white/10'
-                                            }`}
+                                            ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30'
+                                            : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 border border-slate-300 dark:border-white/10'
+                                        }`}
                                     >
                                         {formData.autoShow ? 'مفعّل' : 'معطّل'}
                                     </button>
                                 </label>
                             </div>
-                            <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10">
                                 <label className="flex items-center justify-between cursor-pointer">
-                                    <span className="text-sm text-white/60">يمكن إغلاقه</span>
+                                    <span className="text-sm text-slate-700 dark:text-white/60">يمكن إغلاقه</span>
                                     <button
                                         onClick={() => setFormData({ ...formData, dismissible: !formData.dismissible })}
                                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${formData.dismissible
-                                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                            : 'bg-white/10 text-white/60 border border-white/10'
-                                            }`}
+                                            ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30'
+                                            : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 border border-slate-300 dark:border-white/10'
+                                        }`}
                                     >
                                         {formData.dismissible ? 'نعم' : 'لا'}
                                     </button>
@@ -585,8 +585,8 @@ const AlertModal: React.FC<{
                         </div>
 
                         {/* Target Rooms */}
-                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                            <label className="block text-sm text-white/60 mb-3">الغرف المستهدفة (فارغ = جميع الغرف)</label>
+                        <div className="p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10">
+                            <label className="block text-sm text-slate-700 dark:text-white/60 mb-3">الغرف المستهدفة (فارغ = جميع الغرف)</label>
                             <div className="max-h-40 overflow-y-auto grid grid-cols-4 gap-2">
                                 {availableRooms.map(room => (
                                     <button
@@ -600,8 +600,8 @@ const AlertModal: React.FC<{
                                         }}
                                         className={`py-2 px-3 rounded-lg text-sm transition-all ${
                                             selectedRooms.includes(room)
-                                                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                                                : 'bg-white/10 text-white/60 border border-white/10 hover:bg-white/20'
+                                                ? 'bg-primary-500/20 text-primary-600 dark:text-primary-400 border border-primary-500/30'
+                                                : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 border border-slate-300 dark:border-white/10 hover:bg-slate-300 dark:hover:bg-white/20'
                                         }`}
                                     >
                                         {room}
@@ -609,17 +609,17 @@ const AlertModal: React.FC<{
                                 ))}
                             </div>
                             {selectedRooms.length > 0 && (
-                                <p className="text-xs text-white/40 mt-2">
+                                <p className="text-xs text-slate-500 dark:text-white/40 mt-2">
                                     {selectedRooms.length} غرفة محددة
                                 </p>
                             )}
                         </div>
 
                         {/* Actions */}
-                        <div className="flex gap-3 pt-4 border-t border-white/10">
+                        <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-white/10">
                             <button
                                 onClick={onClose}
-                                className="flex-1 py-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
+                                className="flex-1 py-3 rounded-xl bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-white hover:bg-slate-300 dark:hover:bg-white/20 transition-colors"
                             >
                                 إلغاء
                             </button>

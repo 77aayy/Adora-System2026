@@ -28,7 +28,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/common/ToastManager';
 import { ConfirmProvider } from './components/common/ConfirmDialog';
-import { I18nProvider } from './i18n/i18nContext';
 import { useTenant } from './context/TenantContext';
 import { TenantProvider } from './context/TenantContext';
 import { GlobalServicesProvider } from './components/providers/GlobalServicesProvider';
@@ -808,15 +807,15 @@ const App: React.FC = () => {
     // CRITICAL: TenantProvider MUST be first to identify which tenant before loading anything else
     const providers = [
         { Component: TenantProvider },      // 1️⃣ Tenant identification (SaaS context)
-        { Component: I18nProvider },         // 2️⃣ Language settings
-        { Component: ThemeProvider },        // 3️⃣ Visual theme
-        { Component: AuthProvider },         // 4️⃣ User authentication
-        { Component: GlobalServicesProvider }, // 5️⃣ Global background services
-        { Component: ToastProvider },        // 6️⃣ Notifications
-        { Component: UXProvider },           // 7️⃣ UX settings (voice, animations)
-        { Component: ConfirmProvider },      // 8️⃣ Confirmation dialogs
-        { Component: AIProvider },           // 9️⃣ AI assistant
-        { Component: MaintenanceMode },      // 🔟 Maintenance mode check
+        // ✅ i18n is initialized globally in main.tsx (react-i18next)
+        { Component: ThemeProvider },        // 2️⃣ Visual theme
+        { Component: AuthProvider },         // 3️⃣ User authentication
+        { Component: GlobalServicesProvider }, // 4️⃣ Global background services
+        { Component: ToastProvider },        // 5️⃣ Notifications
+        { Component: UXProvider },           // 6️⃣ UX settings (voice, animations)
+        { Component: ConfirmProvider },      // 7️⃣ Confirmation dialogs
+        { Component: AIProvider },           // 8️⃣ AI assistant
+        { Component: MaintenanceMode },      // 9️⃣ Maintenance mode check
     ];
 
     return (

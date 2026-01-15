@@ -100,24 +100,34 @@ export const CATEGORY_ICONS: Record<ItemCategory, string> = {
 
 /**
  * Subscribe to lost & found items
+ * 🔐 SECURITY: Added tenantId filter for multi-tenant isolation
  */
 export const subscribeToLostFound = (
     branchId: string,
     callback: (items: LostFoundItem[]) => void,
-    status?: ItemStatus
+    status?: ItemStatus,
+    tenantId?: string // 🔐 NEW: Required for SaaS isolation
 ) => {
-    let q = query(
-        collection(db, 'lost_found'),
-        where('branch', '==', branchId)
-    );
+    // 🔐 SECURITY: tenantId is required for SaaS isolation
+    if (!tenantId) {
+        console.warn('⚠️ [LostFound] subscribeToLostFound called without tenantId - returning empty');
+        callback([]);
+        return () => { };
+    }
+
+    const constraints: any[] = [
+        where('branch', '==', branchId),
+        where('tenantId', '==', tenantId) // 🔐 CRITICAL: Tenant isolation
+    ];
 
     if (status) {
-        q = query(
-            collection(db, 'lost_found'),
-            where('branch', '==', branchId),
-            where('status', '==', status)
-        );
+        constraints.push(where('status', '==', status));
     }
+
+    const q = query(
+        collection(db, 'lost_found'),
+        ...constraints
+    );
 
     return onSnapshot(q, (snapshot) => {
         const items: LostFoundItem[] = [];
@@ -475,10 +485,24 @@ export const disposeItem = async (
 // ============================================================
 
 export const getLostFoundStats = async (branchId: string, tenantId?: string) => {
-    const constraints: any[] = [where('branch', '==', branchId)];
-    if (tenantId) {
-        constraints.push(where('tenantId', '==', tenantId));
+    // 🔐 SECURITY: tenantId is required for SaaS isolation
+    if (!tenantId) {
+        console.warn('⚠️ [LostFound] getLostFoundStats called without tenantId');
+        return {
+            total: 0,
+            found: 0,
+            claimed: 0,
+            returned: 0,
+            donated: 0,
+            disposed: 0,
+            byCategory: {}
+        };
     }
+
+    const constraints: any[] = [
+        where('branch', '==', branchId),
+        where('tenantId', '==', tenantId) // 🔐 CRITICAL: Tenant isolation
+    ];
     
     const q = query(
         collection(db, 'lost_found'),

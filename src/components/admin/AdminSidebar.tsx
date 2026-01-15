@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
     LayoutDashboard,
     Users,
@@ -91,33 +92,33 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     const ownerSections = [
         {
             id: 'dashboard',
-            label: 'لوحة التحكم',
+            label: t('sidebar.dashboard') || 'لوحة التحكم',
             icon: <Crown className="w-4 h-4" style={{ color: 'var(--theme-accent-yellow)' }} />,
             items: [
-                { to: '/owner-dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: 'الرئيسية', end: true },
-                { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: 'إدارة المشتركين' },
-                { to: '/owner-dashboard?tab=billing', icon: <DollarSign className="w-4 h-4" />, label: 'الفواتير' },
-                { to: '/owner-dashboard?tab=broadcasts', icon: <Bell className="w-4 h-4" />, label: 'الرسائل والإعلانات' },
+                { to: '/owner-dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: t('sidebar.overview') || 'الرئيسية', end: true },
+                { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: t('admin.manageTenants') || 'إدارة المشتركين' },
+                { to: '/owner-dashboard?tab=billing', icon: <DollarSign className="w-4 h-4" />, label: t('admin.billing') || 'الفواتير' },
+                { to: '/owner-dashboard?tab=broadcasts', icon: <Bell className="w-4 h-4" />, label: t('admin.broadcasts') || 'الرسائل والإعلانات' },
             ]
         },
         {
             id: 'settings',
-            label: 'الإعدادات',
+            label: t('sidebar.settings') || 'الإعدادات',
             icon: <Settings className="w-4 h-4" style={{ color: 'var(--theme-accent-blue)' }} />,
             items: [
-                { to: '/owner-dashboard?tab=settings', icon: <Settings className="w-4 h-4" />, label: 'إعدادات النظام' },
-                { to: '/owner-dashboard?tab=core-config', icon: <ShieldCheck className="w-4 h-4" />, label: '🔐 التأسيس' },
+                { to: '/owner-dashboard?tab=settings', icon: <Settings className="w-4 h-4" />, label: t('admin.systemSettings') || 'إعدادات النظام' },
+                { to: '/owner-dashboard?tab=core-config', icon: <ShieldCheck className="w-4 h-4" />, label: t('admin.coreSetup') || '🔐 التأسيس' },
             ]
         },
         {
             id: 'support',
-            label: 'الدعم الفني',
+            label: t('admin.technicalSupport') || 'الدعم الفني',
             icon: <Mail className="w-4 h-4" style={{ color: 'var(--theme-accent-purple)' }} />,
             items: [
                 { 
                     to: '/admin/support-tickets', 
                     icon: <Mail className="w-4 h-4" />, 
-                    label: 'تذاكر الدعم',
+                    label: t('admin.supportTickets') || 'تذاكر الدعم',
                     badge: ticketStatus && ticketStatus.unreadCount > 0 ? ticketStatus.unreadCount : undefined
                 }
             ]
@@ -133,78 +134,78 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     const { isEnabled: isScheduledTasksEnabled } = useFeatureGate('scheduledTasks');
     const { isEnabled: isWhatsAppEnabled } = useFeatureGate('whatsappIntegration');
 
-    // ✅ MANAGER MENU: Reorganized with professional grouping
+    // ✅ MANAGER MENU: Reorganized with professional grouping (i18n-aware)
     const managerSections = [
         {
             id: 'dashboard',
-            label: 'لوحة التحكم',
+            label: t('sidebar.dashboard') || 'لوحة التحكم',
             icon: <LayoutDashboard className="w-4 h-4" style={{ color: 'var(--theme-primary-500)' }} />,
             items: [
-                { to: '/admin', icon: <LayoutDashboard className="w-4 h-4" />, label: 'نظرة عامة', end: true },
-                { to: '/admin/pulse', icon: <Activity className="w-4 h-4" />, label: '⏱️ النبض اللحظي' },
+                { to: '/admin', icon: <LayoutDashboard className="w-4 h-4" />, label: t('sidebar.overview') || 'نظرة عامة', end: true },
+                { to: '/admin/pulse', icon: <Activity className="w-4 h-4" />, label: t('admin.pulse') || '⏱️ النبض اللحظي' },
             ]
         },
         {
             id: 'facilities',
-            label: 'إدارة المنشأة',
+            label: t('admin.facilities') || 'إدارة المنشأة',
             icon: <Building2 className="w-4 h-4" style={{ color: 'var(--theme-primary-500)' }} />,
             items: [
-                { to: '/admin/branches', icon: <Globe className="w-4 h-4" />, label: 'الفروع' },
-                { to: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" />, label: 'الغرف والأدوار' },
-                { to: '/admin/employees', icon: <Users className="w-4 h-4" />, label: 'الموظفين' },
+                { to: '/admin/branches', icon: <Globe className="w-4 h-4" />, label: t('sidebar.branches') || 'الفروع' },
+                { to: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" />, label: t('admin.roomsAndFloors') || 'الغرف والأدوار' },
+                { to: '/admin/employees', icon: <Users className="w-4 h-4" />, label: t('sidebar.employees') || 'الموظفين' },
             ]
         },
         {
             id: 'operations',
-            label: 'العمليات اليومية',
+            label: t('admin.dailyOperations') || 'العمليات اليومية',
             icon: <Layers className="w-4 h-4" style={{ color: 'var(--theme-accent-purple)' }} />,
             items: [
-                { to: '/admin/chat-monitor', icon: <Radio className="w-4 h-4" />, label: '📡 رادار الشات' },
-                { to: '/admin/chat-settings', icon: <MessageCircle className="w-4 h-4" />, label: '💬 إعدادات الشات' },
-                ...(isScheduledTasksEnabled ? [{ to: '/admin/tasks', icon: <Calendar className="w-4 h-4" />, label: 'أوامر الشغل' }] : []),
+                { to: '/admin/chat-monitor', icon: <Radio className="w-4 h-4" />, label: t('admin.chatRadar') || '📡 رادار الشات' },
+                { to: '/admin/chat-settings', icon: <MessageCircle className="w-4 h-4" />, label: t('admin.chatSettings') || '💬 إعدادات الشات' },
+                ...(isScheduledTasksEnabled ? [{ to: '/admin/tasks', icon: <Calendar className="w-4 h-4" />, label: t('admin.scheduledTasks') || 'أوامر الشغل' }] : []),
             ]
         },
         {
             id: 'inventory',
-            label: 'المخزون والمستودعات',
+            label: t('admin.inventoryAndWarehouses') || 'المخزون والمستودعات',
             icon: <Package className="w-4 h-4" style={{ color: 'var(--theme-accent-orange)' }} />,
             items: [
-                ...(isInventoryEnabled ? [{ to: '/admin/inventory', icon: <Package className="w-4 h-4" />, label: 'المخزون' }] : []),
-                ...(isLaundryEnabled ? [{ to: '/admin/laundry', icon: <Shirt className="w-4 h-4" />, label: 'المغسلة' }] : []),
-                { to: '/admin/lost-found', icon: <Search className="w-4 h-4" />, label: 'المفقودات' },
+                ...(isInventoryEnabled ? [{ to: '/admin/inventory', icon: <Package className="w-4 h-4" />, label: t('sidebar.inventory') || 'المخزون' }] : []),
+                ...(isLaundryEnabled ? [{ to: '/admin/laundry', icon: <Shirt className="w-4 h-4" />, label: t('departments.laundry') || 'المغسلة' }] : []),
+                { to: '/admin/lost-found', icon: <Search className="w-4 h-4" />, label: t('admin.lostFound') || 'المفقودات' },
             ]
         },
         {
             id: 'finance',
-            label: 'المالية والتحفيز',
+            label: t('admin.financeAndMotivation') || 'المالية والتحفيز',
             icon: <DollarSign className="w-4 h-4" style={{ color: 'var(--theme-accent-green)' }} />,
             items: [
-                { to: '/admin/prices', icon: <DollarSign className="w-4 h-4" />, label: 'تعديل الأسعار' },
+                { to: '/admin/prices', icon: <DollarSign className="w-4 h-4" />, label: t('admin.priceManagement') || 'تعديل الأسعار' },
                 ...(isPointsEnabled ? [
-                    { to: '/admin/points', icon: <Target className="w-4 h-4" />, label: 'قواعد النقاط' },
-                    { to: '/admin/gamification', icon: <Award className="w-4 h-4" />, label: 'الشارات والرتب' },
-                    { to: '/admin/payouts', icon: <HandCoins className="w-4 h-4" />, label: 'صرف النقاط' },
+                    { to: '/admin/points', icon: <Target className="w-4 h-4" />, label: t('admin.pointsRules') || 'قواعد النقاط' },
+                    { to: '/admin/gamification', icon: <Award className="w-4 h-4" />, label: t('admin.badgesAndRanks') || 'الشارات والرتب' },
+                    { to: '/admin/payouts', icon: <HandCoins className="w-4 h-4" />, label: t('admin.pointsPayout') || 'صرف النقاط' },
                 ] : []),
             ]
         },
         {
             id: 'settings',
-            label: 'الإعدادات والتكوين',
+            label: t('admin.settingsAndConfiguration') || 'الإعدادات والتكوين',
             icon: <Settings className="w-4 h-4" style={{ color: 'var(--theme-text-tertiary)' }} />,
             items: [
-                { to: '/admin/settings', icon: <Settings className="w-4 h-4" />, label: 'إدارة التطبيق' },
-                { to: '/admin/auto-transfer', icon: <Activity className="w-4 h-4" />, label: 'التحويل التلقائي' },
-                { to: '/admin/translations', icon: <Languages className="w-4 h-4" />, label: '🌍 إدارة الترجمات' },
-                ...(isWhatsAppEnabled ? [{ to: '/admin/whatsapp-templates', icon: <MessageCircle className="w-4 h-4" />, label: 'نماذج WhatsApp' }] : []),
+                { to: '/admin/settings', icon: <Settings className="w-4 h-4" />, label: t('admin.appManagement') || 'إدارة التطبيق' },
+                { to: '/admin/auto-transfer', icon: <Activity className="w-4 h-4" />, label: t('admin.autoTransfer') || 'التحويل التلقائي' },
+                { to: '/admin/translations', icon: <Languages className="w-4 h-4" />, label: t('admin.translations') || '🌍 إدارة الترجمات' },
+                ...(isWhatsAppEnabled ? [{ to: '/admin/whatsapp-templates', icon: <MessageCircle className="w-4 h-4" />, label: t('admin.whatsappTemplates') || 'نماذج WhatsApp' }] : []),
             ]
         },
         {
             id: 'communications',
-            label: 'الاتصالات والإعلانات',
+            label: t('admin.communicationsAndAnnouncements') || 'الاتصالات والإعلانات',
             icon: <Bell className="w-4 h-4" style={{ color: 'var(--theme-accent-yellow)' }} />,
             items: [
-                { to: '/admin/manager-announcements', icon: <Bell className="w-4 h-4" />, label: 'الرسائل العاجلة للأقسام' },
-                { to: '/admin/general-instructions', icon: <BookOpen className="w-4 h-4" />, label: 'التعليمات العامة' },
+                { to: '/admin/manager-announcements', icon: <Bell className="w-4 h-4" />, label: t('admin.urgentMessages') || 'الرسائل العاجلة للأقسام' },
+                { to: '/admin/general-instructions', icon: <BookOpen className="w-4 h-4" />, label: t('admin.generalInstructions') || 'التعليمات العامة' },
             ]
         }
     ];
@@ -274,7 +275,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                 {activeBranch?.name || 'Adora Admin'}
                             </h1>
                             <p className="text-[9px] text-teal-500 font-bold tracking-wider uppercase opacity-80">
-                                {isOwner ? 'لوحة المالك' : 'مدير النظام'}
+                                {isOwner ? (t('admin.ownerDashboard') || 'لوحة المالك') : (t('admin.managerDashboard') || 'مدير النظام')}
                             </p>
                         </div>
                     </div>

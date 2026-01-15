@@ -3,6 +3,8 @@
 نظام إدارة الفنادق الذكي - SaaS Multi-Tenant Platform
 
 [![Version](https://img.shields.io/badge/version-3.5.0-blue.svg)](https://github.com/adora-hotel/adora-hotel-system)
+[![Status](https://img.shields.io/badge/status-Production%20Ready-green.svg)](https://github.com/adora-hotel/adora-hotel-system)
+[![i18n](https://img.shields.io/badge/i18n-4%20Languages-blue.svg)](https://github.com/adora-hotel/adora-hotel-system)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.2-blue.svg)](https://reactjs.org/)
 [![Firebase](https://img.shields.io/badge/Firebase-10.7-orange.svg)](https://firebase.google.com/)
@@ -1099,6 +1101,19 @@ src/
 2. استخدم زر **🎭 Demo Mode** لتعبئة بيانات تجريبية (اختياري)
 3. أدخل بيانات Firebase الخاصة بالعميل (اختياري - للعزل الكامل)
 4. اضغط "حفظ"
+
+---
+
+## 📚 الوثائق الإضافية
+
+### للمطورين الجدد:
+- **`PROJECT_SUMMARY.md`** - ملخص الوضع الحالي والمهام المكتملة
+- **`WORKFLOW_GUIDE.md`** - دليل طريقة العمل والـ Best Practices
+- **`PROJECT_CONTEXT.md`** - سياق المشروع والميزات المكتملة
+
+### التقارير:
+- **`FINAL_REVIEW_REPORT.md`** - تقرير المراجعة النهائية الشامل
+- **`AUDIT_REPORT.md`** - تقرير مراجعة البنية الأساسية
 
 ---
 

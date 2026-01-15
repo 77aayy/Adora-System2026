@@ -321,6 +321,8 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         }
         
         try {
+            // 🔐 SECURITY: System-wide analytics (owner only) - no tenantId filter needed
+            // This is intentional for owner dashboard to see all tenants' data
             // Get total requests (all-time) - override cached
             const requestsSnapshot = await getCountFromServer(query(collection(db, 'requests')));
             totalRequests = requestsSnapshot.data().count;

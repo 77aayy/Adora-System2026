@@ -526,20 +526,20 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                             {status === 'executing' && <div className="text-4xl">✅</div>}
                         </div>
 
-                        <h3 className="text-2xl font-bold text-white mb-2">
+                        <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
                             {status === 'listening' ? 'أنا سامعك...' :
                                 status === 'processing' ? 'جاري التحليل...' :
                                     status === 'speaking' ? 'الرد...' :
                                         status === 'executing' ? 'جاري التنفيذ...' : ''}
                         </h3>
 
-                        <p className="text-white/60 text-lg mb-8 text-center max-w-md">
+                        <p className="text-slate-600 dark:text-white/60 text-lg mb-8 text-center max-w-md">
                             {transcript || feedback || "قول مثلاً: 'ضفي 50 منشفة كبيرة للمخزون'"}
                         </p>
 
                         <button
                             onClick={cancel}
-                            className="px-8 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+                            className="px-8 py-3 rounded-full bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white font-medium transition-colors"
                         >
                             إلغاء
                         </button>
@@ -553,8 +553,8 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                             <Package className="w-5 h-5 text-purple-400" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold text-white">إدارة جرد المغسلة</h3>
-                            <p className="text-sm text-white/60">تحكم كامل بالبنود والتقارير</p>
+                            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">إدارة جرد المغسلة</h3>
+                            <p className="text-sm text-slate-600 dark:text-white/60">تحكم كامل بالبنود والتقارير</p>
                         </div>
                     </div>
 
@@ -564,7 +564,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                         {isModal && (
                             <button
                                 onClick={onClose}
-                                className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20"
+                                className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-white/10 flex items-center justify-center text-slate-600 dark:text-white/60 hover:text-slate-800 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-white/20"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -573,7 +573,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-white/10 px-4">
+                <div className="flex border-b border-slate-200 dark:border-white/10 px-4">
                     {[
                         { id: 'items' as TabType, label: 'البنود', icon: Package },
                         { id: 'reports' as TabType, label: 'التقارير', icon: BarChart3 },
@@ -584,7 +584,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all ${activeTab === tab.id
                                 ? 'border-purple-400 text-purple-400'
-                                : 'border-transparent text-white/60 hover:text-white'
+                                : 'border-transparent text-slate-600 dark:text-white/60 hover:text-slate-800 dark:hover:text-white'
                                 }`}
                         >
                             <tab.icon className="w-4 h-4" />
@@ -611,7 +611,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                         </div>
                                         <div className="flex-1">
                                             <div className="text-amber-400 font-bold text-sm">تنبيه مشتريات عاجل!</div>
-                                            <div className="text-white/60 text-xs">يوجد {lowStockItems.length} بنود قاربت على النفاد من المخزون</div>
+                                            <div className="text-slate-600 dark:text-white/60 text-xs">يوجد {lowStockItems.length} بنود قاربت على النفاد من المخزون</div>
                                         </div>
                                         <button
                                             onClick={() => {
@@ -648,8 +648,8 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                     <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
                                         {/* Dynamic List from Context/Items */}
                                         {items.filter(i => cumulativeDeficit[i.id] && cumulativeDeficit[i.id] > 0).map(item => (
-                                            <div key={item.id} className="flex justify-between items-center text-sm bg-white/5 p-2 rounded-lg group">
-                                                <span className="text-white/80">{item.name}</span>
+                                            <div key={item.id} className="flex justify-between items-center text-sm bg-slate-100 dark:bg-white/5 p-2 rounded-lg group">
+                                                <span className="text-slate-800 dark:text-white/80">{item.name}</span>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-red-400 font-mono font-bold">-{cumulativeDeficit[item.id]}</span>
 
@@ -665,7 +665,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             </div>
                                         ))}
                                         {Object.keys(cumulativeDeficit).length === 0 && (
-                                            <div className="text-white/40 text-sm text-center py-4">لا يوجد عجز مسجل ✨</div>
+                                            <div className="text-slate-500 dark:text-white/40 text-sm text-center py-4">لا يوجد عجز مسجل ✨</div>
                                         )}
                                     </div>
                                 </div>
@@ -682,17 +682,17 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
 
                             {/* Add Item Form */}
                             {showAddItem && (
-                                <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                                <div className="p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 space-y-3">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <input
                                             type="text"
                                             placeholder="اسم البند"
                                             value={newItemName}
                                             onChange={e => setNewItemName(e.target.value)}
-                                            className="px-3 py-2 rounded-xl bg-white/10 text-white placeholder:text-white/40 border border-white/10"
+                                            className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40 border border-slate-300 dark:border-white/10"
                                         />
                                         <input
-                                            className="px-3 py-2 rounded-xl bg-white/10 text-white placeholder:text-white/40 border border-white/10"
+                                            className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40 border border-slate-300 dark:border-white/10"
                                         />
                                         <input
                                             type="number"
@@ -700,7 +700,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             placeholder="السعر"
                                             value={newItemPrice}
                                             onChange={e => setNewItemPrice(e.target.value)}
-                                            className="px-3 py-2 rounded-xl bg-white/10 text-white placeholder:text-white/40 border border-white/10"
+                                            className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40 border border-slate-300 dark:border-white/10"
                                         />
                                         <div className="flex gap-2">
                                             <input
@@ -709,7 +709,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                                 title="الرصيد في المستودع"
                                                 value={newItemStock} // Reusing this state for Warehouse temporarily or split? Best to be clear.
                                                 onChange={e => setNewItemStock(e.target.value)}
-                                                className="w-1/2 px-3 py-2 rounded-xl bg-white/10 text-white placeholder:text-white/40 border border-white/10 border-blue-500/30"
+                                                className="w-1/2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40 border border-slate-300 dark:border-white/10 border-blue-500/30"
                                             />
                                             {/* We rely on defaults for Rooms/Laundry on create, or I need more states. checking... 
                                                 Let's stick to Warehouse for quick add, edit for details. */}
@@ -739,12 +739,12 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                 {items.map(item => (
                                     <div
                                         key={item.id}
-                                        className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                                        className="p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
                                     >
                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-white font-medium">{item.name}</span>
+                                                    <span className="text-slate-800 dark:text-white font-medium">{item.name}</span>
                                                     {item.showInCards && (
                                                         <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">كرت</span>
                                                     )}
@@ -753,33 +753,33 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                                 {/* 📦 Stock Distribution Visualization */}
                                                 <div className="flex items-center gap-6 mt-3 text-sm">
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-white/40 text-xs mb-1">المستودع</span>
+                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">المستودع</span>
                                                         <input
                                                             type="number"
-                                                            className="w-16 bg-transparent border-b border-white/20 text-center text-blue-300 font-mono focus:border-blue-500 outline-none"
+                                                            className="w-16 bg-transparent border-b border-slate-300 dark:border-white/20 text-center text-blue-600 dark:text-blue-300 font-mono focus:border-blue-500 outline-none"
                                                             value={item.stockWarehouse || 0}
                                                             onChange={(e) => handleUpdateItem(item.id, { stockWarehouse: parseInt(e.target.value) || 0 })}
                                                         />
                                                     </div>
-                                                    <div className="text-white/20 text-lg">+</div>
+                                                    <div className="text-slate-400 dark:text-white/20 text-lg">+</div>
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-white/40 text-xs mb-1">الغرف</span>
+                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">الغرف</span>
                                                         <input
                                                             type="number"
-                                                            className="w-16 bg-transparent border-b border-white/20 text-center text-purple-300 font-mono focus:border-purple-500 outline-none"
+                                                            className="w-16 bg-transparent border-b border-slate-300 dark:border-white/20 text-center text-purple-600 dark:text-purple-300 font-mono focus:border-purple-500 outline-none"
                                                             value={item.stockRooms || 0}
                                                             onChange={(e) => handleUpdateItem(item.id, { stockRooms: parseInt(e.target.value) || 0 })}
                                                         />
                                                     </div>
-                                                    <div className="text-white/20 text-lg">+</div>
+                                                    <div className="text-slate-400 dark:text-white/20 text-lg">+</div>
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-white/40 text-xs mb-1">المغسلة</span>
-                                                        <div className="text-orange-300 font-mono font-bold">{item.inLaundry || 0}</div>
+                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">المغسلة</span>
+                                                        <div className="text-orange-600 dark:text-orange-300 font-mono font-bold">{item.inLaundry || 0}</div>
                                                     </div>
-                                                    <div className="text-white/20 text-lg">=</div>
+                                                    <div className="text-slate-400 dark:text-white/20 text-lg">=</div>
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-white/40 text-xs mb-1">الإجمالي</span>
-                                                        <div className="text-white font-bold">
+                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">الإجمالي</span>
+                                                        <div className="text-slate-800 dark:text-white font-bold">
                                                             {(item.stockWarehouse || 0) + (item.stockRooms || 0) + (item.inLaundry || 0)}
                                                         </div>
                                                     </div>
@@ -823,8 +823,8 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                         // Reports Tab
                         <div className="space-y-4">
                             {/* Filters */}
-                            <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
-                                <div className="flex items-center gap-2 text-white/60">
+                            <div className="p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 space-y-4">
+                                <div className="flex items-center gap-2 text-slate-600 dark:text-white/60">
                                     <Filter className="w-4 h-4" />
                                     <span className="font-medium">فلترة التقارير</span>
                                 </div>
@@ -832,11 +832,11 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                                     {/* Period */}
                                     <div>
-                                        <label className="text-xs text-white/40 mb-1 block">الفترة</label>
+                                        <label className="text-xs text-slate-500 dark:text-white/40 mb-1 block">الفترة</label>
                                         <select
                                             value={reportPeriod}
                                             onChange={e => setReportPeriod(e.target.value as ReportPeriod)}
-                                            className="w-full px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10"
+                                            className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white border border-slate-300 dark:border-white/10"
                                         >
                                             <option value="day">يومي</option>
                                             <option value="week">أسبوعي</option>
@@ -847,11 +847,11 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
 
                                     {/* Month */}
                                     <div>
-                                        <label className="text-xs text-white/40 mb-1 block">الشهر</label>
+                                        <label className="text-xs text-slate-500 dark:text-white/40 mb-1 block">الشهر</label>
                                         <select
                                             value={reportMonth}
                                             onChange={e => setReportMonth(parseInt(e.target.value))}
-                                            className="w-full px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10"
+                                            className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white border border-slate-300 dark:border-white/10"
                                         >
                                             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
                                                 <option key={m} value={m}>

@@ -17,6 +17,8 @@ import {
     orderBy,
     Unsubscribe,
     increment,
+    runTransaction,
+    serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { RoomCard, CheckInData, RoomCardStatus } from '../types';

@@ -280,12 +280,12 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                         <QrCode className="w-5 h-5 text-primary-400" />
                     </div>
                     <div>
-                        <h3 className="font-semibold text-white">مولد رابط QR الآمن</h3>
-                        <p className="text-sm text-white/60">رابط مشفر للغرفة يمنع التلاعب برقم الغرفة</p>
+                        <h3 className="font-semibold text-slate-800 dark:text-white">مولد رابط QR الآمن</h3>
+                        <p className="text-sm text-slate-600 dark:text-white/60">رابط مشفر للغرفة يمنع التلاعب برقم الغرفة</p>
                     </div>
                 </div>
-                <div className={`p-2 rounded-lg bg-white/5 transition-transform duration-300 ${isCollapsed ? '' : 'rotate-180'}`}>
-                    <ChevronDown className="w-4 h-4 text-white/60" />
+                <div className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 transition-transform duration-300 ${isCollapsed ? '' : 'rotate-180'}`}>
+                    <ChevronDown className="w-4 h-4 text-slate-600 dark:text-white/60" />
                 </div>
             </div>
 
@@ -304,7 +304,7 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                     <div className="space-y-4">
                         <div className="flex gap-2">
                             <div className="flex-1">
-                                <label className="block text-sm text-white/70 mb-1">اختر الغرفة</label>
+                                <label className="block text-sm text-slate-700 dark:text-white/70 mb-1">اختر الغرفة</label>
                                 {loadingRooms ? (
                                     <div className="input flex items-center justify-center h-[42px]">
                                         <AdoraLoaderInline size={16} />
@@ -350,12 +350,12 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                                     <p className="text-xs text-green-400 font-bold">تم توليد رابط آمن بنجاح</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <code className="flex-1 text-sm text-white/80 bg-black/20 p-2 rounded break-all font-mono">
+                                    <code className="flex-1 text-sm text-slate-800 dark:text-white/80 bg-slate-100 dark:bg-black/20 p-2 rounded break-all font-mono">
                                         {getGuestUrl()}
                                     </code>
                                     <button
                                         onClick={handleCopy}
-                                        className="w-10 h-10 rounded-lg transition-colors duration-300 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                                        className="w-10 h-10 rounded-lg transition-colors duration-300 flex items-center justify-center text-slate-600 dark:text-white/70 hover:text-slate-800 dark:hover:text-white transition-colors"
                                         title="نسخ الرابط"
                                     >
                                         {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
@@ -364,13 +364,13 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                                         href={getGuestUrl()}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="w-10 h-10 rounded-lg transition-colors duration-300 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                                        className="w-10 h-10 rounded-lg transition-colors duration-300 flex items-center justify-center text-slate-600 dark:text-white/70 hover:text-slate-800 dark:hover:text-white transition-colors"
                                         title="فتح الرابط"
                                     >
                                         <ExternalLink className="w-5 h-5" />
                                     </a>
                                 </div>
-                                <p className="text-xs text-white/40 mt-2">
+                                <p className="text-xs text-slate-500 dark:text-white/40 mt-2">
                                     يحتوي هذا الرابط على رمز مشفر ({secureToken.substring(0, 8)}...) لا يظهر فيه رقم الغرفة.
                                 </p>
                             </div>
@@ -380,8 +380,8 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                         {existingTokens.length > 0 && (
                             <div className="mt-6 pt-6 border-t border-white/10">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <QrCode className="w-4 h-4 text-white/60" />
-                                    <h4 className="text-sm font-semibold text-white/80">QR المولد مسبقاً ({existingTokens.length})</h4>
+                                    <QrCode className="w-4 h-4 text-slate-600 dark:text-white/60" />
+                                    <h4 className="text-sm font-semibold text-slate-800 dark:text-white/80">QR المولد مسبقاً ({existingTokens.length})</h4>
                                 </div>
                                 <div className="space-y-3 max-h-[300px] overflow-y-auto">
                                     {existingTokens
@@ -392,17 +392,17 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                                                 className={`p-3 rounded-xl border ${
                                                     token.roomNumber === roomNumber && secureToken
                                                         ? 'bg-primary-500/10 border-primary-500/30'
-                                                        : 'bg-white/5 border-white/10'
+                                                        : 'bg-slate-100 dark:bg-white/5 border-slate-300 dark:border-white/10'
                                                 }`}
                                             >
                                                 <div className="flex items-center justify-between mb-2">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-8 h-8 rounded-lg bg-primary-500/20 flex items-center justify-center">
-                                                            <span className="text-xs font-bold text-primary-400">{token.roomNumber}</span>
+                                                            <span className="text-xs font-bold text-primary-600 dark:text-primary-400">{token.roomNumber}</span>
                                                         </div>
                                                         <div>
-                                                            <p className="text-xs font-semibold text-white">غرفة {token.roomNumber}</p>
-                                                            <p className="text-xs text-white/40">
+                                                            <p className="text-xs font-semibold text-slate-800 dark:text-white">غرفة {token.roomNumber}</p>
+                                                            <p className="text-xs text-slate-500 dark:text-white/40">
                                                                 {token.createdAt.toLocaleDateString('ar-SA', {
                                                                     year: 'numeric',
                                                                     month: 'short',
@@ -420,23 +420,23 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                                                                 setCopied(true);
                                                                 setTimeout(() => setCopied(false), 2000);
                                                             }}
-                                                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                                                            className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
                                                             title="نسخ الرابط"
                                                         >
-                                                            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-white/60" />}
+                                                            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-slate-600 dark:text-white/60" />}
                                                         </button>
                                                         <a
                                                             href={token.fullUrl}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                                                            className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
                                                             title="فتح الرابط"
                                                         >
-                                                            <ExternalLink className="w-4 h-4 text-white/60" />
+                                                            <ExternalLink className="w-4 h-4 text-slate-600 dark:text-white/60" />
                                                         </a>
                                                     </div>
                                                 </div>
-                                                <code className="text-xs text-white/50 bg-black/20 p-2 rounded block break-all font-mono">
+                                                <code className="text-xs text-slate-600 dark:text-white/50 bg-slate-100 dark:bg-black/20 p-2 rounded block break-all font-mono">
                                                     {token.fullUrl}
                                                 </code>
                                             </div>
@@ -638,7 +638,7 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
                                 <>
                                     {/* Google Maps Link */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-white mb-2">
+                                        <label className="block text-sm font-semibold text-slate-800 dark:text-white mb-2">
                                             رابط خرائط جوجل
                                         </label>
                                         <div className="flex gap-2">
@@ -696,7 +696,7 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
                                                     }
                                                 }}
                                                 placeholder="24.7136"
-                                                className="input w-full bg-slate-800/50 border-white/10 text-white placeholder-white/30"
+                                                className="input w-full bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-white/10 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30"
                                             />
                                         </div>
                                         <div>
@@ -789,13 +789,13 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
                             )}
 
                             {/* Device Limit Section */}
-                            <div className="border-t border-white/10 pt-6">
-                                <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl mb-4">
+                            <div className="border-t border-slate-200 dark:border-white/10 pt-6">
+                                <div className="flex items-center justify-between p-4 bg-slate-100 dark:bg-white/5 rounded-xl mb-4">
                                     <div>
-                                        <label className="font-semibold text-white block mb-1">
+                                        <label className="font-semibold text-slate-800 dark:text-white block mb-1">
                                             تفعيل الحد الأقصى للأجهزة
                                         </label>
-                                        <p className="text-xs text-white/50">
+                                        <p className="text-xs text-slate-600 dark:text-white/50">
                                             تحديد الحد الأقصى لعدد الأجهزة المسموح بها لكل غرفة
                                         </p>
                                     </div>
@@ -807,7 +807,7 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
 
                                 {deviceLimitEnabled && (
                                     <div>
-                                        <label className="block text-sm font-semibold text-white mb-2">
+                                        <label className="block text-sm font-semibold text-slate-800 dark:text-white mb-2">
                                             الحد الأقصى للأجهزة لكل غرفة
                                         </label>
                                         <input
@@ -816,9 +816,9 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
                                             onChange={(e) => setMaxDevices(parseInt(e.target.value) || 2)}
                                             min={1}
                                             max={10}
-                                            className="input w-full bg-slate-800/50 border-white/10 text-white"
+                                            className="input w-full bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-white/10 text-slate-800 dark:text-white"
                                         />
-                                        <p className="text-xs text-white/40 mt-1">
+                                        <p className="text-xs text-slate-500 dark:text-white/40 mt-1">
                                             عدد الأجهزة المسموح بها لكل غرفة (افتراضي: 2)
                                         </p>
                                     </div>
