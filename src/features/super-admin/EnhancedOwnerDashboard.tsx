@@ -670,6 +670,19 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 }
             }
 
+            // ✅ FIX: Invalidate cache first, then dispatch event
+            try {
+                const { invalidateCache } = await import('../../utils/requestCache');
+                invalidateCache('settings:system');
+            } catch (err) {
+                console.warn('Could not invalidate cache:', err);
+            }
+
+            // ✅ FIX: Dispatch event to notify all components using useFeatureGate
+            window.dispatchEvent(new CustomEvent('adora_feature_toggled', {
+                detail: { featureKey, enabled }
+            }));
+
             // ✅ No need to reload all data - just update the feature state
             // Components using useFeatureGate will automatically re-check and hide/show
             success(`تم ${enabled ? 'تفعيل' : 'تعطيل'} الميزة بنجاح${!enabled ? ' - سيتم إخفاؤها من جميع الفروع تلقائياً' : ''}`);
@@ -1091,7 +1104,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             {/* ✅ Manager Details Modal - Enhanced for Light Mode + Print */}
             {showManagerDetailsModal && selectedManager && (
                 <div className="fixed inset-0 z-[100] bg-black/40 dark:bg-black/80 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)' }}>
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10">
+                    <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10">
                         {/* Header */}
                         <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/20 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-transparent dark:to-transparent">
                             <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -3490,11 +3503,24 @@ const DeveloperBrandingSection: React.FC = () => {
 
     const handleSave = () => {
         setSaving(true);
+        // ✅ Save to localStorage
         localStorage.setItem('adora_dev_phone_sa', devPhoneSA);
         localStorage.setItem('adora_dev_phone_eg', devPhoneEG);
         localStorage.setItem('adora_dev_email', devEmail);
         localStorage.setItem('adora_dev_name', devName);
         localStorage.setItem('adora_dev_signature', devSignature);
+        
+        // ✅ FIX: Dispatch custom event to notify all components (Footer, LoginScreen, etc.)
+        window.dispatchEvent(new CustomEvent('adora_dev_settings_updated', {
+            detail: {
+                devName,
+                phoneSA: devPhoneSA,
+                phoneEG: devPhoneEG,
+                email: devEmail,
+                signature: devSignature
+            }
+        }));
+        
         setTimeout(() => {
             setSaving(false);
             setSaved(true);
@@ -4615,6 +4641,77 @@ const AddManagerModal: React.FC<{
                             const subtotal = voucher.totalAmount / (1 + taxRate / 100);
                             const taxAmount = voucher.totalAmount - subtotal;
 
+                            // ✅ Company Information HTML (from systemSettings)
+                            const companyInfoHTML = systemSettings ? `
+                                <!-- ✅ Enhanced Company Information Section -->
+                                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 2px solid #0ea5e9; box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);">
+                                    <div style="font-size: 10pt; color: #0c4a6e; font-weight: 700; margin-bottom: 10px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">
+                                        معلومات الشركة
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">اسم الشركة:</div>
+                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.companyName || '________________'}</div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الرقم الضريبي:</div>
+                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.companyTaxNumber || '________________'}</div>
+                                        </div>
+                                    </div>
+                                    ${systemSettings.commercialRegistrationNumber ? `
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">السجل التجاري:</div>
+                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.commercialRegistrationNumber}</div>
+                                        </div>
+                                        ${systemSettings.contactPhone ? `
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الهاتف:</div>
+                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.contactPhone}</div>
+                                        </div>
+                                        ` : '<div></div>'}
+                                    </div>
+                                    ` : ''}
+                                    ${systemSettings.companyAddress ? `
+                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(14, 165, 233, 0.2);">
+                                        <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px; text-align: center;">العنوان:</div>
+                                        <div style="font-size: 10pt; color: #1e293b; font-weight: 500; text-align: center;">${systemSettings.companyAddress}</div>
+                                    </div>
+                                    ` : ''}
+                                    ${systemSettings.contactEmail || systemSettings.contactWebsite ? `
+                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(14, 165, 233, 0.2); display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                        ${systemSettings.contactEmail ? `
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">البريد الإلكتروني:</div>
+                                            <div style="font-size: 10pt; color: #1e293b; font-weight: 500;">${systemSettings.contactEmail}</div>
+                                        </div>
+                                        ` : '<div></div>'}
+                                        ${systemSettings.contactWebsite ? `
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الموقع الإلكتروني:</div>
+                                            <div style="font-size: 10pt; color: #1e293b; font-weight: 500;">${systemSettings.contactWebsite}</div>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                
+                                <!-- ✅ Fixed Text: استلمنا من شركة -->
+                                <div style="background: #fff7ed; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 2px solid #fb923c; text-align: center;">
+                                    <div style="font-size: 11pt; color: #9a3412; font-weight: 700; margin-bottom: 5px;">
+                                        استلمنا من شركة: <span style="color: #1f2937; border-bottom: 2px solid #fb923c; padding: 0 8px; display: inline-block; min-width: 200px;">${systemSettings.companyName || '________________'}</span>
+                                    </div>
+                                    <div style="font-size: 10pt; color: #9a3412; font-weight: 600;">
+                                        رقم ضريبي: <span style="color: #1f2937; border-bottom: 2px solid #fb923c; padding: 0 8px; display: inline-block; min-width: 150px;">${systemSettings.companyTaxNumber || '________________'}</span>
+                                    </div>
+                                    ${systemSettings.companyAddress ? `
+                                    <div style="font-size: 9pt; color: #9a3412; margin-top: 5px;">
+                                        العنوان: <span style="color: #1f2937;">${systemSettings.companyAddress}</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            ` : '';
+
                             return `
                                 <div style="page-break-after: always; padding: 0; margin: 0; max-width: 100%;">
                                     <!-- Header Section -->
@@ -4628,6 +4725,7 @@ const AddManagerModal: React.FC<{
                                     
                                     <!-- Content Section -->
                                     <div style="background: #ffffff; padding: 15px; border: 2px solid #e5e7eb; border-top: none;">
+                                        ${companyInfoHTML}
                                         <!-- Date & Info Row -->
                                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;">
                                             <div>
@@ -4705,7 +4803,8 @@ const AddManagerModal: React.FC<{
                             `;
                         }).join('');
 
-                        const printWindow = window.open('', '_blank');
+                        // ✅ FIX: Prevent double printing - use unique window name
+                        const printWindow = window.open('', `voucher-print-${Date.now()}`, 'noopener,noreferrer');
                         if (printWindow) {
                             printWindow.document.write(`
                                 <!DOCTYPE html>
@@ -4737,6 +4836,20 @@ const AddManagerModal: React.FC<{
                                             }
                                         }
                                     </style>
+                                    <script>
+                                        // ✅ FIX: Prevent double print - flag to ensure single print
+                                        (function() {
+                                            let hasPrinted = false;
+                                            window.addEventListener('beforeprint', function(e) {
+                                                if (hasPrinted) {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    return false;
+                                                }
+                                                hasPrinted = true;
+                                            }, { once: true });
+                                        })();
+                                    </script>
                                 </head>
                                 <body>
                                     ${printContent}
@@ -4744,9 +4857,21 @@ const AddManagerModal: React.FC<{
                                 </html>
                             `);
                             printWindow.document.close();
-                            setTimeout(() => {
-                                printWindow.print();
-                            }, 500);
+                            // ✅ FIX: Single print call - wait for document ready
+                            let hasPrinted = false;
+                            const doPrint = () => {
+                                if (!hasPrinted && !printWindow.closed) {
+                                    hasPrinted = true;
+                                    printWindow.print();
+                                }
+                            };
+                            
+                            // Wait for document to be ready
+                            if (printWindow.document.readyState === 'complete') {
+                                setTimeout(doPrint, 500);
+                            } else {
+                                printWindow.onload = () => setTimeout(doPrint, 500);
+                            }
                         }
                     }
                     // ✅ AUTO-PRINT INVOICES AFTER VOUCHERS
@@ -4783,6 +4908,62 @@ const AddManagerModal: React.FC<{
                             const subtotal = invoice.amount / (1 + taxRate / 100);
                             const taxAmount = invoice.amount - subtotal;
 
+                            // ✅ Company Information HTML (from systemSettings)
+                            const companyInfoHTML = systemSettings ? `
+                                <!-- ✅ Enhanced Company Information Section -->
+                                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 2px solid #0ea5e9; box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);">
+                                    <div style="font-size: 10pt; color: #0c4a6e; font-weight: 700; margin-bottom: 10px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">
+                                        معلومات الشركة
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">اسم الشركة:</div>
+                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.companyName || '________________'}</div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الرقم الضريبي:</div>
+                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.companyTaxNumber || '________________'}</div>
+                                        </div>
+                                    </div>
+                                    ${systemSettings.commercialRegistrationNumber ? `
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">السجل التجاري:</div>
+                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.commercialRegistrationNumber}</div>
+                                        </div>
+                                        ${systemSettings.contactPhone ? `
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الهاتف:</div>
+                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.contactPhone}</div>
+                                        </div>
+                                        ` : '<div></div>'}
+                                    </div>
+                                    ` : ''}
+                                    ${systemSettings.companyAddress ? `
+                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(14, 165, 233, 0.2);">
+                                        <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px; text-align: center;">العنوان:</div>
+                                        <div style="font-size: 10pt; color: #1e293b; font-weight: 500; text-align: center;">${systemSettings.companyAddress}</div>
+                                    </div>
+                                    ` : ''}
+                                    ${systemSettings.contactEmail || systemSettings.contactWebsite ? `
+                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(14, 165, 233, 0.2); display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                        ${systemSettings.contactEmail ? `
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">البريد الإلكتروني:</div>
+                                            <div style="font-size: 10pt; color: #1e293b; font-weight: 500;">${systemSettings.contactEmail}</div>
+                                        </div>
+                                        ` : '<div></div>'}
+                                        ${systemSettings.contactWebsite ? `
+                                        <div style="text-align: right;">
+                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الموقع الإلكتروني:</div>
+                                            <div style="font-size: 10pt; color: #1e293b; font-weight: 500;">${systemSettings.contactWebsite}</div>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            ` : '';
+
                             return `
                                 <div style="page-break-after: always; padding: 0; margin: 0; max-width: 100%;">
                                     <!-- Header Section - Invoice Style -->
@@ -4796,6 +4977,7 @@ const AddManagerModal: React.FC<{
                                     
                                     <!-- Content Section -->
                                     <div style="background: #ffffff; padding: 15px; border: 2px solid #e5e7eb; border-top: none;">
+                                        ${companyInfoHTML}
                                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;">
                                             <div>
                                                 <div style="font-size: 9pt; color: #6b7280; margin-bottom: 3px;">تاريخ الفاتورة</div>
@@ -4865,7 +5047,8 @@ const AddManagerModal: React.FC<{
                             `;
                         }).join('');
 
-                        const invoicePrintWindow = window.open('', '_blank');
+                        // ✅ FIX: Prevent double printing - use unique window name
+                        const invoicePrintWindow = window.open('', `invoice-print-${Date.now()}`, 'noopener,noreferrer');
                         if (invoicePrintWindow) {
                             invoicePrintWindow.document.write(`
                                 <!DOCTYPE html>
@@ -4887,14 +5070,40 @@ const AddManagerModal: React.FC<{
                                             body { padding: 0; background: white; }
                                         }
                                     </style>
+                                    <script>
+                                        // ✅ FIX: Prevent double print - flag to ensure single print
+                                        (function() {
+                                            let hasPrinted = false;
+                                            window.addEventListener('beforeprint', function(e) {
+                                                if (hasPrinted) {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    return false;
+                                                }
+                                                hasPrinted = true;
+                                            }, { once: true });
+                                        })();
+                                    </script>
                                 </head>
                                 <body>${invoicePrintContent}</body>
                                 </html>
                             `);
                             invoicePrintWindow.document.close();
-                            setTimeout(() => {
-                                invoicePrintWindow.print();
-                            }, 500);
+                            // ✅ FIX: Single print call - wait for document ready
+                            let hasPrinted = false;
+                            const doPrint = () => {
+                                if (!hasPrinted && !invoicePrintWindow.closed) {
+                                    hasPrinted = true;
+                                    invoicePrintWindow.print();
+                                }
+                            };
+                            
+                            // Wait for document to be ready
+                            if (invoicePrintWindow.document.readyState === 'complete') {
+                                setTimeout(doPrint, 500);
+                            } else {
+                                invoicePrintWindow.onload = () => setTimeout(doPrint, 500);
+                            }
                         }
                     }
                 } catch (printError) {

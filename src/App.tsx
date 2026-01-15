@@ -512,7 +512,23 @@ const DeveloperFooter: React.FC = () => {
         }
     };
 
-    const config = getConfig();
+    // ✅ FIX: State to force re-render when settings update
+    const [devConfig, setDevConfig] = useState(getConfig());
+    
+    // ✅ FIX: Listen for settings updates from owner dashboard
+    useEffect(() => {
+        const handleSettingsUpdate = (event: CustomEvent) => {
+            setDevConfig(event.detail);
+        };
+        
+        window.addEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
+        
+        return () => {
+            window.removeEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
+        };
+    }, []);
+
+    const config = devConfig;
     const currentYear = new Date().getFullYear();
 
     const getWhatsAppMessage = () => {

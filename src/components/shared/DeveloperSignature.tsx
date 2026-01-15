@@ -49,8 +49,22 @@ export const DeveloperSignature: React.FC<DeveloperSignatureProps> = ({
     className = ''
 }) => {
     const { isDark } = useTheme();
-    const config = getConfig();
+    // ✅ FIX: State to force re-render when settings update
+    const [config, setConfig] = React.useState(getConfig());
     const greeting = encodeURIComponent(getWhatsAppGreeting());
+    
+    // ✅ FIX: Listen for settings updates from owner dashboard
+    React.useEffect(() => {
+        const handleSettingsUpdate = (event: CustomEvent) => {
+            setConfig(event.detail);
+        };
+        
+        window.addEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
+        
+        return () => {
+            window.removeEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
+        };
+    }, []);
 
     return (
         <footer 

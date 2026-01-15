@@ -1,7 +1,8 @@
 import React from 'react';
-import { Award, TrendingUp, Users, ArrowLeft } from 'lucide-react';
+import { Award, TrendingUp, Users, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { EmployeeBadgesDisplay } from '../../components/gamification/EmployeeBadgesDisplay';
 import { AchievementsTab } from './AchievementsTab';
 
@@ -15,7 +16,33 @@ export const GamificationPage: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     
+    // ✅ FIX: Check if gamification feature is enabled
+    const { isEnabled: isGamificationEnabled, loading: featureLoading } = useFeatureGate('gamification');
+    
     const isManager = user?.role === 'manager' || user?.role === 'owner' || user?.role === 'admin';
+    
+    // ✅ FIX: Hide component if feature is disabled
+    if (!featureLoading && !isGamificationEnabled) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--theme-gradient-page)' }}>
+                <div className="max-w-md w-full glass rounded-3xl p-8 text-center border-t border-amber-500/20">
+                    <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <AlertCircle className="w-10 h-10 text-amber-500" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-white mb-2">الميزة غير متاحة</h1>
+                    <p className="text-white/60 mb-8 leading-relaxed">
+                        نظام الشارات والرتب غير مفعل حالياً. يرجى التواصل مع المالك لتفعيله.
+                    </p>
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="px-6 py-3 bg-teal-500 hover:bg-teal-600 text-white rounded-xl font-bold transition-colors"
+                    >
+                        العودة
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div 

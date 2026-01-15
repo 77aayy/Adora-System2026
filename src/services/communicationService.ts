@@ -169,7 +169,10 @@ export const sendSMS = async (
 ): Promise<{ success: boolean; messageId?: string; error?: string }> => {
     // 1. Check if SMS feature is enabled
     if (tenantId) {
-        const isEnabled = await isFeatureEnabled('smsNotifications', tenantId);
+        // ✅ FIX: isFeatureEnabled expects featureKey and optional plan, not tenantId
+        const tenantDoc = await getDoc(doc(db, 'tenants', tenantId));
+        const plan = tenantDoc.data()?.info?.plan;
+        const isEnabled = await isFeatureEnabled('smsNotifications', plan);
         if (!isEnabled) {
             console.log('📱 SMS feature is disabled for this tenant');
             return { success: false, error: 'SMS_FEATURE_DISABLED' };
@@ -257,7 +260,10 @@ export const sendEmail = async (
 ): Promise<{ success: boolean; messageId?: string; error?: string }> => {
     // 1. Check if email feature is enabled
     if (tenantId) {
-        const isEnabled = await isFeatureEnabled('emailNotifications', tenantId);
+        // ✅ FIX: isFeatureEnabled expects featureKey and optional plan, not tenantId
+        const tenantDoc = await getDoc(doc(db, 'tenants', tenantId));
+        const plan = tenantDoc.data()?.info?.plan;
+        const isEnabled = await isFeatureEnabled('emailNotifications', plan);
         if (!isEnabled) {
             console.log('📧 Email feature is disabled for this tenant');
             return { success: false, error: 'EMAIL_FEATURE_DISABLED' };
@@ -326,7 +332,10 @@ export const sendCustomEmail = async (
 ): Promise<{ success: boolean; messageId?: string; error?: string }> => {
     // 1. Check if email feature is enabled
     if (tenantId) {
-        const isEnabled = await isFeatureEnabled('emailNotifications', tenantId);
+        // ✅ FIX: isFeatureEnabled expects featureKey and optional plan, not tenantId
+        const tenantDoc = await getDoc(doc(db, 'tenants', tenantId));
+        const plan = tenantDoc.data()?.info?.plan;
+        const isEnabled = await isFeatureEnabled('emailNotifications', plan);
         if (!isEnabled) {
             return { success: false, error: 'EMAIL_FEATURE_DISABLED' };
         }
@@ -350,13 +359,28 @@ export const sendCustomEmail = async (
 // 13. WHATSAPP INTEGRATION
 // ============================================================
 
-export const sendWhatsApp = async (phoneNumber: string, message: string, mediaUrl?: string): Promise<string> => {
+export const sendWhatsApp = async (
+    phoneNumber: string, 
+    message: string, 
+    mediaUrl?: string,
+    tenantId?: string
+): Promise<string> => {
+    // ✅ FIX: Check if WhatsApp feature is enabled
+    if (tenantId) {
+        const isEnabled = await isFeatureEnabled('whatsappIntegration', undefined, false);
+        if (!isEnabled) {
+            console.log('📱 WhatsApp feature is disabled globally');
+            throw new Error('WHATSAPP_FEATURE_DISABLED');
+        }
+    }
+    
     const docRef = await addDoc(collection(db, 'whatsappMessages'), {
         to: phoneNumber,
         message,
         mediaUrl,
         status: 'sent',
-        sentAt: Timestamp.now()
+        sentAt: Timestamp.now(),
+        tenantId
     });
 
     // Would integrate with WhatsApp Business API

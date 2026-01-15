@@ -130,6 +130,38 @@ const LoginScreen: React.FC = () => {
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [lastLoggedInUser, setLastLoggedInUser] = useState<{ userId: string; tenantId: string } | null>(null);
   const [mounted, setMounted] = useState(false);
+  
+  // ✅ FIX: State for developer settings (auto-updates from owner dashboard)
+  const [devConfig, setDevConfig] = useState(() => {
+    try {
+      return {
+        devName: localStorage.getItem('adora_dev_name') || 'Ayman Abo Warda',
+        phoneSA: localStorage.getItem('adora_dev_phone_sa') || '966570707121',
+        phoneEG: localStorage.getItem('adora_dev_phone_eg') || '201500000162',
+        email: localStorage.getItem('adora_dev_email') || '77aayy@gmail.com',
+      };
+    } catch {
+      return {
+        devName: 'Ayman Abo Warda',
+        phoneSA: '966570707121',
+        phoneEG: '201500000162',
+        email: '77aayy@gmail.com',
+      };
+    }
+  });
+
+  // ✅ FIX: Listen for settings updates from owner dashboard
+  useEffect(() => {
+    const handleSettingsUpdate = (event: CustomEvent) => {
+      setDevConfig(event.detail);
+    };
+    
+    window.addEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
+    };
+  }, []);
 
   // Dynamic greeting based on time of day
   const greeting = useMemo(() => getDynamicGreeting(), []);
@@ -847,8 +879,8 @@ const LoginScreen: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              // Get developer info from localStorage or use defaults
-              const devPhone = localStorage.getItem('adora_dev_phone') || '966570707121';
+              // ✅ FIX: Get developer info from state (auto-updates)
+              const devPhone = devConfig.phoneSA || '966570707121';
               const branchName = localStorage.getItem('adora_branch_name') || 'غير محدد';
               const message = encodeURIComponent(
                 `السلام عليكم،\nأنا مدير فرع [${branchName}]،\nفقدت كود الدخول الخاص بي وأرغب في استعادته أو تحديثه.\nشكراً لكم.`
@@ -890,80 +922,59 @@ const LoginScreen: React.FC = () => {
           </span>
           <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
           
-          {/* Developer Name */}
-          <span className={`font-semibold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
-            {(() => {
-              try { return localStorage.getItem('adora_dev_name') || 'Ayman Abo Warda'; } 
-              catch { return 'Ayman Abo Warda'; }
-            })()}
-          </span>
-          <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-          
-          {/* Saudi Phone */}
-          <a 
-            href={`https://wa.me/${(() => {
-              try { return localStorage.getItem('adora_dev_phone_sa') || '966570707121'; } 
-              catch { return '966570707121'; }
-            })()}?text=${encodeURIComponent((() => {
-              const hour = new Date().getHours();
-              return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
-            })())}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`hover:underline transition-colors ${
-              isDark 
-                ? 'text-slate-300 hover:text-teal-400' 
-                : 'text-slate-600 hover:text-teal-600'
-            }`}
-          >
-            +{(() => {
-              try { return localStorage.getItem('adora_dev_phone_sa') || '966570707121'; } 
-              catch { return '966570707121'; }
-            })()}
-          </a>
-          <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-          
-          {/* Egypt Phone */}
-          <a 
-            href={`https://wa.me/${(() => {
-              try { return localStorage.getItem('adora_dev_phone_eg') || '201500000162'; } 
-              catch { return '201500000162'; }
-            })()}?text=${encodeURIComponent((() => {
-              const hour = new Date().getHours();
-              return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
-            })())}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`hover:underline transition-colors ${
-              isDark 
-                ? 'text-slate-300 hover:text-teal-400' 
-                : 'text-slate-600 hover:text-teal-600'
-            }`}
-          >
-            +{(() => {
-              try { return localStorage.getItem('adora_dev_phone_eg') || '201500000162'; } 
-              catch { return '201500000162'; }
-            })()}
-          </a>
-          <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-          
-          {/* Developer Email */}
-          <a 
-            href={`mailto:${(() => {
-              try { return localStorage.getItem('adora_dev_email') || '77aayy@gmail.com'; } 
-              catch { return '77aayy@gmail.com'; }
-            })()}`}
-            className={`hover:underline transition-colors ${
-              isDark 
-                ? 'text-slate-300 hover:text-teal-400' 
-                : 'text-slate-600 hover:text-teal-600'
-            }`}
-          >
-            {(() => {
-              try { return localStorage.getItem('adora_dev_email') || '77aayy@gmail.com'; } 
-              catch { return '77aayy@gmail.com'; }
-            })()}
-            </a>
+                {/* Developer Name */}
+                <span className={`font-semibold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
+                  {devConfig.devName}
+                </span>
+                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
+                
+                {/* Saudi Phone */}
+                <a 
+                  href={`https://wa.me/${devConfig.phoneSA}?text=${encodeURIComponent((() => {
+                    const hour = new Date().getHours();
+                    return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
+                  })())}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`hover:underline transition-colors ${
+                    isDark 
+                      ? 'text-slate-300 hover:text-teal-400' 
+                      : 'text-slate-600 hover:text-teal-600'
+                  }`}
+                >
+                  +{devConfig.phoneSA}
+                </a>
+                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
+                
+                {/* Egypt Phone */}
+                <a 
+                  href={`https://wa.me/${devConfig.phoneEG}?text=${encodeURIComponent((() => {
+                    const hour = new Date().getHours();
+                    return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
+                  })())}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`hover:underline transition-colors ${
+                    isDark 
+                      ? 'text-slate-300 hover:text-teal-400' 
+                      : 'text-slate-600 hover:text-teal-600'
+                  }`}
+                >
+                  +{devConfig.phoneEG}
+                </a>
+                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
+                
+                {/* Developer Email */}
+                <a 
+                  href={`mailto:${devConfig.email}`}
+                  className={`hover:underline transition-colors ${
+                    isDark 
+                      ? 'text-slate-300 hover:text-teal-400' 
+                      : 'text-slate-600 hover:text-teal-600'
+                  }`}
+                >
+                  {devConfig.email}
+                </a>
           </p>
         </footer>
       </div>

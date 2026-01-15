@@ -386,6 +386,14 @@ export const toggleFeature = async (
             [featureKey]: enabled
         }
     }, updatedBy);
+    
+    // ✅ FIX: Invalidate cache to force refresh
+    try {
+        const { invalidateCache } = await import('../utils/requestCache');
+        invalidateCache('settings:system');
+    } catch (err) {
+        console.warn('Could not invalidate cache:', err);
+    }
 };
 
 /**
@@ -450,9 +458,17 @@ export const cleanExpiredBroadcasts = async (updatedBy: string): Promise<void> =
  */
 export const isFeatureEnabled = async (
     featureKey: keyof SystemSettings['features'],
-    tenantPlan?: 'basic' | 'pro' | 'enterprise'
+    tenantPlan?: 'basic' | 'pro' | 'enterprise',
+    forceRefresh: boolean = false
 ): Promise<boolean> => {
-    const settings = await getSystemSettings();
+    // ✅ FIX: Force refresh if requested (when feature is toggled)
+    const settings = await getSystemSettings(forceRefresh);
+    
+    // ✅ FIX: Validate feature key exists in settings
+    if (!settings.features || typeof settings.features[featureKey] !== 'boolean') {
+        console.warn(`⚠️ Feature key "${featureKey}" not found in settings, defaulting to false`);
+        return false;
+    }
     
     // Check if feature is globally enabled
     if (!settings.features[featureKey]) {

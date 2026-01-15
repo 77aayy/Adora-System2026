@@ -80,6 +80,7 @@ import { ManagerAnnouncementsManager } from './ManagerAnnouncementsManager'; // 
 import { GeneralInstructionsManager } from './GeneralInstructionsManager'; // ✅ General instructions management
 import { WhatsAppTemplatesManager } from './WhatsAppTemplatesManager'; // ✅ WhatsApp templates management
 import { GamificationPage } from './GamificationPage'; // ✅ Gamification - Badges & Ranks
+import { ProtectedFeatureRoute } from '../../components/layout/ProtectedFeatureRoute'; // ✅ Feature protection
 import { TranslationManager } from '../../components/admin/TranslationManager'; // 🌍 Translation Management
 import { DailyOperationsInsight } from '../../components/admin/DailyOperationsInsight'; // 📊 Daily Insight
 import { ProcurementCartWizard } from '../../components/shared/ProcurementCartWizard'; // 🛒 Procurement Cart
@@ -580,7 +581,11 @@ export const AdminDashboard: React.FC = () => {
                                 <Route path="manager-announcements" element={<ManagerAnnouncementsManager />} />
                                 <Route path="general-instructions" element={<GeneralInstructionsManager />} />
                                 <Route path="whatsapp-templates" element={<WhatsAppTemplatesManager />} />
-                                <Route path="gamification" element={<GamificationPage />} />
+                                <Route path="gamification" element={
+                                    <ProtectedFeatureRoute feature="gamification">
+                                        <GamificationPage />
+                                    </ProtectedFeatureRoute>
+                                } />
                                 <Route path="translations" element={<TranslationManager standalone />} /> {/* 🌍 Translation Management */}
                                 <Route path="pulse" element={<LivePulseDashboard />} /> {/* ✅ Live Pulse Dashboard */}
                                 <Route path="chat-settings" element={<ChatSettingsPage tenantId={tenantId || ''} />} /> {/* 💬 Chat Settings */}

@@ -345,8 +345,19 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
     // Animation Classes
     const pulseStyle = isPulsing ? 'animate-bounce scale-110' : '';
 
+    // ✅ FIX: Check feature status for inline mode too
     // Inline version
     if (inline) {
+        // ✅ If feature disabled, show disabled state
+        if (featureDisabled) {
+            return (
+                <div className="flex items-center gap-2 relative opacity-50 cursor-not-allowed" title="نظام النقاط غير مفعل">
+                    <Trophy className="w-5 h-5 text-white/50" />
+                    <span className="font-black text-white/50 text-sm tracking-tighter">-</span>
+                </div>
+            );
+        }
+        
         return (
             <div className="flex items-center gap-2 relative">
                 {/* Flying Delta Animation */}
@@ -615,7 +626,24 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
         );
     }
 
+    // ✅ FIX: Check feature status for full card version too
     // Full card version
+    if (featureDisabled) {
+        return (
+            <div className="glass-card p-5 relative overflow-hidden group opacity-50">
+                <div className="flex items-center justify-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-500/10 flex items-center justify-center">
+                        <Trophy className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-xs font-bold text-white/50 uppercase tracking-widest mb-1">نظام النقاط</h3>
+                        <p className="text-sm text-white/40">غير مفعل حالياً</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    
     return (
         <>
             <div className="glass-card p-5 relative overflow-hidden group">

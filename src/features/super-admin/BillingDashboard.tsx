@@ -499,7 +499,7 @@ const ComprehensiveFinancialStats: React.FC<{
             {/* ✅ Essential Financial KPIs - Single Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {/* 1. إجمالي الإيرادات */}
-                <div className="bg-white dark:bg-gradient-to-br dark:from-green-500/20 dark:to-green-600/10 rounded-xl p-4 border border-green-200 dark:border-green-500/30 shadow-md dark:shadow-none">
+                <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-green-200 dark:border-green-500/30 shadow-md dark:shadow-lg">
                     <StatCard
                         icon={TrendingUp}
                         iconColor="green"
@@ -509,7 +509,7 @@ const ComprehensiveFinancialStats: React.FC<{
                 </div>
                 
                 {/* 2. إجمالي المصروفات */}
-                <div className="bg-white dark:bg-gradient-to-br dark:from-red-500/20 dark:to-red-600/10 rounded-xl p-4 border border-red-200 dark:border-red-500/30 shadow-md dark:shadow-none">
+                <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-red-200 dark:border-red-500/30 shadow-md dark:shadow-lg">
                     <StatCard
                         icon={TrendingDown}
                         iconColor="red"
@@ -519,10 +519,10 @@ const ComprehensiveFinancialStats: React.FC<{
                 </div>
                 
                 {/* 3. صافي الربح */}
-                <div className={`bg-white dark:bg-gradient-to-br rounded-xl p-4 border shadow-md dark:shadow-none ${
+                <div className={`bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border shadow-md dark:shadow-lg ${
                     netProfit >= 0 
-                        ? 'border-teal-200 dark:from-teal-500/20 dark:to-teal-600/10 dark:border-teal-500/30' 
-                        : 'border-orange-200 dark:from-orange-500/20 dark:to-orange-600/10 dark:border-orange-500/30'
+                        ? 'border-teal-200 dark:border-teal-500/30' 
+                        : 'border-orange-200 dark:border-orange-500/30'
                 }`}>
                     <StatCard
                         icon={netProfit >= 0 ? TrendingUp : TrendingDown}
@@ -534,7 +534,7 @@ const ComprehensiveFinancialStats: React.FC<{
             </div>
 
                 {/* 4. سندات القبض */}
-                <div className="bg-white dark:bg-gradient-to-br dark:from-blue-500/20 dark:to-blue-600/10 rounded-xl p-4 border border-blue-200 dark:border-blue-500/30 shadow-md dark:shadow-none">
+                <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-blue-200 dark:border-blue-500/30 shadow-md dark:shadow-lg">
                     <StatCard
                         icon={CreditCard}
                         iconColor="blue"
@@ -545,7 +545,7 @@ const ComprehensiveFinancialStats: React.FC<{
                 </div>
                 
                 {/* 5. سندات الصرف */}
-                <div className="bg-white dark:bg-gradient-to-br dark:from-purple-500/20 dark:to-purple-600/10 rounded-xl p-4 border border-purple-200 dark:border-purple-500/30 shadow-md dark:shadow-none">
+                <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-purple-200 dark:border-purple-500/30 shadow-md dark:shadow-lg">
                     <StatCard
                         icon={DollarSign}
                         iconColor="purple"
@@ -557,7 +557,7 @@ const ComprehensiveFinancialStats: React.FC<{
                 
                 {/* 6. مستحقات متأخرة - Only show if there are overdue */}
                 {overdue.length > 0 && (
-                    <div className="bg-white dark:bg-gradient-to-br dark:from-orange-500/20 dark:to-orange-600/10 rounded-xl p-4 border border-orange-300 dark:border-orange-500/30 shadow-md dark:shadow-none animate-pulse">
+                    <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-orange-300 dark:border-orange-500/30 shadow-md dark:shadow-lg animate-pulse">
                     <StatCard
                         icon={AlertTriangle}
                         iconColor="orange"
@@ -1825,7 +1825,7 @@ const ReceiptVouchersTab: React.FC<{
                                 return (
                                     <div
                                         key={groupKey}
-                                        className="bg-white dark:bg-slate-900/50 rounded-2xl border-2 border-slate-200 dark:border-white/10 shadow-lg overflow-hidden"
+                                        className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-2xl border-2 border-slate-200 dark:border-white/10 shadow-lg overflow-hidden"
                                     >
                                         {/* ✅ Group Header - معلومات المشترك */}
                                         <div className="bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-900/20 dark:to-emerald-900/20 p-4 border-b border-slate-200 dark:border-white/10">
@@ -2019,7 +2019,7 @@ const ReceiptVouchersTab: React.FC<{
             {/* ✅ Preview Modal - معاينة السند - محسّن للوضوح */}
             {previewVoucher && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10">
+                    <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10">
                         <div className="flex items-center justify-between mb-5">
                             <h3 className="text-xl font-bold text-slate-800 dark:text-white">سند قبض #{previewVoucher.voucherNumber}</h3>
                             <button
@@ -3139,7 +3139,7 @@ const ExpenseVouchersTab: React.FC<{
                                     group relative overflow-hidden rounded-xl transition-all duration-300
                                     ${voucher.isDeleted 
                                         ? 'bg-gradient-to-r from-red-50 via-gray-50 to-red-50 dark:from-red-950/20 dark:via-gray-900/40 dark:to-red-950/20 opacity-60' 
-                                        : 'bg-white dark:bg-gradient-to-br dark:from-slate-800/50 dark:to-slate-900/50'
+                                        : 'bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm'
                                     }
                                     ${selectedVouchers.has(voucher.id) 
                                         ? 'ring-2 ring-orange-500 shadow-lg shadow-orange-500/20' 

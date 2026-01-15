@@ -41,9 +41,11 @@ export function useFeatureGate(featureKey: string): UseFeatureGateResult {
             setLoading(true);
             setError(null);
 
-            // ✅ 1. Owner always has access
+            // ✅ 1. Owner always has access (but still check global feature status)
             if (!tenantId || tenantId === 'system-owner' || user?.role === 'owner') {
-                setIsEnabled(true);
+                // ✅ FIX: Even owners need to check if feature is globally enabled
+                const globalEnabled = await isFeatureEnabled(featureKey as any, undefined, true);
+                setIsEnabled(globalEnabled);
                 setLoading(false);
                 return;
             }
@@ -79,7 +81,8 @@ export function useFeatureGate(featureKey: string): UseFeatureGateResult {
             }
 
             // ✅ 4. Check Feature is Enabled for Plan
-            const featureEnabled = await isFeatureEnabled(featureKey as any, plan);
+            // ✅ FIX: Force refresh when feature toggle event is received
+            const featureEnabled = await isFeatureEnabled(featureKey as any, plan, false);
             
             if (!featureEnabled) {
                 setError('هذه الميزة غير متاحة في خطتك الحالية. يرجى الترقية');
@@ -101,6 +104,22 @@ export function useFeatureGate(featureKey: string): UseFeatureGateResult {
     useEffect(() => {
         checkFeature();
     }, [featureKey, tenantId, user?.role]);
+
+    // ✅ FIX: Listen for feature toggle events from owner dashboard
+    useEffect(() => {
+        const handleFeatureToggle = (event: CustomEvent) => {
+            // Only re-check if this feature was toggled
+            if (event.detail?.featureKey === featureKey) {
+                checkFeature();
+            }
+        };
+        
+        window.addEventListener('adora_feature_toggled', handleFeatureToggle as EventListener);
+        
+        return () => {
+            window.removeEventListener('adora_feature_toggled', handleFeatureToggle as EventListener);
+        };
+    }, [featureKey]);
 
     return { isEnabled, loading, error, refetch: checkFeature };
 }
