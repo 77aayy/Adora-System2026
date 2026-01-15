@@ -392,12 +392,19 @@ export const GuestDashboard: React.FC = () => {
         // 🔒 Secure Token Resolution (REQUIRED unless demo mode)
         if (token) {
             try {
+                console.log(`🔍 [GuestDashboard] Token found in URL: ${token.substring(0, 8)}...`);
                 // Get device fingerprint for security tracking
                 const fingerprint = getSavedDeviceFingerprint() || generateDeviceFingerprint();
                 saveDeviceFingerprint(fingerprint);
+                console.log(`🔍 [GuestDashboard] Calling validateSecureAccessToken...`);
                 
                 // Validate token using secure service
                 const validationResult = await validateSecureAccessToken(token, fingerprint);
+                console.log(`🔍 [GuestDashboard] Validation result:`, {
+                    valid: validationResult.valid,
+                    errorCode: validationResult.errorCode,
+                    error: validationResult.error?.substring(0, 50)
+                });
                 
                 if (!validationResult.valid) {
                     console.warn(`🔐 Token validation failed: ${validationResult.errorCode}`);
