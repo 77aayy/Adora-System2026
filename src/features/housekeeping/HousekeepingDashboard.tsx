@@ -46,7 +46,7 @@ import { MinibarProduct, MinibarConsumption } from '../../types/minibar';
 import { uploadInspectionPhoto } from '../../services/storageService';
 import { PhotoUpload } from '../../components/shared/PhotoUpload';
 import { updateRoomStatus } from '../../services/roomService';
-import { usei18n } from '../../i18n/i18nContext';
+import { useTranslation } from 'react-i18next';
 import { useBrandName } from '../../hooks/useBrandName';
 
 // Shared Components
@@ -112,22 +112,9 @@ type RoomFilter = 'all' | 'occupied' | 'checkout';
 // CONSTANTS
 // ============================================================
 
-const STATUS_CONFIG = {
-    CONFIRMED: { label: 'جاهز للبدء', color: 'text-yellow-400', bg: 'bg-yellow-500/20', icon: AlertCircle },
-    IN_PROGRESS: { label: 'جاري التنظيف', color: 'text-blue-400', bg: 'bg-blue-500/20', icon: Play },
-    COMPLETED: { label: 'مكتمل', color: 'text-green-400', bg: 'bg-green-500/20', icon: CheckCircle2 },
-    NEEDS_INSPECTION: { label: 'بانتظار الفحص', color: 'text-purple-400', bg: 'bg-purple-500/20', icon: Eye }
-};
+// STATUS_CONFIG will be created inside component to use t()
 
-const CLEANING_TYPE_CONFIG: any = {
-    occupied: { label: 'غرفة ساكن', color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
-    checkout: { label: 'غرفة مغادرة', color: 'text-orange-400', bg: 'bg-orange-500/20' },
-    post_inspection: { label: 'تنظيف بعد فحص', color: 'text-purple-400', bg: 'bg-purple-500/20' },
-    // ⭐ Config for Maintenance Check
-    maintenance_check: { label: 'فحص صيانة', color: 'text-red-400', bg: 'bg-red-500/20' },
-    // Fallback for raw maintenance type
-    undefined: { label: 'فحص صيانة', color: 'text-red-400', bg: 'bg-red-500/20' }
-};
+// CLEANING_TYPE_CONFIG will be created inside component to use t()
 
 // ============================================================
 // HELPER COMPONENTS
@@ -144,19 +131,22 @@ const TaskCard: React.FC<{
     onView?: () => void;
     userId?: string;
     userName?: string;
-}> = ({ task, onStart, onComplete, onView, userId, userName }) => {
-    const statusConfig = STATUS_CONFIG[task.status] || STATUS_CONFIG.CONFIRMED;
-    const typeConfig = CLEANING_TYPE_CONFIG[task.cleaningType] || CLEANING_TYPE_CONFIG.occupied;
+    statusConfig: Record<string, { label: string; color: string; bg: string; icon: any }>;
+    cleaningTypeConfig: Record<string, { label: string; color: string; bg: string }>;
+}> = ({ task, onStart, onComplete, onView, userId, userName, statusConfig, cleaningTypeConfig }) => {
+    const { t } = useTranslation();
+    const config = statusConfig[task.status] || statusConfig.CONFIRMED;
+    const typeConfig = cleaningTypeConfig[task.cleaningType] || cleaningTypeConfig.occupied;
 
     const timeAgo = useMemo(() => {
         if (!task.createdAt) return '';
         const date = task.createdAt.toDate ? task.createdAt.toDate() : new Date(task.createdAt);
         const diff = Math.floor((Date.now() - date.getTime()) / 60000);
-        if (diff < 1) return 'الآن';
-        if (diff < 60) return `${diff}د`;
-        if (diff < 1440) return `${Math.floor(diff / 60)}س`;
-        return `${Math.floor(diff / 1440)}ي`;
-    }, [task.createdAt]);
+        if (diff < 1) return t('common.now');
+        if (diff < 60) return `${diff}${t('housekeeping.timeAgo.minutes')}`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}${t('housekeeping.timeAgo.hours')}`;
+        return `${Math.floor(diff / 1440)}${t('housekeeping.timeAgo.days')}`;
+    }, [task.createdAt, t]);
 
     const elapsedTime = useMemo(() => {
         if (!task.startedAt) return null;
@@ -199,11 +189,11 @@ const TaskCard: React.FC<{
                         {isUrgent && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
                         {isQR && <QrCode className="w-3 h-3 text-teal-500" />}
                     </div>
-                    <p className="text-[10px] adora-text-secondary truncate">{task.guestName || 'نزيل'}</p>
+                    <p className="text-[10px] adora-text-secondary truncate">{task.guestName || t('common.guest')}</p>
                 </div>
                 <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                    <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${statusConfig.bg} ${statusConfig.color}`}>
-                        {statusConfig.label}
+                    <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${config.bg} ${config.color}`}>
+                        {config.label}
                     </div>
                     <span className="text-[10px] adora-text-disabled">{timeAgo}</span>
                 </div>
@@ -213,9 +203,9 @@ const TaskCard: React.FC<{
             {task.status === 'IN_PROGRESS' && elapsedTime !== null && (
                 <div className="mb-2">
                     <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-[9px] adora-text-tertiary">الوقت</span>
+                        <span className="text-[9px] adora-text-tertiary">{t('common.time')}</span>
                         <span className={`text-[9px] font-bold ${isDelayed ? 'text-orange-500' : 'adora-text-primary'}`}>
-                            {elapsedTime}د
+                            {elapsedTime}{t('housekeeping.timeAgo.minutes')}
                         </span>
                     </div>
                     <div className="h-1 rounded-full overflow-hidden adora-bg-tertiary">
@@ -237,20 +227,20 @@ const TaskCard: React.FC<{
                 {task.status === 'CONFIRMED' && onStart && (
                     <button onClick={(e) => { e.stopPropagation(); onStart(); }}
                         className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
-                        <Play className="w-3 h-3" /> بدء
+                        <Play className="w-3 h-3" /> {t('common.start')}
                     </button>
                 )}
                 {task.status === 'IN_PROGRESS' && onComplete && (
                     <button onClick={(e) => { e.stopPropagation(); onComplete(); }}
                         className="flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> إتمام
+                        <CheckCircle2 className="w-3 h-3" /> {t('common.complete')}
                     </button>
                 )}
                 <button onClick={(e) => { e.stopPropagation(); onView?.(); }}
                     className={`py-1.5 px-3 rounded-lg text-xs font-medium adora-bg-tertiary adora-text-secondary ${
                         task.status === 'COMPLETED' ? 'flex-1 justify-center' : ''
                     } flex items-center gap-1`}>
-                    <Eye className="w-3 h-3" /> التفاصيل
+                    <Eye className="w-3 h-3" /> {t('common.details')}
                 </button>
             </div>
         </div>
@@ -259,8 +249,18 @@ const TaskCard: React.FC<{
 
 
 // Wrapper for Swipeable Task Card
-const SwipeableTaskCard: React.FC<any> = (props) => {
-    const { task, onStart, onComplete } = props;
+const SwipeableTaskCard: React.FC<{
+    task: CleaningRequest;
+    onStart?: () => void;
+    onComplete?: () => void;
+    onView?: () => void;
+    userId?: string;
+    userName?: string;
+    statusConfig: Record<string, { label: string; color: string; bg: string; icon: any }>;
+    cleaningTypeConfig: Record<string, { label: string; color: string; bg: string }>;
+}> = (props) => {
+    const { t } = useTranslation();
+    const { task, onStart, onComplete, statusConfig, cleaningTypeConfig } = props;
 
     // Only enable swipe for actionable states
     const canSwipeComplete = task.status === 'IN_PROGRESS';
@@ -270,7 +270,7 @@ const SwipeableTaskCard: React.FC<any> = (props) => {
         <SwipeableRow
             disabled={!canSwipeComplete && !canSwipeStart}
             onSwipeRight={canSwipeComplete ? onComplete : (canSwipeStart ? onStart : undefined)}
-            rightLabel={canSwipeComplete ? 'إكمال' : 'بدء'}
+            rightLabel={canSwipeComplete ? t('common.complete') : t('common.start')}
             rightColor={canSwipeComplete ? 'bg-green-500' : 'bg-blue-500'}
             rightIcon={canSwipeComplete ? <CheckCircle2 className="w-6 h-6 text-white" /> : <Play className="w-6 h-6 text-white" />}
             // Disable left swipe for now or use for something else
@@ -292,6 +292,7 @@ const InspectionModal: React.FC<{
     isSubmitting?: boolean; // ✅ UX: Loading state
     tenantId?: string; // Tenant ID for loading minibar products
 }> = ({ isOpen, task, onClose, onSubmit, isSubmitting: externalIsSubmitting = false, tenantId }) => {
+    const { t } = useTranslation();
     const [selectedResult, setSelectedResult] = useState<'clean' | 'damages' | 'missing_items' | null>(null);
     const [notes, setNotes] = useState('');
     const [minibarProducts, setMinibarProducts] = useState<MinibarProduct[]>([]);
@@ -330,7 +331,7 @@ const InspectionModal: React.FC<{
 
         // ✅ Validate: Photo required for damages and missing_items
         if ((selectedResult === 'damages' || selectedResult === 'missing_items') && !inspectionPhoto) {
-            alert('يجب إرفاق صورة للتلفيات/المفقودات');
+                alert(t('housekeeping.photoMustAttach'));
             return;
         }
 
@@ -354,12 +355,12 @@ const InspectionModal: React.FC<{
                 if (result.success && result.url) {
                     photoUrl = result.url;
                 } else {
-                    alert('فشل رفع الصورة');
+                    alert(t('housekeeping.photoUploadFailed'));
                     setUploading(false);
                     return;
                 }
             } catch (error) {
-                alert('فشل رفع الصورة');
+                alert(t('housekeeping.photoUploadFailed'));
                 setUploading(false);
                 return;
             }
@@ -394,8 +395,8 @@ const InspectionModal: React.FC<{
                         <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
                             <Clipboard className="w-8 h-8 text-purple-400" />
                         </div>
-                        <h3 className="text-xl font-bold text-white">فحص الغرفة {task.roomNumber}</h3>
-                        <p className="text-white/50 mt-1">اختر نتيجة الفحص</p>
+                        <h3 className="text-xl font-bold text-white">{t('housekeeping.inspectionTitle')} {task.roomNumber}</h3>
+                        <p className="text-white/50 mt-1">{t('housekeeping.selectInspectionResult')}</p>
                     </div>
 
                     {/* Result Options */}
@@ -409,8 +410,8 @@ const InspectionModal: React.FC<{
                         >
                             <CheckCircle2 className="w-6 h-6" />
                             <div className="text-right">
-                                <p className="font-bold">الغرفة كاملة ✓</p>
-                                <p className="text-sm opacity-70">لا توجد مشاكل - جاهزة للاستلام</p>
+                                <p className="font-bold">{t('housekeeping.roomComplete')}</p>
+                                <p className="text-sm opacity-70">{t('housekeeping.roomReadyDesc')}</p>
                             </div>
                         </button>
 
@@ -423,8 +424,8 @@ const InspectionModal: React.FC<{
                         >
                             <AlertCircle className="w-6 h-6" />
                             <div className="text-right">
-                                <p className="font-bold">الغرفة بها تلفيات</p>
-                                <p className="text-sm opacity-70">صورة إجباري - وصف اختياري</p>
+                                <p className="font-bold">{t('housekeeping.roomWithDamage')}</p>
+                                <p className="text-sm opacity-70">{t('housekeeping.photoRequiredDesc')}</p>
                             </div>
                         </button>
 
@@ -437,8 +438,8 @@ const InspectionModal: React.FC<{
                         >
                             <Package className="w-6 h-6" />
                             <div className="text-right">
-                                <p className="font-bold">الغرفة بها مفقودات</p>
-                                <p className="text-sm opacity-70">صورة إجباري - وصف اختياري</p>
+                                <p className="font-bold">{t('housekeeping.roomWithLost')}</p>
+                                <p className="text-sm opacity-70">{t('housekeeping.photoRequiredDesc')}</p>
                             </div>
                         </button>
                     </div>
@@ -447,7 +448,7 @@ const InspectionModal: React.FC<{
                     <textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder={selectedResult === 'damages' || selectedResult === 'missing_items' ? 'وصف التلفيات/المفقودات (اختياري)...' : 'ملاحظات الفحص (اختياري)...'}
+                        placeholder={selectedResult === 'damages' || selectedResult === 'missing_items' ? t('housekeeping.damageDescriptionPlaceholder') : t('housekeeping.inspectionNotesPlaceholder')}
                         className="adora-input w-full p-3 rounded-xl resize-none mb-4"
                         rows={3}
                     />
@@ -457,8 +458,8 @@ const InspectionModal: React.FC<{
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
                                 <Camera className="w-4 h-4" />
-                                {selectedResult === 'damages' ? 'صورة التلفيات' : 'صورة المفقودات'}
-                                <span className="text-red-400 text-xs">(إجباري)</span>
+                                {selectedResult === 'damages' ? t('housekeeping.damagePhoto') : t('housekeeping.lostPhoto')}
+                                <span className="text-red-400 text-xs">{t('housekeeping.required')}</span>
                             </label>
                             <PhotoUpload
                                 preview={inspectionPhotoPreview}
@@ -483,14 +484,14 @@ const InspectionModal: React.FC<{
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
                                 <ShoppingCart className="w-4 h-4" />
-                                استهلاك الميني بار
+                                {t('housekeeping.minibarConsumption')}
                             </label>
                             <div className="space-y-2 max-h-48 overflow-y-auto">
                                 {minibarProducts.map(product => (
                                     <div key={product.id} className="adora-card flex items-center justify-between p-3 rounded-xl">
                                         <div className="flex-1">
                                             <p className="text-sm font-medium text-white">{product.name}</p>
-                                            <p className="text-xs text-white/60">{product.price} ر.س</p>
+                                            <p className="text-xs text-white/60">{product.price} {t('common.rs')}</p>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
@@ -516,8 +517,8 @@ const InspectionModal: React.FC<{
                             {minibarTotal > 0 && (
                                 <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-green-500/20 to-primary-500/20 border border-green-500/30">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-white/80">الإجمالي:</span>
-                                        <span className="text-lg font-bold text-green-400">{minibarTotal} ر.س</span>
+                                        <span className="text-sm text-white/80">{t('common.total')}:</span>
+                                        <span className="text-lg font-bold text-green-400">{minibarTotal} {t('common.rs')}</span>
                                     </div>
                                 </div>
                             )}
@@ -531,7 +532,7 @@ const InspectionModal: React.FC<{
                             onClick={onClose}
                             className="adora-btn-ghost flex-1 py-3 rounded-xl font-medium transition-all"
                         >
-                            إلغاء
+                            {t('common.cancel')}
                         </button>
                         <button
                             onClick={handleSubmit}
@@ -541,10 +542,10 @@ const InspectionModal: React.FC<{
                             {uploading ? (
                                 <>
                                     <AdoraLoaderInline size={20} />
-                                    جاري الرفع...
+                                    {t('common.uploading')}
                                 </>
                             ) : (
-                                'تأكيد الفحص'
+                                t('housekeeping.confirmInspection')
                             )}
                         </button>
                     </div>
@@ -573,6 +574,7 @@ interface StartCleaningModalProps {
 const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
     isOpen, task, onClose, onSubmit, teamMembers
 }) => {
+    const { t } = useTranslation();
     const [cleaningType, setCleaningType] = useState<'occupied' | 'checkout'>('occupied');
     const [guestStatus, setGuestStatus] = useState<'in' | 'out'>('out');
     const [roomAssignments, setRoomAssignments] = useState<Record<string, { id: string; name: string }>>({});
@@ -580,13 +582,13 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Room sections
-    const roomSections = [
-        { id: 'bedroom1', name: 'نوم 1', icon: '🛏️' },
-        { id: 'bedroom2', name: 'نوم 2', icon: '🛏️' },
-        { id: 'living', name: 'صالة', icon: '🛋️' },
-        { id: 'kitchen', name: 'مطبخ', icon: '🍳' },
-        { id: 'bathroom', name: 'حمام', icon: '🚿' }
-    ];
+    const roomSections = useMemo(() => [
+        { id: 'bedroom1', name: t('housekeeping.roomSections.bedroom1'), icon: '🛏️' },
+        { id: 'bedroom2', name: t('housekeeping.roomSections.bedroom2'), icon: '🛏️' },
+        { id: 'living', name: t('housekeeping.roomSections.living'), icon: '🛋️' },
+        { id: 'kitchen', name: t('housekeeping.roomSections.kitchen'), icon: '🍳' },
+        { id: 'bathroom', name: t('housekeeping.roomSections.bathroom'), icon: '🚿' }
+    ], [t]);
 
     // Reset state when modal opens
     useEffect(() => {
@@ -620,7 +622,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                 {/* Header */}
                 <div className="p-4 border-b border-white/10 flex items-center justify-between">
                     <h3 className="text-lg font-bold text-white">
-                        🧹 بدء تنظيف - غرفة {task.roomNumber}
+                        🧹 {t('housekeeping.startCleaningForRoom', { room: task.roomNumber })}
                     </h3>
                     <button onClick={onClose} className="text-white/50 hover:text-white">
                         <X className="w-6 h-6" />
@@ -628,11 +630,11 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                 </div>
 
                 <div className="p-4 space-y-4">
-                    {/* نوع التنظيف وحالة النزيل */}
+                    {/* Cleaning type and guest status */}
                     <div className="grid grid-cols-2 gap-4">
                         {/* Cleaning Type */}
                         <div>
-                            <label className="text-sm text-white/60 mb-2 block">نوع التنظيف</label>
+                            <label className="text-sm text-white/60 mb-2 block">{t('housekeeping.cleaningTypeLabel')}</label>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setCleaningType('occupied')}
@@ -641,7 +643,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                         : 'adora-btn-ghost'
                                         }`}
                                 >
-                                    🏠 ساكن
+                                    🏠 {t('housekeeping.filterOccupied')}
                                 </button>
                                 <button
                                     onClick={() => setCleaningType('checkout')}
@@ -650,14 +652,14 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                         : 'adora-btn-ghost'
                                         }`}
                                 >
-                                    🚪 مغادرة
+                                    🚪 {t('housekeeping.filterCheckout')}
                                 </button>
                             </div>
                         </div>
 
                         {/* Guest Status */}
                         <div>
-                            <label className="text-sm text-white/60 mb-2 block">حالة النزيل</label>
+                            <label className="text-sm text-white/60 mb-2 block">{t('housekeeping.guestStatus')}</label>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setGuestStatus('out')}
@@ -666,7 +668,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                         : 'adora-btn-ghost'
                                         }`}
                                 >
-                                    🚶 خارج
+                                    🚶 {t('housekeeping.guestOut')}
                                 </button>
                                 <button
                                     onClick={() => setGuestStatus('in')}
@@ -675,7 +677,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                         : 'adora-btn-ghost'
                                         }`}
                                 >
-                                    🏠 داخل
+                                    🏠 {t('housekeeping.guestIn')}
                                 </button>
                             </div>
                         </div>
@@ -683,7 +685,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
 
                     {/* Room Assignment Grid */}
                     <div>
-                        <label className="text-sm text-white/60 mb-2 block">توزيع الفريق على الغرف</label>
+                        <label className="text-sm text-white/60 mb-2 block">{t('housekeeping.roomAssignment')}</label>
                         <div className="grid grid-cols-5 gap-2">
                             {roomSections.map(section => (
                                 <button
@@ -703,7 +705,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                             ✓ {roomAssignments[section.id].name.split(' ')[0]}
                                         </p>
                                     ) : (
-                                        <p className="text-[9px] adora-text-tertiary mt-0.5">اختر</p>
+                                        <p className="text-[9px] adora-text-tertiary mt-0.5">{t('common.select')}</p>
                                     )}
                                 </button>
                             ))}
@@ -714,12 +716,12 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                     {selectingRoom && (
                         <div className="adora-card rounded-xl p-3">
                             <p className="text-sm adora-text-secondary mb-2">
-                                اختر موظف لـ {roomSections.find(s => s.id === selectingRoom)?.name}:
+                                {t('housekeeping.selectEmployeeForRoom', { room: roomSections.find(s => s.id === selectingRoom)?.name || '' })}:
                             </p>
                             {teamMembers.length === 0 ? (
                                 <div className="text-center py-4 adora-text-secondary">
-                                    <p className="text-sm mb-2">لا يوجد فريق محفوظ</p>
-                                    <p className="text-xs adora-text-tertiary">يرجى إضافة فريق من قائمة الفريق في الترويسة</p>
+                                    <p className="text-sm mb-2">{t('housekeeping.noTeamSaved')}</p>
+                                    <p className="text-xs adora-text-tertiary">{t('housekeeping.addTeamFromHeader')}</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
@@ -741,7 +743,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                                 onClick={() => setSelectingRoom(null)}
                                 className="mt-2 text-xs adora-text-tertiary hover:opacity-70"
                             >
-                                إلغاء
+                                {t('common.cancel')}
                             </button>
                         </div>
                     )}
@@ -753,7 +755,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                         onClick={onClose}
                         className="adora-btn-ghost flex-1 py-3 rounded-xl transition-all"
                     >
-                        إلغاء
+                        {t('common.cancel')}
                     </button>
                     <button
                         onClick={async () => {
@@ -775,7 +777,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                         ) : (
                             <>
                                 <Play className="w-5 h-5" />
-                                بدء التنظيف
+                                {t('housekeeping.startCleaningNote')}
                             </>
                         )}
                     </button>
@@ -796,7 +798,7 @@ export const HousekeepingDashboard: React.FC = () => {
     const tenantContext = useTenant();
     const tenantId = tenantContext.tenantId;
     const { success, error, haptic, playSound } = useUX();
-    const { t } = usei18n();
+    const { t } = useTranslation();
     const brandName = useBrandName();
 
     // State
@@ -837,6 +839,22 @@ export const HousekeepingDashboard: React.FC = () => {
     const { showTour, steps: tourSteps, closeTour, completeTour } = useOnboardingTour('housekeeping');
     
     const [inspectionTask, setInspectionTask] = useState<CleaningRequest | null>(null);
+
+    // ✅ STATUS_CONFIG and CLEANING_TYPE_CONFIG using t()
+    const STATUS_CONFIG = useMemo(() => ({
+        CONFIRMED: { label: t('housekeeping.statusLabels.confirmed'), color: 'text-yellow-400', bg: 'bg-yellow-500/20', icon: AlertCircle },
+        IN_PROGRESS: { label: t('housekeeping.statusLabels.inProgress'), color: 'text-blue-400', bg: 'bg-blue-500/20', icon: Play },
+        COMPLETED: { label: t('housekeeping.statusLabels.completed'), color: 'text-green-400', bg: 'bg-green-500/20', icon: CheckCircle2 },
+        NEEDS_INSPECTION: { label: t('housekeeping.statusLabels.needsInspection'), color: 'text-purple-400', bg: 'bg-purple-500/20', icon: Eye }
+    }), [t]);
+
+    const CLEANING_TYPE_CONFIG = useMemo(() => ({
+        occupied: { label: t('housekeeping.cleaningTypes.occupied'), color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
+        checkout: { label: t('housekeeping.cleaningTypes.checkout'), color: 'text-orange-400', bg: 'bg-orange-500/20' },
+        post_inspection: { label: t('housekeeping.cleaningTypes.postInspection'), color: 'text-purple-400', bg: 'bg-purple-500/20' },
+        maintenance_check: { label: t('housekeeping.cleaningTypes.maintenanceCheck'), color: 'text-red-400', bg: 'bg-red-500/20' },
+        undefined: { label: t('housekeeping.cleaningTypes.maintenanceCheck'), color: 'text-red-400', bg: 'bg-red-500/20' }
+    }), [t]);
     const [roomHistoryRoom, setRoomHistoryRoom] = useState<string | null>(null);
     const [startCleaningTask, setStartCleaningTask] = useState<CleaningRequest | null>(null);
     const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string }>>([]);
@@ -939,7 +957,7 @@ export const HousekeepingDashboard: React.FC = () => {
             if (action === 'UPDATE_STATUS') {
                 const targetTask = tasks.find(t => t.roomNumber === params.roomId);
                 if (!targetTask) {
-                    error(`لم يتم العثور على مهمة للغرفة ${params.roomId}`);
+                    error(t('housekeeping.taskNotFound', { room: params.roomId }));
                     return;
                 }
 
@@ -955,7 +973,7 @@ export const HousekeepingDashboard: React.FC = () => {
                 }
             } else if (action === 'RECORD_LAUNDRY_INVENTORY') {
                 // This would normally call a laundry service
-                success('تم تسجيل مخزون المغسلة المذكور');
+                success(t('housekeeping.laundryInventoryRecorded'));
             }
         }
     });
@@ -1072,12 +1090,12 @@ export const HousekeepingDashboard: React.FC = () => {
                     setTeamMembers(members);
                 } else {
                     // Fallback to current user if list is empty
-                    setTeamMembers([{ id: user?.id || '', name: user?.name || 'أنا' }]);
+                    setTeamMembers([{ id: user?.id || '', name: user?.name || t('common.me') }]);
                 }
             } catch (e) {
                 console.error('Error loading team settings:', e);
                 // Fallback to current user
-                setTeamMembers([{ id: user?.id || '', name: user?.name || 'أنا' }]);
+                setTeamMembers([{ id: user?.id || '', name: user?.name || t('common.me') }]);
             }
         };
         loadTeam();
@@ -1146,7 +1164,7 @@ export const HousekeepingDashboard: React.FC = () => {
         // Since we are starting the task, we must assign at least the main room
         const currentAssignment = data.roomAssignments[startCleaningTask.roomNumber];
         if (!currentAssignment && Object.keys(data.roomAssignments).length === 0) {
-            alert('يجب تعيين موظف للمهنة');
+            alert(t('housekeeping.assignEmployeeRequired'));
             throw new Error('Assignment required');
         }
 
@@ -1169,14 +1187,14 @@ export const HousekeepingDashboard: React.FC = () => {
                     timestamp: now,
                     userId: user?.id || '',
                     userName: user?.name || '',
-                    notes: 'بدء التنظيف'
+                    notes: t('housekeeping.startCleaningNote')
                 })
             });
 
             // Award points for starting - Non-blocking
             if (user?.id) {
                 try {
-                    await awardPoints('default', user.id, 2, 'بدء مهمة تنظيف');
+                    await awardPoints('default', user.id, 2, t('housekeeping.startTask'));
                 } catch (e) {
                     console.warn('Failed to award points:', e);
                 }
@@ -1229,14 +1247,14 @@ export const HousekeepingDashboard: React.FC = () => {
                         timestamp: now,
                         userId: user?.id || '',
                         userName: user?.name || '',
-                        notes: 'تم إكمال التنظيف'
+                        notes: t('housekeeping.cleaningCompletedNote')
                     }, {
                         department: 'housekeeping',
                         action: 'returned',
                         timestamp: now,
                         userId: user?.id || '',
                         userName: user?.name || '',
-                        notes: 'تم الإرجاع للاستقبال'
+                        notes: t('housekeeping.returnedToReceptionNote')
                     })
                 });
             }
@@ -1262,13 +1280,13 @@ export const HousekeepingDashboard: React.FC = () => {
                 }
             }
 
-            success('تم إتمام التنظيف بنجاح');
+            success(t('housekeeping.cleaningCompletedSuccess'));
         } catch (err: any) {
             console.error('Error completing cleaning:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
             });
-            error('فشل إتمام التنظيف');
+            error(t('housekeeping.cleaningCompletedFailed'));
         }
     };
 
@@ -1280,13 +1298,13 @@ export const HousekeepingDashboard: React.FC = () => {
                 assignedAt: Timestamp.now()
             });
 
-            success('تم تعيين المهمة بنجاح');
+            success(t('housekeeping.taskAssignedSuccess'));
         } catch (err: any) {
             console.error('Error assigning task:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
             });
-            error('فشل تعيين المهمة');
+            error(t('housekeeping.taskAssignedFailed'));
         }
     };
 
@@ -1333,7 +1351,7 @@ export const HousekeepingDashboard: React.FC = () => {
                             user?.id || '',
                             user?.name || '',
                             'COMPLETED' as any,
-                            `تم اعتماد الصيانة - ${notes || 'لا توجد ملاحظات'}`
+                            t('housekeeping.maintenanceApprovedNoteWithNotes', { notes: notes || t('common.noDescription') })
                         );
 
                         await updateDoc(taskRef, {
@@ -1349,7 +1367,7 @@ export const HousekeepingDashboard: React.FC = () => {
                         // Update Room Status to ready
                         await updateRoomStatus(tenantId, branchId, inspectionTask.roomNumber, 'ready' as any);
 
-                        success('تم اعتماد الصيانة وإرسال الطلب للاستقبال');
+                        success(t('housekeeping.maintenanceApprovedSent'));
                     } else if (result === 'damages' || result === 'missing_items') {
                         // ❌ Reject: Maintenance has issues -> Send back to Maintenance with photo and notes
                         await transferRequestToDepartment(
@@ -1359,7 +1377,7 @@ export const HousekeepingDashboard: React.FC = () => {
                             user?.id || '',
                             user?.name || '',
                             'IN_PROGRESS' as any,
-                            `تم رفض الصيانة: ${notes || 'يوجد تلفيات/مفقودات'}`
+                            t('housekeeping.maintenanceRejectedNoteWithReason', { reason: notes || t('housekeeping.damagesInRoom') })
                         );
 
                         await updateDoc(taskRef, {
@@ -1377,7 +1395,7 @@ export const HousekeepingDashboard: React.FC = () => {
                         // Room stays in maintenance status
                         await updateRoomStatus(tenantId, branchId, inspectionTask.roomNumber, 'maintenance' as any);
 
-                        error('تم رفض الصيانة وإعادتها للصيانة مع ملاحظات الفحص');
+                        error(t('housekeeping.maintenanceRejectedReturned'));
                     }
 
                     setInspectionTask(null);
@@ -1401,7 +1419,7 @@ export const HousekeepingDashboard: React.FC = () => {
 
                         // Award bonus points (updates both personal and team points)
                         if (user?.id) {
-                            await awardPoints('default', user.id, 15, 'فحص نظيف - دورة كاملة');
+                            await awardPoints('default', user.id, 15, t('housekeeping.cleanInspectionPoints'));
                         }
                     } else if (result === 'needs_maintenance') {
                         // 🔄 Needs maintenance → create maintenance request and LOOP
@@ -1448,7 +1466,7 @@ export const HousekeepingDashboard: React.FC = () => {
                     }
 
                     setInspectionTask(null);
-                    success('تم الفحص بنجاح');
+                    success(t('housekeeping.inspectionSuccess'));
                     return;
                 }
 
@@ -1467,12 +1485,12 @@ export const HousekeepingDashboard: React.FC = () => {
                                         inventoryItem.id,
                                         consumedItem.quantity,
                                         'out',
-                                        `استهلاك ميني بار - غرفة ${inspectionTask.roomNumber}`,
+                                        t('housekeeping.minibarConsumptionNote', { room: inspectionTask.roomNumber }),
                                         user?.id || '',
                                         user?.name || '',
                                         branchId,
                                         undefined,
-                                        `منتج: ${consumedItem.productName}`,
+                                        t('housekeeping.productNote', { product: consumedItem.productName }),
                                         tenantId || undefined // ✅ Pass tenantId
                                     );
                                     console.log(`✅ Deducted inventory: ${consumedItem.productName} -${consumedItem.quantity}`);
@@ -1580,7 +1598,7 @@ export const HousekeepingDashboard: React.FC = () => {
                             branchId: branchId,
                             tenantId: tenantId,
                             roomNumber: inspectionTask.roomNumber,
-                            description: `تم فحص الغرفة ${inspectionTask.roomNumber} ووجد مفقودات: ${notes || 'لا يوجد وصف'}`,
+                            description: t('housekeeping.roomInspectedWithMissingItems', { room: inspectionTask.roomNumber, notes: notes || t('housekeeping.noDescription') }),
                             photoUrl: photoUrl || null,
                             foundBy: { id: user?.id || '', name: user?.name || '' },
                             inspectedBy: { id: user?.id || '', name: user?.name || '' },
@@ -1630,7 +1648,7 @@ export const HousekeepingDashboard: React.FC = () => {
                                 tenantId: tenantId,
                                 roomId: inspectionTask.roomNumber,
                                 severity: 'medium',
-                                message: `تنظيف سريع جداً (${Math.round(durationMinutes)} دقيقة) - الغرفة ${inspectionTask.roomNumber}`,
+                                message: t('housekeeping.veryFastCleaningWarning', { minutes: Math.round(durationMinutes), room: inspectionTask.roomNumber }),
                                 createdAt: Timestamp.now(),
                                 createdBy: { id: user?.id, name: user?.name },
                                 status: 'active'
@@ -1645,7 +1663,7 @@ export const HousekeepingDashboard: React.FC = () => {
                 if (result === 'clean') {
                     setUndoState({
                         show: true,
-                        message: `تم تحديث حالة الغرفة ${inspectionTask.roomNumber} إلى "نظيفة"`,
+                        message: t('housekeeping.roomStatusUpdatedToClean', { room: inspectionTask.roomNumber }),
                         onUndo: async () => {
                             try {
                                 // Revert status
@@ -1654,16 +1672,16 @@ export const HousekeepingDashboard: React.FC = () => {
                                     inspectionResult: previousState.inspectionResult,
                                     completedAt: null
                                 });
-                                success('تم التراجع عن التغيير');
+                                success(t('housekeeping.changeReverted'));
                             } catch (err) {
-                                error('فشل التراجع عن التغيير');
+                                error(t('housekeeping.changeRevertFailed'));
                             }
                         }
                     });
                 }
             },
             {
-                successMessage: 'تم إرسال نتيجة الفحص بنجاح',
+                successMessage: t('housekeeping.inspectionResultSent'),
                 operation: 'inspection-submit'
             }
         );
@@ -1676,7 +1694,7 @@ export const HousekeepingDashboard: React.FC = () => {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center theme-page">
-                <AdoraLoader size="lg" message="جاري تحميل البيانات..." />
+                <AdoraLoader size="lg" message={t('common.loadingData')} />
             </div>
         );
     }
@@ -1689,7 +1707,7 @@ export const HousekeepingDashboard: React.FC = () => {
             <div className="min-h-screen p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
             {/* Flexible Header */}
             <FlexibleHeader
-                title="الهاوس كيبنج"
+                title={t('housekeeping.title')}
                 titleIcon={<Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400 flex-shrink-0" />}
                 showGreeting={true}
                 brandName={brandName}
@@ -1698,39 +1716,39 @@ export const HousekeepingDashboard: React.FC = () => {
                     {
                         id: 'history',
                         icon: <History className="w-5 h-5" />,
-                        label: 'سجل العمليات',
+                        label: t('housekeeping.operationsHistory'),
                         onClick: () => setShowHistory(true),
                         variant: 'primary'
                     },
                     {
                         id: 'shiftNotes',
                         icon: <MessageSquare className="w-5 h-5" />,
-                        label: 'ملاحظات الغرف',
+                        label: t('housekeeping.roomNotes'),
                         onClick: () => setShowShiftNotes(true)
                     },
                     {
                         id: 'procurement',
                         icon: <ShoppingCart className="w-5 h-5" />,
-                        label: 'المشتريات',
+                        label: t('housekeeping.procurement'),
                         onClick: () => setShowProcurement(true)
                     },
                     {
                         id: 'laundry',
                         icon: <Clock className="w-5 h-5" />,
-                        label: 'جرد المغسلة',
+                        label: t('housekeeping.laundryInventory'),
                         onClick: () => setShowLaundryInventory(true)
                     },
                     {
                         id: 'instructions',
                         icon: <BookOpen className="w-5 h-5" />,
-                        label: 'تعليمات عامة',
+                        label: t('housekeeping.generalInstructions'),
                         onClick: () => setShowGeneralInstructions(true),
                         variant: 'primary'
                     },
                     {
                         id: 'support',
                         icon: <Headphones className="w-5 h-5" />,
-                        label: 'دعم فني',
+                        label: t('housekeeping.technicalSupport'),
                         onClick: () => setShowSupportTicket(true)
                     }
                 ]}
@@ -1764,31 +1782,31 @@ export const HousekeepingDashboard: React.FC = () => {
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={groupedTasks.new.length}
-                        label="🧹 جاهز للبدء"
+                        label={t('housekeeping.statusLabels.confirmed')}
                         icon={AlertCircle}
                         iconColor="orange"
                         status={groupedTasks.new.length > 10 ? 'warning' : 'normal'}
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('common.lastUpdate')}
                     />
                 </div>
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={groupedTasks.inProgress.length}
-                        label="🧽 قيد التنظيف"
+                        label={t('housekeeping.statusLabels.inProgress')}
                         icon={Play}
                         iconColor="blue"
                         status={groupedTasks.inProgress.length > 15 ? 'warning' : 'normal'}
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('common.lastUpdate')}
                     />
                 </div>
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={groupedTasks.completed.length}
-                        label="✨ مكتمل"
+                        label={t('housekeeping.statusLabels.completed')}
                         icon={CheckCircle2}
                         iconColor="green"
                         status="success"
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('common.lastUpdate')}
                     />
                 </div>
             </div>
@@ -1796,9 +1814,9 @@ export const HousekeepingDashboard: React.FC = () => {
             {/* Room Type Filter - Segmented Control Style */}
             <div className="adora-card p-1 rounded-2xl flex mb-4 relative z-0">
                 {[
-                    { key: 'all', label: 'الكل', icon: <DoorOpen className="w-4 h-4" /> },
-                    { key: 'occupied', label: 'ساكن', icon: <span>🏠</span> },
-                    { key: 'checkout', label: 'مغادرة', icon: <span>🚪</span> }
+                    { key: 'all', label: t('housekeeping.filterAll'), icon: <DoorOpen className="w-4 h-4" /> },
+                    { key: 'occupied', label: t('housekeeping.filterOccupied'), icon: <span>🏠</span> },
+                    { key: 'checkout', label: t('housekeeping.filterCheckout'), icon: <span>🚪</span> }
                 ].map((filter) => (
                     <button
                         key={filter.key}
@@ -1819,7 +1837,7 @@ export const HousekeepingDashboard: React.FC = () => {
 
             {/* Floor Filter */}
             <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
-                <span className="adora-text-tertiary text-sm flex-shrink-0">الطابق:</span>
+                <span className="adora-text-tertiary text-sm flex-shrink-0">{t('housekeeping.floorFilter')}:</span>
                 {availableFloors.map((floor) => (
                     <button
                         key={floor}
@@ -1832,7 +1850,7 @@ export const HousekeepingDashboard: React.FC = () => {
                             : 'adora-card adora-text-secondary hover:opacity-80'
                             }`}
                     >
-                        {floor === 0 ? 'الكل' : floor}
+                        {floor === 0 ? t('housekeeping.filterAll') : floor}
                     </button>
                 ))}
             </div>
@@ -1856,7 +1874,7 @@ export const HousekeepingDashboard: React.FC = () => {
                         <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 adora-bg-tertiary">
                             <Sparkles className="w-6 h-6 adora-text-disabled" />
                         </div>
-                        <p className="text-sm adora-text-secondary">لا توجد مهام في هذه القائمة</p>
+                        <p className="text-sm adora-text-secondary">{t('housekeeping.noTasksInList')}</p>
                     </div>
                 ) : (
                     currentTasks.map(task => (
@@ -1865,6 +1883,8 @@ export const HousekeepingDashboard: React.FC = () => {
                             task={task}
                             userId={user?.id}
                             userName={user?.name}
+                            statusConfig={STATUS_CONFIG}
+                            cleaningTypeConfig={CLEANING_TYPE_CONFIG}
                             onStart={() => {
                                 if (task.status === 'CONFIRMED') {
                                     setStartCleaningTask(task);
@@ -1949,7 +1969,7 @@ export const HousekeepingDashboard: React.FC = () => {
                                 const members = docSnap.data().teamMembers;
                                 setTeamMembers(members);
                             } else {
-                                setTeamMembers([{ id: user?.id || '', name: user?.name || 'أنا' }]);
+                                setTeamMembers([{ id: user?.id || '', name: user?.name || t('common.me') }]);
                             }
                         } catch (e) {
                             console.error('Error reloading team after update:', e);
@@ -1968,7 +1988,7 @@ export const HousekeepingDashboard: React.FC = () => {
                                 const members = docSnap.data().teamMembers;
                                 setTeamMembers(members);
                             } else {
-                                setTeamMembers([{ id: user?.id || '', name: user?.name || 'أنا' }]);
+                                setTeamMembers([{ id: user?.id || '', name: user?.name || t('common.me') }]);
                             }
                         } catch (e) {
                             console.error('Error reloading team after update:', e);
@@ -1998,21 +2018,21 @@ export const HousekeepingDashboard: React.FC = () => {
                 items={[
                     {
                         id: 'history',
-                        label: 'سجل العمليات',
+                        label: t('housekeeping.operationsHistory'),
                         icon: <History className="w-5 h-5" />,
                         onClick: () => setShowHistory(true),
                         color: 'text-blue-400'
                     },
                     {
                         id: 'shift-notes',
-                        label: 'ملاحظات الغرف',
+                        label: t('housekeeping.roomNotes'),
                         icon: <MessageSquare className="w-5 h-5" />,
                         onClick: () => setShowShiftNotes(true),
                         color: 'text-white/60'
                     },
                     {
                         id: 'team',
-                        label: 'الفريق',
+                        label: t('housekeeping.team'),
                         icon: <Users className="w-5 h-5" />,
                         onClick: () => {
                             if (user?.role === 'manager' || user?.role === 'owner') {
@@ -2025,14 +2045,14 @@ export const HousekeepingDashboard: React.FC = () => {
                     },
                     {
                         id: 'procurement',
-                        label: 'المشتريات',
+                        label: t('housekeeping.procurement'),
                         icon: <ShoppingCart className="w-5 h-5" />,
                         onClick: () => setShowProcurement(true),
                         color: 'text-white/60'
                     },
                     {
                         id: 'laundry',
-                        label: 'جرد المغسلة',
+                        label: t('housekeeping.laundryInventory'),
                         icon: <span className="text-xl">🧺</span>,
                         onClick: () => setShowLaundryInventory(true),
                         color: 'text-purple-400'

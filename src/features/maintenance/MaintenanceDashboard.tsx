@@ -22,7 +22,7 @@ import { PageTransition } from '../../components/common/PageTransition';
 import { ResponsiveActionBar } from '../../components/common/ResponsiveActionBar'; // ✅ Unified responsive actions
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
-import { usei18n } from '../../i18n/i18nContext';
+import { useTranslation } from 'react-i18next';
 import { db } from '../../services/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, Timestamp, orderBy, getDocs, arrayUnion } from 'firebase/firestore';
 import { useSmartAgent } from '../../hooks/useSmartAgent';
@@ -98,6 +98,7 @@ export const MaintenanceDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { success, error, haptic } = useUX();
+    const { t } = useTranslation();
     const { tenantId, setTenant } = useTenant(); // ✅ Use Tenant Context - moved early
     const brandName = useBrandName();
     const greeting = getGreetingParts(user?.name);
@@ -426,11 +427,11 @@ export const MaintenanceDashboard: React.FC = () => {
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         const now = new Date();
         const diff = Math.floor((now.getTime() - date.getTime()) / 60000);
-        if (diff < 1) return 'الآن';
-        if (diff < 60) return `منذ ${diff} دقيقة`;
+        if (diff < 1) return t('maintenance.timeAgo.now');
+        if (diff < 60) return t('maintenance.timeAgo.minutesAgo', { minutes: diff });
         const hours = Math.floor(diff / 60);
-        if (hours < 24) return `منذ ${hours} ساعة`;
-        return `منذ ${Math.floor(hours / 24)} يوم`;
+        if (hours < 24) return t('maintenance.timeAgo.hoursAgo', { hours });
+        return t('maintenance.timeAgo.daysAgo', { days: Math.floor(hours / 24) });
     };
 
     const getEstimatedCost = (maintenanceType: string): number => {
@@ -447,9 +448,9 @@ export const MaintenanceDashboard: React.FC = () => {
 
     const getPriorityLabel = (priority?: string): string => {
         switch (priority) {
-            case 'urgent': return 'عاجل';
-            case 'low': return 'منخفض';
-            default: return 'عادي';
+            case 'urgent': return t('maintenance.priority.urgent');
+            case 'low': return t('maintenance.priority.low');
+            default: return t('maintenance.priority.normal');
         }
     };
 
@@ -500,7 +501,7 @@ export const MaintenanceDashboard: React.FC = () => {
             if (result.success && result.url) {
                 // ✅ Replace preview with uploaded URL
                 setBeforePhoto(result.url);
-                success('تم رفع صورة قبل الإصلاح');
+                success(t('maintenance.photoUpload.beforeUploaded'));
             } else {
                 error('فشل رفع الصورة: ' + (result.error || 'خطأ غير معروف'));
                 setBeforePhoto(null);
@@ -544,7 +545,7 @@ export const MaintenanceDashboard: React.FC = () => {
                     timestamp: now,
                     userId: user?.id || '',
                     userName: user?.name || '',
-                    notes: 'بدء الصيانة'
+                    notes: t('maintenance.workflow.started')
                 })
             });
 
@@ -563,10 +564,10 @@ export const MaintenanceDashboard: React.FC = () => {
                 }
             }
 
-            success('تم بدء الصيانة بنجاح');
+            success(t('maintenance.workflow.startedSuccess'));
         } catch (err) {
             console.error('Error starting maintenance:', err);
-            error('فشل بدء الصيانة');
+            error(t('maintenance.workflow.startedFailed'));
         }
     };
 
@@ -630,7 +631,7 @@ export const MaintenanceDashboard: React.FC = () => {
                 // ✅ Replace preview with uploaded URL
                 setAfterPhoto(result.url);
                 setUploadProgress(100);
-                success('تم رفع الصورة بنجاح');
+                success(t('maintenance.photoUpload.afterUploaded'));
             } else {
                 error('فشل رفع الصورة: ' + (result.error || 'خطأ غير معروف'));
                 setAfterPhoto(null);
@@ -667,13 +668,13 @@ export const MaintenanceDashboard: React.FC = () => {
 
         // ✅ MANDATORY: After Photo is required
         if (!afterPhoto) {
-            error('يجب رفع صورة بعد الإصلاح لإتمام الطلب');
+            error(t('maintenance.photoUpload.afterRequired'));
             return;
         }
 
         // ✅ Check if photo is still uploading
         if (uploadingPhoto) {
-            error('يرجى الانتظار حتى يتم رفع الصورة');
+            error(t('maintenance.photoUpload.uploadWait'));
             return;
         }
 
@@ -686,7 +687,7 @@ export const MaintenanceDashboard: React.FC = () => {
                 user?.id || '',
                 user?.name || '',
                 'NEEDS_INSPECTION' as any, // Status: Needs Inspection
-                `تم إتمام الصيانة. ${completionNotes ? `ملاحظات: ${completionNotes}` : ''}`
+                completionNotes ? t('maintenance.workflow.completedWithNotes', { notes: completionNotes }) : t('maintenance.workflow.completed')
             );
 
             // ✅ Update request with completion data and afterPhoto
@@ -732,11 +733,11 @@ export const MaintenanceDashboard: React.FC = () => {
                 ...(currentCompleteRequest.maintenanceType && { maintenanceType: currentCompleteRequest.maintenanceType })
             });
             
-            success('تم إتمام الصيانة وإرسالها للفحص في الهاوس كيبنج ✓');
+            success(t('maintenance.workflow.completedSentForInspection'));
             haptic('success');
         } catch (err: any) {
             console.error('Error completing maintenance:', err);
-            error('فشل إتمام الصيانة: ' + (err.message || 'خطأ غير معروف'));
+            error(t('maintenance.workflow.completedFailed', { error: err.message || t('common.error') }));
         }
     };
 
@@ -750,10 +751,10 @@ export const MaintenanceDashboard: React.FC = () => {
                 status: 'WAITING_PARTS',
                 'timeline.pausedAt': Timestamp.now()
             });
-            success('تم تعليق الطلب لانتظار القطع');
+            success(t('maintenance.workflow.suspended'));
         } catch (err) {
             console.error(err);
-            error('فشل تعليق الطلب');
+            error(t('maintenance.workflow.suspendedFailed'));
         }
     };
 
@@ -763,10 +764,10 @@ export const MaintenanceDashboard: React.FC = () => {
                 status: 'IN_PROGRESS',
                 'timeline.resumedAt': Timestamp.now() // Could be array for multiple pauses
             });
-            success('تم استئناف العمل');
+            success(t('maintenance.workflow.resumed'));
         } catch (err) {
             console.error(err);
-            error('فشل استئناف الطلب');
+            error(t('maintenance.workflow.resumedFailed'));
         }
     };
 
@@ -853,7 +854,13 @@ export const MaintenanceDashboard: React.FC = () => {
 
     const exportMaintenanceDataToCSV = () => {
         const data = [...activeRequests, ...completedRequests];
-        const headers = ['الغرفة', 'النوع', 'الحالة', 'التكلفة', 'التاريخ'];
+        const headers = [
+            t('maintenance.tableHeaders.room'),
+            t('maintenance.tableHeaders.type'),
+            t('maintenance.tableHeaders.status'),
+            t('maintenance.tableHeaders.cost'),
+            t('maintenance.tableHeaders.date')
+        ];
         const rows = data.map(r => [
             r.roomNumber,
             r.maintenanceType || 'عام',
@@ -955,7 +962,7 @@ export const MaintenanceDashboard: React.FC = () => {
                         ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                         : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                         }`}>
-                        {request.status === 'IN_PROGRESS' ? 'جاري التنفيذ' : 'انتظار'}
+                        {request.status === 'IN_PROGRESS' ? t('maintenance.statusLabels.inProgress') : t('maintenance.statusLabels.waiting')}
                     </span>
 
                     {/* View Details Button */}
@@ -1008,7 +1015,7 @@ export const MaintenanceDashboard: React.FC = () => {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center theme-page">
-                <AdoraLoader size="lg" message="جاري تحميل البيانات..." />
+                <AdoraLoader size="lg" message={t('maintenance.loadingData')} />
             </div>
         );
     }
@@ -1042,19 +1049,19 @@ export const MaintenanceDashboard: React.FC = () => {
                         {
                             id: 'history',
                             icon: <History className="w-5 h-5" />,
-                            label: 'سجل العمليات',
+                            label: t('maintenance.operationsHistory'),
                             onClick: () => setShowHistory(true),
                         },
                         {
                             id: 'notes',
                             icon: <MessageSquare className="w-5 h-5" />,
-                            label: 'ملاحظات الغرف',
+                            label: t('maintenance.roomNotes'),
                             onClick: () => setShowShiftNotes(true),
                         },
                         {
                             id: 'procurement',
                             icon: <ShoppingCart className="w-5 h-5" />,
-                            label: 'المشتريات',
+                            label: t('maintenance.procurement'),
                             onClick: () => setShowProcurement(true),
                         },
                         {
@@ -1066,7 +1073,7 @@ export const MaintenanceDashboard: React.FC = () => {
                         {
                             id: 'support',
                             icon: <Headphones className="w-5 h-5" />,
-                            label: 'دعم فني',
+                            label: t('maintenance.technicalSupport'),
                             onClick: () => setShowSupportTicket(true),
                         },
                     ]}
@@ -1105,37 +1112,37 @@ export const MaintenanceDashboard: React.FC = () => {
                         icon={Activity}
                         iconColor="blue"
                         status="normal"
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('maintenance.lastUpdate')}
                     />
                 </div>
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={activeRequests.filter(r => r.status === 'CONFIRMED').length}
-                        label="⏳ بانتظار البدء"
+                        label={t('maintenance.statusLabels.pending')}
                         icon={Clock}
                         iconColor="orange"
                         status={activeRequests.filter(r => r.status === 'CONFIRMED').length > 10 ? 'warning' : 'normal'}
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('maintenance.lastUpdate')}
                     />
                 </div>
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={completedRequests.length}
-                        label="✅ مكتملة اليوم"
+                        label={t('maintenance.completedToday')}
                         icon={CheckCircle}
                         iconColor="green"
                         status="success"
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('maintenance.lastUpdate')}
                     />
                 </div>
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={activeRequests.filter(r => r.priority === 'urgent').length}
-                        label="🚨 عاجلة"
+                        label={t('maintenance.urgent')}
                         icon={AlertTriangle}
                         iconColor="red"
                         status={activeRequests.filter(r => r.priority === 'urgent').length > 0 ? 'error' : 'normal'}
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('maintenance.lastUpdate')}
                     />
                 </div>
             </div>
@@ -1163,13 +1170,13 @@ export const MaintenanceDashboard: React.FC = () => {
 
             {/* Issue Type Filter */}
             <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
-                <span className="adora-text-tertiary text-sm flex-shrink-0">نوع العطل:</span>
+                <span className="adora-text-tertiary text-sm flex-shrink-0">{t('maintenance.issueType')}:</span>
                 {[
-                    { key: 'all', label: 'الكل', icon: '🔧' },
-                    { key: 'كهرب', label: 'كهرباء', icon: '⚡' },
-                    { key: 'سباك', label: 'سباكة', icon: '🚿' },
-                    { key: 'تكييف', label: 'تكييف', icon: '❄️' },
-                    { key: 'نجار', label: 'نجارة', icon: '🪚' },
+                    { key: 'all', label: t('maintenance.all'), icon: '🔧' },
+                    { key: 'كهرب', label: t('maintenance.categories.electrical'), icon: '⚡' },
+                    { key: 'سباك', label: t('maintenance.categories.plumbing'), icon: '🚿' },
+                    { key: 'تكييف', label: t('maintenance.categories.ac'), icon: '❄️' },
+                    { key: 'نجار', label: t('maintenance.categories.carpentry'), icon: '🪚' },
                 ].map((type) => (
                     <button
                         key={type.key}
@@ -1232,13 +1239,13 @@ export const MaintenanceDashboard: React.FC = () => {
                             </div>
 
                             <div className="adora-card p-3 rounded-xl">
-                                <p className="adora-text-secondary text-sm mb-1">الوصف</p>
-                                <p className="text-white">{currentStartRequest.description || 'لا يوجد وصف'}</p>
+                                <p className="adora-text-secondary text-sm mb-1">{t('common.description')}</p>
+                                <p className="text-white">{currentStartRequest.description || t('maintenance.noDescription')}</p>
                             </div>
 
                             {/* Before Photo */}
                             <div>
-                                <label className="block text-white/60 mb-2">صورة قبل الإصلاح</label>
+                                <label className="block text-white/60 mb-2">{t('maintenance.photoUpload.beforeLabel')}</label>
                                 {beforePhoto ? (
                                     <div className="relative">
                                         <img src={beforePhoto} alt="Before" className="w-full h-40 object-cover rounded-xl" />
@@ -1293,8 +1300,8 @@ export const MaintenanceDashboard: React.FC = () => {
                                     <CheckCircle className="w-6 h-6 text-orange-400" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-white">إتمام صيانة</h2>
-                                    <p className="text-sm text-white/60">غرفة {currentCompleteRequest.roomNumber}</p>
+                                    <h2 className="text-xl font-bold text-white">{t('maintenance.completeWork')}</h2>
+                                    <p className="text-sm text-white/60">{t('common.room')} {currentCompleteRequest.roomNumber}</p>
                                 </div>
                             </div>
                             <button 
@@ -1314,22 +1321,22 @@ export const MaintenanceDashboard: React.FC = () => {
                                     <p className="text-white font-medium text-sm">{currentCompleteRequest.maintenanceType || 'عام'}</p>
                                 </div>
                                 <div className="adora-card p-3 rounded-xl">
-                                    <p className="adora-text-secondary text-xs mb-1">الأولوية</p>
+                                    <p className="adora-text-secondary text-xs mb-1">{t('common.status')}</p>
                                     <p className={`font-medium text-sm ${currentCompleteRequest.priority === 'urgent' ? 'text-red-400' : 'text-blue-400'}`}>
-                                        {currentCompleteRequest.priority === 'urgent' ? '🚨 عاجل' : '⏱️ عادي'}
+                                        {currentCompleteRequest.priority === 'urgent' ? `🚨 ${t('maintenance.priority.urgent')}` : `⏱️ ${t('maintenance.priority.normal')}`}
                                     </p>
                                 </div>
                             </div>
 
                             {/* Completion Notes */}
                             <div>
-                                <label className="block text-white/70 text-sm mb-2 font-medium">ملاحظات الإتمام (اختياري)</label>
+                                <label className="block text-white/70 text-sm mb-2 font-medium">{t('common.notes')} ({t('common.optional')})</label>
                                 <textarea
                                     value={completionNotes}
                                     onChange={(e) => setCompletionNotes(e.target.value)}
                                     rows={3}
                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                                    placeholder="اكتب أي ملاحظات عن الصيانة المنجزة..."
+                                    placeholder={t('maintenance.completionNotesPlaceholder')}
                                 />
                             </div>
 

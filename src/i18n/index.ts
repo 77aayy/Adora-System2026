@@ -75,12 +75,20 @@ export const getDirection = (): 'rtl' | 'ltr' => {
 };
 
 /**
+ * Update document direction based on language
+ */
+export const updateDirection = (lang: string): void => {
+    const dir = RTL_LANGUAGES.includes(lang) ? 'rtl' : 'ltr';
+    document.documentElement.setAttribute('dir', dir);
+    document.documentElement.setAttribute('lang', lang);
+};
+
+/**
  * Change language and update document direction
  */
 export const changeLanguage = async (lang: string): Promise<void> => {
     await i18n.changeLanguage(lang);
-    document.documentElement.lang = lang;
-    document.documentElement.dir = RTL_LANGUAGES.includes(lang) ? 'rtl' : 'ltr';
+    updateDirection(lang);
 };
 
 /**

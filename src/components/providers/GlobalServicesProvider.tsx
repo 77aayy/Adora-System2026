@@ -85,13 +85,14 @@ export const GlobalServicesProvider: React.FC<GlobalServicesProviderProps> = ({ 
     const { overdueRequests, warningCount, criticalCount } = useOverdueAlerts(branch, {
         warningMinutes: 15,
         criticalMinutes: 30,
+        tenantId: user?.tenantId
     });
 
     // Initialize pending alerts
     const { pendingRequests, pendingCount, urgentCount, toggleAlerts, toggleSound } = usePendingAlerts(
         branch,
         department,
-        { enabled: alertsEnabled, soundEnabled }
+        { enabled: alertsEnabled, soundEnabled, tenantId: user?.tenantId }
     );
 
     // Initialize services on mount
@@ -136,7 +137,9 @@ export const GlobalServicesProvider: React.FC<GlobalServicesProviderProps> = ({ 
 
                 // Start auto-transfer service
                 try {
-                    await startAutoTransfer(branch, user.tenantId);
+                    if (branch && user?.tenantId) {
+                        await startAutoTransfer(branch, user.tenantId);
+                    }
                 } catch (err) {
                     console.warn('Failed to start auto-transfer service:', err);
                 }

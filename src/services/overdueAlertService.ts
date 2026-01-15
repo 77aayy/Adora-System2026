@@ -57,9 +57,11 @@ let currentConfig = DEFAULT_CONFIG;
 
 /**
  * Start monitoring for overdue requests
+ * ✅ SaaS: Added tenantId parameter for data isolation
  */
 export function startOverdueMonitoring(
     branchId: string,
+    tenantId: string,
     config: Partial<OverdueConfig> = {}
 ): void {
     currentConfig = { ...DEFAULT_CONFIG, ...config };
@@ -67,10 +69,10 @@ export function startOverdueMonitoring(
     // Stop existing monitoring
     stopOverdueMonitoring();
 
-    // 🔐 SECURITY: Added tenantId filter for multi-tenant isolation
-    if (!tenantId) {
-        console.warn('⚠️ [OverdueAlert] subscribeToOverdueAlerts called without tenantId');
-        return () => { };
+    // 🔐 SECURITY: Check tenantId before proceeding
+    if (!tenantId || !branchId) {
+        console.warn('⚠️ [OverdueAlert] startOverdueMonitoring called without tenantId or branchId');
+        return;
     }
 
     // Listen to pending requests
@@ -234,13 +236,13 @@ function getServiceLabel(type: string): string {
 
 import { useState, useEffect } from 'react';
 
-export function useOverdueAlerts(branchId: string, config?: Partial<OverdueConfig>) {
+export function useOverdueAlerts(branchId: string, config?: Partial<OverdueConfig> & { tenantId?: string }) {
     const [overdueRequests, setOverdueRequests] = useState<OverdueRequest[]>([]);
 
     useEffect(() => {
-        if (!branchId) return;
+        if (!branchId || !config?.tenantId) return;
 
-        startOverdueMonitoring(branchId, config);
+        startOverdueMonitoring(branchId, config.tenantId, config);
 
         const unsubscribe = onOverdue((requests) => {
             setOverdueRequests(requests);
@@ -250,7 +252,7 @@ export function useOverdueAlerts(branchId: string, config?: Partial<OverdueConfi
             unsubscribe();
             stopOverdueMonitoring();
         };
-    }, [branchId]);
+    }, [branchId, config?.tenantId]);
 
     return {
         overdueRequests,

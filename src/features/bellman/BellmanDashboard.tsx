@@ -28,6 +28,7 @@ import { FlexibleHeader } from '../../components/common/FlexibleHeader';
 import { PageTransition } from '../../components/common/PageTransition';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { haptic, playSound } from '../../utils/uxEffects';
 import { db } from '../../services/firebase';
 import {
@@ -110,19 +111,7 @@ type TabType = 'new' | 'in_progress' | 'completed';
 // CONSTANTS
 // ============================================================
 
-const REQUEST_TYPE_LABELS: Record<string, string> = {
-    luggage_up: 'صعود أمتعة',
-    luggage_down: 'نزول أمتعة',
-    cart: 'عربة',
-    escort: 'مرافقة'
-};
-
-const LOCATION_LABELS: Record<string, string> = {
-    lobby: 'اللوبي',
-    room: 'الغرفة',
-    storage: 'المخزن',
-    vehicle: 'السيارة'
-};
+// REQUEST_TYPE_LABELS and LOCATION_LABELS will be created inside component to use t()
 
 // ============================================================
 // HELPER COMPONENTS
@@ -213,6 +202,7 @@ const CheckinModal: React.FC<{
     roomsCapacity: Map<string, { type: string; adults: number; children: number }>; // ✅ Room capacity data
     activeRoomCards: RoomCard[]; // ✅ Rooms with active cards (cannot check-in)
 }> = ({ isOpen, onClose, onSubmit, rooms, receptionEmployees, roomsCapacity, activeRoomCards }) => {
+    const { t } = useTranslation();
     const [step, setStep] = useState<'room' | 'details'>('room');
     const [roomNumber, setRoomNumber] = useState('');
     const [guestName, setGuestName] = useState('');
@@ -253,7 +243,7 @@ const CheckinModal: React.FC<{
         if (adults > maxAdults || children > maxChildren) {
             return {
                 exceeded: true,
-                message: `⚠️ انتبه! قرار إداري: لا تستوعب هذه الغرفة (${roomCapacity.type}) أكثر من ${maxAdults} بالغين و ${maxChildren} أطفال`
+                message: t('bellman.capacityWarning', { type: roomCapacity.type, maxAdults, maxChildren })
             };
         }
         return { exceeded: false, message: '' };
@@ -331,7 +321,7 @@ const CheckinModal: React.FC<{
                                 className="adora-card w-full py-4 rounded-xl hover:opacity-80 transition-colors flex items-center justify-center gap-2"
                             >
                                 <DoorOpen className="w-5 h-5 text-green-400" />
-                                <span className="text-white font-medium">اختر الغرفة حسب الدور</span>
+                                <span className="text-white font-medium">{t('bellman.selectRoomByFloor')}</span>
                             </button>
 
                             {/* Or direct input */}
@@ -346,7 +336,7 @@ const CheckinModal: React.FC<{
                                             handleRoomSelect(roomNumber);
                                         }
                                     }}
-                                    placeholder="أو اكتب رقم الغرفة مباشرة"
+                                    placeholder={t('bellman.orEnterRoomDirectly')}
                                     className={`input text-center text-lg ${roomHasActiveCard ? 'border-red-500 border-2' : ''}`}
                                 />
                                 
@@ -356,8 +346,8 @@ const CheckinModal: React.FC<{
                                         <div className="flex items-center gap-2 text-red-400">
                                             <AlertCircle className="w-5 h-5" />
                                             <div>
-                                                <p className="font-bold text-sm">لا يمكن إدخال هذه الغرفة!</p>
-                                                <p className="text-xs text-red-300">الغرفة {roomNumber} لها كارت نشط - يجب تسجيل الخروج أولاً</p>
+                                                <p className="font-bold text-sm">{t('bellman.roomHasActiveCard')}</p>
+                                                <p className="text-xs text-red-300">{t('bellman.roomHasActiveCardDesc', { room: roomNumber })}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -374,7 +364,7 @@ const CheckinModal: React.FC<{
                                     }`}
                                 >
                                     <CheckCircle className="w-5 h-5" />
-                                    تأكيد رقم الغرفة
+                                    {t('bellman.confirmRoomNumber')}
                                 </button>
                             </div>
 
@@ -403,9 +393,9 @@ const CheckinModal: React.FC<{
                                 <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                                     <p className="text-sm text-blue-400 flex items-center gap-2">
                                         <DoorOpen className="w-4 h-4" />
-                                        <span>نوع الغرفة: <strong>{roomCapacity.type}</strong></span>
+                                        <span>{t('bellman.roomType')} <strong>{roomCapacity.type}</strong></span>
                                         <span className="mx-2">|</span>
-                                        <span>الاستيعاب: {roomCapacity.adults} بالغين، {roomCapacity.children} أطفال</span>
+                                        <span>{t('bellman.capacity')} {t('bellman.capacityAdults', { adults: roomCapacity.adults })}, {t('bellman.capacityChildren', { children: roomCapacity.children })}</span>
                                     </p>
                                 </div>
                             )}
@@ -431,7 +421,7 @@ const CheckinModal: React.FC<{
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-2">الأطفال</label>
+                                    <label className="block text-sm text-white/60 mb-2">{t('bellman.children')}</label>
                                     <div className="flex items-center gap-3">
                                         <button
                                             onClick={() => setChildren(Math.max(0, children - 1))}
@@ -461,7 +451,7 @@ const CheckinModal: React.FC<{
                                                 {capacityExceeded.message}
                                             </p>
                                             <p className="text-xs text-red-400/70 mt-2">
-                                                ⚠️ سيتم تسجيل هذا التجاوز في سجلك
+                                                {t('bellman.capacityExceededWarning')}
                                             </p>
                                         </div>
                                     </div>
@@ -474,7 +464,7 @@ const CheckinModal: React.FC<{
                                 <textarea
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    placeholder="أي ملاحظات إضافية..."
+                                    placeholder={t('bellman.additionalNotes')}
                                     className="adora-input w-full p-3 rounded-xl resize-none"
                                     rows={2}
                                 />
@@ -483,7 +473,7 @@ const CheckinModal: React.FC<{
                             {/* Reception Employee Selection */}
                             {receptionEmployees.length > 0 && (
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-2">موظف الاستقبال (اختياري)</label>
+                                    <label className="block text-sm text-white/60 mb-2">{t('bellman.receptionEmployee')}</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {receptionEmployees.map((emp: any) => (
                                             <button
@@ -512,21 +502,21 @@ const CheckinModal: React.FC<{
                 {/* Footer */}
                 <div className="p-4 border-t border-white/10">
                     {step === 'room' ? (
-                        <p className="text-center adora-text-tertiary text-sm">اضغط على رقم الغرفة للمتابعة</p>
+                        <p className="text-center adora-text-tertiary text-sm">{t('bellman.clickRoomToContinue')}</p>
                     ) : (
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setStep('room')}
                                 className="adora-btn-ghost flex-1 py-3 rounded-xl font-medium transition-all"
                             >
-                                رجوع
+                                {t('common.back')}
                             </button>
                             <button
                                 onClick={handleSubmit}
                                 className="flex-1 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-teal-600 text-white font-bold hover:shadow-lg hover:shadow-primary-500/25 transition-all flex items-center justify-center gap-2"
                             >
                                 <UserPlus className="w-5 h-5" />
-                                تسجيل الدخول
+                                {t('bellman.checkIn')}
                             </button>
                         </div>
                     )}
@@ -544,6 +534,7 @@ export const BellmanDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { success, error, haptic, playSound } = useUX();
+    const { t } = useTranslation();
     const brandName = useBrandName();
 
     // State
@@ -581,6 +572,21 @@ export const BellmanDashboard: React.FC = () => {
     // ✅ Points Notification State
     const [activeNotifications, setActiveNotifications] = useState<Set<string>>(new Set());
     const [notificationRequest, setNotificationRequest] = useState<BellmanRequest | null>(null);
+
+    // ✅ REQUEST_TYPE_LABELS and LOCATION_LABELS using t()
+    const REQUEST_TYPE_LABELS = useMemo(() => ({
+        luggage_up: t('bellman.requestTypeLabels.luggage_up'),
+        luggage_down: t('bellman.requestTypeLabels.luggage_down'),
+        cart: t('bellman.requestTypeLabels.cart'),
+        escort: t('bellman.requestTypeLabels.escort')
+    }), [t]);
+
+    const LOCATION_LABELS = useMemo(() => ({
+        lobby: t('bellman.locationLabels.lobby'),
+        room: t('bellman.locationLabels.room'),
+        storage: t('bellman.locationLabels.storage'),
+        vehicle: t('bellman.locationLabels.vehicle')
+    }), [t]);
     
     // ✅ Branch Location Warning State
     const [showLocationWarning, setShowLocationWarning] = useState(false);
@@ -836,14 +842,14 @@ export const BellmanDashboard: React.FC = () => {
         capacityLimit?: { adults: number; children: number };
     }) => {
         if (!tenantId || !branchId) {
-            error('بيانات الفرع غير متوفرة. يرجى تسجيل الخروج والدخول مرة أخرى.');
+            error(t('bellman.branchDataUnavailable'));
             return;
         }
 
         try {
             await checkIn({
                 roomNumber: data.roomNumber,
-                guestName: data.guestName || `نزيل - ${data.roomNumber}`,
+                guestName: data.guestName || t('bellman.guestNamePlaceholder', { room: data.roomNumber }),
                 adults: data.adults,
                 children: data.children,
                 needsCart: data.needsCart,
@@ -864,7 +870,12 @@ export const BellmanDashboard: React.FC = () => {
                         limitAdults: data.capacityLimit.adults,
                         limitChildren: data.capacityLimit.children,
                         timestamp: Timestamp.now(),
-                        notes: `تجاوز الاستيعاب: أدخل ${data.adults} بالغين و ${data.children} أطفال بينما القرار الإداري ${data.capacityLimit.adults} بالغين و ${data.capacityLimit.children} أطفال`
+                        notes: t('bellman.capacityExceededNote', { 
+                            adults: data.adults, 
+                            children: data.children, 
+                            limitAdults: data.capacityLimit.adults, 
+                            limitChildren: data.capacityLimit.children 
+                        })
                     });
                     console.warn(`⚠️ Capacity violation logged for room ${data.roomNumber} by ${user?.name}`);
                 } catch (logErr) {
@@ -881,7 +892,7 @@ export const BellmanDashboard: React.FC = () => {
                 }
             }
 
-            success('تم تسجيل الدخول بنجاح');
+            success(t('bellman.checkInSuccess'));
             
             // ✅ Show warning after successful checkin if capacity was exceeded
             if (data.exceededCapacity) {
@@ -927,13 +938,13 @@ export const BellmanDashboard: React.FC = () => {
                 roomCard.id
             );
 
-            success('تم تسجيل الخروج بنجاح');
+            success(t('bellman.checkOutSuccess'));
         } catch (err: any) {
             console.error('Checkout error:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
             });
-            error('فشل تسجيل الخروج');
+            error(t('bellman.checkOutFailed'));
         }
     };
 
@@ -966,7 +977,7 @@ export const BellmanDashboard: React.FC = () => {
                         source: 'bellman_checkout',
                         priority: 'normal',
                         cleaningType: 'checkout',
-                        notes: `طلب فحص - مغادرة نزيل (من البيلمان)`,
+                        notes: t('bellman.inspectionRequestNote'),
                         createdAt: Timestamp.now(),
 
                         createdBy: { id: user?.id, name: user?.name },
@@ -992,13 +1003,13 @@ export const BellmanDashboard: React.FC = () => {
                 }
             }
 
-            success('تم بدء الطلب');
+            success(t('bellman.requestStarted'));
         } catch (err: any) {
             console.error('Error starting request:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
             });
-            error('فشل بدء الطلب');
+            error(t('bellman.requestStartFailed'));
         }
     };
 
@@ -1033,13 +1044,13 @@ export const BellmanDashboard: React.FC = () => {
                 }
             }
 
-            success('تم إتمام الطلب بنجاح');
+            success(t('bellman.requestCompleted'));
         } catch (err: any) {
             console.error('Error completing request:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
             });
-            error('فشل إتمام الطلب');
+            error(t('bellman.requestCompleteFailed'));
         }
     };
 
@@ -1061,7 +1072,7 @@ export const BellmanDashboard: React.FC = () => {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center theme-page">
-                <AdoraLoader size="lg" message="جاري تحميل البيانات..." />
+                <AdoraLoader size="lg" message={t('bellman.loadingData')} />
             </div>
         );
     }
@@ -1074,7 +1085,7 @@ export const BellmanDashboard: React.FC = () => {
         <div className="min-h-screen p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
             {/* Flexible Header */}
             <FlexibleHeader
-                title="البيلمان"
+                title={t('bellman.title')}
                 titleIcon={<Bell className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 flex-shrink-0" />}
                 showGreeting={true}
                 brandName={brandName}
@@ -1083,7 +1094,7 @@ export const BellmanDashboard: React.FC = () => {
                     {
                         id: 'history',
                         icon: <History className="w-5 h-5" />,
-                        label: 'سجل العمليات',
+                        label: t('bellman.operationsHistory'),
                         onClick: () => setShowHistory(true),
                         variant: 'primary'
                     },
@@ -1096,20 +1107,20 @@ export const BellmanDashboard: React.FC = () => {
                     {
                         id: 'procurement',
                         icon: <ShoppingCart className="w-5 h-5" />,
-                        label: 'المشتريات',
+                        label: t('bellman.procurement'),
                         onClick: () => setShowProcurement(true)
                     },
                     {
                         id: 'instructions',
                         icon: <BookOpen className="w-5 h-5" />,
-                        label: 'تعليمات عامة',
+                        label: t('bellman.generalInstructions'),
                         onClick: () => setShowGeneralInstructions(true),
                         variant: 'primary'
                     },
                     {
                         id: 'support',
                         icon: <Headphones className="w-5 h-5" />,
-                        label: 'دعم فني',
+                        label: t('bellman.technicalSupport'),
                         onClick: () => setShowSupportTicket(true)
                     }
                 ]}
@@ -1133,31 +1144,31 @@ export const BellmanDashboard: React.FC = () => {
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={occupiedRoomNumbers.length}
-                        label="🚪 غرف مشغولة"
+                        label={t('bellman.occupiedRooms')}
                         icon={DoorOpen}
                         iconColor="purple"
                         status="normal"
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('bellman.lastUpdate')}
                     />
                 </div>
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={activeRequests.length}
-                        label="🔔 طلبات نشطة"
+                        label={t('bellman.activeRequests')}
                         icon={Bell}
                         iconColor="orange"
                         status={activeRequests.length > 10 ? 'warning' : 'normal'}
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('bellman.lastUpdate')}
                     />
                 </div>
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={luggage.filter(l => l.status !== 'delivered').length}
-                        label="🧳 أمتعة معلقة"
+                        label={t('bellman.pendingLuggage')}
                         icon={Package}
                         iconColor="blue"
                         status={luggage.filter(l => l.status !== 'delivered').length > 5 ? 'warning' : 'normal'}
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('bellman.lastUpdate')}
                     />
                 </div>
             </div>
@@ -1175,8 +1186,8 @@ export const BellmanDashboard: React.FC = () => {
                                 <UserPlus className="w-7 h-7 text-green-400" />
                             </div>
                             <div className="text-right">
-                                <h3 className="text-lg sm:text-xl font-bold adora-text-primary mb-1 group-hover:text-green-400 transition-colors">تسجيل دخول نزيل</h3>
-                                <p className="adora-text-tertiary text-sm">إجراء عملية تسكين جديدة للغرف</p>
+                                <h3 className="text-lg sm:text-xl font-bold adora-text-primary mb-1 group-hover:text-green-400 transition-colors">{t('bellman.registerGuest')}</h3>
+                                <p className="adora-text-tertiary text-sm">{t('bellman.checkInDescription')}</p>
                             </div>
                         </div>
                         <div className="w-10 h-10 rounded-full flex items-center justify-center group-hover:bg-green-500/20 transition-colors" style={{ background: 'var(--theme-bg-tertiary)' }}>
@@ -1237,7 +1248,7 @@ export const BellmanDashboard: React.FC = () => {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-1.5 flex-wrap">
                                                 <span className="text-[10px] adora-text-secondary truncate">
-                                                    {REQUEST_TYPE_LABELS[request.requestType || ''] || 'بيلمان'}
+                                                    {REQUEST_TYPE_LABELS[request.requestType || ''] || t('bellman.requestTypeDefault')}
                                                 </span>
                                                 {(request as any).source === 'QR' && <QrCode className="w-3 h-3 text-teal-500" />}
                                             </div>
@@ -1249,7 +1260,7 @@ export const BellmanDashboard: React.FC = () => {
                                                 : request.status === 'COMPLETED' ? 'bg-green-500/20 text-green-500'
                                                 : 'bg-teal-500/20 text-teal-500'
                                             }`}>
-                                                {request.status === 'IN_PROGRESS' ? 'جاري' : request.status === 'COMPLETED' ? 'مكتمل' : 'جديد'}
+                                                {request.status === 'IN_PROGRESS' ? t('bellman.statusLabels.inProgress') : request.status === 'COMPLETED' ? t('bellman.statusLabels.completed') : t('bellman.statusLabels.new')}
                                             </div>
                                         </div>
                                     </div>
@@ -1307,7 +1318,7 @@ export const BellmanDashboard: React.FC = () => {
                             {roomCards.filter(r => r.status === 'active').slice(0, 8).map(room => (
                                 <div key={room.id} className="adora-card p-3 text-center">
                                     <span className="text-lg font-bold adora-text-primary">{room.roomNumber}</span>
-                                    <p className="text-[10px] adora-text-tertiary truncate">{room.guestName || 'نزيل'}</p>
+                                            <p className="text-[10px] adora-text-tertiary truncate">{room.guestName || t('bellman.guestDefault')}</p>
                                     <div className="flex gap-1 mt-2">
                                         <button 
                                             onClick={() => handleCheckout(room)}
@@ -1374,7 +1385,7 @@ export const BellmanDashboard: React.FC = () => {
                 items={[
                     {
                         id: 'history',
-                        label: 'سجل العمليات',
+                        label: t('bellman.operationsHistory'),
                         icon: <History className="w-5 h-5" />,
                         onClick: () => setShowHistory(true),
                         color: 'text-blue-400'
@@ -1395,7 +1406,7 @@ export const BellmanDashboard: React.FC = () => {
                     },
                     {
                         id: 'procurement',
-                        label: 'المشتريات',
+                        label: t('bellman.procurement'),
                         icon: <ShoppingCart className="w-5 h-5" />,
                         onClick: () => setShowProcurement(true),
                         color: 'text-white/60'

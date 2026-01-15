@@ -42,6 +42,7 @@ interface DepartmentTab {
 export const UnifiedManagerHeader: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const { user, logout, branchId, setBranch } = useAuth();
     const { branches } = useTenantBranches();
     const { isEnabled: isProcurementEnabled } = useFeatureGate('procurementSystem');
@@ -52,7 +53,7 @@ export const UnifiedManagerHeader: React.FC = () => {
 
     // Current branch name
     const currentBranch = branches.find(b => b.id === branchId);
-    const branchName = currentBranch?.name || 'الفرع';
+    const branchName = currentBranch?.name || t('sidebar.branch') || 'الفرع';
 
     // Define department tabs (i18n-aware)
     const departmentTabs: DepartmentTab[] = [
@@ -197,7 +198,7 @@ export const UnifiedManagerHeader: React.FC = () => {
                                     : 'var(--theme-bg-tertiary)',
                                 border: '1px solid var(--theme-border-primary)',
                             }}
-                            aria-label="فتح القائمة الإدارية"
+                            aria-label={t('sidebar.openAdminMenu') || 'فتح القائمة الإدارية'}
                         >
                             <Menu 
                                 className="w-5 h-5" 

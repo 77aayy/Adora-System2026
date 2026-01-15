@@ -114,6 +114,7 @@ const UserTypeTab: React.FC<{
 const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const { login, loginWithBiometric, isAuthenticated, isLoading: authLoading, user: authUser } = useAuth();
   const { showInfo } = useUX();
   const { theme, toggleTheme, isDark } = useTheme();
@@ -190,7 +191,7 @@ const LoginScreen: React.FC = () => {
     if (magicCode) {
       setBranchCode(magicCode);
       setUserType('employee');
-      showInfo(hotelName ? `مرحباً بك في ${hotelName}!` : 'مرحباً بك في Adora!');
+      showInfo(hotelName ? (t('auth.welcomeToHotel', { hotel: hotelName }) || `مرحباً بك في ${hotelName}!`) : (t('auth.welcomeToAdora') || 'مرحباً بك في Adora!'));
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [showInfo]);
@@ -251,11 +252,11 @@ const LoginScreen: React.FC = () => {
   const getConfig = () => {
     switch (userType) {
       case 'owner':
-        return { showBranch: false, pinLength: 6, pinLabel: 'كود المالك', branchLength: 0 };
+        return { showBranch: false, pinLength: 6, pinLabel: t('auth.ownerPinLabel') || 'كود المالك', branchLength: 0 };
       case 'manager':
-        return { showBranch: false, pinLength: 4, pinLabel: 'كود المدير', branchLength: 0 };
+        return { showBranch: false, pinLength: 4, pinLabel: t('auth.managerPinLabel') || 'كود المدير', branchLength: 0 };
       case 'employee':
-        return { showBranch: true, pinLength: 4, pinLabel: 'كود الموظف', branchLength: 4 };
+        return { showBranch: true, pinLength: 4, pinLabel: t('auth.employeePinLabel') || 'كود الموظف', branchLength: 4 };
     }
   };
 
@@ -328,18 +329,18 @@ const LoginScreen: React.FC = () => {
     // Validation
     if (userType === 'employee') {
       if (branchCode.length === 0) {
-        setError('أدخل كود الفرع أولاً');
+        setError(t('auth.enterBranchCodeFirst') || 'أدخل كود الفرع أولاً');
         triggerHaptic('error');
         return;
       }
       if (pin.length < config.pinLength) {
-        setError(`أدخل كود الموظف (${config.pinLength} أرقام)`);
+        setError(t('auth.enterEmployeeCode', { digits: config.pinLength }) || `أدخل كود الموظف (${config.pinLength} أرقام)`);
         triggerHaptic('error');
         return;
       }
     } else {
       if (pin.length < config.pinLength) {
-        setError(`أدخل الكود كاملاً (${config.pinLength} أرقام)`);
+        setError(t('auth.enterFullCode', { digits: config.pinLength }) || `أدخل الكود كاملاً (${config.pinLength} أرقام)`);
         triggerHaptic('error');
         return;
       }
@@ -353,7 +354,7 @@ const LoginScreen: React.FC = () => {
       const result = await login(pin, effectiveBranch);
 
       triggerHaptic('success');
-      setSuccess('تم تسجيل الدخول بنجاح! ✨');
+      setSuccess(t('auth.loginSuccess') || 'تم تسجيل الدخول بنجاح! ✨');
 
       setTimeout(async () => {
         if (authUser) {
@@ -375,7 +376,7 @@ const LoginScreen: React.FC = () => {
 
     } catch (err: any) {
       triggerHaptic('error');
-      setError(err.message || 'كود خاطئ');
+      setError(err.message || t('auth.wrongCode') || 'كود خاطئ');
       setPin('');
     } finally {
       setIsLoading(false);
@@ -393,7 +394,7 @@ const LoginScreen: React.FC = () => {
       navigate(path || '/admin');
     } catch (err: any) {
       triggerHaptic('error');
-      setError(err.message || 'فشل التحقق من البصمة');
+      setError(err.message || t('auth.biometricFailed') || 'فشل التحقق من البصمة');
     } finally {
       setIsLoading(false);
     }
@@ -429,7 +430,7 @@ const LoginScreen: React.FC = () => {
           }
           backdrop-blur-sm shadow-sm
         `}
-        aria-label={isDark ? 'الوضع النهاري' : 'الوضع الليلي'}
+        aria-label={isDark ? (t('auth.dayMode') || 'الوضع النهاري') : (t('auth.nightMode') || 'الوضع الليلي')}
       >
         {isDark ? (
           <Sun className="w-5 h-5" />
@@ -628,7 +629,7 @@ const LoginScreen: React.FC = () => {
             <div className="relative z-10">
               <img
                 src="/adora-logo.png"
-                alt="Adora - منظومة إدارة الفنادق"
+                alt={t('auth.welcomeMessage') || 'Adora - منظومة إدارة الفنادق'}
                 className="logo-float logo-crisp"
                 style={{ 
                   width: 'clamp(80px, 25vw, 160px)',
@@ -682,7 +683,7 @@ const LoginScreen: React.FC = () => {
               active={userType === 'employee'}
               onClick={() => setUserType('employee')}
               icon={<User className="w-4 h-4" />}
-              label="موظف"
+              label={t('auth.employee') || 'موظف'}
               color="from-teal-500 to-teal-600 shadow-teal-500/30"
               isDark={isDark}
             />
@@ -700,7 +701,7 @@ const LoginScreen: React.FC = () => {
               active={userType === 'owner'}
               onClick={() => setUserType('owner')}
               icon={<Crown className="w-4 h-4" />}
-              label="مالك"
+              label={t('auth.owner') || 'مالك'}
               color="from-amber-500 to-amber-600 shadow-amber-500/30"
               isDark={isDark}
             />
@@ -741,8 +742,8 @@ const LoginScreen: React.FC = () => {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Building2 className={`w-4 h-4 ${activeInput === 'branch' ? 'text-teal-500' : isDark ? 'text-slate-400' : 'text-slate-400'}`} />
-                  <span className={`text-sm font-medium ${activeInput === 'branch' ? isDark ? 'text-teal-400' : 'text-teal-700' : isDark ? 'text-slate-300' : 'text-slate-500'}`}>كود الفرع</span>
-                  {activeInput === 'branch' && <span className="text-xs text-teal-500 animate-pulse">● نشط</span>}
+                  <span className={`text-sm font-medium ${activeInput === 'branch' ? isDark ? 'text-teal-400' : 'text-teal-700' : isDark ? 'text-slate-300' : 'text-slate-500'}`}>{t('auth.branchCodeLabel') || 'كود الفرع'}</span>
+                  {activeInput === 'branch' && <span className="text-xs text-teal-500 animate-pulse">● {t('auth.activeLabel') || 'نشط'}</span>}
                 </div>
                 <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{branchCode.length}/1-4</span>
               </div>
@@ -760,7 +761,7 @@ const LoginScreen: React.FC = () => {
               </div>
               {activeInput === 'branch' && branchCode.length > 0 && (
                 <p className={`text-center text-xs mt-2 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
-                  ✓ بعد إدخال كود الفرع، اضغط على "كود الموظف" للمتابعة
+                  ✓ {t('auth.afterBranchEnterPin') || 'بعد إدخال كود الفرع، اضغط على "كود الموظف" للمتابعة'}
                 </p>
               )}
             </div>
@@ -790,7 +791,7 @@ const LoginScreen: React.FC = () => {
                 {userType === 'manager' && <Shield className={`w-4 h-4 text-blue-500`} />}
                 {userType === 'employee' && <User className={`w-4 h-4 ${activeInput === 'pin' ? 'text-teal-500' : 'text-slate-400'}`} />}
                 <span className={`text-sm font-medium ${activeInput === 'pin' || userType !== 'employee' ? isDark ? 'text-teal-400' : 'text-teal-700' : isDark ? 'text-slate-300' : 'text-slate-500'}`}>{config.pinLabel}</span>
-                {(activeInput === 'pin' || userType !== 'employee') && <span className="text-xs text-teal-500 animate-pulse">● نشط</span>}
+                {(activeInput === 'pin' || userType !== 'employee') && <span className="text-xs text-teal-500 animate-pulse">● {t('auth.activeLabel') || 'نشط'}</span>}
               </div>
               <div className="flex items-center gap-2">
                 <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{pin.length}/{config.pinLength}</span>
@@ -869,10 +870,10 @@ const LoginScreen: React.FC = () => {
           {/* Instructions */}
           <p className={`text-center text-xs mt-3 ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>
             {userType === 'employee' 
-              ? 'أدخل كود الفرع (1-4 أرقام) ثم كود الموظف (4 أرقام)'
+              ? (t('auth.enterBranchThenEmployee') || 'أدخل كود الفرع (1-4 أرقام) ثم كود الموظف (4 أرقام)')
               : userType === 'manager'
-                ? 'أدخل كود المدير (4 أرقام)'
-                : 'أدخل كود المالك (6 أرقام)'
+                ? (t('auth.enterManagerCode') || 'أدخل كود المدير (4 أرقام)')
+                : (t('auth.enterOwnerCode') || 'أدخل كود المالك (6 أرقام)')
             }
           </p>
 
@@ -882,15 +883,15 @@ const LoginScreen: React.FC = () => {
             onClick={() => {
               // ✅ FIX: Get developer info from state (auto-updates)
               const devPhone = devConfig.phoneSA || '966570707121';
-              const branchName = localStorage.getItem('adora_branch_name') || 'غير محدد';
+              const branchName = localStorage.getItem('adora_branch_name') || t('auth.branchNotSpecified') || 'غير محدد';
               const message = encodeURIComponent(
-                `السلام عليكم،\nأنا مدير فرع [${branchName}]،\nفقدت كود الدخول الخاص بي وأرغب في استعادته أو تحديثه.\nشكراً لكم.`
+                t('auth.forgotCodeMessage', { branch: branchName }) || `السلام عليكم،\nأنا مدير فرع [${branchName}]،\nفقدت كود الدخول الخاص بي وأرغب في استعادته أو تحديثه.\nشكراً لكم.`
               );
               window.open(`https://wa.me/${devPhone}?text=${message}`, '_blank');
             }}
             className={`w-full mt-3 py-2 text-center text-sm transition-colors ${isDark ? 'text-teal-400 hover:text-teal-300' : 'text-teal-600 hover:text-teal-700'} hover:underline`}
           >
-            🔑 نسيت الكود؟
+            🔑 {t('auth.forgotCode') || 'نسيت الكود؟'}
           </button>
         </div>
 
@@ -933,7 +934,7 @@ const LoginScreen: React.FC = () => {
                 <a 
                   href={`https://wa.me/${devConfig.phoneSA}?text=${encodeURIComponent((() => {
                     const hour = new Date().getHours();
-                    return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
+                    return hour >= 5 && hour < 12 ? (t('auth.goodMorning') || 'صباح الخير، أنا مهتم بمشروعك') : (t('auth.goodEvening') || 'مساء الخير، أنا مهتم بمشروعك');
                   })())}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -951,7 +952,7 @@ const LoginScreen: React.FC = () => {
                 <a 
                   href={`https://wa.me/${devConfig.phoneEG}?text=${encodeURIComponent((() => {
                     const hour = new Date().getHours();
-                    return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
+                    return hour >= 5 && hour < 12 ? (t('auth.goodMorning') || 'صباح الخير، أنا مهتم بمشروعك') : (t('auth.goodEvening') || 'مساء الخير، أنا مهتم بمشروعك');
                   })())}`}
                   target="_blank"
                   rel="noopener noreferrer"

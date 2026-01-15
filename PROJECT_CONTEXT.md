@@ -127,6 +127,16 @@ src/
 - [x] Multi-language Menu (ترجمة)
 - [x] Offline Persistence
 
+### 🌐 الترجمة الدولية (i18n)
+- [x] ReceptionDashboard.tsx - تحويل كامل (222 نص)
+- [x] HousekeepingDashboard.tsx - مترجم بالكامل
+- [x] MaintenanceDashboard.tsx - مترجم بالكامل
+- [x] BellmanDashboard.tsx - مترجم بالكامل
+- [x] CoffeeShopDashboard.tsx - مترجم بالكامل
+- [x] جميع Toast Messages مترجمة
+- [x] جميع Placeholders مترجمة
+- [x] جميع Enum Labels مترجمة
+
 ### 🛡️ الدعم الفني
 - [x] Super Admin Master Access
 - [x] Emergency Password Reset
@@ -202,6 +212,13 @@ src/
 - ✅ `LanguageSwitcher` في Header بجانب Dark Mode
 - ✅ تغيير اللغة بدون ريفرش + تغيير تلقائي للاتجاه
 - ✅ مصطلحات عامية للعمال (Colloquial Hindi/Bengali)
+- ✅ **ReceptionDashboard.tsx**: تحويل كامل لـ 222 نص عربي إلى `t()` calls
+- ✅ **150+ مفتاح جديد** في ملفات JSON (ar, en, hi, bn)
+- ✅ جميع Toast Messages مترجمة (Success/Error)
+- ✅ جميع Placeholders في Inputs مترجمة
+- ✅ جميع Enum Labels مترجمة (Status, Service Types, Priority, Departments)
+- ✅ Dynamic Locale للتواريخ والأوقات
+- ✅ RTL/LTR Support كامل
 
 ### مراجعة البنية الأساسية (Global SaaS Audit) - ✅ مكتمل
 - ✅ Multi-tenancy Isolation: 97 ملف مع `tenantId` filters

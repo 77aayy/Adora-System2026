@@ -46,6 +46,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     const location = useLocation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+    const { t } = useTranslation();
     const { branchId, setBranch, logout, user } = useAuth(); // ✅ Get logout function & User
     const { branches } = useTenantBranches();
     const { tenantId } = useTenant();
@@ -461,7 +462,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                         <Activity className="w-4 h-4 shrink-0" style={{ color: 'var(--theme-primary-500)' }} />
                         <div className="flex-1">
                             <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: 'var(--theme-primary-500)' }}>بيئة العمل آمنة</span>
+                                <span className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: 'var(--theme-primary-500)' }}>{t('admin.safeWorkEnvironment') || 'بيئة العمل آمنة'}</span>
                                 <span className="text-[10px] transition-colors duration-300" style={{ color: 'var(--theme-primary-500)' }}>100%</span>
                             </div>
                             <div className="h-1 w-full rounded-full overflow-hidden transition-colors duration-300" style={{ background: 'var(--theme-bg-tertiary)' }}>
@@ -487,7 +488,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                         logout();
                     }}
                     className="flex items-center justify-center w-11 h-11 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 active:scale-95 transition-all outline-none border border-red-500/10"
-                    title="تسجيل الخروج"
+                    title={t('auth.logout') || 'تسجيل الخروج'}
                 >
                     <LogOut className="w-5 h-5 flip-rtl" />
                 </button>

@@ -52,6 +52,7 @@ type TabType = 'new' | 'in_progress' | 'completed'; // ✅ Unified tabs
 export const CoffeeShopDashboard: React.FC = () => {
     const { user, logout } = useAuth();
     const { success, error } = useUX();
+    const { t } = useTranslation();
     const { tenantId } = useTenant();
     const brandName = useBrandName();
 
@@ -127,7 +128,7 @@ export const CoffeeShopDashboard: React.FC = () => {
     // Handle complete order
     const handleComplete = async (order: CoffeeShopOrder) => {
         if (!user?.id || !user?.name) {
-            error('يجب تسجيل الدخول أولاً');
+            error(t('common.pleaseLogin'));
             return;
         }
 
@@ -164,10 +165,10 @@ export const CoffeeShopDashboard: React.FC = () => {
                 }
             }
 
-            success('تم إكمال الطلب بنجاح');
+            success(t('coffeeshop.orderCompletedSuccess'));
         } catch (err: any) {
             console.error('Error completing order:', err);
-            error('فشل إكمال الطلب: ' + (err.message || 'خطأ غير معروف'));
+            error(t('coffeeshop.orderCompletedFailed', { error: err.message || t('common.error') }));
         } finally {
             setCompleting(false);
         }
@@ -178,10 +179,10 @@ export const CoffeeShopDashboard: React.FC = () => {
         if (!timestamp) return '-';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         const diff = Math.floor((Date.now() - date.getTime()) / 60000);
-        if (diff < 1) return 'الآن';
-        if (diff < 60) return `${diff} د`;
-        if (diff < 1440) return `${Math.floor(diff / 60)} س`;
-        return `${Math.floor(diff / 1440)} ي`;
+        if (diff < 1) return t('common.now');
+        if (diff < 60) return `${diff}${t('time.minutes')}`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}${t('time.hours')}`;
+        return `${Math.floor(diff / 1440)}${t('time.days')}`;
     };
 
     // Format date
@@ -200,7 +201,7 @@ export const CoffeeShopDashboard: React.FC = () => {
         return (
             <PageTransition>
                 <div className="flex items-center justify-center min-h-screen theme-page">
-                    <AdoraLoader size="lg" message="جاري تحميل البيانات..." />
+                    <AdoraLoader size="lg" message={t('coffeeshop.loadingData')} />
                 </div>
             </PageTransition>
         );
@@ -222,7 +223,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                         {
                             id: 'procurement',
                             icon: <ShoppingCart className="w-5 h-5" />,
-                            label: 'المشتريات',
+                            label: t('coffeeshop.procurement'),
                             onClick: () => setShowProcurement(true)
                         },
                         {
@@ -235,7 +236,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                         {
                             id: 'support',
                             icon: <Headphones className="w-5 h-5" />,
-                            label: 'دعم فني',
+                            label: t('coffeeshop.technicalSupport'),
                             onClick: () => setShowSupportTicket(true)
                         }
                     ]}
@@ -254,16 +255,16 @@ export const CoffeeShopDashboard: React.FC = () => {
                         icon={<AlertCircle />}
                         iconColor="orange"
                         status={groupedOrders.new.length > 10 ? 'warning' : 'normal'}
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('coffeeshop.lastUpdate')}
                         trend="—"
                     />
                     <StatCard
                         count={groupedOrders.in_progress.length}
-                        label="☕ قيد التحضير"
+                        label={t('coffeeshop.inProgress')}
                         icon={<Clock />}
                         iconColor="blue"
                         status={groupedOrders.in_progress.length > 15 ? 'warning' : 'normal'}
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('coffeeshop.lastUpdate')}
                         trend="—"
                     />
                     <StatCard
@@ -272,7 +273,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                         icon={<CheckCircle2 />}
                         iconColor="green"
                         status="success"
-                        lastUpdate="تم التحديث الآن"
+                        lastUpdate={t('coffeeshop.lastUpdate')}
                         trend="—"
                     />
                 </div>
@@ -290,7 +291,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="adora-input w-full pr-12 pl-4 py-3 rounded-xl"
-                        placeholder="بحث بالغرفة أو النزيل..."
+                        placeholder={t('coffeeshop.searchPlaceholder')}
                     />
                 </div>
 
@@ -308,7 +309,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                     {currentOrders.length === 0 ? (
                         <div className="adora-card rounded-2xl transition-colors duration-300 p-12 text-center">
                             <Coffee className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--theme-text-tertiary)' }} />
-                            <p className="adora-text-tertiary">لا توجد طلبات في هذه القائمة</p>
+                            <p className="adora-text-tertiary">{t('coffeeshop.noOrdersInList')}</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -324,15 +325,18 @@ export const CoffeeShopDashboard: React.FC = () => {
                                         <p className="text-[10px] adora-text-tertiary truncate">{order.guestName || 'نزيل'} • {order.items.length} صنف</p>
                                     </div>
                                     <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                                        <span className="text-xs font-bold text-teal-500">{order.totalAmount} ر.س</span>
+                                        <span className="text-xs font-bold text-teal-500">{order.totalAmount} {t('common.rs')}</span>
                                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                                             order.status === 'pending' || order.status === 'confirmed' ? 'bg-yellow-500/20 text-yellow-500' :
                                             order.status === 'preparing' || order.status === 'ready' ? 'bg-blue-500/20 text-blue-500' :
                                             order.status === 'delivered' ? 'bg-green-500/20 text-green-500' : 'bg-gray-500/20 text-gray-400'
                                         }`}>
-                                            {order.status === 'pending' ? 'انتظار' : order.status === 'confirmed' ? 'مؤكد' :
-                                             order.status === 'preparing' ? 'تحضير' : order.status === 'ready' ? 'جاهز' :
-                                             order.status === 'delivered' ? 'تسليم' : 'ملغى'}
+                                            {order.status === 'pending' ? t('coffeeshop.statusLabels.pending') : 
+                                             order.status === 'confirmed' ? t('coffeeshop.statusLabels.confirmed') :
+                                             order.status === 'preparing' ? t('coffeeshop.statusLabels.preparing') : 
+                                             order.status === 'ready' ? t('coffeeshop.statusLabels.ready') :
+                                             order.status === 'delivered' ? t('coffeeshop.statusLabels.delivered') : 
+                                             t('coffeeshop.statusLabels.cancelled')}
                                         </span>
                                     </div>
                                 </div>
@@ -360,7 +364,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                                         {(order.status === 'preparing' || order.status === 'ready') && (
                                             <button onClick={() => handleComplete(order)} disabled={completing}
                                                 className="flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">
-                                                {completing ? <AdoraLoaderInline size={12} /> : <><Check className="w-3 h-3" /> إنهاء</>}
+                                                {completing ? <AdoraLoaderInline size={12} /> : <><Check className="w-3 h-3" /> {t('coffeeshop.completeOrder')}</>}
                                             </button>
                                         )}
                                     </div>

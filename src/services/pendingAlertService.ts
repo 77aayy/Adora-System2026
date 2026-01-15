@@ -307,14 +307,14 @@ import { useState, useEffect } from 'react';
 export function usePendingAlerts(
     branchId: string,
     department: string,
-    config?: Partial<PendingAlertConfig>
+    config?: Partial<PendingAlertConfig> & { tenantId?: string }
 ) {
     const [pending, setPending] = useState<PendingRequest[]>([]);
 
     useEffect(() => {
-        if (!branchId || !department) return;
+        if (!branchId || !department || !config?.tenantId) return;
 
-        startPendingAlerts(branchId, department, config);
+        startPendingAlerts(branchId, config.tenantId, department, config);
 
         const unsubscribe = onPendingUpdate(setPending);
 
@@ -322,7 +322,7 @@ export function usePendingAlerts(
             unsubscribe();
             stopPendingAlerts();
         };
-    }, [branchId, department]);
+    }, [branchId, department, config?.tenantId]);
 
     return {
         pendingRequests: pending,

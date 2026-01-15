@@ -61,7 +61,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { haptic, playSound } from '../../utils/uxEffects';
-import { usei18n } from '../../i18n/i18nContext';
+import { useTranslation } from 'react-i18next';
 import { db } from '../../services/firebase';
 import {
     collection, query, where, onSnapshot, doc, updateDoc,
@@ -212,38 +212,7 @@ type TabType = 'new' | 'in_progress' | 'completed'; // ✅ Unified tabs
 // ============================================================
 
 // ✅ THEME-AWARE: Using CSS Variables for consistent Light/Dark styling
-const QUICK_ACTIONS: QuickAction[] = [
-    { type: 'cleaning', icon: <Sparkles className="w-6 h-6" />, label: 'تنظيف', color: 'adora-service-housekeeping', bgColor: 'adora-service-bg-housekeeping' },
-    { type: 'maintenance', icon: <Wrench className="w-6 h-6" />, label: 'صيانة', color: 'adora-service-maintenance', bgColor: 'adora-service-bg-maintenance' },
-    { type: 'bellman', icon: <Bell className="w-6 h-6" />, label: 'بيلمان', color: 'adora-service-bellman', bgColor: 'adora-service-bg-bellman' },
-    { type: 'coffee', icon: <Coffee className="w-6 h-6" />, label: 'مشروبات', color: 'adora-service-coffee', bgColor: 'adora-service-bg-coffee' },
-    { type: 'inspection', icon: <Eye className="w-6 h-6" />, label: 'فحص غرفة', color: 'adora-service-inspection', bgColor: 'adora-service-bg-inspection' },
-    { type: 'other', icon: <AlertTriangle className="w-6 h-6" />, label: 'طلبات أخرى', color: 'adora-service-emergency', bgColor: 'adora-service-bg-emergency' },
-];
-
-const SERVICE_NAMES: Record<string, string> = {
-    cleaning: 'تنظيف',
-    maintenance: 'صيانة',
-    bellman: 'بيلمان',
-    coffee: 'مشروبات',
-    laundry: 'غسيل',
-    minibar: 'ميني بار',
-    inspection: 'فحص غرفة',
-    extension: 'تمديد الإقامة',
-    other: 'طلب طارئ'
-};
-
-// ✅ THEME-AWARE: Using CSS Variables for consistent Light/Dark styling
-const STATUS_CONFIG = {
-    PENDING: { label: 'جديد', color: 'adora-status-pending', bg: 'adora-status-bg-pending', icon: AlertCircle },
-    PENDING_RECEPTION: { label: 'بانتظار التأكيد', color: 'adora-status-warning', bg: 'adora-status-bg-warning', icon: AlertCircle },
-    CONFIRMED: { label: 'مؤكد', color: 'adora-status-confirmed', bg: 'adora-status-bg-confirmed', icon: Check },
-    IN_PROGRESS: { label: 'قيد التنفيذ', color: 'adora-status-progress', bg: 'adora-status-bg-progress', icon: Clock },
-    COMPLETED: { label: 'مكتمل', color: 'adora-status-success', bg: 'adora-status-bg-success', icon: CheckCircle2 },
-    WAITING_PARTS: { label: 'بانتظار قطع', color: 'adora-status-danger', bg: 'adora-status-bg-danger', icon: Wrench },
-    NEEDS_INSPECTION: { label: 'يحتاج فحص', color: 'adora-status-progress', bg: 'adora-status-bg-progress', icon: Eye },
-    SCHEDULED: { label: 'مجدول', color: 'adora-status-confirmed', bg: 'adora-status-bg-confirmed', icon: Calendar }
-};
+// Note: QUICK_ACTIONS, SERVICE_NAMES, and STATUS_CONFIG are now defined inside the component to use t()
 
 // ============================================================
 // HELPER COMPONENTS
@@ -258,19 +227,37 @@ const CompactRequestCard: React.FC<{
     request: ServiceRequest;
     onView: () => void;
     onQuickAction?: (action: 'confirm' | 'complete') => void;
-}> = ({ request, onView, onQuickAction }) => {
-    const serviceConfig = QUICK_ACTIONS.find(a => a.type === request.type);
+    quickActions: QuickAction[];
+    serviceNames: Record<string, string>;
+    statusConfig: typeof STATUS_CONFIG;
+}> = ({ request, onView, onQuickAction, quickActions, serviceNames, statusConfig }) => {
+    const { t } = useTranslation();
+    const serviceConfig = quickActions.find(a => a.type === request.type);
+    
+    // ✅ Department names helper using t()
+    const getDeptName = useCallback((dept: string): string => {
+        const deptMap: Record<string, string> = {
+            'reception': t('departments.reception'),
+            'housekeeping': t('departments.housekeeping'),
+            'maintenance': t('departments.maintenance'),
+            'bellman': t('departments.bellman'),
+            'coffee_shop': t('departments.coffeeshop'),
+            'coffeeshop': t('departments.coffeeshop'),
+            'procurement': t('departments.procurement')
+        };
+        return deptMap[dept] || dept;
+    }, [t]);
     
     // Calculate time ago
     const timeAgo = useMemo(() => {
         if (!request.createdAt) return '';
         const date = request.createdAt.toDate ? request.createdAt.toDate() : new Date(request.createdAt);
         const diff = Math.floor((Date.now() - date.getTime()) / 60000);
-        if (diff < 1) return 'الآن';
-        if (diff < 60) return `${diff}د`;
-        if (diff < 1440) return `${Math.floor(diff / 60)}س`;
-        return `${Math.floor(diff / 1440)}ي`;
-    }, [request.createdAt]);
+        if (diff < 1) return t('reception.timeAgo.now');
+        if (diff < 60) return `${diff}${t('reception.timeAgo.minutes')}`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}${t('reception.timeAgo.hours')}`;
+        return `${Math.floor(diff / 1440)}${t('reception.timeAgo.days')}`;
+    }, [request.createdAt, t]);
     
     const isUrgent = request.priority === 'urgent' || request.isEmergency;
     const isDelayed = request.status !== 'COMPLETED' && request.createdAt && 
@@ -301,7 +288,7 @@ const CompactRequestCard: React.FC<{
                 {/* Room & Service */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                        <span className="text-base font-bold adora-text-primary">غ.{request.roomNumber}</span>
+                        <span className="text-base font-bold adora-text-primary">{t('reception.room.roomShort')}{request.roomNumber}</span>
                         {isUrgent && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
                         {isQR && (
                             <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-600 dark:text-teal-400 text-[9px] font-bold flex items-center gap-0.5">
@@ -309,7 +296,7 @@ const CompactRequestCard: React.FC<{
                             </span>
                         )}
                     </div>
-                    <p className="text-[10px] adora-text-secondary">{SERVICE_NAMES[request.type]}</p>
+                    <p className="text-[10px] adora-text-secondary">{serviceNames[request.type] || request.type}</p>
                 </div>
                 
                 {/* Time & Status */}
@@ -320,9 +307,9 @@ const CompactRequestCard: React.FC<{
                         request.status === 'CONFIRMED' ? 'bg-teal-500/20 text-teal-600 dark:text-teal-400' :
                         'bg-orange-500/20 text-orange-600 dark:text-orange-400'
                     }`}>
-                        {request.status === 'COMPLETED' ? 'مكتمل' :
-                         request.status === 'IN_PROGRESS' ? 'جاري' :
-                         request.status === 'CONFIRMED' ? 'مؤكد' : 'جديد'}
+                        {request.status === 'COMPLETED' ? t('reception.statusLabels.completed') :
+                         request.status === 'IN_PROGRESS' ? t('reception.statusLabels.inProgressShort') :
+                         request.status === 'CONFIRMED' ? t('reception.statusLabels.confirmed') : t('reception.statusLabels.newShort')}
                     </div>
                     <span className="text-[10px] adora-text-disabled">{timeAgo}</span>
                 </div>
@@ -333,9 +320,9 @@ const CompactRequestCard: React.FC<{
                 <div className="flex items-center gap-2 mb-2 p-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20">
                     <User className="w-3 h-3 text-teal-500 flex-shrink-0" />
                     <div className="flex-1 min-w-0 text-[10px] text-teal-700 dark:text-teal-300">
-                        <span className="font-bold">{request.guestName || 'نزيل'}</span>
-                        {request.guestIdentity && <span className="mr-2">• هوية: {request.guestIdentity}</span>}
-                        {request.guestPhone && <span className="mr-2">• جوال: {request.guestPhone}</span>}
+                        <span className="font-bold">{request.guestName || t('reception.guest.guest')}</span>
+                        {request.guestIdentity && <span className="mr-2">• {t('reception.guest.identity')}: {request.guestIdentity}</span>}
+                        {request.guestPhone && <span className="mr-2">• {t('reception.guest.phone')}: {request.guestPhone}</span>}
                     </div>
                 </div>
             )}
@@ -348,9 +335,9 @@ const CompactRequestCard: React.FC<{
                         : 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20'
                 }`}>
                     {request.guestStatus === 'in' ? (
-                        <><User className="w-3 h-3" /> النزيل موجود بالغرفة</>
+                        <><User className="w-3 h-3" /> {t('reception.guestInRoom')}</>
                     ) : (
-                        <><DoorOpen className="w-3 h-3" /> الغرفة فارغة</>
+                        <><DoorOpen className="w-3 h-3" /> {t('reception.roomEmpty')}</>
                     )}
                 </div>
             )}
@@ -367,13 +354,7 @@ const CompactRequestCard: React.FC<{
             {request.currentDepartment && request.currentDepartment !== 'reception' && (
                 <div className="flex items-center gap-1.5 mb-2 text-[10px] adora-text-tertiary">
                     <ArrowRightLeft className="w-3 h-3" />
-                    <span>حالياً في: {
-                        request.currentDepartment === 'housekeeping' ? 'هاوس كيبنج 🧹' :
-                        request.currentDepartment === 'maintenance' ? 'الصيانة 🔧' :
-                        request.currentDepartment === 'bellman' ? 'البيلمان 🛎️' :
-                        request.currentDepartment === 'coffee_shop' ? 'كافي شوب ☕' :
-                        request.currentDepartment
-                    }</span>
+                    <span>{t('reception.currentlyIn')}: {getDeptName(request.currentDepartment)}</span>
                 </div>
             )}
             
@@ -385,7 +366,7 @@ const CompactRequestCard: React.FC<{
                         onClick={(e) => { e.stopPropagation(); onQuickAction('confirm'); }}
                         className="flex-1 py-1.5 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1 hover:bg-teal-600 transition-colors"
                     >
-                        <Check className="w-3 h-3" /> تأكيد
+                        <Check className="w-3 h-3" /> {t('reception.confirm')}
                     </button>
                 )}
                 
@@ -396,7 +377,7 @@ const CompactRequestCard: React.FC<{
                         (request.status === 'PENDING' || request.status === 'PENDING_RECEPTION') ? '' : 'flex-1 justify-center'
                     }`}
                 >
-                    <Eye className="w-3 h-3" /> التفاصيل
+                    <Eye className="w-3 h-3" /> {t('reception.details')}
                 </button>
             </div>
         </div>
@@ -419,6 +400,7 @@ const RequestCard: React.FC<{
     userRole?: string;
     potentialMismatch?: string; // ✅ Room number if guest is found elsewhere
 }> = ({ request, onConfirm, onConfirmCompletion, onView, onComplete, onDelete, onRequestDeletion, onMove, onArchive, userId, userName, userRole, potentialMismatch }) => {
+    const { t, i18n } = useTranslation();
     const StatusIcon = STATUS_CONFIG[request.status]?.icon || AlertCircle;
     const statusConfig = STATUS_CONFIG[request.status];
 
@@ -429,21 +411,24 @@ const RequestCard: React.FC<{
             if (!timestamp) return '';
             const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
             const diff = Math.floor((Date.now() - date.getTime()) / 60000);
-            if (diff < 1) return 'الآن';
-            if (diff < 60) return `${diff} د`;
-            if (diff < 1440) return `${Math.floor(diff / 60)} س`;
-            return `${Math.floor(diff / 1440)} ي`;
+            if (diff < 1) return t('reception.timeAgo.now');
+            if (diff < 60) return `${diff} ${t('reception.timeAgo.minutes')}`;
+            if (diff < 1440) return `${Math.floor(diff / 60)} ${t('reception.timeAgo.hours')}`;
+            return `${Math.floor(diff / 1440)} ${t('reception.timeAgo.days')}`;
         };
 
-        // Helper to get department name in Arabic
+        // ✅ Helper to get department name using t() (inside useMemo, so can use t directly)
         const getDeptName = (dept: string): string => {
-            const names: Record<string, string> = {
-                'reception': 'الاستقبال',
-                'housekeeping': 'الهاوس كيبنج',
-                'maintenance': 'الصيانة',
-                'bellman': 'البيلمان'
+            const deptMap: Record<string, string> = {
+                'reception': t('departments.reception'),
+                'housekeeping': t('departments.housekeeping'),
+                'maintenance': t('departments.maintenance'),
+                'bellman': t('departments.bellman'),
+                'coffee_shop': t('departments.coffeeshop'),
+                'coffeeshop': t('departments.coffeeshop'),
+                'procurement': t('departments.procurement')
             };
-            return names[dept] || dept;
+            return deptMap[dept] || dept;
         };
 
         // 1. Check departmentHistory for last transfer/action
@@ -455,7 +440,7 @@ const RequestCard: React.FC<{
                 const timeAgoStr = getTimeAgo(lastEntry.enteredAt);
                 if (lastEntry.department) {
                     return {
-                        lastActionText: `تم إرساله إلى ${getDeptName(lastEntry.department)}`,
+                        lastActionText: `${t('reception.sentTo')} ${getDeptName(lastEntry.department)}`,
                         timeAgo: timeAgoStr
                     };
                 }
@@ -465,7 +450,7 @@ const RequestCard: React.FC<{
                 const timeAgoStr = getTimeAgo(lastEntry.exitedAt);
                 if (lastEntry.nextDepartment) {
                     return {
-                        lastActionText: `تم إرساله من ${getDeptName(lastEntry.department || '')} إلى ${getDeptName(lastEntry.nextDepartment)}`,
+                        lastActionText: `${t('reception.sentFrom')} ${getDeptName(lastEntry.department || '')} ${t('reception.to')} ${getDeptName(lastEntry.nextDepartment)}`,
                         timeAgo: timeAgoStr
                     };
                 }
@@ -476,19 +461,19 @@ const RequestCard: React.FC<{
         if (request.timeline) {
             if (request.timeline.completed && request.status === 'COMPLETED') {
                 return {
-                    lastActionText: 'تم الإكمال',
+                    lastActionText: t('reception.completed'),
                     timeAgo: getTimeAgo(request.timeline.completed)
                 };
             }
             if (request.timeline.started && request.status === 'IN_PROGRESS') {
                 return {
-                    lastActionText: 'تم البدء',
+                    lastActionText: t('reception.started'),
                     timeAgo: getTimeAgo(request.timeline.started)
                 };
             }
             if (request.timeline.confirmed && request.status === 'CONFIRMED') {
                 return {
-                    lastActionText: 'تم التأكيد',
+                    lastActionText: t('reception.confirmed'),
                     timeAgo: getTimeAgo(request.timeline.confirmed)
                 };
             }
@@ -497,17 +482,17 @@ const RequestCard: React.FC<{
         // 3. Check currentDepartment to determine current location
         if (request.currentDepartment && request.currentDepartment !== request.originDepartment) {
             return {
-                lastActionText: `حالياً في ${getDeptName(request.currentDepartment)}`,
+                lastActionText: `${t('reception.currentlyIn')} ${getDeptName(request.currentDepartment)}`,
                 timeAgo: getTimeAgo(request.createdAt)
             };
         }
 
         // 4. Fallback to createdAt
         return {
-            lastActionText: 'تم الإنشاء',
+            lastActionText: t('reception.created'),
             timeAgo: getTimeAgo(request.createdAt)
         };
-    }, [request.departmentHistory, request.timeline, request.currentDepartment, request.originDepartment, request.status, request.createdAt]);
+    }, [request.departmentHistory, request.timeline, request.currentDepartment, request.originDepartment, request.status, request.createdAt, t]);
 
     const isUrgent = request.priority === 'urgent';
     const isDelayed = useMemo(() => {
@@ -557,27 +542,27 @@ const RequestCard: React.FC<{
             {/* Header - Mobile Optimized - Theme Aware */}
             <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                    <span className="text-2xl sm:text-3xl font-semibold adora-text-primary tracking-tight">غ.{request.roomNumber}</span>
+                    <span className="text-2xl sm:text-3xl font-semibold adora-text-primary tracking-tight">{t('reception.room.roomShort')}{request.roomNumber}</span>
                     {isUrgent && (
                         <span className="adora-badge adora-badge-red text-xs font-bold">
-                            عاجل
+                            {t('reception.urgent')}
                         </span>
                     )}
                     {isDelayed && (
                         <span className="adora-badge adora-badge-orange text-xs font-bold animate-pulse">
-                            متأخر
+                            {t('reception.delayed')}
                         </span>
                     )}
                     {/* ☕ Coffee Shop Completion Badge */}
                     {request.type === 'coffee' && request.status === 'COMPLETED' && request.currentDepartment === 'reception' && (
                         <span className="adora-badge adora-badge-yellow text-xs font-bold">
-                            ☕ تم التوصيل
+                            ☕ {t('reception.delivered')}
                         </span>
                     )}
                     {/* ✅ Emergency Request Badge */}
                     {request.isEmergency && (
                         <span className="adora-badge adora-badge-red text-xs font-bold animate-pulse">
-                            🔴 طلب طارئ
+                            🔴 {t('reception.emergencyRequest')}
                         </span>
                     )}
                 </div>
@@ -612,7 +597,7 @@ const RequestCard: React.FC<{
                         )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        <p className="adora-text-secondary text-xs sm:text-sm truncate">{request.guestName || 'نزيل'}</p>
+                        <p className="adora-text-secondary text-xs sm:text-sm truncate">{request.guestName || t('reception.guest.guest')}</p>
                         {/* ✅ Guest Info - Show identity/phone if available */}
                         {(request.guestIdentity || request.guestPhone) && (
                             <span className="adora-text-disabled text-xs sm:text-xs flex items-center gap-1">
@@ -641,7 +626,7 @@ const RequestCard: React.FC<{
                         {/* WhatsApp-style read receipt */}
                         <ReadReceipt request={request as any} size="sm" showPopup={false} />
                     </div>
-                    <span className="adora-text-disabled text-xs sm:text-sm whitespace-nowrap font-medium">منذ {timeAgo}</span>
+                    <span className="adora-text-disabled text-xs sm:text-sm whitespace-nowrap font-medium">{t('reception.since')} {timeAgo}</span>
                 </div>
             </div>
 
@@ -660,9 +645,9 @@ const RequestCard: React.FC<{
                 <div className="mb-3 adora-info-box orange animate-pulse">
                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                        <p className="text-xs font-bold">تنبيه: محتمل اختلاف الغرفة</p>
+                        <p className="text-xs font-bold">{t('reception.roomMismatchAlert')}</p>
                         <p className="text-xs opacity-80">
-                            النزيل مسجل حالياً في غرفة <b>{potentialMismatch}</b>. هل تريد نقل الطلب؟
+                            {t('reception.guestRegisteredIn')} <b>{potentialMismatch}</b>. {t('reception.wantToTransferRequest')}
                         </p>
                     </div>
                     {onMove && (
@@ -670,7 +655,7 @@ const RequestCard: React.FC<{
                             onClick={(e) => { e.stopPropagation(); onMove(); }}
                             className="adora-btn adora-btn-warning adora-btn-sm"
                         >
-                            نقل
+                            {t('reception.transferRequest')}
                         </button>
                     )}
                 </div>
@@ -681,13 +666,13 @@ const RequestCard: React.FC<{
                 <div className="mb-3 adora-info-box red animate-pulse">
                     <Trash2 className="w-4 h-4 flex-shrink-0" />
                     <div className="flex-1">
-                        <p className="text-xs font-bold">طلب حذف معلق</p>
-                        <p className="text-xs opacity-60">بواسطة: {request.deletionRequest.requestedBy}</p>
+                        <p className="text-xs font-bold">{t('reception.pendingDeletion')}</p>
+                        <p className="text-xs opacity-60">{t('reception.by')}: {request.deletionRequest.requestedBy}</p>
                     </div>
                     {/* If Manager, show Approval Badge */}
                     {['manager', 'admin', 'owner'].includes(userRole || '') && (
                         <span className="adora-badge adora-badge-red text-xs">
-                            مطلوب الموافقة
+                            {t('reception.approvalRequired')}
                         </span>
                     )}
                 </div>
@@ -698,14 +683,14 @@ const RequestCard: React.FC<{
                 <div className="mb-3 adora-info-box teal">
                     <QrCode className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                        <p className="text-xs font-bold">طلب من QR - يحتاج تأكيد</p>
+                        <p className="text-xs font-bold">{t('reception.qrRequestNeedsConfirmTitle')}</p>
                         <p className="text-xs opacity-80 mt-0.5">
-                            النزيل: <b>{request.guestName || 'غير محدد'}</b>
-                            {request.guestIdentity && ` • هوية: ${request.guestIdentity}`}
-                            {request.guestPhone && ` • جوال: ${request.guestPhone}`}
+                            {t('reception.guestLabel')} <b>{request.guestName || t('reception.guestNotSpecified')}</b>
+                            {request.guestIdentity && ` • ${t('reception.identityLabel')} ${request.guestIdentity}`}
+                            {request.guestPhone && ` • ${t('reception.phoneLabel')} ${request.guestPhone}`}
                         </p>
                         <p className="text-xs opacity-60 mt-1">
-                            يرجى التحقق من البيانات والتأكيد قبل إرسال الطلب للقسم المختص
+                            {t('reception.pleaseVerify')}
                         </p>
                     </div>
                 </div>
@@ -717,12 +702,12 @@ const RequestCard: React.FC<{
                     <div className="flex items-center gap-2 mb-2">
                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
                         <p className="text-xs font-bold">
-                            {request.inspectionResult === 'damages' ? '⚠️ تلفيات في الغرفة' : '📦 مفقودات من الغرفة'}
+                            {request.inspectionResult === 'damages' ? `⚠️ ${t('reception.damagesInRoom')}` : `📦 ${t('reception.lostItemsInRoom')}`}
                         </p>
                     </div>
                     <img 
                         src={request.inspectionPhoto} 
-                        alt={request.inspectionResult === 'damages' ? 'صورة التلفيات' : 'صورة المفقودات'}
+                        alt={request.inspectionResult === 'damages' ? t('reception.damagePhoto') : t('reception.lostPhoto')}
                         className="w-full h-32 sm:h-40 object-cover rounded-lg mb-2 cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={(e) => {
                             e.stopPropagation();
@@ -740,16 +725,16 @@ const RequestCard: React.FC<{
                 <div className="mb-3 adora-info-box green" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
                     <div className="flex items-center gap-2 mb-1.5">
                         <ShoppingCart className="w-4 h-4" />
-                        <p className="text-xs font-bold">استهلاك الميني بار</p>
+                        <p className="text-xs font-bold">{t('reception.minibarConsumption')}</p>
                         {request.minibarTotal && (
-                            <span className="mr-auto text-xs font-bold">الإجمالي: {request.minibarTotal} ر.س</span>
+                            <span className="mr-auto text-xs font-bold">{t('reception.total')}: {request.minibarTotal} {t('currency.sar')}</span>
                         )}
                     </div>
                     <div className="space-y-1">
                         {request.minibarConsumption.map((item, idx) => (
                             <div key={idx} className="flex items-center justify-between text-xs opacity-80">
                                 <span>{item.productName}</span>
-                                <span>{item.quantity} × {item.pricePerUnit} ر.س = {item.total} ر.س</span>
+                                <span>{item.quantity} × {item.pricePerUnit} {t('reception.sarCurrency')} = {item.total} {t('reception.sarCurrency')}</span>
                             </div>
                         ))}
                     </div>
@@ -761,8 +746,8 @@ const RequestCard: React.FC<{
                 <div className="mb-3 adora-info-box purple">
                     <Package className="w-5 h-5 flex-shrink-0" />
                     <div className="flex-1">
-                        <p className="text-xs font-bold">كارت مفقودات مفتوح</p>
-                        <p className="text-xs opacity-60">جاهز للنقل للأرشيف</p>
+                        <p className="text-xs font-bold">{t('reception.lostFoundCardOpen')}</p>
+                        <p className="text-xs opacity-60">{t('reception.readyForArchive')}</p>
                     </div>
                     <button
                         onClick={(e) => { e.stopPropagation(); onArchive(); }}
@@ -770,7 +755,7 @@ const RequestCard: React.FC<{
                         style={{ background: 'linear-gradient(135deg, var(--theme-accent-purple) 0%, var(--theme-accent-purple-dark) 100%)', color: 'white' }}
                     >
                         <Archive className="w-4 h-4" />
-                        نقل للأرشيف
+                        {t('reception.transferRequest')} {t('common.to')} {t('common.archive')}
                     </button>
                 </div>
             )}
@@ -780,7 +765,7 @@ const RequestCard: React.FC<{
                 <div className="mb-3 adora-info-box slate">
                     <MessageSquare className="w-4 h-4 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                        <p className="text-xs font-bold mb-1">ملاحظات الطلب</p>
+                        <p className="text-xs font-bold mb-1">{t('reception.requestNotes')}</p>
                         <p className="text-sm opacity-90 leading-relaxed whitespace-pre-wrap">{request.notes}</p>
                     </div>
                 </div>
@@ -790,7 +775,7 @@ const RequestCard: React.FC<{
             {request.needsCart && (
                 <div className="mb-3 adora-info-box blue">
                     <ShoppingCart className="w-4 h-4 flex-shrink-0" />
-                    <p className="text-xs font-bold">يحتاج عربة تنظيف</p>
+                    <p className="text-xs font-bold">{t('reception.needsCleaningCart')}</p>
                 </div>
             )}
 
@@ -799,7 +784,7 @@ const RequestCard: React.FC<{
                 <div className={`mb-3 adora-info-box ${request.guestStatus === 'in' ? 'green' : 'orange'}`}>
                     <User className="w-4 h-4 flex-shrink-0" />
                     <p className="text-xs font-bold">
-                        {request.guestStatus === 'in' ? '✅ النزيل موجود بالغرفة' : '🚪 الغرفة فارغة'}
+                        {request.guestStatus === 'in' ? `✅ ${t('reception.guestInRoom')}` : `🚪 ${t('reception.roomEmpty')}`}
                     </p>
                 </div>
             )}
@@ -809,17 +794,17 @@ const RequestCard: React.FC<{
                 <div className="mb-3 adora-info-box cyan">
                     <ArrowRightLeft className="w-4 h-4 flex-shrink-0" />
                     <div className="flex-1">
-                        <p className="text-xs font-bold">حالياً في: {(() => {
+                        <p className="text-xs font-bold">{t('reception.currentlyIn')}: {(() => {
                             const deptNames: Record<string, string> = {
-                                housekeeping: 'الهاوس كيبنج 🧹',
-                                maintenance: 'الصيانة 🔧',
-                                bellman: 'البيلمان 🛎️',
-                                coffee_shop: 'الكافي شوب ☕'
+                                housekeeping: `${t('departments.housekeeping')} 🧹`,
+                                maintenance: `${t('departments.maintenance')} 🔧`,
+                                bellman: `${t('departments.bellman')} 🛎️`,
+                                coffee_shop: `${t('departments.coffeeshop')} ☕`
                             };
                             return deptNames[request.currentDepartment] || request.currentDepartment;
                         })()}</p>
                         {request.assignedTo?.name && (
-                            <p className="text-xs opacity-70 mt-0.5">المسؤول: {request.assignedTo.name}</p>
+                            <p className="text-xs opacity-70 mt-0.5">{t('reception.responsible')} {request.assignedTo.name}</p>
                         )}
                     </div>
                 </div>
@@ -830,11 +815,12 @@ const RequestCard: React.FC<{
                 <div className="mb-3 adora-info-box purple">
                     <CalendarClock className="w-4 h-4 flex-shrink-0" />
                     <div className="flex-1">
-                        <p className="text-xs font-bold">طلب مجدول</p>
+                        <p className="text-xs font-bold">{t('reception.priority.scheduled')} {t('common.request')}</p>
                         <p className="text-xs opacity-70">
                             {(() => {
                                 const date = request.scheduledAt.toDate ? request.scheduledAt.toDate() : new Date(request.scheduledAt);
-                                return date.toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' });
+                                const locale = i18n.language === 'ar' ? 'ar-SA' : i18n.language === 'hi' ? 'hi-IN' : i18n.language === 'bn' ? 'bn-BD' : 'en-US';
+                                return date.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
                             })()}
                         </p>
                     </div>
@@ -850,14 +836,14 @@ const RequestCard: React.FC<{
                             className="adora-btn adora-btn-success flex-1 py-4 sm:py-5 text-base sm:text-lg rounded-[1.5rem] group"
                         >
                             <Check className="w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-300 group-hover:scale-105" />
-                            <span>تأكيد</span>
+                            <span>{t('reception.confirmButton')}</span>
                         </button>
                         {onMove && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onMove(); }}
                                 className="adora-btn px-3 rounded-xl"
                                 style={{ background: 'var(--theme-accent-orange-light)', color: 'var(--theme-accent-orange)' }}
-                                title="نقل النزيل"
+                                title={t('reception.transferRequest')}
                             >
                                 <Repeat className="w-4 h-4" />
                             </button>
@@ -871,7 +857,7 @@ const RequestCard: React.FC<{
                         style={{ background: 'linear-gradient(135deg, var(--theme-accent-blue) 0%, var(--theme-accent-blue-dark) 100%)', color: 'white', boxShadow: '0 4px 14px rgba(59, 130, 246, 0.3)' }}
                     >
                         <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-300 group-hover:scale-105" />
-                        <span>إتمام</span>
+                        <span>{t('reception.completeButton')}</span>
                     </button>
                 )}
                 <button
@@ -889,7 +875,7 @@ const RequestCard: React.FC<{
                                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
                                 className="adora-btn py-2.5 sm:py-2 px-3 sm:px-4 rounded-xl"
                                 style={{ background: 'var(--theme-accent-red-light)', color: 'var(--theme-accent-red)' }}
-                                title="حذف الطلب"
+                                title={t('reception.deleteRequest')}
                             >
                                 <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
@@ -900,10 +886,10 @@ const RequestCard: React.FC<{
                                 onClick={(e) => { e.stopPropagation(); onRequestDeletion(); }}
                                 className="adora-btn py-2.5 sm:py-2 px-3 sm:px-4 rounded-xl"
                                 style={{ background: 'var(--theme-accent-orange-light)', color: 'var(--theme-accent-orange)' }}
-                                title="طلب حذف (يرسل للمدير)"
+                                title={t('reception.requestDeletion')}
                             >
                                 <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-                                <span className="hidden sm:inline text-xs font-medium">طلب حذف</span>
+                                <span className="hidden sm:inline text-xs font-medium">{t('reception.requestDeletionShort')}</span>
                             </button>
                         )}
                     </>
@@ -915,7 +901,7 @@ const RequestCard: React.FC<{
                             onClick={(e) => { e.stopPropagation(); onDelete(); }}
                             className="adora-btn px-3 py-2 rounded-xl"
                             style={{ background: 'var(--theme-accent-red-light)', color: 'var(--theme-accent-red)' }}
-                            title="موافقة على الحذف"
+                            title={t('reception.approveDeletion')}
                         >
                             <CheckCircle className="w-4 h-4" />
                         </button>
@@ -923,7 +909,7 @@ const RequestCard: React.FC<{
                             <button
                                 onClick={(e) => { e.stopPropagation(); onRequestDeletion(); }}
                                 className="adora-btn adora-btn-secondary px-3 py-2 rounded-xl"
-                                title="رفض طلب الحذف"
+                                title={t('reception.rejectDeletion')}
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -944,6 +930,8 @@ const LostFoundModal: React.FC<{
     userId: string;
     userName: string;
 }> = ({ isOpen, onClose, branchId, tenantId, userId, userName }) => {
+    const { t, i18n } = useTranslation();
+    const currentLanguage = i18n.language;
     const { success, error } = useUX();
     const [items, setItems] = useState<LostFoundItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -975,7 +963,7 @@ const LostFoundModal: React.FC<{
                         branchId: branchId,
                         tenantId: tenantId,
                         roomNumber: item.roomNumber || '',
-                        description: `تم تسليم المفقودات: ${item.description}`,
+                        description: `${t('reception.lostFoundDeliverySuccess').split(' ')[0]}: ${item.description}`,
                         photoUrl: item.imageUrl || null,
                         returnedBy: { id: userId, name: userName },
                         createdAt: Timestamp.now(),
@@ -987,34 +975,37 @@ const LostFoundModal: React.FC<{
                 console.warn('Failed to create live feed entry:', e);
             }
 
-            success('تم تسليم المفقودات بنجاح');
+            success(t('reception.lostFoundDeliverySuccess'));
         } catch (err: any) {
             console.error('Error returning item:', err);
-            error('فشل تسليم المفقودات: ' + (err.message || 'خطأ غير معروف'));
+            error(t('reception.lostFoundDeliveryFailed') + ' ' + (err.message || t('reception.unknownError')));
         }
     };
 
-    const formatDate = (timestamp: any): string => {
+    // ✅ Format date with dynamic locale based on current language
+    const formatDate = useCallback((timestamp: any): string => {
         if (!timestamp) return '-';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return date.toLocaleString('ar-SA', {
+        const locale = currentLanguage === 'ar' ? 'ar-SA' : currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'bn' ? 'bn-BD' : 'en-US';
+        return date.toLocaleString(locale, {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
         });
-    };
+    }, [currentLanguage]);
 
-    const getTimeAgo = (timestamp: any): string => {
+    // ✅ Get time ago using t() with interpolation
+    const getTimeAgo = useCallback((timestamp: any): string => {
         if (!timestamp) return '';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         const diff = Math.floor((Date.now() - date.getTime()) / 60000);
-        if (diff < 1) return 'الآن';
-        if (diff < 60) return `منذ ${diff} دقيقة`;
-        if (diff < 1440) return `منذ ${Math.floor(diff / 60)} ساعة`;
-        return `منذ ${Math.floor(diff / 1440)} يوم`;
-    };
+        if (diff < 1) return t('reception.nowTime');
+        if (diff < 60) return t('reception.minutesAgo', { minutes: diff });
+        if (diff < 1440) return t('reception.hoursAgo', { hours: Math.floor(diff / 60) });
+        return t('reception.daysAgo', { days: Math.floor(diff / 1440) });
+    }, [t]);
 
     if (!isOpen) return null;
 
@@ -1028,8 +1019,8 @@ const LostFoundModal: React.FC<{
                             <Package className="w-6 h-6" />
                         </div>
                         <div>
-                            <h2 className="adora-modal-title-v2">المفقودات والموجودات</h2>
-                            <p className="adora-modal-subtitle">جميع العناصر المفقودة من فحص الغرف</p>
+                            <h2 className="adora-modal-title-v2">{t('reception.lostAndFound')}</h2>
+                            <p className="adora-modal-subtitle">{t('reception.lostAndFound')} {t('reception.inspection')}</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="adora-modal-close-v2">
@@ -1047,7 +1038,7 @@ const LostFoundModal: React.FC<{
                                 : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/20'
                         }`}
                     >
-                        نشطة ({activeItems.length})
+                        {t('reception.activeTab')} ({activeItems.length})
                     </button>
                     <button
                         onClick={() => setActiveTab('log')}
@@ -1057,7 +1048,7 @@ const LostFoundModal: React.FC<{
                                 : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/20'
                         }`}
                     >
-                        السجل ({logItems.length})
+                        {t('reception.logTab')} ({logItems.length})
                     </button>
                 </div>
 
@@ -1065,7 +1056,7 @@ const LostFoundModal: React.FC<{
                 <div className="adora-modal-body-v2">
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
-                            <AdoraLoader size="md" message="جاري التحميل..." />
+                            <AdoraLoader size="md" message={t('reception.loading')} />
                         </div>
                     ) : (activeTab === 'active' ? activeItems : logItems).length === 0 ? (
                         <div className="adora-empty">
@@ -1073,7 +1064,7 @@ const LostFoundModal: React.FC<{
                                 <Package className="w-8 h-8" />
                             </div>
                             <p className="adora-empty-description">
-                                {activeTab === 'active' ? 'لا توجد مفقودات نشطة' : 'السجل فارغ'}
+                                {activeTab === 'active' ? t('reception.noActiveLostItems') : t('reception.logEmpty')}
                             </p>
                         </div>
                     ) : (
@@ -1095,7 +1086,7 @@ const LostFoundModal: React.FC<{
                                         )}
                                         <div className="flex-1">
                                             <p className="adora-text-primary font-medium text-sm mb-1">{item.description}</p>
-                                            <p className="adora-text-tertiary text-xs">غرفة {item.roomNumber || '-'}</p>
+                                            <p className="adora-text-tertiary text-xs">{t('reception.roomLabel')} {item.roomNumber || '-'}</p>
                                         </div>
                                         <span className={`adora-badge ${
                                             item.status === 'found' ? 'adora-badge-blue' :
@@ -1103,36 +1094,36 @@ const LostFoundModal: React.FC<{
                                             item.status === 'returned' ? 'adora-badge-green' :
                                             'adora-badge-teal'
                                         } text-xs font-bold`}>
-                                            {item.status === 'found' ? 'موجود' :
-                                             item.status === 'claimed' ? 'مطالب به' :
-                                             item.status === 'returned' ? 'تم التسليم' : 'تم التخلص'}
+                                            {item.status === 'found' ? t('reception.foundStatus') :
+                                             item.status === 'claimed' ? t('reception.claimedStatus') :
+                                             item.status === 'returned' ? t('reception.returnedStatus') : t('reception.disposedStatus')}
                                         </span>
                                     </div>
 
                                     {/* Details */}
                                     <div className="space-y-2 mb-3">
                                         <div className="flex items-center justify-between text-xs">
-                                            <span className="adora-text-tertiary">تاريخ العثور:</span>
+                                            <span className="adora-text-tertiary">{t('reception.foundDate')}</span>
                                             <span className="adora-text-secondary">{formatDate(item.createdAt)}</span>
                                         </div>
                                         {item.foundBy && (
                                             <div className="flex items-center justify-between text-xs">
-                                                <span className="adora-text-tertiary">وجدها:</span>
+                                                <span className="adora-text-tertiary">{t('reception.foundBy')}</span>
                                                 <span className="adora-text-secondary">{item.foundBy.name}</span>
                                             </div>
                                         )}
                                         {item.returnedBy && item.returnedAt && (
                                             <div className="adora-info-box green" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.25rem' }}>
                                                 <div className="flex items-center justify-between text-xs mb-1">
-                                                    <span className="font-bold">تم التسليم</span>
+                                                    <span className="font-bold">{t('reception.returnedLabel')}</span>
                                                     <span className="opacity-80">{formatDate(item.returnedAt)}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-xs">
-                                                    <span className="opacity-60">بواسطة:</span>
+                                                    <span className="opacity-60">{t('reception.returnedBy')}</span>
                                                     <span className="opacity-80">{item.returnedBy.name}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between text-xs mt-1">
-                                                    <span className="opacity-60">الوقت:</span>
+                                                    <span className="opacity-60">{t('reception.timeLabel')}</span>
                                                     <span className="opacity-80">{getTimeAgo(item.returnedAt)}</span>
                                                 </div>
                                             </div>
@@ -1146,7 +1137,7 @@ const LostFoundModal: React.FC<{
                                             className="adora-btn adora-btn-primary w-full"
                                         >
                                             <CheckCircle2 className="w-4 h-4" />
-                                            تم التسليم
+                                            {t('reception.returnItemButton')}
                                         </button>
                                     )}
                                 </div>
@@ -1165,110 +1156,131 @@ const RequestDetailsModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     branchId: string;
-}> = ({ request, isOpen, onClose, branchId }) => {
+    quickActions: QuickAction[];
+    serviceNames: Record<string, string>;
+    statusConfig: typeof STATUS_CONFIG;
+}> = ({ request, isOpen, onClose, branchId, quickActions, serviceNames, statusConfig }) => {
+    const { t, i18n } = useTranslation();
+    const currentLanguage = i18n.language;
+    
     if (!isOpen || !request) return null;
 
-    const getDeptName = (dept: string): string => {
-        const names: Record<string, string> = {
-            'reception': 'الاستقبال',
-            'housekeeping': 'الهاوس كيبنج',
-            'maintenance': 'الصيانة',
-            'bellman': 'البيلمان'
+    // ✅ Department names helper using t() with useMemo
+    const getDeptName = useCallback((dept: string): string => {
+        const deptMap: Record<string, string> = {
+            'reception': t('departments.reception'),
+            'housekeeping': t('departments.housekeeping'),
+            'maintenance': t('departments.maintenance'),
+            'bellman': t('departments.bellman'),
+            'coffee_shop': t('departments.coffeeshop'),
+            'coffeeshop': t('departments.coffeeshop'),
+            'procurement': t('departments.procurement')
         };
-        return names[dept] || dept;
-    };
+        return deptMap[dept] || dept;
+    }, [t]);
 
-    const formatTime = (timestamp: any): string => {
-        if (!timestamp) return 'غير محدد';
+    // ✅ Format time with dynamic locale based on current language
+    const formatTime = useCallback((timestamp: any): string => {
+        if (!timestamp) return t('reception.notSpecifiedTime');
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return date.toLocaleString('ar-SA', {
+        const locale = currentLanguage === 'ar' ? 'ar-SA' : currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'bn' ? 'bn-BD' : 'en-US';
+        return date.toLocaleString(locale, {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
         });
-    };
+    }, [t, currentLanguage]);
 
-    const getTimeAgo = (timestamp: any): string => {
+    // ✅ Get time ago using t() with interpolation
+    const getTimeAgo = useCallback((timestamp: any): string => {
         if (!timestamp) return '';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         const diff = Math.floor((Date.now() - date.getTime()) / 60000);
-        if (diff < 1) return 'الآن';
-        if (diff < 60) return `منذ ${diff} دقيقة`;
-        if (diff < 1440) return `منذ ${Math.floor(diff / 60)} ساعة`;
-        return `منذ ${Math.floor(diff / 1440)} يوم`;
-    };
+        if (diff < 1) return t('reception.nowTime');
+        if (diff < 60) return t('reception.minutesAgo', { minutes: diff });
+        if (diff < 1440) return t('reception.hoursAgo', { hours: Math.floor(diff / 60) });
+        return t('reception.daysAgo', { days: Math.floor(diff / 1440) });
+    }, [t]);
 
-    // Build timeline from departmentHistory and timeline
-    const timelineEvents: Array<{ action: string; time: any; department?: string; by?: string }> = [];
-    
-    // 1. Created
-    if (request.createdAt) {
-        timelineEvents.push({
-            action: 'تم إنشاء الطلب',
-            time: request.createdAt,
-            department: request.originDepartment ? getDeptName(request.originDepartment) : undefined,
-            by: request.createdBy?.name
-        });
-    }
+    // ✅ Build timeline from departmentHistory and timeline using t()
+    const timelineEvents: Array<{ action: string; time: any; department?: string; by?: string }> = useMemo(() => {
+        const events: Array<{ action: string; time: any; department?: string; by?: string }> = [];
+        
+        // 1. Created
+        if (request.createdAt) {
+            events.push({
+                action: t('reception.requestCreated'),
+                time: request.createdAt,
+                department: request.originDepartment ? getDeptName(request.originDepartment) : undefined,
+                by: request.createdBy?.name
+            });
+        }
 
-    // 2. Department History - Build complete journey
-    if (request.departmentHistory && request.departmentHistory.length > 0) {
-        request.departmentHistory.forEach((entry: any, index: number) => {
-            // When request entered this department
-            if (entry.enteredAt) {
-                timelineEvents.push({
-                    action: `تم إرساله إلى ${getDeptName(entry.department)}`,
-                    time: entry.enteredAt,
-                    department: getDeptName(entry.department),
-                    by: entry.handledBy?.name
+        // 2. Department History - Build complete journey
+        if (request.departmentHistory && request.departmentHistory.length > 0) {
+            request.departmentHistory.forEach((entry: any, index: number) => {
+                // When request entered this department
+                if (entry.enteredAt) {
+                    events.push({
+                        action: `${t('reception.sentToDepartment')} ${getDeptName(entry.department)}`,
+                        time: entry.enteredAt,
+                        department: getDeptName(entry.department),
+                        by: entry.handledBy?.name
+                    });
+                }
+                // When request exited/left this department
+                if (entry.exitedAt) {
+                    const nextDept = entry.nextDepartment 
+                        ? `${t('reception.toDepartment')} ${getDeptName(entry.nextDepartment)}` 
+                        : t('reception.fromDepartment');
+                    events.push({
+                        action: `${t('reception.sentFrom')} ${getDeptName(entry.department)} ${nextDept}`,
+                        time: entry.exitedAt,
+                        department: getDeptName(entry.department),
+                        by: entry.handledBy?.name
+                    });
+                }
+            });
+        }
+
+        // 3. Timeline events
+        if (request.timeline) {
+            if (request.timeline.confirmed) {
+                events.push({
+                    action: t('reception.requestConfirmed'),
+                    time: request.timeline.confirmed,
+                    by: request.confirmedBy?.name
                 });
             }
-            // When request exited/left this department
-            if (entry.exitedAt) {
-                const nextDept = entry.nextDepartment ? `إلى ${getDeptName(entry.nextDepartment)}` : 'من';
-                timelineEvents.push({
-                    action: `تم إرساله ${nextDept} ${getDeptName(entry.department)}`,
-                    time: entry.exitedAt,
-                    department: getDeptName(entry.department),
-                    by: entry.handledBy?.name
+            if (request.timeline.started) {
+                events.push({
+                    action: t('reception.requestStarted'),
+                    time: request.timeline.started,
+                    by: request.assignedTo?.name || (request as any).startedBy
                 });
             }
+            if (request.timeline.completed) {
+                events.push({
+                    action: t('reception.requestCompleted'),
+                    time: request.timeline.completed,
+                    by: request.completedBy?.name
+                });
+            }
+        }
+        
+        return events;
+    }, [request, t, getDeptName]);
+
+    // ✅ Sort by time (newest first)
+    const sortedTimelineEvents = useMemo(() => {
+        return [...timelineEvents].sort((a, b) => {
+            const aTime = a.time?.toDate ? a.time.toDate().getTime() : new Date(a.time).getTime();
+            const bTime = b.time?.toDate ? b.time.toDate().getTime() : new Date(b.time).getTime();
+            return bTime - aTime;
         });
-    }
-
-    // 3. Timeline events
-    if (request.timeline) {
-        if (request.timeline.confirmed) {
-            timelineEvents.push({
-                action: 'تم التأكيد',
-                time: request.timeline.confirmed,
-                by: request.confirmedBy?.name
-            });
-        }
-        if (request.timeline.started) {
-            timelineEvents.push({
-                action: 'تم البدء',
-                time: request.timeline.started,
-                by: request.assignedTo?.name || (request as any).startedBy
-            });
-        }
-        if (request.timeline.completed) {
-            timelineEvents.push({
-                action: 'تم الإكمال',
-                time: request.timeline.completed,
-                by: request.completedBy?.name
-            });
-        }
-    }
-
-    // Sort by time (newest first)
-    timelineEvents.sort((a, b) => {
-        const aTime = a.time?.toDate ? a.time.toDate().getTime() : new Date(a.time).getTime();
-        const bTime = b.time?.toDate ? b.time.toDate().getTime() : new Date(b.time).getTime();
-        return bTime - aTime;
-    });
+    }, [timelineEvents]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200" style={{ backdropFilter: 'none' }}>
@@ -1276,12 +1288,12 @@ const RequestDetailsModal: React.FC<{
                 {/* Header */}
                 <div className="p-6 border-b border-white/10 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 rounded-xl ${QUICK_ACTIONS.find(a => a.type === request.type)?.bgColor || 'bg-white/10'} flex items-center justify-center`}>
-                            {QUICK_ACTIONS.find(a => a.type === request.type)?.icon || <Sparkles className="w-6 h-6 text-white/60" />}
+                        <div className={`w-12 h-12 rounded-xl ${quickActions.find(a => a.type === request.type)?.bgColor || 'bg-white/10'} flex items-center justify-center`}>
+                            {quickActions.find(a => a.type === request.type)?.icon || <Sparkles className="w-6 h-6 text-white/60" />}
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">تفاصيل الطلب</h2>
-                            <p className="text-sm text-white/60">غرفة {request.roomNumber} - {SERVICE_NAMES[request.type]}</p>
+                            <h2 className="text-xl font-bold text-white">{t('common.details')} {t('common.request')}</h2>
+                            <p className="text-sm text-white/60">{t('reception.room.room')} {request.roomNumber} - {serviceNames[request.type]}</p>
                         </div>
                     </div>
                     <button
@@ -1298,36 +1310,36 @@ const RequestDetailsModal: React.FC<{
                     <div className="space-y-4 mb-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 3xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
                             <div className="p-4 bg-white/5 rounded-xl">
-                                <p className="text-white/60 text-sm mb-1">الحالة</p>
-                                <p className="text-white font-medium">{STATUS_CONFIG[request.status]?.label || request.status}</p>
+                                <p className="text-white/60 text-sm mb-1">{t('reception.statusLabel')}</p>
+                                <p className="text-white font-medium">{statusConfig[request.status]?.label || request.status}</p>
                             </div>
                             <div className="p-4 bg-white/5 rounded-xl">
-                                <p className="text-white/60 text-sm mb-1">الأولوية</p>
-                                <p className="text-white font-medium">{request.priority === 'urgent' ? 'عاجل' : 'عادي'}</p>
+                                <p className="text-white/60 text-sm mb-1">{t('forms.priority')}</p>
+                                <p className="text-white font-medium">{request.priority === 'urgent' ? t('reception.urgent') : t('reception.priority.normal')}</p>
                             </div>
                         </div>
                         
                         <div className="p-4 bg-white/5 rounded-xl">
-                            <p className="text-white/60 text-sm mb-1">القسم الحالي</p>
-                            <p className="text-white font-medium">{request.currentDepartment ? getDeptName(request.currentDepartment) : 'غير محدد'}</p>
+                            <p className="text-white/60 text-sm mb-1">{t('reception.currentDepartment')}</p>
+                            <p className="text-white font-medium">{request.currentDepartment ? getDeptName(request.currentDepartment) : t('reception.notSpecified')}</p>
                         </div>
 
                         {request.guestName && (
                             <div className="p-4 bg-white/5 rounded-xl">
-                                <p className="text-white/60 text-sm mb-1">اسم النزيل</p>
+                                <p className="text-white/60 text-sm mb-1">{t('reception.guestNameLabel')}</p>
                                 <p className="text-white font-medium">{request.guestName}</p>
                                 {request.guestIdentity && (
-                                    <p className="text-white/70 text-xs mt-1">الهوية: {request.guestIdentity}</p>
+                                    <p className="text-white/70 text-xs mt-1">{t('reception.identityLabelDetail')} {request.guestIdentity}</p>
                                 )}
                                 {request.guestPhone && (
-                                    <p className="text-white/70 text-xs mt-1">الجوال: {request.guestPhone}</p>
+                                    <p className="text-white/70 text-xs mt-1">{t('reception.phoneLabelDetail')} {request.guestPhone}</p>
                                 )}
                             </div>
                         )}
 
                         {request.notes && (
                             <div className="p-4 bg-white/5 rounded-xl">
-                                <p className="text-white/60 text-sm mb-1">ملاحظات</p>
+                                <p className="text-white/60 text-sm mb-1">{t('reception.notesLabel')}</p>
                                 <p className="text-white">{request.notes}</p>
                             </div>
                         )}
@@ -1337,25 +1349,25 @@ const RequestDetailsModal: React.FC<{
                     <div className="border-t border-white/10 pt-6">
                         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                             <Clock className="w-5 h-5" />
-                            سجل العمليات والتتبع الكامل
+                            {t('reception.operationsHistoryFull')}
                         </h3>
                         <div className="space-y-4">
-                            {timelineEvents.length > 0 ? (
-                                timelineEvents.map((event, index) => (
+                            {sortedTimelineEvents.length > 0 ? (
+                                sortedTimelineEvents.map((event, index) => (
                                     <div key={index} className="flex gap-4">
                                         <div className="flex flex-col items-center pt-1">
                                             <div className="w-3 h-3 rounded-full bg-primary-500 ring-2 ring-primary-500/30" />
-                                            {index < timelineEvents.length - 1 && (
+                                            {index < sortedTimelineEvents.length - 1 && (
                                                 <div className="w-0.5 h-full bg-white/10 min-h-[60px] mt-1" />
                                             )}
                                         </div>
                                         <div className="flex-1 pb-4">
                                             <p className="text-white font-medium text-sm">{event.action}</p>
                                             {event.department && (
-                                                <p className="text-white/60 text-xs mt-0.5">📍 في {event.department}</p>
+                                                <p className="text-white/60 text-xs mt-0.5">📍 {t('reception.inDepartment')} {event.department}</p>
                                             )}
                                             {event.by && (
-                                                <p className="text-white/70 text-xs mt-1">👤 بواسطة: {event.by}</p>
+                                                <p className="text-white/70 text-xs mt-1">{t('reception.byUser')} {event.by}</p>
                                             )}
                                             <p className="text-white/70 text-xs mt-1.5 flex items-center gap-2">
                                                 <Clock className="w-3 h-3" />
@@ -1367,8 +1379,8 @@ const RequestDetailsModal: React.FC<{
                                 ))
                             ) : (
                                 <div className="p-4 bg-white/5 rounded-xl text-center">
-                                    <p className="text-white/70 text-sm">لا توجد عمليات مسجلة</p>
-                                    <p className="text-white/70 text-xs mt-1">تم الإنشاء: {formatTime(request.createdAt)}</p>
+                                    <p className="text-white/70 text-sm">{t('reception.noOperationsRecorded')}</p>
+                                    <p className="text-white/70 text-xs mt-1">{t('reception.createdAt')} {formatTime(request.createdAt)}</p>
                                 </div>
                             )}
                         </div>
@@ -1380,15 +1392,15 @@ const RequestDetailsModal: React.FC<{
                             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                                 {request.inspectionResult === 'clean' && <CheckCircle2 className="w-5 h-5 text-green-400" />}
                                 {(request.inspectionResult === 'damages' || request.inspectionResult === 'missing_items') && <AlertCircle className="w-5 h-5 text-orange-400" />}
-                                نتيجة الفحص
+                                {t('reception.inspectionResult')}
                             </h3>
                             <div className="space-y-4">
                                 <div className="p-4 bg-white/5 rounded-xl">
-                                    <p className="text-white/60 text-sm mb-1">الحالة</p>
+                                    <p className="text-white/60 text-sm mb-1">{t('reception.statusLabel')}</p>
                                     <p className="text-white font-medium">
-                                        {request.inspectionResult === 'clean' && '✅ الغرفة كاملة - جاهزة'}
-                                        {request.inspectionResult === 'damages' && '⚠️ الغرفة بها تلفيات'}
-                                        {request.inspectionResult === 'missing_items' && '📦 الغرفة بها مفقودات'}
+                                        {request.inspectionResult === 'clean' && `✅ ${t('reception.roomComplete')}`}
+                                        {request.inspectionResult === 'damages' && `⚠️ ${t('reception.roomWithDamages')}`}
+                                        {request.inspectionResult === 'missing_items' && `📦 ${t('reception.roomWithMissingItems')}`}
                                     </p>
                                 </div>
 
@@ -1396,11 +1408,11 @@ const RequestDetailsModal: React.FC<{
                                 {request.inspectionPhoto && (request.inspectionResult === 'damages' || request.inspectionResult === 'missing_items') && (
                                     <div className="p-4 bg-white/5 rounded-xl">
                                         <p className="text-white/60 text-sm mb-3">
-                                            {request.inspectionResult === 'damages' ? 'صورة التلفيات' : 'صورة المفقودات'}
+                                            {request.inspectionResult === 'damages' ? t('reception.damagePhoto') : t('reception.lostPhoto')}
                                         </p>
                                         <img 
                                             src={request.inspectionPhoto} 
-                                            alt={request.inspectionResult === 'damages' ? 'صورة التلفيات' : 'صورة المفقودات'}
+                                            alt={request.inspectionResult === 'damages' ? t('reception.damagePhoto') : t('reception.lostPhoto')}
                                             className="w-full h-64 object-contain rounded-xl cursor-pointer hover:opacity-80 transition-opacity bg-white/5 p-2"
                                             onClick={() => window.open(request.inspectionPhoto, '_blank')}
                                         />
@@ -1410,7 +1422,7 @@ const RequestDetailsModal: React.FC<{
                                 {/* Inspection Notes */}
                                 {request.inspectionNotes && (
                                     <div className="p-4 bg-white/5 rounded-xl">
-                                        <p className="text-white/60 text-sm mb-1">ملاحظات الفحص</p>
+                                        <p className="text-white/60 text-sm mb-1">{t('reception.inspectionNotes')}</p>
                                         <p className="text-white">{request.inspectionNotes}</p>
                                     </div>
                                 )}
@@ -1418,7 +1430,7 @@ const RequestDetailsModal: React.FC<{
                                 {/* Inspected By */}
                                 {request.inspectedBy?.name && (
                                     <div className="p-4 bg-white/5 rounded-xl">
-                                        <p className="text-white/60 text-sm mb-1">تم الفحص بواسطة</p>
+                                        <p className="text-white/60 text-sm mb-1">{t('reception.inspectedBy')}</p>
                                         <p className="text-white font-medium">{request.inspectedBy.name}</p>
                                     </div>
                                 )}
@@ -1431,22 +1443,22 @@ const RequestDetailsModal: React.FC<{
                         <div className="border-t border-white/10 pt-6">
                             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                                 <ShoppingCart className="w-5 h-5 text-green-400" />
-                                استهلاك الميني بار
+                                {t('reception.minibarConsumptionTitle')}
                             </h3>
                             <div className="space-y-2">
                                 {request.minibarConsumption.map((item, idx) => (
                                     <div key={idx} className="p-4 bg-white/5 rounded-xl flex items-center justify-between">
                                         <div>
                                             <p className="text-white font-medium">{item.productName}</p>
-                                            <p className="text-white/60 text-sm">الكمية: {item.quantity} × {item.pricePerUnit} ر.س</p>
+                                            <p className="text-white/60 text-sm">{t('reception.quantityLabel')} {item.quantity} × {item.pricePerUnit} {t('reception.sarCurrency')}</p>
                                         </div>
-                                        <p className="text-green-400 font-bold text-lg">{item.total} ر.س</p>
+                                        <p className="text-green-400 font-bold text-lg">{item.total} {t('reception.sarCurrency')}</p>
                                     </div>
                                 ))}
                                 {request.minibarTotal && (
                                     <div className="p-4 bg-gradient-to-r from-green-500/20 to-primary-500/20 border border-green-500/30 rounded-xl flex items-center justify-between mt-4">
-                                        <p className="text-white font-bold">الإجمالي</p>
-                                        <p className="text-green-400 font-bold text-xl">{request.minibarTotal} ر.س</p>
+                                        <p className="text-white font-bold">{t('reception.totalLabel')}</p>
+                                        <p className="text-green-400 font-bold text-xl">{request.minibarTotal} {t('reception.sarCurrency')}</p>
                                     </div>
                                 )}
                             </div>
@@ -1456,11 +1468,11 @@ const RequestDetailsModal: React.FC<{
                     {/* Additional Info */}
                     {(request as any).afterPhoto && (
                         <div className="border-t border-white/10 pt-6">
-                            <h3 className="text-lg font-bold text-white mb-4">صور بعد العمل</h3>
+                            <h3 className="text-lg font-bold text-white mb-4">{t('reception.afterWorkPhotos')}</h3>
                             <div className="grid grid-cols-2 gap-2">
                                 <img 
                                     src={(request as any).afterPhoto} 
-                                    alt="بعد العمل" 
+                                    alt={t('reception.afterWorkAlt')}
                                     className="w-full h-32 object-cover rounded-xl cursor-pointer hover:opacity-80 transition-opacity"
                                     onClick={() => window.open((request as any).afterPhoto, '_blank')}
                                 />
@@ -1478,13 +1490,13 @@ const RequestDetailsModal: React.FC<{
                         }}
                         className="flex-1 py-3 rounded-xl bg-white/10 text-white font-medium hover:bg-white/20 transition-colors"
                     >
-                        عرض تاريخ الغرفة
+                        {t('reception.viewRoomHistory')}
                     </button>
                     <button
                         onClick={onClose}
                         className="flex-1 py-3 rounded-xl bg-primary-500 text-white font-medium hover:bg-primary-600 transition-colors"
                     >
-                        إغلاق
+                        {t('reception.closeButton')}
                     </button>
                 </div>
             </div>
@@ -1500,7 +1512,10 @@ const QuickCreateModal: React.FC<{
     onSubmit: (data: { roomNumber: string; type: string; priority: 'normal' | 'urgent'; notes: string; needsCart?: boolean; guestsInRoom?: boolean }) => void;
     rooms: { floor: number; rooms: string[] }[];
     requests: ServiceRequest[]; // Current active requests to check for duplicates
-}> = ({ isOpen, onClose, selectedType, onSubmit, rooms, requests }) => {
+    serviceNames: Record<string, string>;
+}> = ({ isOpen, onClose, selectedType, onSubmit, rooms, requests, serviceNames }) => {
+    const { t, i18n } = useTranslation();
+    const currentLanguage = i18n.language;
     const [step, setStep] = useState<'room' | 'details'>('room');
     const [selectedRoom, setSelectedRoom] = useState('');
     const [priority, setPriority] = useState<'normal' | 'urgent' | 'scheduled'>('normal');
@@ -1544,10 +1559,11 @@ const QuickCreateModal: React.FC<{
                     const data = snapshot.docs[0].data();
                     if (data.createdAt) {
                         const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+                        const locale = currentLanguage === 'ar' ? 'ar-EG' : currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'bn' ? 'bn-BD' : 'en-US';
                         setLastRequest({
-                            type: SERVICE_NAMES[data.type] || data.type,
-                            date: date.toLocaleDateString('ar-EG'),
-                            time: date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+                            type: serviceNames[data.type] || data.type,
+                            date: date.toLocaleDateString(locale),
+                            time: date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
                         });
                     }
                 } else {
@@ -1573,9 +1589,9 @@ const QuickCreateModal: React.FC<{
                                 // Only show if still active (not completed)
                                 const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
                                 previous.push({
-                                    description: data.notes || 'لا يوجد وصف',
-                                    date: date.toLocaleDateString('ar-EG') + ' ' + date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-                                    department: data.emergencyTargetDepartment || 'غير محدد'
+                                    description: data.notes || t('reception.noDescriptionFallback'),
+                                    date: date.toLocaleDateString(currentLanguage === 'ar' ? 'ar-EG' : currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'bn' ? 'bn-BD' : 'en-US') + ' ' + date.toLocaleTimeString(currentLanguage === 'ar' ? 'ar-EG' : currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'bn' ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
+                                    department: data.emergencyTargetDepartment || t('reception.departmentNotSpecified')
                                 });
                             }
                         });
@@ -1596,7 +1612,7 @@ const QuickCreateModal: React.FC<{
 
         const timer = setTimeout(fetchLastRequest, 500); // 500ms debounce
         return () => clearTimeout(timer);
-    }, [roomNumber, selectedType]);
+    }, [roomNumber, selectedType, serviceNames, t, currentLanguage]);
 
     // ✅ Calculate Blocked Rooms (Real-time)
     const activeStats = useMemo(() => {
@@ -1673,7 +1689,7 @@ const QuickCreateModal: React.FC<{
 
         // ✅ REQUIRE NOTES FOR MAINTENANCE (with inline error state)
         if (selectedType === 'maintenance' && !notes.trim()) {
-            setValidationError('الرجاء كتابة تفاصيل المشكلة (مطلوب للصيانة)');
+            setValidationError(t('reception.pleaseEnterProblemDetails'));
             haptic('error');
             return;
         }
@@ -1681,12 +1697,12 @@ const QuickCreateModal: React.FC<{
         // ✅ REQUIRE NOTES AND DEPARTMENT FOR EMERGENCY/OTHER
         if (selectedType === 'other') {
             if (!notes.trim()) {
-                setValidationError('الرجاء كتابة وصف الطلب');
+                setValidationError(t('reception.pleaseEnterRequestDescription'));
                 haptic('error');
                 return;
             }
             if (!emergencyTargetDepartment) {
-                setValidationError('الرجاء اختيار القسم المرسل إليه');
+                setValidationError(t('reception.pleaseSelectTargetDepartment'));
                 haptic('error');
                 return;
             }
@@ -1714,9 +1730,19 @@ const QuickCreateModal: React.FC<{
         onClose();
     };
 
+    // ✅ Define QUICK_ACTIONS inside QuickCreateModal (local to this component) - BEFORE return statement
+    const QUICK_ACTIONS_LOCAL: QuickAction[] = useMemo(() => [
+        { type: 'cleaning', icon: <Sparkles className="w-6 h-6" />, label: t('reception.quickActionLabels.cleaning'), color: 'adora-service-housekeeping', bgColor: 'adora-service-bg-housekeeping' },
+        { type: 'maintenance', icon: <Wrench className="w-6 h-6" />, label: t('reception.quickActionLabels.maintenance'), color: 'adora-service-maintenance', bgColor: 'adora-service-bg-maintenance' },
+        { type: 'bellman', icon: <Bell className="w-6 h-6" />, label: t('reception.quickActionLabels.bellman'), color: 'adora-service-bellman', bgColor: 'adora-service-bg-bellman' },
+        { type: 'coffee', icon: <Coffee className="w-6 h-6" />, label: t('reception.quickActionLabels.coffee'), color: 'adora-service-coffee', bgColor: 'adora-service-bg-coffee' },
+        { type: 'inspection', icon: <Eye className="w-6 h-6" />, label: t('reception.quickActionLabels.inspection'), color: 'adora-service-inspection', bgColor: 'adora-service-bg-inspection' },
+        { type: 'other', icon: <AlertTriangle className="w-6 h-6" />, label: t('reception.quickActionLabels.other'), color: 'adora-service-emergency', bgColor: 'adora-service-bg-emergency' },
+    ], [t]);
+
     if (!isOpen || !selectedType) return null;
 
-    const action = QUICK_ACTIONS.find(a => a.type === selectedType);
+    const action = QUICK_ACTIONS_LOCAL.find(a => a.type === selectedType);
 
     return (
         <div className="pro-modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -1728,9 +1754,9 @@ const QuickCreateModal: React.FC<{
                             {action?.icon}
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">طلب {action?.label}</h3>
+                            <h3 className="text-lg font-bold text-white">{t('reception.createRequestTitle')} {action?.label}</h3>
                             <p className="text-sm text-white/50">
-                                {step === 'room' ? 'اختر الغرفة' : `غرفة ${selectedRoom}`}
+                                {step === 'room' ? t('reception.selectRoom') : t('reception.roomNumber', { room: selectedRoom })}
                             </p>
                         </div>
                     </div>
@@ -1750,7 +1776,7 @@ const QuickCreateModal: React.FC<{
                                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 shadow-lg shadow-orange-500/5">
                                         <AlertCircle className="w-3.5 h-3.5 text-orange-400" />
                                         <span className="text-xs text-orange-300 font-medium">
-                                            يوجد طلب {SERVICE_NAMES[activeStats.activeRequest.type] || 'نشط'} قيد التنفيذ
+                                            {t('reception.activeRequest', { type: serviceNames[activeStats.activeRequest.type] || t('common.status') })}
                                         </span>
                                     </div>
                                 </div>
@@ -1762,7 +1788,7 @@ const QuickCreateModal: React.FC<{
                                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 shadow-lg shadow-blue-500/5">
                                         <History className="w-3.5 h-3.5 text-blue-400" />
                                         <div className="text-xs text-blue-300 font-medium flex gap-1">
-                                            <span>آخر طلب: {lastRequest.type}</span>
+                                            <span>{t('reception.lastRequestLabel')} {lastRequest.type}</span>
                                             <span className="opacity-60">|</span>
                                             <span>{lastRequest.date}</span>
                                             <span className="opacity-60">|</span>
@@ -1783,7 +1809,7 @@ const QuickCreateModal: React.FC<{
                                             handleRoomSelect(roomNumber);
                                         }
                                     }}
-                                    placeholder="اكتب رقم الغرفة"
+                                    placeholder={t('reception.enterRoomNumber')}
                                     className={`input text-center text-xl font-bold transition-all ${activeStats.activeRequest && selectedType !== 'coffee'
                                         ? 'border-orange-500/50 focus:border-orange-500 focus:ring-orange-500/20'
                                         : ''
@@ -1801,14 +1827,14 @@ const QuickCreateModal: React.FC<{
                                     }`}
                                 >
                                     <CheckCircle className="w-5 h-5" />
-                                    تأكيد رقم الغرفة
+                                    {t('reception.confirmRoomNumber')}
                                 </button>
                             </div>
 
                             {/* Divider */}
                             <div className="flex items-center gap-2 text-white/70">
                                 <div className="flex-1 h-px bg-white/10"></div>
-                                <span className="text-xs">أو اختر من القائمة</span>
+                                <span className="text-xs">{t('reception.orSelectFromList')}</span>
                                 <div className="flex-1 h-px bg-white/10"></div>
                             </div>
 
@@ -1818,7 +1844,7 @@ const QuickCreateModal: React.FC<{
                                 className="w-full py-3.5 rounded-2xl pro-card hover:bg-white/15 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm font-semibold"
                             >
                                 <Building2 className="w-4 h-4 text-primary-400" />
-                                <span className="text-white/80">اختر الغرفة حسب الدور</span>
+                                <span className="text-white/80">{t('reception.selectRoomByFloor')}</span>
                             </button>
 
                             {/* Floor Room Selector Modal */}
@@ -1835,7 +1861,7 @@ const QuickCreateModal: React.FC<{
                         <div className="space-y-4">
                             {/* Priority */}
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">الأولوية</label>
+                                <label className="block text-sm text-white/60 mb-2">{t('reception.priorityLabel')}</label>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setPriority('normal')}
@@ -1844,7 +1870,7 @@ const QuickCreateModal: React.FC<{
                                             : 'bg-white/10 text-white/60 hover:bg-white/20'
                                             }`}
                                     >
-                                        عادي
+                                        {t('reception.priority.normal')}
                                     </button>
                                     <button
                                         onClick={() => setPriority('urgent')}
@@ -1853,7 +1879,7 @@ const QuickCreateModal: React.FC<{
                                             : 'bg-white/10 text-white/60 hover:bg-white/20'
                                             }`}
                                     >
-                                        🔥 عاجل
+                                        🔥 {t('reception.priority.urgent')}
                                     </button>
                                     <button
                                         onClick={() => setPriority('scheduled')}
@@ -1862,7 +1888,7 @@ const QuickCreateModal: React.FC<{
                                             : 'bg-white/10 text-white/60 hover:bg-white/20'
                                             }`}
                                     >
-                                        📅 مجدول
+                                        📅 {t('reception.priority.scheduled')}
                                     </button>
                                 </div>
                             </div>
@@ -1870,16 +1896,16 @@ const QuickCreateModal: React.FC<{
                             {/* Scheduled DateTime Picker */}
                             {priority === 'scheduled' && (
                                 <div className="space-y-2">
-                                    <label className="block text-sm text-white/60">موعد التنفيذ بعد</label>
+                                    <label className="block text-sm text-white/60">{t('reception.scheduledTime.after')}</label>
                                     {/* Quick Time Buttons */}
                                     <div className="grid grid-cols-3 gap-2">
                                         {[
-                                            { label: '30 د', minutes: 30 },
-                                            { label: '1 س', minutes: 60 },
-                                            { label: '2 س', minutes: 120 },
-                                            { label: '3 س', minutes: 180 },
-                                            { label: '4 س', minutes: 240 },
-                                            { label: '5 س', minutes: 300 },
+                                            { label: t('reception.scheduledTime.minutes30'), minutes: 30 },
+                                            { label: t('reception.scheduledTime.hour1'), minutes: 60 },
+                                            { label: t('reception.scheduledTime.hours2'), minutes: 120 },
+                                            { label: t('reception.scheduledTime.hours3'), minutes: 180 },
+                                            { label: t('reception.scheduledTime.hours4'), minutes: 240 },
+                                            { label: t('reception.scheduledTime.hours5'), minutes: 300 },
                                         ].map(opt => {
                                             const targetTime = new Date(Date.now() + opt.minutes * 60000);
                                             const value = targetTime.toISOString().slice(0, 16);
@@ -1901,11 +1927,14 @@ const QuickCreateModal: React.FC<{
                                     {/* Show selected time */}
                                     {scheduledDateTime && (
                                         <div className="text-center text-sm text-primary-400 py-2 bg-primary-500/10 rounded-lg">
-                                            {new Date(scheduledDateTime).toLocaleString('ar-SA', {
-                                                weekday: 'short',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
+                                            {(() => {
+                                                const locale = currentLanguage === 'ar' ? 'ar-SA' : currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'bn' ? 'bn-BD' : 'en-US';
+                                                return new Date(scheduledDateTime).toLocaleString(locale, {
+                                                    weekday: 'short',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                });
+                                            })()}
                                         </div>
                                     )}
                                     {/* Custom datetime option */}
@@ -1931,7 +1960,7 @@ const QuickCreateModal: React.FC<{
                                             }`}
                                     >
                                         <span>🛒</span>
-                                        <span className="text-sm font-medium">عربة</span>
+                                        <span className="text-sm font-medium">{t('bellman.cart')}</span>
                                     </button>
                                 )}
                                 {/* Guest In Room - For All */}
@@ -1944,22 +1973,22 @@ const QuickCreateModal: React.FC<{
                                         }`}
                                 >
                                     <span>👥</span>
-                                    <span className="text-sm font-medium">بالغرفة</span>
+                                    <span className="text-sm font-medium">{t('reception.guestsInRoomButton')}</span>
                                 </button>
                             </div>
 
                             {/* ✅ Emergency Request - Department Selection */}
                             {selectedType === 'other' && (
                                 <div>
-                                    <label className="block text-sm text-white/60 mb-2">اختر القسم المرسل إليه *</label>
+                                    <label className="block text-sm text-white/60 mb-2">{t('reception.selectTargetDepartment')}</label>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {[
-                                            { key: 'housekeeping', label: 'الهاوس كيبنج', icon: '🧹' },
-                                            { key: 'maintenance', label: 'الصيانة', icon: '🔧' },
-                                            { key: 'bellman', label: 'البيلمان', icon: '🚪' },
-                                            { key: 'coffee_shop', label: 'الكوفي شوب', icon: '☕' },
-                                            { key: 'procurement', label: 'المشتريات', icon: '🛒' }
-                                        ].map(dept => (
+                                        {useMemo(() => [
+                                            { key: 'housekeeping', label: t('reception.housekeepingLabel'), icon: '🧹' },
+                                            { key: 'maintenance', label: t('reception.maintenanceLabel'), icon: '🔧' },
+                                            { key: 'bellman', label: t('reception.bellmanLabel'), icon: '🚪' },
+                                            { key: 'coffee_shop', label: t('reception.coffeeshopLabel'), icon: '☕' },
+                                            { key: 'procurement', label: t('reception.procurementLabel'), icon: '🛒' }
+                                        ], [t]).map(dept => (
                                             <button
                                                 key={dept.key}
                                                 type="button"
@@ -1982,7 +2011,7 @@ const QuickCreateModal: React.FC<{
                                 <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30">
                                     <div className="flex items-center gap-2 mb-2">
                                         <AlertCircle className="w-4 h-4 text-orange-400" />
-                                        <p className="text-orange-300 text-xs font-bold">طلبات طارئة سابقة لنفس الغرفة</p>
+                                        <p className="text-orange-300 text-xs font-bold">{t('reception.previousEmergencyRequests')}</p>
                                     </div>
                                     <div className="space-y-1.5">
                                         {previousEmergencyRequests.map((prev, idx) => (
@@ -1998,14 +2027,14 @@ const QuickCreateModal: React.FC<{
                             {/* Notes */}
                             <div>
                                 <label className="block text-sm text-white/60 mb-2">
-                                    {selectedType === 'maintenance' ? 'وصف المشكلة (مطلوب) *' : 
-                                     selectedType === 'other' ? 'وصف الطلب (مطلوب) *' : 
-                                     'ملاحظات (اختياري)'}
+                                    {selectedType === 'maintenance' ? t('reception.problemDescriptionRequired') : 
+                                     selectedType === 'other' ? t('reception.requestDescriptionRequired') : 
+                                     t('reception.notesOptional')}
                                 </label>
                                 <textarea
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    placeholder={selectedType === 'other' ? 'مثال: النزيل يرغب في منشفتين...' : 'أي تفاصيل إضافية...'}
+                                    placeholder={selectedType === 'other' ? t('reception.examplePlaceholder') : t('reception.anyAdditionalDetails')}
                                     className="w-full p-3 rounded-xl bg-white/10 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
                                     rows={3}
                                 />
@@ -2017,7 +2046,7 @@ const QuickCreateModal: React.FC<{
                 {/* Footer */}
                 <div className="p-4 border-t border-white/10">
              {step === 'room' ? (
-    <p className="text-center text-white/70 text-sm">اضغط على رقم الغرفة للمتابعة</p>
+    <p className="text-center text-white/70 text-sm">{t('reception.clickRoomToContinue')}</p>
 ) : (
     <>
         {/* ✅ Validation Error Display (replaces native alert) */}
@@ -2038,14 +2067,14 @@ const QuickCreateModal: React.FC<{
                                 onClick={() => setStep('room')}
                                 className="flex-1 py-3 rounded-xl bg-white/10 text-white font-medium hover:bg-white/20 transition-all"
                             >
-                                رجوع
+                                {t('reception.backButton')}
                             </button>
                             <button
                                 onClick={handleSubmit}
                                 className="flex-1 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold hover:shadow-lg hover:shadow-primary-500/25 transition-all flex items-center justify-center gap-2"
                             >
                                 <Send className="w-5 h-5" />
-                                إنشاء الطلب
+                                {t('reception.createRequestButton')}
                             </button>
                         </div>
                     </>
@@ -2061,10 +2090,45 @@ const QuickCreateModal: React.FC<{
 // ============================================================
 
 export const ReceptionDashboard: React.FC = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { success, error, haptic, playSound } = useUX();
     const brandName = useBrandName();
+
+    // ✅ THEME-AWARE: Using CSS Variables for consistent Light/Dark styling
+    const QUICK_ACTIONS: QuickAction[] = useMemo(() => [
+        { type: 'cleaning', icon: <Sparkles className="w-6 h-6" />, label: t('reception.quickActionLabels.cleaning'), color: 'adora-service-housekeeping', bgColor: 'adora-service-bg-housekeeping' },
+        { type: 'maintenance', icon: <Wrench className="w-6 h-6" />, label: t('reception.quickActionLabels.maintenance'), color: 'adora-service-maintenance', bgColor: 'adora-service-bg-maintenance' },
+        { type: 'bellman', icon: <Bell className="w-6 h-6" />, label: t('reception.quickActionLabels.bellman'), color: 'adora-service-bellman', bgColor: 'adora-service-bg-bellman' },
+        { type: 'coffee', icon: <Coffee className="w-6 h-6" />, label: t('reception.quickActionLabels.coffee'), color: 'adora-service-coffee', bgColor: 'adora-service-bg-coffee' },
+        { type: 'inspection', icon: <Eye className="w-6 h-6" />, label: t('reception.quickActionLabels.inspection'), color: 'adora-service-inspection', bgColor: 'adora-service-bg-inspection' },
+        { type: 'other', icon: <AlertTriangle className="w-6 h-6" />, label: t('reception.quickActionLabels.other'), color: 'adora-service-emergency', bgColor: 'adora-service-bg-emergency' },
+    ], [t]);
+
+    const SERVICE_NAMES: Record<string, string> = useMemo(() => ({
+        cleaning: t('reception.serviceNames.cleaning'),
+        maintenance: t('reception.serviceNames.maintenance'),
+        bellman: t('reception.serviceNames.bellman'),
+        coffee: t('reception.serviceNames.coffee'),
+        laundry: t('reception.serviceNames.laundry'),
+        minibar: t('reception.serviceNames.minibar'),
+        inspection: t('reception.serviceNames.inspection'),
+        extension: t('reception.serviceNames.extension'),
+        other: t('reception.serviceNames.other')
+    }), [t]);
+
+    // ✅ THEME-AWARE: Using CSS Variables for consistent Light/Dark styling
+    const STATUS_CONFIG = useMemo(() => ({
+        PENDING: { label: t('reception.statusLabels.pending'), color: 'adora-status-pending', bg: 'adora-status-bg-pending', icon: AlertCircle },
+        PENDING_RECEPTION: { label: t('reception.statusLabels.pendingReception'), color: 'adora-status-warning', bg: 'adora-status-bg-warning', icon: AlertCircle },
+        CONFIRMED: { label: t('reception.statusLabels.confirmed'), color: 'adora-status-confirmed', bg: 'adora-status-bg-confirmed', icon: Check },
+        IN_PROGRESS: { label: t('reception.statusLabels.inProgress'), color: 'adora-status-progress', bg: 'adora-status-bg-progress', icon: Clock },
+        COMPLETED: { label: t('reception.statusLabels.completed'), color: 'adora-status-success', bg: 'adora-status-bg-success', icon: CheckCircle2 },
+        WAITING_PARTS: { label: t('reception.statusLabels.waitingParts'), color: 'adora-status-danger', bg: 'adora-status-bg-danger', icon: Wrench },
+        NEEDS_INSPECTION: { label: t('reception.statusLabels.needsInspection'), color: 'adora-status-progress', bg: 'adora-status-bg-progress', icon: Eye },
+        SCHEDULED: { label: t('reception.statusLabels.scheduled'), color: 'adora-status-confirmed', bg: 'adora-status-bg-confirmed', icon: Calendar }
+    }), [t]);
 
     // Voice Agent
     const {
@@ -2242,11 +2306,11 @@ export const ReceptionDashboard: React.FC = () => {
             const details: Record<string, { guestId: string; guestName: string }> = {};
             updatedRooms.forEach(r => {
                 if (r.status === 'occupied' && r.currentGuestId) {
-                    details[r.number] = { guestId: r.currentGuestId, guestName: 'نزيل حالي' };
+                    details[r.number] = { guestId: r.currentGuestId, guestName: t('reception.currentGuest') };
                 }
             });
             setActiveRoomDetails(details);
-        }, tenantId);
+        });
 
         // Subscribe to employees (Reception & Bellman)
         const unsubTeam = subscribeToEmployees((allEmployees) => {
@@ -2260,7 +2324,7 @@ export const ReceptionDashboard: React.FC = () => {
             unsubRooms();
             unsubTeam();
         };
-    }, [branchId]);
+    }, [branchId, tenantId, t]);
 
 
 
@@ -2476,7 +2540,7 @@ export const ReceptionDashboard: React.FC = () => {
         try {
             // ✅ Validate user exists
             if (!user || !user.id) {
-                throw new Error('يجب تسجيل الدخول أولاً');
+                throw new Error(t('reception.mustLoginFirst'));
             }
 
             // ✅ Determine which department should handle this request
@@ -2522,7 +2586,7 @@ export const ReceptionDashboard: React.FC = () => {
             if (data.type === 'coffee') {
                 const serviceCount = activeRequests.filter(r => r.type === 'coffee').length;
                 if (serviceCount >= 5) {
-                    error('لقد تجاوزت الحد الأقصى لطلبات الخدمات لهذه الغرفة (5 طلبات)');
+                    error(t('reception.maxServiceRequestsExceeded'));
                     haptic('error');
                     throw new Error('Max service requests reached');
                 }
@@ -2545,17 +2609,17 @@ export const ReceptionDashboard: React.FC = () => {
                 notes: data.notes || '',
                 status: data.priority === 'scheduled' ? 'SCHEDULED' as const : 'CONFIRMED' as const,
                 branch: branchId,
-                guestName: 'طلب من الاستقبال',
+                guestName: t('reception.requestFromReception'),
                 needsCart: data.needsCart || false,
                 guestsInRoom: data.guestsInRoom || false,
                 guestStatus: data.guestsInRoom ? 'in' : 'out', // ✅ Convert guestsInRoom to guestStatus for display
                 createdBy: {
                     id: user.id,
-                    name: user.name || 'مستخدم غير معروف'
+                    name: user.name || t('reception.unknownUser')
                 },
                 confirmedBy: {
                     id: user.id,
-                    name: user.name || 'مستخدم غير معروف'
+                    name: user.name || t('reception.unknownUser')
                 },
                 originDepartment: 'reception',
                 tenantId: tenantId,
@@ -2583,14 +2647,14 @@ export const ReceptionDashboard: React.FC = () => {
                         action: 'created',
                         timestamp: Timestamp.now(),
                         userId: user.id,
-                        userName: user.name || 'مستخدم'
+                        userName: user.name || t('reception.userLabel')
                     }, {
                         department: 'reception',
                         action: 'sent',
                         timestamp: Timestamp.now(),
                         userId: user.id,
-                        userName: user.name || 'مستخدم',
-                        notes: `تم الإرسال إلى ${getDepartment(data.type, data.emergencyTargetDepartment)}`
+                        userName: user.name || t('reception.userLabel'),
+                        notes: `${t('reception.sentToDepartmentNote')} ${getDepartment(data.type, data.emergencyTargetDepartment)}`
                     }]
                 }
             };
@@ -2633,7 +2697,7 @@ export const ReceptionDashboard: React.FC = () => {
                 }
             }
 
-            success(isDuplicate ? 'تم إنشاء الطلب (ملاحظة: يوجد طلب مماثل مفتوح)' : 'تم إنشاء الطلب بنجاح');
+            success(isDuplicate ? t('reception.requestCreatedDuplicate') : t('reception.requestCreatedSuccess'));
             setShowCreateModal(false);
         } catch (err: any) {
             console.error('Error creating request:', {
@@ -2643,10 +2707,10 @@ export const ReceptionDashboard: React.FC = () => {
             });
             // Show more specific error message
             const errorMessage = err?.message?.includes('permission')
-                ? 'ليس لديك صلاحية لإنشاء الطلب'
+                ? t('reception.noPermissionToCreate')
                 : err?.message?.includes('network') || err?.message?.includes('offline')
-                    ? 'تحقق من الاتصال بالإنترنت'
-                    : 'فشل إنشاء الطلب: ' + (err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || 'خطأ غير معروف');
+                    ? t('reception.checkInternetConnection')
+                    : t('reception.requestCreationFailed') + ' ' + (err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || t('reception.unknownError'));
             error(errorMessage);
         }
     };
@@ -2672,7 +2736,7 @@ export const ReceptionDashboard: React.FC = () => {
                     priority: 'normal' as const,
                     currentDepartment: 'housekeeping',
                     originDepartment: 'reception',
-                    notes: `تنظيف بعد الفحص - غرفة ${requestData.roomNumber}`,
+                    notes: t('reception.cleaningAfterInspection', { room: requestData.roomNumber }),
                     createdAt: Timestamp.now(),
                     createdBy: { id: user?.id || '', name: user?.name || 'Unknown' },
                     linkedInspectionId: requestId,
@@ -2699,7 +2763,7 @@ export const ReceptionDashboard: React.FC = () => {
 
                 // Award points (updates both personal and team points)
                 if (user?.id) {
-                    await awardPoints(tenantId || 'default', user.id, 5, 'تأكيد فحص غرفة');
+                    await awardPoints(tenantId || 'default', user.id, 5, t('reception.confirmInspectionRoom'));
                 }
 
                 haptic('success');
@@ -2745,7 +2809,7 @@ export const ReceptionDashboard: React.FC = () => {
                         user?.id || '',
                         user?.name || '',
                         'CONFIRMED' as any,
-                        'تم التأكيد من الاستقبال - طلب من QR'
+                        t('reception.confirmedFromReceptionQR')
                     );
                 } else {
                     // Update department history for reception-only requests
@@ -2764,10 +2828,10 @@ export const ReceptionDashboard: React.FC = () => {
 
                 // Award points
                 if (user?.id) {
-                    await awardPoints(tenantId || 'default', user.id, 5, 'تأكيد طلب QR');
+                    await awardPoints(tenantId || 'default', user.id, 5, t('reception.confirmQRRequest'));
                 }
 
-                success('تم تأكيد الطلب وتحويله تلقائياً للقسم المختص');
+                success(t('reception.requestConfirmedAutoTransfer'));
                 haptic('success');
                 playSound('success');
                 return;
@@ -2776,19 +2840,19 @@ export const ReceptionDashboard: React.FC = () => {
             // Normal confirmation for other requests
             await updateDoc(requestRef, {
                 status: 'CONFIRMED',
-                confirmedBy: { id: user?.id || '', name: user?.name || 'Unknown' },
+                confirmedBy: { id: user?.id || '', name: user?.name || t('reception.unknownUser') },
                 confirmedAt: Timestamp.now()
             });
 
             // Award points (updates both personal and team points)
             if (user?.id) {
-                await awardPoints(tenantId || 'default', user.id, 5, 'تأكيد طلب');
+                await awardPoints(tenantId || 'default', user.id, 5, t('reception.confirmRequestLabel'));
             }
 
-            success('تم تأكيد الطلب بنجاح');
+            success(t('reception.requestConfirmedSuccess'));
         } catch (err) {
             console.error('Error confirming:', err);
-            error('فشل تأكيد الطلب');
+            error(t('reception.requestConfirmFailed'));
         }
     };
 
@@ -2800,10 +2864,10 @@ export const ReceptionDashboard: React.FC = () => {
                 currentDepartment: 'reception' // Return to reception for final review
             });
 
-            success('تم إتمام الطلب بنجاح');
+            success(t('reception.requestCompletedSuccess'));
         } catch (err) {
             console.error('Error completing:', err);
-            error('فشل إتمام الطلب');
+            error(t('reception.requestCompleteFailed'));
         }
     };
 
@@ -2812,12 +2876,12 @@ export const ReceptionDashboard: React.FC = () => {
         try {
             const { confirmCompletion } = await import('../../services/requestService');
             await confirmCompletion(requestId, user?.id || '', user?.name || '', 'reception');
-            success('تم تأكيد الإغلاق وإتمام الطلب');
+            success(t('reception.requestClosedAndCompleted'));
             haptic('success');
             playSound('success');
         } catch (err) {
             console.error('Error confirming completion:', err);
-            error('فشل تأكيد الإغلاق');
+            error(t('reception.requestCloseFailed'));
         }
     };
 
@@ -2831,12 +2895,12 @@ export const ReceptionDashboard: React.FC = () => {
             console.log('🗑️ Attempting to delete request:', requestId);
             await deleteDoc(doc(db, 'requests', requestId));
             console.log('✅ Delete successful');
-            success('تم حذف الطلب بنجاح');
+            success(t('reception.requestDeletedSuccess'));
         } catch (err: any) {
             console.error('❌ Delete failed:', err);
             const errorMsg = err?.code === 'permission-denied'
-                ? 'ليس لديك صلاحية لحذف هذا الطلب.'
-                : `فشل حذف الطلب: ${err?.message || 'خطأ غير معروف'}`;
+                ? t('reception.noPermissionToDelete')
+                : t('reception.requestDeleteFailed') + ' ' + (err?.message || t('reception.unknownError'));
             error(errorMsg);
         }
     };
@@ -2865,7 +2929,7 @@ export const ReceptionDashboard: React.FC = () => {
 
         // Room number validation (basic)
         if (targetRoomNumber === selectedTransferRequest.roomNumber) {
-            error('لا يمكن النقل لنفس الغرفة');
+            error(t('reception.cannotTransferToSameRoom'));
             haptic('error');
             return;
         }
@@ -2906,7 +2970,7 @@ export const ReceptionDashboard: React.FC = () => {
             const roomSnap = await getDocs(roomsQuery);
 
             if (roomSnap.empty) {
-                throw new Error('الغرفة الحالية غير موجودة');
+                throw new Error(t('reception.currentRoomNotFound'));
             }
 
             const oldRoomData = roomSnap.docs[0].data();
@@ -2916,7 +2980,7 @@ export const ReceptionDashboard: React.FC = () => {
             if (!guestId) {
                 // If no guest ID (maybe manual request?), we just move the request? 
                 // No, "Room Move" implies moving a guest.
-                error('لا يوجد نزيل مسجل في هذه الغرفة للنقل');
+                error(t('reception.noGuestRegistered'));
                 haptic('error');
                 setIsTransferring(false);
                 return;
@@ -2930,16 +2994,16 @@ export const ReceptionDashboard: React.FC = () => {
                 selectedTransferRequest.roomNumber,
                 targetRoomNumber,
                 guestId,
-                selectedTransferRequest.guestName || 'نزيل'
+                selectedTransferRequest.guestName || t('reception.guestLabelFallback')
             );
 
-            success(`تم نقل النزيل ${selectedTransferRequest.guestName} إلى غرفة ${targetRoomNumber} بنجاح`);
+            success(t('reception.transferSuccess', { guestName: selectedTransferRequest.guestName, roomNumber: targetRoomNumber }));
             setTransferModalOpen(false);
             setSelectedTransferRequest(null);
 
         } catch (err) {
             console.error('Transfer failed:', err);
-            error('فشل عملية النقل: ' + (err as any).message);
+            error(t('reception.transferFailed') + ' ' + (err as any).message);
         } finally {
             setIsTransferring(false);
         }
@@ -3002,11 +3066,11 @@ export const ReceptionDashboard: React.FC = () => {
                     reason: 'Requested by staff' // Can be enhanced with input
                 }
             });
-            success('تم إرسال طلب الحذف للمدير للموافقة');
+            success(t('reception.deletionRequestSent'));
             haptic('success');
         } catch (err) {
             console.error('Error requesting deletion:', err);
-            error('فشل إرسال طلب الحذف');
+            error(t('reception.deletionRequestSendFailed'));
             haptic('error');
         }
     };
@@ -3029,11 +3093,11 @@ export const ReceptionDashboard: React.FC = () => {
             await updateDoc(doc(db, 'requests', requestId), {
                 deletionRequest: deleteField() // Remove the field
             });
-            success('تم رفض طلب الحذف');
+            success(t('reception.deletionRequestRejected'));
             haptic('success');
         } catch (err) {
             console.error('Error rejecting deletion:', err);
-            error('فشل رفض طلب الحذف');
+            error(t('reception.deletionRequestRejectFailed'));
             haptic('error');
         }
     };
@@ -3050,7 +3114,7 @@ export const ReceptionDashboard: React.FC = () => {
             const requestSnap = await getDoc(requestRef);
             
             if (!requestSnap.exists()) {
-                error('الطلب غير موجود');
+                error(t('reception.requestNotFound'));
                 return;
             }
 
@@ -3063,12 +3127,12 @@ export const ReceptionDashboard: React.FC = () => {
                 {
                     type: 'found',
                     category: 'other', // Default category
-                    description: requestData.inspectionNotes || `مفقودات من غرفة ${requestData.roomNumber}`,
-                    location: `غرفة ${requestData.roomNumber}`,
+                    description: requestData.inspectionNotes || t('reception.lostItemsFromRoom', { room: requestData.roomNumber }),
+                    location: t('reception.roomNumber', { room: requestData.roomNumber }),
                     roomNumber: requestData.roomNumber,
                     guestName: requestData.guestName || null,
-                    storageLocation: 'خزنة الاستقبال',
-                    notes: `نقل تلقائي من فحص الغرفة. ${requestData.inspectionNotes || ''}`,
+                    storageLocation: t('reception.receptionStorage'),
+                    notes: t('reception.autoTransferFromInspection', { notes: requestData.inspectionNotes || '' }),
                     branch: branchId,
                     foundBy: { id: user?.id || '', name: user?.name || '' }
                 },
@@ -3103,11 +3167,11 @@ export const ReceptionDashboard: React.FC = () => {
                 console.warn('Failed to update live feed:', e);
             }
 
-            success('تم نقل المفقودات للأرشيف بنجاح');
+            success(t('reception.lostFoundArchivedSuccess'));
             haptic('success');
         } catch (err: any) {
             console.error('Error archiving to Lost & Found:', err);
-            error('فشل نقل المفقودات للأرشيف: ' + (err.message || 'خطأ غير معروف'));
+            error(t('reception.lostFoundArchiveFailed') + ' ' + (err.message || t('reception.unknownError')));
             haptic('error');
         }
     };
@@ -3130,9 +3194,9 @@ export const ReceptionDashboard: React.FC = () => {
         if (occupancyRate > 90) {
             return {
                 type: 'price' as const,
-                title: 'طلب مرتفع جداً (High Demand)',
-                description: `نسبة الإشغال ${Math.round(occupancyRate)}%. يُنصح برفع سعر الغرف المتبقية بنسبة 15-20% لتعظيم الربح.`,
-                action: 'تطبيق زيادة السعر'
+                title: t('reception.highDemandTitle'),
+                description: t('reception.occupancyRateAdvice', { rate: Math.round(occupancyRate) }),
+                action: t('reception.applyPriceIncrease')
             };
         }
 
@@ -3140,18 +3204,18 @@ export const ReceptionDashboard: React.FC = () => {
         if (currentHour >= 22 && occupancyRate < 40) {
             return {
                 type: 'price' as const,
-                title: 'فرصة بيع مسائي (Late Night Deal)',
-                description: `الساعة متأخرة والإشغال ${Math.round(occupancyRate)}% فقط. يُنصح بتقديم خصم "Last Minute" بنسبة 10% لجذب المارة.`,
-                action: 'تفعيل خصم مسائي'
+                title: t('reception.lateNightDealTitle'),
+                description: t('reception.lateNightDealDescription', { rate: Math.round(occupancyRate) }),
+                action: t('reception.enableEveningDiscount')
             };
         }
 
         return null;
-    }, [rooms]);
+    }, [rooms, t]);
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center theme-page">
-            <AdoraLoader size="lg" message="جاري تحميل البيانات..." />
+            <AdoraLoader size="lg" message={t('reception.loadingData')} />
         </div>
     );
 
@@ -3170,7 +3234,7 @@ export const ReceptionDashboard: React.FC = () => {
                         description={pricingInsight.description}
                         actionLabel={pricingInsight.action}
                         onAction={() => {
-                            success('جاري فتح إعدادات الأسعار...');
+                            success(t('reception.openingPriceSettings'));
                             navigate('/dashboard/settings');
                         }}
                         autoExpand={true}
@@ -3185,7 +3249,7 @@ export const ReceptionDashboard: React.FC = () => {
                         tenantId={tenantId}
                         branchId={branchId}
                         onReroute={(from, to) => {
-                            success(`تم اقتراح تحويل الطلبات من ${from} إلى ${to}`);
+                            success(t('reception.transferSuggested', { from, to }));
                         }}
                     />
                 </div>
@@ -3193,7 +3257,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             {/* Flexible Header - Actions Only (Greeting in main header) */}
             <FlexibleHeader
-                title="الاستقبال"
+                title={t('reception.receptionTitle')}
                 showGreeting={false}
                 brandName={brandName}
                 subtitle={null}
@@ -3201,53 +3265,53 @@ export const ReceptionDashboard: React.FC = () => {
                     {
                         id: 'history',
                         icon: <History className="w-5 h-5" />,
-                        label: 'سجل العمليات',
+                        label: t('reception.operationsHistory'),
                         onClick: () => setShowHistory(true),
                         variant: 'primary'
                     },
                     {
                         id: 'shiftNotes',
                         icon: <MessageSquare className="w-5 h-5" />,
-                        label: 'ملاحظات الغرف',
+                        label: t('reception.roomNotes'),
                         onClick: () => setShowShiftNotes(true)
                     },
                     {
                         id: 'procurement',
                         icon: <ShoppingCart className="w-5 h-5" />,
-                        label: 'المشتريات',
+                        label: t('reception.procurement'),
                         onClick: () => setShowProcurement(true)
                     },
                     {
                         id: 'lostFound',
                         icon: <Package className="w-5 h-5" />,
-                        label: 'المفقودات',
+                        label: t('reception.lostFound'),
                         onClick: () => setShowLostFound(true)
                     },
                     {
                         id: 'instructions',
                         icon: <BookOpen className="w-5 h-5" />,
-                        label: 'تعليمات عامة',
+                        label: t('reception.generalInstructions'),
                         onClick: () => setShowGeneralInstructions(true),
                         variant: 'primary'
                     },
                     {
                         id: 'whatsapp',
                         icon: <MessageCircle className="w-5 h-5" />,
-                        label: 'رسائل WhatsApp',
+                        label: t('reception.whatsappMessages'),
                         onClick: () => setShowWhatsAppModal(true),
                         variant: 'primary'
                     },
                     {
                         id: 'support',
                         icon: <MessageSquare className="w-5 h-5" />,
-                        label: 'دعم فني',
+                        label: t('reception.technicalSupport'),
                         onClick: () => setShowSupportTicket(true),
                         variant: 'warning'
                     },
                     {
                         id: 'logout',
                         icon: <LogOut className="w-5 h-5" />,
-                        label: 'تسجيل خروج',
+                        label: t('auth.logout'),
                         onClick: logout,
                         variant: 'danger'
                     }
@@ -3322,21 +3386,21 @@ export const ReceptionDashboard: React.FC = () => {
             <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-3 mb-4">
                 <StatCard
                     count={groupedRequests.new.length}
-                    label="جديد"
+                    label={t('reception.newTab')}
                     icon={AlertCircle}
                     iconColor="orange"
                     status={groupedRequests.new.length > 10 ? 'warning' : 'normal'}
                 />
                 <StatCard
                     count={groupedRequests.in_progress.length}
-                    label="قيد التنفيذ"
+                    label={t('reception.inProgressTab')}
                     icon={Clock}
                     iconColor="blue"
                     status={groupedRequests.in_progress.length > 15 ? 'warning' : 'normal'}
                 />
                 <StatCard
                     count={groupedRequests.completed.length}
-                    label="مكتمل"
+                    label={t('reception.completedTab')}
                     icon={CheckCircle2}
                     iconColor="green"
                     status="success"
@@ -3362,8 +3426,8 @@ export const ReceptionDashboard: React.FC = () => {
                         <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     </div>
                     <div>
-                        <h2 className="text-sm sm:text-lg lg:text-xl font-bold adora-text-primary">إنشاء طلب سريع</h2>
-                        <p className="text-xs sm:text-xs adora-text-tertiary hidden sm:block">اضغط لإنشاء طلب جديد</p>
+                        <h2 className="text-sm sm:text-lg lg:text-xl font-bold adora-text-primary">{t('reception.quickCreateTitle')}</h2>
+                        <p className="text-xs sm:text-xs adora-text-tertiary hidden sm:block">{t('reception.quickCreateDescription')}</p>
                     </div>
                 </div>
                 
@@ -3408,7 +3472,7 @@ export const ReceptionDashboard: React.FC = () => {
                         type="text"
                         value={roomSearchQuery}
                         onChange={(e) => setRoomSearchQuery(e.target.value)}
-                        placeholder="بحث برقم الغرفة..."
+                        placeholder={t('reception.searchByRoomNumber')}
                         className="w-full sm:w-64 px-3 sm:px-4 py-2 pr-10 
                                    bg-slate-100 dark:bg-white/10 
                                    border border-slate-300 dark:border-white/10 
@@ -3434,11 +3498,11 @@ export const ReceptionDashboard: React.FC = () => {
 
             {/* Tabs - Mobile First + Theme Aware */}
             <div className="flex gap-1 sm:gap-2 mb-3 sm:mb-4 overflow-x-auto pb-1 -mx-3 sm:mx-0 px-3 sm:px-0 scrollbar-hide" data-tour="tabs">
-                {[
-                    { key: 'new', label: 'جديد', count: groupedRequests.new.length, activeClass: 'bg-orange-500 text-white shadow-orange-500/25', inactiveClass: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' },
-                    { key: 'in_progress', label: 'قيد التنفيذ', count: groupedRequests.in_progress.length, activeClass: 'bg-blue-500 text-white shadow-blue-500/25', inactiveClass: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
-                    { key: 'completed', label: 'مكتمل', count: groupedRequests.completed.length, activeClass: 'bg-green-500 text-white shadow-green-500/25', inactiveClass: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' }
-                ].map(tab => (
+                {useMemo(() => [
+                    { key: 'new', label: t('reception.newTab'), count: groupedRequests.new.length, activeClass: 'bg-orange-500 text-white shadow-orange-500/25', inactiveClass: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' },
+                    { key: 'in_progress', label: t('reception.inProgressTab'), count: groupedRequests.in_progress.length, activeClass: 'bg-blue-500 text-white shadow-blue-500/25', inactiveClass: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
+                    { key: 'completed', label: t('reception.completedTab'), count: groupedRequests.completed.length, activeClass: 'bg-green-500 text-white shadow-green-500/25', inactiveClass: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' }
+                ], [t, groupedRequests.new.length, groupedRequests.in_progress.length, groupedRequests.completed.length]).map(tab => (
                     <button
                         key={tab.key}
                         onClick={() => setCurrentTab(tab.key as TabType)}
@@ -3475,23 +3539,23 @@ export const ReceptionDashboard: React.FC = () => {
                     <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl p-6 shadow-2xl relative">
                         <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                             <Repeat className="w-6 h-6 text-orange-400" />
-                            نقل النزيل (تحويل غرفة)
+                            {t('reception.confirmTransfer')}
                         </h2>
 
                         <div className="space-y-4">
                             <div className="p-3 bg-white/5 rounded-xl border border-white/10">
-                                <p className="text-white/60 text-sm mb-1">الغرفة الحالية</p>
-                                <p className="text-xl font-bold text-white">غرفة {selectedTransferRequest.roomNumber}</p>
+                                <p className="text-white/60 text-sm mb-1">{t('reception.currentRoom')}</p>
+                                <p className="text-xl font-bold text-white">{t('reception.roomNumber', { room: selectedTransferRequest.roomNumber })}</p>
                                 <p className="text-white/70 text-xs mt-1">{selectedTransferRequest.guestName}</p>
                             </div>
 
                             <div>
-                                <label className="block text-white/70 text-sm mb-2">إلى الغرفة الجديدة</label>
+                                <label className="block text-white/70 text-sm mb-2">{t('reception.toNewRoom')}</label>
                                 <input
                                     type="text"
                                     value={targetRoomNumber}
                                     onChange={(e) => setTargetRoomNumber(e.target.value)}
-                                    placeholder="رقم الغرفة الجديدة (مثلاً 202)"
+                                    placeholder={t('reception.newRoomNumberPlaceholder')}
                                     className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors text-center text-lg font-bold"
                                     autoFocus
                                 />
@@ -3501,7 +3565,7 @@ export const ReceptionDashboard: React.FC = () => {
                                 <p className="text-orange-400 text-xs flex items-start gap-2">
                                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                                     <span>
-                                        سيتم نقل الطلبات الشخصية تلقائياً، وإنشاء طلبات "نقل أمتعة" و "تنظيف خروج".
+                                        {t('reception.transferDescription')}
                                     </span>
                                 </p>
                             </div>
@@ -3518,7 +3582,7 @@ export const ReceptionDashboard: React.FC = () => {
                                 ) : (
                                     <>
                                         <Repeat className="w-5 h-5" />
-                                        تأكيد النقل
+                                        {t('reception.confirmTransfer')}
                                     </>
                                 )}
                             </button>
@@ -3530,7 +3594,7 @@ export const ReceptionDashboard: React.FC = () => {
                                 }}
                                 className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-colors"
                             >
-                                إلغاء
+                                {t('common.cancel')}
                             </button>
                         </div>
                     </div>
@@ -3545,11 +3609,14 @@ export const ReceptionDashboard: React.FC = () => {
                         <div className="w-12 h-12 rounded-full adora-bg-tertiary flex items-center justify-center mx-auto mb-3">
                             <CheckCircle2 className="w-6 h-6 adora-text-disabled" />
                         </div>
-                        <p className="text-sm adora-text-secondary">لا توجد طلبات في هذه القائمة</p>
+                        <p className="text-sm adora-text-secondary">{t('reception.noRequestsInList')}</p>
                     </div>
                 ) : (
                     currentRequests.map(request => (
                         <CompactRequestCard
+                            quickActions={QUICK_ACTIONS}
+                            serviceNames={SERVICE_NAMES}
+                            statusConfig={STATUS_CONFIG}
                             key={request.id}
                             request={request}
                             onView={() => setSelectedRequest(request)}
@@ -3567,6 +3634,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             {/* Modals */}
             <QuickCreateModal
+                serviceNames={SERVICE_NAMES}
                 isOpen={showCreateModal}
                 onClose={() => setShowCreateModal(false)}
                 selectedType={selectedType}
@@ -3596,36 +3664,36 @@ export const ReceptionDashboard: React.FC = () => {
                 onClose={() => setShowMobileMenu(false)}
                 user={user || undefined}
                 onLogout={logout}
-                items={[
-                    {
-                        id: 'history',
-                        label: 'سجل العمليات',
-                        icon: <History className="w-5 h-5" />,
-                        onClick: () => setShowHistory(true),
-                        color: 'text-blue-400'
-                    },
-                    {
-                        id: 'shift-notes',
-                        label: 'ملاحظات الغرف',
-                        icon: <MessageSquare className="w-5 h-5" />,
-                        onClick: () => setShowShiftNotes(true),
-                        color: 'text-white/60'
-                    },
-                    {
-                        id: 'team',
-                        label: 'الفريق',
-                        icon: <Users className="w-5 h-5" />,
-                        onClick: () => setShowTeam(true),
-                        color: 'text-white/60'
-                    },
-                    {
-                        id: 'procurement',
-                        label: 'المشتريات',
-                        icon: <ShoppingCart className="w-5 h-5" />,
-                        onClick: () => setShowProcurement(true),
-                        color: 'text-white/60'
-                    }
-                ]}
+                    items={[
+                        {
+                            id: 'history',
+                            label: t('reception.operationsHistory'),
+                            icon: <History className="w-5 h-5" />,
+                            onClick: () => setShowHistory(true),
+                            color: 'text-blue-400'
+                        },
+                        {
+                            id: 'shift-notes',
+                            label: t('reception.roomNotes'),
+                            icon: <MessageSquare className="w-5 h-5" />,
+                            onClick: () => setShowShiftNotes(true),
+                            color: 'text-white/60'
+                        },
+                        {
+                            id: 'team',
+                            label: t('reception.team'),
+                            icon: <Users className="w-5 h-5" />,
+                            onClick: () => setShowTeam(true),
+                            color: 'text-white/60'
+                        },
+                        {
+                            id: 'procurement',
+                            label: t('reception.procurement'),
+                            icon: <ShoppingCart className="w-5 h-5" />,
+                            onClick: () => setShowProcurement(true),
+                            color: 'text-white/60'
+                        }
+                    ]}
             />
 
             {/* ✅ Request Details Modal */}
@@ -3634,6 +3702,9 @@ export const ReceptionDashboard: React.FC = () => {
                 isOpen={!!selectedRequest}
                 onClose={() => setSelectedRequest(null)}
                 branchId={branchId}
+                quickActions={QUICK_ACTIONS}
+                serviceNames={SERVICE_NAMES}
+                statusConfig={STATUS_CONFIG}
             />
 
             {/* Room History Modal */}
@@ -3652,22 +3723,22 @@ export const ReceptionDashboard: React.FC = () => {
                             <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mb-4 mx-auto">
                                 <Trash2 className="w-6 h-6 text-red-400" />
                             </div>
-                            <h3 className="text-xl font-bold text-white text-center mb-2">حذف الطلب؟</h3>
+                            <h3 className="text-xl font-bold text-white text-center mb-2">{t('reception.deleteRequestConfirm')}</h3>
                             <p className="text-white/60 text-center mb-6 text-sm">
-                                هل أنت متأكد من حذف هذا الطلب نهائياً؟ لا يمكن التراجع عن هذا الإجراء.
+                                {t('reception.deleteRequestConfirmDesc')}
                             </p>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setDeleteConfirmation(null)}
                                     className="flex-1 py-2.5 rounded-xl bg-white/5 text-white hover:bg-white/10 transition-colors font-medium text-sm"
                                 >
-                                    إلغاء
+                                    {t('common.cancel')}
                                 </button>
                                 <button
                                     onClick={confirmDelete}
                                     className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors font-medium text-sm shadow-lg shadow-red-500/20"
                                 >
-                                    حذف نهائي
+                                    {t('reception.deleteRequest')}
                                 </button>
                             </div>
                         </div>
@@ -3705,7 +3776,7 @@ export const ReceptionDashboard: React.FC = () => {
                     isOpen={showSupportTicket}
                     onClose={() => setShowSupportTicket(false)}
                     branchId={branchId}
-                    branchName={branchId || 'الفرع'}
+                    branchName={branchId || t('reception.branchLabel')}
                 />
             )}
 
@@ -3721,7 +3792,7 @@ export const ReceptionDashboard: React.FC = () => {
                 isOpen={showWhatsAppModal}
                 onClose={() => setShowWhatsAppModal(false)}
                 branchId={branchId}
-                branchName={branchId || 'الفرع'}
+                branchName={branchId || t('reception.branchLabel')}
                 branchNumber={branchId || ''}
                 rooms={rooms}
             />
@@ -3783,7 +3854,7 @@ export const ReceptionDashboard: React.FC = () => {
                 onClick={() => setShowChatInbox(true)}
                 className="fixed bottom-20 left-4 z-40 p-4 rounded-full bg-gradient-to-r from-teal-500 to-cyan-500
                            shadow-lg shadow-teal-500/30 hover:scale-110 transition-all"
-                title="صندوق الشات"
+                title={t('reception.chatBoxTitle')}
             >
                 <MessageCircle className="w-6 h-6 text-white" />
             </button>

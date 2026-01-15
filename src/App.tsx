@@ -473,26 +473,7 @@ const DeveloperFooter: React.FC = () => {
         document.documentElement.getAttribute('data-theme') === 'dark'
     );
 
-    // Listen for theme changes - MUST be before any conditional return!
-    useEffect(() => {
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.attributeName === 'data-theme') {
-                    setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
-                }
-            });
-        });
-
-        observer.observe(document.documentElement, { attributes: true });
-        return () => observer.disconnect();
-    }, []);
-    
-    // ✅ Hide footer on login page and guest page (they have their own footers)
-    const isLoginPage = location.pathname === '/login';
-    const isGuestPage = location.pathname === '/guest' || location.pathname.startsWith('/guest');
-    if (isLoginPage || isGuestPage) return null;
-
-    // ✅ Get config from localStorage (set by owner in settings)
+    // ✅ Get config from localStorage (set by owner in settings) - MUST be before conditional return
     const getConfig = () => {
         try {
             return {
@@ -511,10 +492,24 @@ const DeveloperFooter: React.FC = () => {
         }
     };
 
-    // ✅ FIX: State to force re-render when settings update
+    // ✅ FIX: State to force re-render when settings update - MUST be before conditional return
     const [devConfig, setDevConfig] = useState(getConfig());
+
+    // Listen for theme changes - MUST be before any conditional return!
+    useEffect(() => {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'data-theme') {
+                    setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
+                }
+            });
+        });
+
+        observer.observe(document.documentElement, { attributes: true });
+        return () => observer.disconnect();
+    }, []);
     
-    // ✅ FIX: Listen for settings updates from owner dashboard
+    // ✅ FIX: Listen for settings updates from owner dashboard - MUST be before conditional return
     useEffect(() => {
         const handleSettingsUpdate = (event: CustomEvent) => {
             setDevConfig(event.detail);
@@ -526,6 +521,11 @@ const DeveloperFooter: React.FC = () => {
             window.removeEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
         };
     }, []);
+    
+    // ✅ Hide footer on login page and guest page (they have their own footers) - AFTER all hooks
+    const isLoginPage = location.pathname === '/login';
+    const isGuestPage = location.pathname === '/guest' || location.pathname.startsWith('/guest');
+    if (isLoginPage || isGuestPage) return null;
 
     const config = devConfig;
     const currentYear = new Date().getFullYear();

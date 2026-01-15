@@ -32,7 +32,7 @@ import {
     LanguageKey
 } from '../../services/languageDetectionService';
 import { useUX } from '../../context/UXContext';
-import { usei18n } from '../../i18n/i18nContext';
+import { useTranslation } from 'react-i18next';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
 
 // ============================================================
@@ -227,7 +227,8 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     onRetry,
     onResetErrors,
 }) => {
-    const { language: appLang } = usei18n();
+    const { i18n } = useTranslation();
+    const appLang = i18n.language;
     const { voiceEnabled, playSound, haptic } = useUX();
     // ✅ Feature Gate: Check if AI Assistant feature is enabled
     const { isEnabled: isAiAssistantEnabled, loading: featureLoading } = useFeatureGate('aiAssistant');
