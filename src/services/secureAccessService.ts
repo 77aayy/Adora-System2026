@@ -209,7 +209,10 @@ export const validateSecureAccessToken = async (
     token: string,
     deviceFingerprint?: string
 ): Promise<TokenValidationResult> => {
+    console.log(`🔍 [validateSecureAccessToken] Starting validation for token: ${token.substring(0, 8)}...`);
+    
     if (!db) {
+        console.error(`🔍 [validateSecureAccessToken] Firebase db is null!`);
         return { 
             valid: false, 
             error: 'النظام غير متاح حالياً', 
@@ -218,6 +221,7 @@ export const validateSecureAccessToken = async (
     }
     
     if (!token || token.length < 20) {
+        console.warn(`🔍 [validateSecureAccessToken] Token too short: ${token?.length || 0} chars`);
         return { 
             valid: false, 
             error: 'رابط الوصول غير صالح', 
@@ -228,18 +232,24 @@ export const validateSecureAccessToken = async (
     try {
         // Search for token across all tenants (since we don't know tenant from URL)
         // This is a global search - consider indexing for performance
+        console.log(`🔍 [validateSecureAccessToken] Searching for token across all tenants...`);
         const tenantsRef = collection(db, 'tenants');
         const tenantsSnapshot = await getDocs(tenantsRef);
+        console.log(`🔍 [validateSecureAccessToken] Found ${tenantsSnapshot.docs.length} tenant(s) to search`);
         
         for (const tenantDoc of tenantsSnapshot.docs) {
             const tenantId = tenantDoc.id;
+            console.log(`🔍 [validateSecureAccessToken] Checking tenant: ${tenantId}`);
             const tokensRef = collection(db, `tenants/${tenantId}/secureAccessTokens`);
             const q = query(tokensRef, where('token', '==', token));
             const snapshot = await getDocs(q);
             
+            console.log(`🔍 [validateSecureAccessToken] Tenant ${tenantId}: Found ${snapshot.size} token(s)`);
+            
             if (!snapshot.empty) {
                 const tokenDoc = snapshot.docs[0];
                 const tokenData = tokenDoc.data() as any;
+                console.log(`🔍 [validateSecureAccessToken] Token found! Room: ${tokenData.roomNumber}, Branch: ${tokenData.branchId}, Active: ${tokenData.isActive}`);
                 
                 // Check if active
                 if (!tokenData.isActive) {
