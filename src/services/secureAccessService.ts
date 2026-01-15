@@ -382,15 +382,21 @@ const verifyActiveCheckIn = async (
     
     try {
         // Check for active room card
+        // ✅ FIX: tenantId is optional in roomCards - some old records may not have it
         const roomCardsRef = collection(db, 'roomCards');
-        const q = query(
-            roomCardsRef,
+        const constraints: any[] = [
             where('roomNumber', '==', roomNumber),
             where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
             where('status', '==', 'active')
-        );
+        ];
         
+        // Only add tenantId filter if it's provided (for SaaS isolation)
+        // But don't make it mandatory to support legacy room cards
+        if (tenantId) {
+            constraints.push(where('tenantId', '==', tenantId));
+        }
+        
+        const q = query(roomCardsRef, ...constraints);
         const snapshot = await getDocs(q);
         
         if (snapshot.empty) {
@@ -400,9 +406,16 @@ const verifyActiveCheckIn = async (
             };
         }
         
+        // ✅ FIX: If tenantId was provided, verify it matches (for SaaS security)
         const roomCard = snapshot.docs[0].data();
+        if (tenantId && roomCard.tenantId && roomCard.tenantId !== tenantId) {
+            return { 
+                valid: false, 
+                error: 'الغرفة لا تتبع للفندق المحدد.' 
+            };
+        }
         
-        // Check if QR is enabled for this room
+        // Check if QR is enabled for this room (defaults to true if not set)
         if (roomCard.qrActive === false) {
             return { 
                 valid: false, 
