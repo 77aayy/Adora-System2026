@@ -18,13 +18,15 @@ import { db } from './firebase';
 export interface LaundryItem {
     id: string; // "1", "2"... from settings
     name: string;
-    priceWithTax: number;
+    priceWithTax: number; // ✅ Price for guest (washing service price)
+    unitCost?: number; // 🔐 REQUIRED: Actual purchase/replacement cost for accounting
     active: boolean;
     order: number;
-    // Stock Distribution
-    stockWarehouse: number;
-    stockRooms: number;
-    inLaundry: number;
+    // Stock Distribution (3 Locations)
+    stockWarehouse: number; // 🔐 IMMUTABLE: Base stock in warehouse (only updated manually by admin)
+    stockRooms: number; // 🔐 IMMUTABLE: Stock in rooms (only changes via delivery/receipt transactions)
+    inLaundry: number; // ✅ DYNAMIC: Items currently at laundry (changes with delivery/receipt)
+    inTreatment?: number; // 🔐 NEW: Items under treatment (not counted as deficit until settled)
     showInCards: boolean; // Default true
     createdAt?: any;
     updatedAt?: any;
@@ -51,7 +53,9 @@ export interface LaundryRecord {
     receiptSignature?: string;
 
     // Calculated
-    deficit?: Record<string, number>;
+    deficit?: Record<string, number>; // Daily deficit (delivered - received)
+    dailyVariance?: Record<string, number>; // 🔐 NEW: Daily variance tracking
+    treatmentItems?: Record<string, number>; // 🔐 NEW: Items moved to treatment (not counted as deficit yet)
 
     damagePhotos?: {
         itemId: string;
@@ -70,14 +74,15 @@ export interface AccountingReport {
         totalReceived: number;
         deficit: number;
         surplus: number;
-        pricePerUnit: number; // Snapshot of price at generation time
-        totalCost: number;
-        deficitCost: number;
-        surplusCost: number;
+        pricePerUnit: number; // ✅ Washing price (priceWithTax)
+        unitCost: number; // 🔐 Purchase/replacement cost (unitCost)
+        totalCost: number; // ✅ Total washing cost (delivered * priceWithTax)
+        deficitCost: number; // 🔐 Cost of lost items (deficit * unitCost)
+        surplusCost: number; // ✅ Value of surplus items (surplus * priceWithTax)
     }[];
-    grandTotal: number;
-    totalDeficitValue: number;
-    totalSurplusValue: number;
+    grandTotal: number; // Total washing cost
+    totalDeficitValue: number; // Total replacement cost of lost items
+    totalSurplusValue: number; // Total value of surplus items
 }
 
 // ============================================================
@@ -152,12 +157,14 @@ export const subscribeToLaundryItems = (
                 id: item.id || (index + 1).toString(),
                 name: item.name,
                 priceWithTax: Number(item.total || 0),
+                unitCost: Number(item.unitCost || item.total || 0), // 🔐 Default to priceWithTax if not set
                 active: true,
                 order: index + 1,
                 // ✅ FIXED: Read actual stock values from document
                 stockWarehouse: item.stockWarehouse || 0,
                 stockRooms: item.stockRooms || 0,
                 inLaundry: item.inLaundry || 0,
+                inTreatment: item.inTreatment || 0, // 🔐 NEW: Items under treatment
                 showInCards: item.showInCards !== false // Default true
             }));
 
@@ -207,7 +214,8 @@ export const addLaundryItem = async (
         name: item.name || 'بند جديد',
         price: item.priceWithTax ? item.priceWithTax / 1.15 : 1,
         tax: item.priceWithTax ? item.priceWithTax - (item.priceWithTax / 1.15) : 0.15,
-        total: item.priceWithTax || 1.15
+        total: item.priceWithTax || 1.15,
+        unitCost: item.unitCost || item.priceWithTax || 1.15 // 🔐 Default unitCost to priceWithTax if not provided
     });
 
     await setDoc(docRef, { items, updatedAt: Timestamp.now() }, { merge: true });
@@ -236,10 +244,12 @@ export const updateLaundryItem = async (
                 name: updates.name ?? item.name,
                 total: updates.priceWithTax ?? item.total,
                 price: updates.priceWithTax ? updates.priceWithTax / 1.15 : item.price,
+                unitCost: (updates as any).unitCost ?? item.unitCost ?? item.total, // 🔐 Include unitCost in updates
                 // ✅ FIXED: Include stock fields in updates
                 stockWarehouse: updates.stockWarehouse ?? item.stockWarehouse ?? 0,
                 stockRooms: updates.stockRooms ?? item.stockRooms ?? 0,
                 inLaundry: updates.inLaundry ?? item.inLaundry ?? 0,
+                inTreatment: (updates as any).inTreatment ?? item.inTreatment ?? 0, // 🔐 Include inTreatment
                 // ✅ FIX: Include showInCards in updates
                 showInCards: (updates as any).showInCards !== undefined ? (updates as any).showInCards : item.showInCards !== false
             };
@@ -381,28 +391,30 @@ export const submitDelivery = async (
         // Read inside transaction for consistency
         const settingsSnap = await transaction.get(settingsRef);
 
-        if (settingsSnap.exists()) {
-            const items = settingsSnap.data().items as LaundryItem[] || [];
-            const updatedItems = items.map(item => {
-                const qtyToSend = quantities[item.id] || 0;
-                if (qtyToSend > 0) {
-                    // 🛡️ VALIDATE: Check sufficient stock BEFORE processing
-                    const currentRooms = item.stockRooms || 0;
-                    if (currentRooms < qtyToSend) {
-                        throw new Error(`مخزون غير كافٍ في الغرف: ${item.name} (متوفر: ${currentRooms}, مطلوب: ${qtyToSend})`);
-                    }
-
-                    const currentLaundry = item.inLaundry || 0;
-                    return {
-                        ...item,
-                        stockRooms: currentRooms - qtyToSend,
-                        inLaundry: currentLaundry + qtyToSend
-                    };
+    if (settingsSnap.exists()) {
+        const items = settingsSnap.data().items as LaundryItem[] || [];
+        const updatedItems = items.map(item => {
+            const qtyToSend = quantities[item.id] || 0;
+            if (qtyToSend > 0) {
+                // 🛡️ VALIDATE: Check sufficient stock BEFORE processing
+                // Only check stockRooms (warehouse is immutable, inLaundry is already out)
+                const currentRooms = item.stockRooms || 0;
+                if (currentRooms < qtyToSend) {
+                    throw new Error(`مخزون غير كافٍ في الغرف: ${item.name} (متوفر: ${currentRooms}, مطلوب: ${qtyToSend})`);
                 }
-                return item;
-            });
-            transaction.update(settingsRef, { items: updatedItems });
-        }
+
+                const currentLaundry = item.inLaundry || 0;
+                return {
+                    ...item,
+                    // 🔐 IMMUTABLE: stockWarehouse remains unchanged
+                    stockRooms: currentRooms - qtyToSend, // ✅ Move from rooms to laundry
+                    inLaundry: currentLaundry + qtyToSend // ✅ Add to laundry balance
+                };
+            }
+            return item;
+        });
+        transaction.update(settingsRef, { items: updatedItems });
+    }
 
         // 2. Create Record
         const data = {
@@ -420,16 +432,20 @@ export const submitDelivery = async (
 };
 
 /**
- * Submit Receipt (8 AM) - RETURNS STOCK & DESTROYS DEFICIT
+ * Submit Receipt (8 AM) - RETURNS STOCK & CALCULATES DEFICIT
+ * 🔐 ENHANCED: Supports treatment items (items staying at laundry for processing)
  */
 export const submitReceipt = async (
     tenantId: string,
     branchId: string,
     recordId: string,
-    quantities: Record<string, number>,
+    quantities: Record<string, number>, // Received quantities
     userId: string,
-    userName: string
+    userName: string,
+    treatmentItems?: Record<string, number> // 🔐 NEW: Items moved to treatment (not counted as deficit yet)
 ): Promise<void> => {
+    if (!db) throw new Error('Firebase not initialized');
+    
     const recordRef = doc(db, `tenants/${tenantId}/branches/${branchId}/laundry_records`, recordId);
 
     // 🔒 USE TRANSACTION to prevent race conditions
@@ -442,30 +458,43 @@ export const submitReceipt = async (
         const record = snap.data() as LaundryRecord;
         const delivered = record.delivered || {};
 
-        // 2. Calculate Deficit
+        // 2. Calculate Daily Variance & Deficit
+        // Deficit = Delivered - Received - Treatment (items under treatment are NOT counted as deficit)
         const deficit: Record<string, number> = {};
+        const dailyVariance: Record<string, number> = {};
         const deficitLog: LaundryRecord['deficit'] = {};
+        const varianceLog: LaundryRecord['dailyVariance'] = {};
 
         Object.keys(delivered).forEach(id => {
             const del = delivered[id] || 0;
             const rec = quantities[id] || 0;
-            const diff = del - rec; // Delivered 100 - Received 95 = 5 Lost
-            if (diff > 0) {
-                deficit[id] = diff;
-                deficitLog[id] = diff;
+            const treatment = treatmentItems?.[id] || 0; // Items under treatment
+            
+            // Daily Variance = Delivered - Received (includes treatment items)
+            const variance = del - rec - treatment;
+            varianceLog[id] = variance;
+            
+            // Deficit = Only items that are truly lost (not in treatment)
+            // If variance > 0 and no treatment, it's a deficit
+            const actualDeficit = variance > 0 ? variance : 0;
+            if (actualDeficit > 0) {
+                deficit[id] = actualDeficit;
+                deficitLog[id] = actualDeficit;
             }
         });
 
-        // 3. Update Record
+        // 3. Update Record with variance and treatment tracking
         transaction.update(recordRef, {
             status: 'completed',
             received: quantities,
-            receivedAt: Timestamp.now(),
+            receivedAt: serverTimestamp(),
             receivedBy: { id: userId, name: userName },
-            deficit: deficitLog
+            deficit: deficitLog,
+            dailyVariance: varianceLog, // 🔐 NEW: Track daily variance
+            treatmentItems: treatmentItems || {} // 🔐 NEW: Track items in treatment
         });
 
-        // 4. Update Stock & BURN Deficit
+        // 4. Update Stock & Handle Treatment Items
         const settingsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/settings`, 'laundry_prices');
         const settingsSnap = await transaction.get(settingsRef);
 
@@ -473,27 +502,31 @@ export const submitReceipt = async (
             const items = settingsSnap.data().items as LaundryItem[] || [];
             const updatedItems = items.map(item => {
                 const qtyReceived = quantities[item.id] || 0; // The 95
-                const qtyDeficit = deficit[item.id] || 0;     // The 5
-                const totalOut = qtyReceived + qtyDeficit;    // 100 (The original batch)
+                const qtyDeficit = deficit[item.id] || 0;     // The 5 (actual lost)
+                const qtyTreatment = treatmentItems?.[item.id] || 0; // Items under treatment
+                const totalOut = qtyReceived + qtyDeficit + qtyTreatment; // 100 (The original batch)
 
                 const currentLaundry = item.inLaundry || 0;
                 const currentRooms = item.stockRooms || 0;
+                const currentTreatment = item.inTreatment || 0;
 
                 // Logic:
                 // 1. Remove the WHOLE batch (100) from 'inLaundry'.
                 // 2. Add ONLY the received (95) back to 'stockRooms'.
-                // 3. The 5 is evaporated (effectively deducted from Total Asset).
+                // 3. Move treatment items to 'inTreatment' (not counted as deficit).
+                // 4. The actual deficit (5) is evaporated (deducted from Total Asset).
 
                 return {
                     ...item,
                     inLaundry: Math.max(0, currentLaundry - totalOut),
-                    stockRooms: currentRooms + qtyReceived
+                    stockRooms: currentRooms + qtyReceived,
+                    inTreatment: currentTreatment + qtyTreatment // 🔐 NEW: Track treatment items
                 };
             });
             transaction.update(settingsRef, { items: updatedItems });
         }
 
-        // 5. Update Cumulative Deficit Stats
+        // 5. Update Cumulative Deficit Stats (only actual deficits, not treatment items)
         const statsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/laundry_stats`, 'cumulative_deficit');
         const statsSnap = await transaction.get(statsRef);
         let currentStats = statsSnap.exists() ? statsSnap.data().counts || {} : {};
@@ -502,7 +535,9 @@ export const submitReceipt = async (
             currentStats[id] = (currentStats[id] || 0) + qty;
         });
 
-        transaction.set(statsRef, { counts: currentStats, updatedAt: Timestamp.now() }, { merge: true });
+        transaction.set(statsRef, { counts: currentStats, updatedAt: serverTimestamp() }, { merge: true });
+        
+        console.log(`✅ ATOMIC: Receipt completed for record ${recordId}. Deficit: ${Object.keys(deficit).length} items, Treatment: ${Object.keys(treatmentItems || {}).length} items`);
     });
 };
 
@@ -533,7 +568,10 @@ export const getMonthlyAccountingReport = async (
     if (settingsSnap.exists()) {
         const items = settingsSnap.data().items || [];
         items.forEach((item: any) => {
-            itemsMap[item.id] = item;
+            itemsMap[item.id] = {
+                ...item,
+                unitCost: item.unitCost || item.total || 0 // 🔐 Use unitCost if available, fallback to total
+            };
         });
     }
 
@@ -578,13 +616,13 @@ export const getMonthlyAccountingReport = async (
         });
     });
 
-    // 5. Calculate Costs
+    // 5. Calculate Costs (🔐 ENHANCED: Use unitCost for deficit, priceWithTax for washing cost)
     const finalItems = Object.values(reportItems).map(item => {
-        const deficit = Math.max(0, item.totalReceived - item.totalDelivered); // Wait, logic check
-        // Deficit = Received - Delivered.
-        // If I deliver 100 and receive 90, I have -10 (deficit).
-        // If I deliver 100 and receive 110, I have +10 (surplus).
+        const itemDef = itemsMap[item.itemId] || {};
+        const unitCost = Number(itemDef.unitCost || item.price || 0); // 🔐 Use unitCost (purchase cost)
+        const washingPrice = Number(item.price || 0); // ✅ Use priceWithTax (washing service price)
 
+        // Calculate net difference
         const net = item.totalReceived - item.totalDelivered;
         const isDeficit = net < 0;
         const isSurplus = net > 0;
@@ -596,10 +634,11 @@ export const getMonthlyAccountingReport = async (
             totalReceived: item.totalReceived,
             deficit: isDeficit ? Math.abs(net) : 0,
             surplus: isSurplus ? net : 0,
-            pricePerUnit: item.price,
-            totalCost: item.totalDelivered * item.price, // Cost of washing
-            deficitCost: (isDeficit ? Math.abs(net) : 0) * item.price, // Cost of lost items (using washing price? usually item replacement cost is higher, but for now we use list price)
-            surplusCost: (isSurplus ? net : 0) * item.price
+            pricePerUnit: washingPrice, // ✅ Washing service price
+            unitCost: unitCost, // 🔐 Purchase/replacement cost
+            totalCost: item.totalDelivered * washingPrice, // ✅ Total washing cost (delivered * washing price)
+            deficitCost: (isDeficit ? Math.abs(net) : 0) * unitCost, // 🔐 Cost of lost items (deficit * unitCost)
+            surplusCost: (isSurplus ? net : 0) * washingPrice // ✅ Value of surplus items (surplus * washing price)
         };
     });
 
@@ -634,8 +673,9 @@ export const updateCumulativeDeficit = async (
 };
 
 /**
- * Report Lost by Laundry (Manual Deficit)
+ * 🔐 ATOMIC: Report Lost by Laundry (Manual Deficit)
  * Reduces inLaundry count and increases Cumulative Deficit
+ * Uses runTransaction for atomic operation
  */
 export const reportLostByLaundry = async (
     tenantId: string,
@@ -645,42 +685,60 @@ export const reportLostByLaundry = async (
     userId: string,
     userName: string
 ): Promise<void> => {
-    if (!tenantId || !branchId || quantity <= 0) return;
-
-    const batch = writeBatch(db);
-
-    // 1. Reduce inLaundry count
-    const settingsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/settings`, 'laundry_prices');
-    const settingsSnap = await getDoc(settingsRef);
-
-    if (settingsSnap.exists()) {
-        const items = settingsSnap.data().items as LaundryItem[] || [];
-        const updatedItems = items.map(item => {
-            if (item.id === itemId) {
-                return {
-                    ...item,
-                    inLaundry: Math.max(0, (item.inLaundry || 0) - quantity)
-                };
-            }
-            return item;
-        });
-        batch.update(settingsRef, { items: updatedItems });
+    if (!db) throw new Error('Firebase not initialized');
+    if (!tenantId || !branchId || quantity <= 0) {
+        throw new Error('Invalid parameters for reporting lost items');
     }
 
-    // 2. Increase Cumulative Deficit
+    const settingsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/settings`, 'laundry_prices');
     const statsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/laundry_stats`, 'cumulative_deficit');
-    const statsSnap = await getDoc(statsRef);
-    const currentCounts = statsSnap.exists() ? statsSnap.data().counts || {} : {};
 
-    currentCounts[itemId] = (currentCounts[itemId] || 0) + quantity;
-    batch.set(statsRef, { counts: currentCounts, updatedAt: Timestamp.now() }, { merge: true });
+    await runTransaction(db, async (transaction) => {
+        // 1. Read current stock
+        const settingsSnap = await transaction.get(settingsRef);
+        if (!settingsSnap.exists()) {
+            throw new Error('Laundry settings not found');
+        }
 
-    await batch.commit();
+        const items = settingsSnap.data().items as LaundryItem[] || [];
+        const item = items.find(i => i.id === itemId);
+        
+        if (!item) {
+            throw new Error(`Item ${itemId} not found`);
+        }
+
+        // 🛡️ VALIDATE: Check sufficient stock in laundry
+        const currentLaundry = item.inLaundry || 0;
+        if (currentLaundry < quantity) {
+            throw new Error(`مخزون غير كافٍ في المغسلة: ${item.name} (متوفر: ${currentLaundry}, مطلوب: ${quantity})`);
+        }
+
+        // 2. Reduce inLaundry count
+        const updatedItems = items.map(i => {
+            if (i.id === itemId) {
+                return {
+                    ...i,
+                    inLaundry: Math.max(0, currentLaundry - quantity)
+                };
+            }
+            return i;
+        });
+        transaction.update(settingsRef, { items: updatedItems });
+
+        // 3. Increase Cumulative Deficit
+        const statsSnap = await transaction.get(statsRef);
+        const currentCounts = statsSnap.exists() ? statsSnap.data().counts || {} : {};
+        currentCounts[itemId] = (currentCounts[itemId] || 0) + quantity;
+        transaction.set(statsRef, { counts: currentCounts, updatedAt: serverTimestamp() }, { merge: true });
+
+        console.log(`✅ ATOMIC: Reported ${quantity} lost items for ${item.name}. New deficit: ${currentCounts[itemId]}`);
+    });
 };
 
 /**
- * Settle Deficit (Return Items)
+ * 🔐 ATOMIC: Settle Deficit (Return Items from Treatment or External Source)
  * Reduces deficit count and restores stock to Rooms
+ * Also supports settling treatment items (moving from inTreatment to stockRooms)
  */
 export const settleDeficit = async (
     tenantId: string,
@@ -688,47 +746,85 @@ export const settleDeficit = async (
     itemId: string,
     quantity: number,
     userId: string,
-    userName: string
+    userName: string,
+    fromTreatment: boolean = false // 🔐 NEW: If true, settle from treatment items instead of cumulative deficit
 ): Promise<void> => {
-    if (!tenantId || !branchId || quantity <= 0) return;
-
-    const batch = writeBatch(db);
-
-    // 1. Reduce Cumulative Deficit
-    const statsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/laundry_stats`, 'cumulative_deficit');
-    const statsSnap = await getDoc(statsRef);
-    if (!statsSnap.exists()) return; // No deficit logic initialized?
-
-    const currentCounts = statsSnap.data().counts || {};
-    const currentDeficit = currentCounts[itemId] || 0;
-
-    if (currentDeficit < quantity) {
-        throw new Error(`Cannot settle ${quantity}. Max deficit is ${currentDeficit}`);
+    if (!db) throw new Error('Firebase not initialized');
+    if (!tenantId || !branchId || quantity <= 0) {
+        throw new Error('Invalid parameters for settling deficit');
     }
 
-    currentCounts[itemId] = currentDeficit - quantity;
-    batch.update(statsRef, { counts: currentCounts, updatedAt: Timestamp.now() });
-
-    // 2. Restore Stock to Rooms
     const settingsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/settings`, 'laundry_prices');
-    const settingsSnap = await getDoc(settingsRef);
-    if (settingsSnap.exists()) {
+    const statsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/laundry_stats`, 'cumulative_deficit');
+
+    await runTransaction(db, async (transaction) => {
+        // 1. Read current stock and deficit
+        const settingsSnap = await transaction.get(settingsRef);
+        if (!settingsSnap.exists()) {
+            throw new Error('Laundry settings not found');
+        }
+
         const items = settingsSnap.data().items as LaundryItem[] || [];
-        const updatedItems = items.map(item => {
-            if (item.id === itemId) {
-                return {
-                    ...item,
-                    stockRooms: (item.stockRooms || 0) + quantity
-                };
+        const item = items.find(i => i.id === itemId);
+        
+        if (!item) {
+            throw new Error(`Item ${itemId} not found`);
+        }
+
+        if (fromTreatment) {
+            // 🔐 Settle from treatment items
+            const currentTreatment = item.inTreatment || 0;
+            if (currentTreatment < quantity) {
+                throw new Error(`لا يمكن تسوية ${quantity} من المعالجة. المتوفر: ${currentTreatment}`);
             }
-            return item;
-        });
-        batch.update(settingsRef, { items: updatedItems });
-    }
 
-    // 3. Log Settlement (Optional: Add to today's record or special log? Let's keep it simple for now)
+            // Move from treatment to rooms
+            const updatedItems = items.map(i => {
+                if (i.id === itemId) {
+                    return {
+                        ...i,
+                        inTreatment: Math.max(0, currentTreatment - quantity),
+                        stockRooms: (i.stockRooms || 0) + quantity
+                    };
+                }
+                return i;
+            });
+            transaction.update(settingsRef, { items: updatedItems });
+            
+            console.log(`✅ ATOMIC: Settled ${quantity} items from treatment for ${item.name}`);
+        } else {
+            // Settle from cumulative deficit (external return)
+            const statsSnap = await transaction.get(statsRef);
+            if (!statsSnap.exists()) {
+                throw new Error('Deficit stats not initialized');
+            }
 
-    await batch.commit();
+            const currentCounts = statsSnap.data().counts || {};
+            const currentDeficit = currentCounts[itemId] || 0;
+
+            if (currentDeficit < quantity) {
+                throw new Error(`لا يمكن تسوية ${quantity}. الحد الأقصى للعجز: ${currentDeficit}`);
+            }
+
+            // 2. Reduce Cumulative Deficit
+            currentCounts[itemId] = currentDeficit - quantity;
+            transaction.update(statsRef, { counts: currentCounts, updatedAt: serverTimestamp() });
+
+            // 3. Restore Stock to Rooms
+            const updatedItems = items.map(i => {
+                if (i.id === itemId) {
+                    return {
+                        ...i,
+                        stockRooms: (i.stockRooms || 0) + quantity
+                    };
+                }
+                return i;
+            });
+            transaction.update(settingsRef, { items: updatedItems });
+
+            console.log(`✅ ATOMIC: Settled ${quantity} items from deficit for ${item.name}. Remaining deficit: ${currentCounts[itemId]}`);
+        }
+    });
 };
 
 export const getCumulativeDeficit = async (
@@ -754,12 +850,89 @@ export const getRecords = async (
         collection(db, `tenants/${tenantId}/branches/${branchId}/laundry_records`),
         where('date', '>=', startDate),
         where('date', '<=', endDate),
-        limit(50) // Limit 50 records per fetch
+        orderBy('date', 'desc'),
+        limit(100) // ✅ Increased limit for monthly reports
     );
 
     const snapshot = await getDocs(q);
     const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as LaundryRecord));
-    return docs.sort((a, b) => b.date.localeCompare(a.date));
+    return docs; // Already sorted by orderBy
+};
+
+/**
+ * 🔐 Get Daily Variance Report
+ * Calculates variance for a specific date (delivered - received - treatment)
+ */
+export const getDailyVariance = async (
+    tenantId: string,
+    branchId: string,
+    date: string
+): Promise<Record<string, number>> => {
+    if (!tenantId || !branchId) return {};
+
+    const recordsRef = collection(db, `tenants/${tenantId}/branches/${branchId}/laundry_records`);
+    const q = query(recordsRef, where('date', '==', date), limit(1));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) return {};
+
+    const record = snapshot.docs[0].data() as LaundryRecord;
+    return record.dailyVariance || record.deficit || {};
+};
+
+/**
+ * 🔐 Move Items to Treatment
+ * Moves items from inLaundry to inTreatment (not counted as deficit)
+ */
+export const moveToTreatment = async (
+    tenantId: string,
+    branchId: string,
+    itemId: string,
+    quantity: number,
+    userId: string,
+    userName: string
+): Promise<void> => {
+    if (!db) throw new Error('Firebase not initialized');
+    if (!tenantId || !branchId || quantity <= 0) {
+        throw new Error('Invalid parameters for moving to treatment');
+    }
+
+    const settingsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/settings`, 'laundry_prices');
+
+    await runTransaction(db, async (transaction) => {
+        const settingsSnap = await transaction.get(settingsRef);
+        if (!settingsSnap.exists()) {
+            throw new Error('Laundry settings not found');
+        }
+
+        const items = settingsSnap.data().items as LaundryItem[] || [];
+        const item = items.find(i => i.id === itemId);
+        
+        if (!item) {
+            throw new Error(`Item ${itemId} not found`);
+        }
+
+        // 🛡️ VALIDATE: Check sufficient stock in laundry
+        const currentLaundry = item.inLaundry || 0;
+        if (currentLaundry < quantity) {
+            throw new Error(`مخزون غير كافٍ في المغسلة: ${item.name} (متوفر: ${currentLaundry}, مطلوب: ${quantity})`);
+        }
+
+        // Move from inLaundry to inTreatment
+        const updatedItems = items.map(i => {
+            if (i.id === itemId) {
+                return {
+                    ...i,
+                    inLaundry: Math.max(0, currentLaundry - quantity),
+                    inTreatment: (i.inTreatment || 0) + quantity
+                };
+            }
+            return i;
+        });
+        transaction.update(settingsRef, { items: updatedItems });
+
+        console.log(`✅ ATOMIC: Moved ${quantity} items to treatment for ${item.name}`);
+    });
 };
 
 // ============================================================
