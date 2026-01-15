@@ -148,6 +148,7 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
             }
             
             const roomCard = roomCardSnapshot.docs[0].data() as any;
+            const roomCardId = roomCardSnapshot.docs[0].id; // ✅ Get document ID for token linking
 
             // ✅ FIX 3: Check if QR is active (qrActive field)
             if (roomCard.qrActive === false) {
