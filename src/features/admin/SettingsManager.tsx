@@ -123,10 +123,19 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
             }
 
             // ✅ FIX 2: Check for active room card with QR enabled (Bellman check-in required)
-            const { getActiveRoomCard } = await import('../../services/roomCardService');
-            const roomCard = await getActiveRoomCard(roomNumber, tenantId);
-
-            if (!roomCard) {
+            // ✅ IMPORTANT: We need to check by branchId too, not just roomNumber
+            const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
+            const roomCardsRef = collection(db, 'roomCards');
+            const roomCardQuery = query(
+                roomCardsRef,
+                where('roomNumber', '==', roomNumber),
+                where('branch', '==', branchId),
+                where('status', '==', 'active'),
+                limit(1)
+            );
+            const roomCardSnapshot = await getDocs(roomCardQuery);
+            
+            if (roomCardSnapshot.empty) {
                 await customConfirm({
                     title: 'الغرفة غير نشطة',
                     message: 'عذراً، هذه الغرفة غير نشطة حالياً. يجب أن يقوم البيلمان بتسجيل دخول النزيل أولاً.',
@@ -137,6 +146,8 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 setGenerating(false);
                 return;
             }
+            
+            const roomCard = roomCardSnapshot.docs[0].data() as any;
 
             // ✅ FIX 3: Check if QR is active (qrActive field)
             if (roomCard.qrActive === false) {
