@@ -332,6 +332,8 @@ export const GuestDashboard: React.FC = () => {
     }, []);
 
     const initGuestPage = async () => {
+        console.log('🚀 [GuestDashboard] initGuestPage started');
+        console.log('🚀 [GuestDashboard] Current URL:', window.location.href);
         updateDynamicGreeting();
 
         // 🔐 STEP 1: Ensure Anonymous Authentication (Budget Protection!)
@@ -359,6 +361,10 @@ export const GuestDashboard: React.FC = () => {
         let tenantId = getParam('tenantId') || getParam('hotelId');
         // 🔐 NEW: Support both 't' (short) and 'token' (legacy)
         const token = getParam('t') || getParam('token');
+        console.log('🔍 [GuestDashboard] Token from URL:', token ? `${token.substring(0, 8)}...` : 'NOT FOUND');
+        console.log('🔍 [GuestDashboard] Room from URL:', roomNum);
+        console.log('🔍 [GuestDashboard] Branch from URL:', branchId);
+        console.log('🔍 [GuestDashboard] Tenant from URL:', tenantId);
         
         // ✅ Check for Demo Mode (for trial buyers)
         const demo = getParam('demo');
@@ -445,9 +451,11 @@ export const GuestDashboard: React.FC = () => {
             }
         } else if (!demo) {
             // 🚨 No token and not demo mode - require secure access
+            console.log('⚠️ [GuestDashboard] No token found in URL and not demo mode');
             // Allow existing session to continue (for page refresh)
             const existingSession = checkExistingSession();
             if (!existingSession) {
+                console.log('⚠️ [GuestDashboard] No existing session found - showing default message');
                 setAuthError('مرحباً بك في فندق أدورا 🌟\n\nيرجى مسح رمز QR الموجود في غرفتك للوصول إلى خدمات الفندق.\n\nإذا كنت ترى هذه الرسالة بعد المسح، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك فوراً.');
                 setLoading(false);
                 return;
