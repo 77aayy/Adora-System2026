@@ -313,11 +313,18 @@ export const validateSecureAccessToken = async (
                 });
                 
                 // Verify there's an active check-in for this room
+                console.log(`🔍 [QR Validation] Checking room card for Room ${tokenData.roomNumber}, Branch ${tokenData.branchId}, Tenant ${tenantId}`);
                 const roomCardValid = await verifyActiveCheckIn(
                     tokenData.roomNumber,
                     tokenData.branchId,
                     tenantId
                 );
+                
+                console.log(`🔍 [QR Validation] Room card check result:`, {
+                    valid: roomCardValid.valid,
+                    error: roomCardValid.error,
+                    guestName: roomCardValid.guestName
+                });
                 
                 if (!roomCardValid.valid) {
                     // 🚨 Send alert - someone accessing room without check-in
@@ -383,6 +390,7 @@ const verifyActiveCheckIn = async (
     try {
         // Check for active room card
         // ✅ FIX: tenantId is optional in roomCards - some old records may not have it
+        console.log(`🔍 [verifyActiveCheckIn] Searching for room card: Room ${roomNumber}, Branch ${branchId}, Tenant ${tenantId || 'not provided'}`);
         const roomCardsRef = collection(db, 'roomCards');
         const constraints: any[] = [
             where('roomNumber', '==', roomNumber),
@@ -399,7 +407,45 @@ const verifyActiveCheckIn = async (
         const q = query(roomCardsRef, ...constraints);
         const snapshot = await getDocs(q);
         
+        console.log(`🔍 [verifyActiveCheckIn] Query result: ${snapshot.size} room card(s) found`);
+        
         if (snapshot.empty) {
+            // ✅ Try without tenantId filter if it was provided (for legacy room cards)
+            if (tenantId) {
+                console.log(`🔍 [verifyActiveCheckIn] No results with tenantId filter, trying without tenantId...`);
+                const fallbackConstraints = [
+                    where('roomNumber', '==', roomNumber),
+                    where('branch', '==', branchId),
+                    where('status', '==', 'active')
+                ];
+                const fallbackQuery = query(roomCardsRef, ...fallbackConstraints);
+                const fallbackSnapshot = await getDocs(fallbackQuery);
+                console.log(`🔍 [verifyActiveCheckIn] Fallback query result: ${fallbackSnapshot.size} room card(s) found`);
+                
+                if (!fallbackSnapshot.empty) {
+                    const roomCard = fallbackSnapshot.docs[0].data();
+                    console.log(`🔍 [verifyActiveCheckIn] Found room card without tenantId filter:`, {
+                        roomNumber: roomCard.roomNumber,
+                        branch: roomCard.branch,
+                        tenantId: roomCard.tenantId,
+                        qrActive: roomCard.qrActive
+                    });
+                    
+                    // Check if QR is enabled (defaults to true if not set)
+                    if (roomCard.qrActive === false) {
+                        return { 
+                            valid: false, 
+                            error: 'عذراً، خدمة QR غير مفعلة لهذه الغرفة حالياً.\n\nيرجى التواصل مع الاستقبال لتفعيل الخدمة. نحن في خدمتك دائماً.' 
+                        };
+                    }
+                    
+                    return { 
+                        valid: true, 
+                        guestName: roomCard.guestName || roomCard.guest_name 
+                    };
+                }
+            }
+            
             return { 
                 valid: false, 
                 error: 'عذراً، يبدو أن غرفتك غير مسجلة دخول حالياً في النظام.\n\nيرجى التوجه إلى الاستقبال لإتمام عملية تسجيل الدخول أولاً. بعد ذلك، سيعمل رابط QR الخاص بغرفتك تلقائياً.\n\nنعتذر عن أي إزعاج ونتمنى لك إقامة سعيدة.' 
@@ -408,6 +454,14 @@ const verifyActiveCheckIn = async (
         
         // ✅ FIX: If tenantId was provided, verify it matches (for SaaS security)
         const roomCard = snapshot.docs[0].data();
+        console.log(`🔍 [verifyActiveCheckIn] Found room card:`, {
+            roomNumber: roomCard.roomNumber,
+            branch: roomCard.branch,
+            tenantId: roomCard.tenantId,
+            qrActive: roomCard.qrActive,
+            status: roomCard.status
+        });
+        
         if (tenantId && roomCard.tenantId && roomCard.tenantId !== tenantId) {
             return { 
                 valid: false, 
