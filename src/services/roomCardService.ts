@@ -242,6 +242,19 @@ export const checkOut = async (
             qrActive: false
         });
 
+        // 🔐 SECURITY: Deactivate all QR tokens for this room on checkout
+        // This ensures tokens become invalid immediately when guest checks out
+        try {
+            const { deactivateTokenOnCheckout } = await import('./secureAccessService');
+            const branchId = cardData?.branch || cardData?.branchId || 'default';
+            const finalTenantId = tenantId || cardData?.tenantId || cardData?.hotelId || 'default';
+            await deactivateTokenOnCheckout(roomNumber, branchId, finalTenantId);
+            console.log(`🔐 QR tokens deactivated for Room ${roomNumber} on checkout`);
+        } catch (tokenError) {
+            console.warn('⚠️ Failed to deactivate tokens on checkout (non-critical):', tokenError);
+            // Don't fail checkout if token deactivation fails
+        }
+
         // 2. Create inspection request (goes directly to Housekeeping)
         const inspectionRequest = {
             roomNumber,
