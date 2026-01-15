@@ -18,7 +18,9 @@ import {
     getDocs,
     Timestamp,
     orderBy,
-    Unsubscribe
+    Unsubscribe,
+    runTransaction,
+    serverTimestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -33,7 +35,8 @@ export type ProcurementStatus =
     | 'PURCHASING'        // Rep is buying items
     | 'PURCHASED'         // Items purchased (all or partial)
     | 'DELIVERED'         // Delivered to department
-    | 'RECEIVED'          // Department confirmed receipt
+    | 'PARTIALLY_DELIVERED' // ✅ Partial receipt (some items received, backorder created)
+    | 'RECEIVED'          // Department confirmed receipt (full)
     | 'COMPLETED';        // Fully closed
 
 export interface ProcurementItem {
