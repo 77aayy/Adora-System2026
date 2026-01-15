@@ -550,17 +550,89 @@ export const confirmReceipt = async (
         }
     }
 
-    // Update procurement request status
-    await updateDoc(requestRef, {
-        status: 'RECEIVED',
-        receivedAt: Timestamp.now(),
-        receivedBy: { id: employeeId, name: employeeName },
-        receiptType,
-        receiptNotes: notes || null,
-        items: updatedItems
-    });
+    // 🔐 ATOMIC TRANSACTION: Update request + Create backorder (if needed) in one atomic operation
+    // This ensures either both succeed or both fail - no partial updates!
+    let backorderId: string | null = null;
     
-    // ✅ Create receipt record and send notification
+    try {
+        await runTransaction(db, async (transaction) => {
+            // 1. Re-read the request to ensure we have latest data (prevents race conditions)
+            const requestDoc = await transaction.get(requestRef);
+            if (!requestDoc.exists()) {
+                throw new Error('الطلب غير موجود في النظام');
+            }
+            
+            const latestData = requestDoc.data() as ProcurementRequest;
+            
+            // 2. Calculate remaining quantities for backorder (if shortage)
+            const remainingItems: ProcurementItem[] = [];
+            if (receiptType === 'shortage') {
+                for (const it of updatedItems) {
+                    const expected = expectedQtyFor(it);
+                    const received = Number(it.receivedQty ?? 0);
+                    const remaining = Math.max(0, expected - received);
+                    if (remaining > 0) {
+                        remainingItems.push({
+                            ...it,
+                            quantity: remaining,
+                            purchasedQty: undefined,
+                            receivedQty: undefined
+                        });
+                    }
+                }
+            }
+            
+            // 3. ATOMIC UPDATE: Update the original request status
+            // Determine final status based on receipt type
+            let finalStatus: ProcurementStatus = 'RECEIVED';
+            if (receiptType === 'shortage' && remainingItems.length > 0) {
+                finalStatus = 'PARTIALLY_DELIVERED'; // ✅ Use PARTIALLY_DELIVERED for partial receipts
+            }
+            
+            transaction.update(requestRef, {
+                status: finalStatus,
+                receivedAt: serverTimestamp(),
+                receivedBy: { id: employeeId, name: employeeName },
+                receiptType,
+                receiptNotes: notes || null,
+                items: updatedItems
+            });
+            
+            // 4. ATOMIC CREATE: Create backorder in the same transaction (if needed)
+            if (receiptType === 'shortage' && remainingItems.length > 0) {
+                const backorderRef = doc(collection(db, 'procurementRequests'));
+                backorderId = backorderRef.id; // Store ID for return value
+                
+                transaction.set(backorderRef, {
+                    items: remainingItems.map(i => ({
+                        itemName: i.itemName,
+                        quantity: i.quantity,
+                        notes: i.notes || `متبقي من طلب سابق (عجز في الاستلام)`,
+                        priority: (i.priority as any) || 'urgent'
+                    })),
+                    department: latestData.department,
+                    requestedBy: latestData.requestedBy,
+                    branch: branchId,
+                    tenantId,
+                    status: 'PENDING_APPROVAL' as ProcurementStatus,
+                    createdAt: serverTimestamp(),
+                    isBackorder: true,
+                    originalRequestId: requestId,
+                    notes: 'تم إنشاؤه تلقائياً للكمية المتبقية بعد العجز في الاستلام'
+                });
+                
+                console.log(`✅ ATOMIC: Backorder created with ID: ${backorderId} for remaining ${remainingItems.length} items`);
+            }
+        });
+        
+        console.log(`✅ ATOMIC: Request ${requestId} updated to ${receiptType === 'shortage' ? 'PARTIALLY_DELIVERED' : 'RECEIVED'} successfully`);
+        
+    } catch (error: any) {
+        console.error('❌ ATOMIC TRANSACTION FAILED:', error);
+        throw new Error(`فشل تأكيد الاستلام: ${error.message || 'خطأ غير معروف'}`);
+    }
+    
+    // ✅ Create receipt record and send notification (outside transaction - non-critical)
     try {
         const { createReceiptRecord, logProcurementStage, sendProcurementNotification } = await import('./procurementNotificationService');
         
@@ -586,48 +658,10 @@ export const confirmReceipt = async (
         );
     } catch (err) {
         console.error('Error creating receipt record:', err);
+        // Don't fail the whole operation if notification fails
     }
 
-    // ✅ Auto-backorder on shortage (remaining quantities)
-    if (receiptType === 'shortage') {
-        const remainingItems: ProcurementItem[] = [];
-        for (const it of updatedItems) {
-            const expected = expectedQtyFor(it);
-            const received = Number(it.receivedQty ?? 0);
-            const remaining = Math.max(0, expected - received);
-            if (remaining > 0) {
-                remainingItems.push({
-                    ...it,
-                    quantity: remaining,
-                    purchasedQty: undefined,
-                    receivedQty: undefined
-                });
-            }
-        }
-
-        if (remainingItems.length > 0) {
-            const newRef = await addDoc(collection(db, 'procurementRequests'), {
-                items: remainingItems.map(i => ({
-                    itemName: i.itemName,
-                    quantity: i.quantity,
-                    notes: i.notes || `متبقي من طلب سابق (عجز في الاستلام)`,
-                    priority: (i.priority as any) || 'urgent'
-                })),
-                department: requestData.department,
-                requestedBy: requestData.requestedBy,
-                branch: branchId,
-                tenantId,
-                status: 'PENDING_APPROVAL',
-                createdAt: Timestamp.now(),
-                isBackorder: true,
-                originalRequestId: requestId,
-                notes: 'تم إنشاؤه تلقائياً للكمية المتبقية بعد العجز في الاستلام'
-            });
-            return newRef.id;
-        }
-    }
-
-    return null;
+    return backorderId;
 };
 
 /**
