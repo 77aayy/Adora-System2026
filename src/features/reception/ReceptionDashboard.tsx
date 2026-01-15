@@ -2437,6 +2437,13 @@ export const ReceptionDashboard: React.FC = () => {
         return list;
     }, [currentTab, groupedRequests, roomSearchQuery]);
 
+    // Tab definitions for navigation
+    const tabDefinitions = useMemo(() => [
+        { key: 'new', label: t('reception.newTab'), count: groupedRequests.new.length, activeClass: 'bg-orange-500 text-white shadow-orange-500/25', inactiveClass: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' },
+        { key: 'in_progress', label: t('reception.inProgressTab'), count: groupedRequests.in_progress.length, activeClass: 'bg-blue-500 text-white shadow-blue-500/25', inactiveClass: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
+        { key: 'completed', label: t('reception.completedTab'), count: groupedRequests.completed.length, activeClass: 'bg-green-500 text-white shadow-green-500/25', inactiveClass: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' }
+    ], [t, groupedRequests.new.length, groupedRequests.in_progress.length, groupedRequests.completed.length]);
+
     // ✅ Show Points Notification for new PENDING_RECEPTION or CONFIRMED requests
     useEffect(() => {
         // Find first PENDING_RECEPTION or CONFIRMED request that hasn't been notified yet
@@ -3498,11 +3505,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             {/* Tabs - Mobile First + Theme Aware */}
             <div className="flex gap-1 sm:gap-2 mb-3 sm:mb-4 overflow-x-auto pb-1 -mx-3 sm:mx-0 px-3 sm:px-0 scrollbar-hide" data-tour="tabs">
-                {useMemo(() => [
-                    { key: 'new', label: t('reception.newTab'), count: groupedRequests.new.length, activeClass: 'bg-orange-500 text-white shadow-orange-500/25', inactiveClass: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' },
-                    { key: 'in_progress', label: t('reception.inProgressTab'), count: groupedRequests.in_progress.length, activeClass: 'bg-blue-500 text-white shadow-blue-500/25', inactiveClass: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
-                    { key: 'completed', label: t('reception.completedTab'), count: groupedRequests.completed.length, activeClass: 'bg-green-500 text-white shadow-green-500/25', inactiveClass: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' }
-                ], [t, groupedRequests.new.length, groupedRequests.in_progress.length, groupedRequests.completed.length]).map(tab => (
+                {tabDefinitions.map(tab => (
                     <button
                         key={tab.key}
                         onClick={() => setCurrentTab(tab.key as TabType)}

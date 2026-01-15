@@ -4,7 +4,7 @@
  * Adora Hotel Management System V2
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Coffee, Clock, CheckCircle2, AlertCircle,
     Package, Search, Filter, X, User, Building2, ShoppingCart,
@@ -17,6 +17,7 @@ import { PageTransition } from '../../components/common/PageTransition';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useTenant } from '../../context/TenantContext';
+import { useTranslation } from 'react-i18next';
 import {
     subscribeToOrders,
     completeOrder,
@@ -52,9 +53,10 @@ type TabType = 'new' | 'in_progress' | 'completed'; // ✅ Unified tabs
 export const CoffeeShopDashboard: React.FC = () => {
     const { user, logout } = useAuth();
     const { success, error } = useUX();
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { tenantId } = useTenant();
     const brandName = useBrandName();
+    const currentLanguage = i18n.language;
 
     const branchId = useMemo(() => (user as any)?.branch || (user as any)?.branchId || 'default', [user]);
 
@@ -175,27 +177,28 @@ export const CoffeeShopDashboard: React.FC = () => {
     };
 
     // Calculate time elapsed
-    const getTimeElapsed = (timestamp: any): string => {
+    const getTimeElapsed = useCallback((timestamp: any): string => {
         if (!timestamp) return '-';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         const diff = Math.floor((Date.now() - date.getTime()) / 60000);
         if (diff < 1) return t('common.now');
-        if (diff < 60) return `${diff}${t('time.minutes')}`;
-        if (diff < 1440) return `${Math.floor(diff / 60)}${t('time.hours')}`;
-        return `${Math.floor(diff / 1440)}${t('time.days')}`;
-    };
+        if (diff < 60) return `${diff} ${t('common.minutes')}`;
+        if (diff < 1440) return `${Math.floor(diff / 60)} ${t('common.hours')}`;
+        return `${Math.floor(diff / 1440)} ${t('common.days')}`;
+    }, [t]);
 
     // Format date
-    const formatDate = (timestamp: any): string => {
+    const formatDate = useCallback((timestamp: any): string => {
         if (!timestamp) return '-';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return date.toLocaleString('ar-SA', {
+        const locale = currentLanguage === 'ar' ? 'ar-SA' : currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'bn' ? 'bn-BD' : 'en-US';
+        return date.toLocaleString(locale, {
             hour: '2-digit',
             minute: '2-digit',
             day: 'numeric',
             month: 'short'
         });
-    };
+    }, [currentLanguage]);
 
     if (loading) {
         return (
