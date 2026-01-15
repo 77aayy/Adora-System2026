@@ -65,6 +65,12 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
         if (!tenantId || !branchId) return;
         setLoading(true);
         try {
+            if (!db) {
+                console.warn('Firebase db not initialized');
+                setLoading(false);
+                return;
+            }
+            
             // Load all alerts (active and inactive) for management
             const q = query(
                 collection(db, 'emergency_alerts'),
@@ -80,13 +86,19 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
                 } as EmergencyAlert);
             });
             setAlerts(loaded.sort((a, b) => {
-                const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-                const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+                const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+                const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
                 return bTime.getTime() - aTime.getTime();
             }));
-        } catch (err) {
+            console.log(`✅ Loaded ${loaded.length} emergency alerts for branch ${branchId}`);
+        } catch (err: any) {
             console.error('Error loading emergency alerts:', err);
-            error('فشل تحميل التنبيهات الطارئة');
+            // ✅ Only show error if it's a real error, not just empty collection
+            if (err.code !== 'permission-denied') {
+                error('فشل تحميل التنبيهات الطارئة');
+            } else {
+                console.warn('⚠️ Permission denied - check Firestore rules for emergency_alerts');
+            }
         } finally {
             setLoading(false);
         }
