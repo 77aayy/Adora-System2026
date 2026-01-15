@@ -76,7 +76,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
         return branches.filter(b => b.id === branchId);
     }, [branches, isOwner, user, branchId]);
 
-    const [expandedSections, setExpandedSections] = React.useState<string[]>(['hub']);
+    const [expandedSections, setExpandedSections] = React.useState<string[]>(['dashboard']);
 
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
@@ -133,14 +133,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     const { isEnabled: isScheduledTasksEnabled } = useFeatureGate('scheduledTasks');
     const { isEnabled: isWhatsAppEnabled } = useFeatureGate('whatsappIntegration');
 
-    // ✅ MANAGER MENU: Full manager features (filtered by feature gates)
+    // ✅ MANAGER MENU: Reorganized with professional grouping
     const managerSections = [
         {
-            id: 'insights',
-            label: 'الرقابة والتقارير',
-            icon: <BarChart3 className="w-4 h-4" style={{ color: 'var(--theme-accent-blue)' }} />,
+            id: 'dashboard',
+            label: 'لوحة التحكم',
+            icon: <LayoutDashboard className="w-4 h-4" style={{ color: 'var(--theme-primary-500)' }} />,
             items: [
                 { to: '/admin', icon: <LayoutDashboard className="w-4 h-4" />, label: 'نظرة عامة', end: true },
+                { to: '/admin/pulse', icon: <Activity className="w-4 h-4" />, label: '⏱️ النبض اللحظي' },
             ]
         },
         {
@@ -150,20 +151,26 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             items: [
                 { to: '/admin/branches', icon: <Globe className="w-4 h-4" />, label: 'الفروع' },
                 { to: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" />, label: 'الغرف والأدوار' },
+                { to: '/admin/employees', icon: <Users className="w-4 h-4" />, label: 'الموظفين' },
             ]
         },
         {
             id: 'operations',
-            label: 'العمليات والتشغيل',
+            label: 'العمليات اليومية',
             icon: <Layers className="w-4 h-4" style={{ color: 'var(--theme-accent-purple)' }} />,
             items: [
-                { to: '/admin/pulse', icon: <Activity className="w-4 h-4" />, label: '⏱️ النبض اللحظي' }, // ✅ Live Pulse Dashboard
-                { to: '/admin/chat-monitor', icon: <Radio className="w-4 h-4" />, label: '📡 رادار الشات' }, // 📡 Live Chat Monitor
-                { to: '/admin/chat-settings', icon: <MessageCircle className="w-4 h-4" />, label: '💬 إعدادات الشات' }, // 💬 Chat Settings
-                { to: '/admin/employees', icon: <Users className="w-4 h-4" />, label: 'الموظفين' },
+                { to: '/admin/chat-monitor', icon: <Radio className="w-4 h-4" />, label: '📡 رادار الشات' },
+                { to: '/admin/chat-settings', icon: <MessageCircle className="w-4 h-4" />, label: '💬 إعدادات الشات' },
                 ...(isScheduledTasksEnabled ? [{ to: '/admin/tasks', icon: <Calendar className="w-4 h-4" />, label: 'أوامر الشغل' }] : []),
-                ...(isLaundryEnabled ? [{ to: '/admin/laundry', icon: <Shirt className="w-4 h-4" />, label: 'المغسلة' }] : []),
+            ]
+        },
+        {
+            id: 'inventory',
+            label: 'المخزون والمستودعات',
+            icon: <Package className="w-4 h-4" style={{ color: 'var(--theme-accent-orange)' }} />,
+            items: [
                 ...(isInventoryEnabled ? [{ to: '/admin/inventory', icon: <Package className="w-4 h-4" />, label: 'المخزون' }] : []),
+                ...(isLaundryEnabled ? [{ to: '/admin/laundry', icon: <Shirt className="w-4 h-4" />, label: 'المغسلة' }] : []),
                 { to: '/admin/lost-found', icon: <Search className="w-4 h-4" />, label: 'المفقودات' },
             ]
         },
@@ -172,23 +179,32 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             label: 'المالية والتحفيز',
             icon: <DollarSign className="w-4 h-4" style={{ color: 'var(--theme-accent-green)' }} />,
             items: [
-                { to: '/admin/prices', icon: <Activity className="w-4 h-4" />, label: 'تعديل الأسعار' },
-                ...(isPointsEnabled ? [{ to: '/admin/payouts', icon: <HandCoins className="w-4 h-4" />, label: 'صرف النقاط' }] : []),
+                { to: '/admin/prices', icon: <DollarSign className="w-4 h-4" />, label: 'تعديل الأسعار' },
+                ...(isPointsEnabled ? [
+                    { to: '/admin/points', icon: <Target className="w-4 h-4" />, label: 'قواعد النقاط' },
+                    { to: '/admin/gamification', icon: <Award className="w-4 h-4" />, label: 'الشارات والرتب' },
+                    { to: '/admin/payouts', icon: <HandCoins className="w-4 h-4" />, label: 'صرف النقاط' },
+                ] : []),
             ]
         },
         {
-            id: 'config',
-            label: 'إعدادات النظام',
+            id: 'settings',
+            label: 'الإعدادات والتكوين',
             icon: <Settings className="w-4 h-4" style={{ color: 'var(--theme-text-tertiary)' }} />,
             items: [
                 { to: '/admin/settings', icon: <Settings className="w-4 h-4" />, label: 'إدارة التطبيق' },
-                ...(isPointsEnabled ? [{ to: '/admin/points', icon: <Target className="w-4 h-4" />, label: 'قواعد النقاط' }] : []),
-                ...(isPointsEnabled ? [{ to: '/admin/gamification', icon: <Award className="w-4 h-4" />, label: 'الشارات والرتب' }] : []),
                 { to: '/admin/auto-transfer', icon: <Activity className="w-4 h-4" />, label: 'التحويل التلقائي' },
-                { to: '/admin/manager-announcements', icon: <Bell className="w-4 h-4" />, label: 'الرسائل العاجلة للأقسام' },
-                { to: '/admin/general-instructions', icon: <BookOpen className="w-4 h-4" />, label: 'التعليمات العامة' },
                 { to: '/admin/translations', icon: <Languages className="w-4 h-4" />, label: '🌍 إدارة الترجمات' },
                 ...(isWhatsAppEnabled ? [{ to: '/admin/whatsapp-templates', icon: <MessageCircle className="w-4 h-4" />, label: 'نماذج WhatsApp' }] : []),
+            ]
+        },
+        {
+            id: 'communications',
+            label: 'الاتصالات والإعلانات',
+            icon: <Bell className="w-4 h-4" style={{ color: 'var(--theme-accent-yellow)' }} />,
+            items: [
+                { to: '/admin/manager-announcements', icon: <Bell className="w-4 h-4" />, label: 'الرسائل العاجلة للأقسام' },
+                { to: '/admin/general-instructions', icon: <BookOpen className="w-4 h-4" />, label: 'التعليمات العامة' },
             ]
         }
     ];
