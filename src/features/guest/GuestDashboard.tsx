@@ -186,6 +186,7 @@ const SERVICES: ServiceItem[] = [
 // ============================================================
 
 export const GuestDashboard: React.FC = () => {
+    console.log('🚀 [GuestDashboard] Component rendered!');
     // 🌙 Theme Support
     const { theme, toggleTheme, isDark } = useTheme();
     
