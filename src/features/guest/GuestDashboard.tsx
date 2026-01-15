@@ -329,7 +329,10 @@ export const GuestDashboard: React.FC = () => {
     // ============================================================
 
     useEffect(() => {
-        initGuestPage();
+        console.log('🚀 [GuestDashboard] useEffect triggered - calling initGuestPage');
+        initGuestPage().catch((error) => {
+            console.error('❌ [GuestDashboard] initGuestPage failed:', error);
+        });
     }, []);
 
     const initGuestPage = async () => {
