@@ -384,7 +384,7 @@ export const GuestDashboard: React.FC = () => {
                 reason: 'Attempted access with direct room parameter without secure token'
             });
             
-            setAuthError('🔒 رابط الوصول غير آمن. يرجى مسح رمز QR الخاص بغرفتك للحصول على رابط آمن.');
+            setAuthError('عذراً، الرابط الذي استخدمته غير آمن.\n\nيرجى مسح رمز QR الموجود في غرفتك للحصول على رابط آمن ومشفر. هذا يضمن حماية بياناتك وأمان وصولك للخدمات.\n\nنعتذر عن أي إزعاج.');
             setLoading(false);
             return;
         }
@@ -402,14 +402,14 @@ export const GuestDashboard: React.FC = () => {
                 if (!validationResult.valid) {
                     console.warn(`🔐 Token validation failed: ${validationResult.errorCode}`);
                     
-                    // Map error codes to user-friendly messages
+                    // ✅ Map error codes to user-friendly, polite, and very clear messages
                     const errorMessages: Record<string, string> = {
-                        'INVALID_TOKEN': 'رابط الوصول غير صالح أو منتهي الصلاحية',
-                        'EXPIRED_TOKEN': 'انتهت صلاحية رابط الوصول. يرجى طلب رابط جديد من الاستقبال.',
-                        'INACTIVE_TOKEN': 'رابط الوصول غير نشط. ربما تم تسجيل الخروج من الغرفة.',
-                        'DEVICE_LIMIT': 'تم الوصول للحد الأقصى من الأجهزة المسموح بها (3 أجهزة). يرجى التواصل مع الاستقبال.',
-                        'NO_ACTIVE_CHECKIN': 'الغرفة غير مسجلة دخول حالياً. يرجى التسجيل في الاستقبال أولاً.',
-                        'SYSTEM_ERROR': 'حدث خطأ في النظام. يرجى المحاولة مرة أخرى.'
+                        'INVALID_TOKEN': 'عذراً، الرابط الذي استخدمته غير صالح أو تم إلغاؤه.\n\nيرجى التأكد من أنك تستخدم الرابط الصحيح الموجود في غرفتك. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال للحصول على رابط جديد.',
+                        'EXPIRED_TOKEN': 'عذراً، انتهت صلاحية رابط الوصول الخاص بغرفتك.\n\nيرجى التواصل مع الاستقبال للحصول على رابط جديد. نحن في خدمتك دائماً.',
+                        'INACTIVE_TOKEN': 'عذراً، رابط الوصول الخاص بغرفتك غير نشط حالياً.\n\nقد يكون هذا بسبب تسجيل الخروج من الغرفة. يرجى التواصل مع الاستقبال لتجديد الرابط أو التحقق من حالة الحجز.',
+                        'DEVICE_LIMIT': 'عذراً، تم الوصول للحد الأقصى من الأجهزة المسموح بها لهذه الغرفة (3 أجهزة).\n\nإذا كنت بحاجة لاستخدام جهاز إضافي، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك.',
+                        'NO_ACTIVE_CHECKIN': 'عذراً، يبدو أن غرفتك غير مسجلة دخول حالياً في النظام.\n\nيرجى التوجه إلى الاستقبال لإتمام عملية تسجيل الدخول أولاً. بعد ذلك، سيعمل رابط QR الخاص بغرفتك تلقائياً.\n\nنعتذر عن أي إزعاج ونتمنى لك إقامة سعيدة.',
+                        'SYSTEM_ERROR': 'عذراً، حدث خطأ تقني غير متوقع أثناء التحقق من الرابط.\n\nيرجى المحاولة مرة أخرى بعد قليل. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك فوراً.'
                     };
                     
                     setAuthError(validationResult.error || errorMessages[validationResult.errorCode || 'SYSTEM_ERROR']);
@@ -432,7 +432,7 @@ export const GuestDashboard: React.FC = () => {
                 
             } catch (error) {
                 console.error("Token resolution error:", error);
-                setAuthError('حدث خطأ في التحقق من الرابط. يرجى المحاولة مرة أخرى.');
+                setAuthError('عذراً، حدث خطأ تقني أثناء التحقق من رابط الوصول.\n\nيرجى المحاولة مرة أخرى بعد قليل. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك فوراً.');
                 setLoading(false);
                 return;
             }
@@ -441,7 +441,7 @@ export const GuestDashboard: React.FC = () => {
             // Allow existing session to continue (for page refresh)
             const existingSession = checkExistingSession();
             if (!existingSession) {
-                setAuthError('🔒 يرجى مسح رمز QR الخاص بغرفتك للوصول إلى الخدمات.');
+                setAuthError('مرحباً بك في فندق أدورا 🌟\n\nيرجى مسح رمز QR الموجود في غرفتك للوصول إلى خدمات الفندق.\n\nإذا كنت ترى هذه الرسالة بعد المسح، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك فوراً.');
                 setLoading(false);
                 return;
             }
@@ -2690,6 +2690,53 @@ export const GuestDashboard: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* ============================================
+                        AUTH ERROR MESSAGE - ELEGANT & CLEAR
+                        ============================================ */}
+                    {authError && (
+                        <div className={`w-full max-w-sm mb-6 rounded-2xl p-6 shadow-2xl transition-all duration-500 animate-in fade-in slide-in-from-top-2 ${
+                            isDark 
+                                ? 'bg-gradient-to-br from-amber-900/30 to-orange-900/20 border-2 border-amber-700/50 shadow-amber-900/30' 
+                                : 'bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 shadow-amber-200/50'
+                        }`}>
+                            <div className="flex items-start gap-4">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                    isDark 
+                                        ? 'bg-amber-500/20 border border-amber-500/30' 
+                                        : 'bg-amber-100 border border-amber-200'
+                                }`}>
+                                    <AlertCircle className={`w-6 h-6 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>
+                                        {authError.includes('مرحباً بك') ? 'مرحباً بك في فندق أدورا 🌟' : 'تنبيه مهم'}
+                                    </h3>
+                                    <p className={`text-sm leading-relaxed whitespace-pre-line ${isDark ? 'text-amber-100/90' : 'text-amber-700'}`}>
+                                        {authError}
+                                    </p>
+                                    {authError.includes('التواصل مع الاستقبال') && (
+                                        <div className="mt-4 pt-4 border-t border-amber-500/20">
+                                            <p className={`text-xs ${isDark ? 'text-amber-200/70' : 'text-amber-600/80'}`}>
+                                                💡 نصيحة: يمكنك التواصل مع الاستقبال عبر رقم الواتساب الموجود في صفحة الخدمات
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => setAuthError(null)}
+                                    className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
+                                        isDark 
+                                            ? 'text-amber-400/60 hover:text-amber-400 hover:bg-amber-500/10' 
+                                            : 'text-amber-600/60 hover:text-amber-600 hover:bg-amber-100'
+                                    }`}
+                                    aria-label="إغلاق"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* ============================================
                         MAIN VERIFICATION CARD - THEME AWARE

@@ -253,7 +253,7 @@ export const validateSecureAccessToken = async (
                     
                     return { 
                         valid: false, 
-                        error: 'رابط الوصول غير نشط', 
+                        error: 'عذراً، رابط الوصول الخاص بغرفتك غير نشط حالياً.\n\nقد يكون هذا بسبب تسجيل الخروج من الغرفة. يرجى التواصل مع الاستقبال لتجديد الرابط أو التحقق من حالة الحجز.\n\nنعتذر عن أي إزعاج ونتمنى لك إقامة سعيدة.', 
                         errorCode: 'INACTIVE_TOKEN' 
                     };
                 }
@@ -273,7 +273,7 @@ export const validateSecureAccessToken = async (
                         
                         return { 
                             valid: false, 
-                            error: 'انتهت صلاحية رابط الوصول', 
+                            error: 'عذراً، انتهت صلاحية رابط الوصول الخاص بغرفتك.\n\nيرجى التواصل مع الاستقبال للحصول على رابط جديد. نحن في خدمتك دائماً.', 
                             errorCode: 'EXPIRED_TOKEN' 
                         };
                     }
@@ -295,7 +295,7 @@ export const validateSecureAccessToken = async (
                             
                             return { 
                                 valid: false, 
-                                error: 'تم الوصول للحد الأقصى من الأجهزة المسموح بها', 
+                                error: 'عذراً، تم الوصول للحد الأقصى من الأجهزة المسموح بها لهذه الغرفة (3 أجهزة).\n\nإذا كنت بحاجة لاستخدام جهاز إضافي، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك.', 
                                 errorCode: 'DEVICE_LIMIT' 
                             };
                         }
@@ -330,7 +330,7 @@ export const validateSecureAccessToken = async (
                     
                     return { 
                         valid: false, 
-                        error: roomCardValid.error || 'لا يوجد تسجيل دخول نشط لهذه الغرفة', 
+                        error: roomCardValid.error || 'عذراً، يبدو أن غرفتك غير مسجلة دخول حالياً في النظام.\n\nيرجى التوجه إلى الاستقبال لإتمام عملية تسجيل الدخول أولاً. بعد ذلك، سيعمل رابط QR الخاص بغرفتك تلقائياً.\n\nنعتذر عن أي إزعاج ونتمنى لك إقامة سعيدة.', 
                         errorCode: 'NO_ACTIVE_CHECKIN' 
                     };
                 }
@@ -356,7 +356,7 @@ export const validateSecureAccessToken = async (
         
         return { 
             valid: false, 
-            error: 'رابط الوصول غير صالح أو منتهي', 
+            error: 'عذراً، الرابط الذي استخدمته غير صالح أو تم إلغاؤه.\n\nيرجى التأكد من أنك تستخدم الرابط الصحيح الموجود في غرفتك. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال للحصول على رابط جديد.', 
             errorCode: 'INVALID_TOKEN' 
         };
         
@@ -364,7 +364,7 @@ export const validateSecureAccessToken = async (
         console.error('Token validation error:', error);
         return { 
             valid: false, 
-            error: 'حدث خطأ في التحقق من الرابط', 
+            error: 'عذراً، حدث خطأ تقني غير متوقع أثناء التحقق من الرابط.\n\nيرجى المحاولة مرة أخرى بعد قليل. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك فوراً.', 
             errorCode: 'SYSTEM_ERROR' 
         };
     }
@@ -402,7 +402,7 @@ const verifyActiveCheckIn = async (
         if (snapshot.empty) {
             return { 
                 valid: false, 
-                error: 'الغرفة غير مسجلة دخول حالياً. يرجى التسجيل في الاستقبال أولاً.' 
+                error: 'عذراً، يبدو أن غرفتك غير مسجلة دخول حالياً في النظام.\n\nيرجى التوجه إلى الاستقبال لإتمام عملية تسجيل الدخول أولاً. بعد ذلك، سيعمل رابط QR الخاص بغرفتك تلقائياً.\n\nنعتذر عن أي إزعاج ونتمنى لك إقامة سعيدة.' 
             };
         }
         
@@ -411,7 +411,7 @@ const verifyActiveCheckIn = async (
         if (tenantId && roomCard.tenantId && roomCard.tenantId !== tenantId) {
             return { 
                 valid: false, 
-                error: 'الغرفة لا تتبع للفندق المحدد.' 
+                error: 'عذراً، يبدو أن هناك عدم تطابق في بيانات الفندق.\n\nيرجى التواصل مع الاستقبال للتحقق من صحة الرابط. نحن في خدمتك دائماً.' 
             };
         }
         
@@ -419,7 +419,7 @@ const verifyActiveCheckIn = async (
         if (roomCard.qrActive === false) {
             return { 
                 valid: false, 
-                error: 'خدمة QR غير مفعلة لهذه الغرفة حالياً.' 
+                error: 'عذراً، خدمة QR غير مفعلة لهذه الغرفة حالياً.\n\nيرجى التواصل مع الاستقبال لتفعيل الخدمة. نحن في خدمتك دائماً.' 
             };
         }
         
