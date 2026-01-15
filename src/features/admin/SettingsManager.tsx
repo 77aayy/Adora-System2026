@@ -36,7 +36,7 @@ import {
     Package,
     Phone
 } from 'lucide-react';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Switch } from '../../components/common/Switch';
 import { confirm as customConfirm } from '../../services/customConfirmService';
@@ -95,11 +95,66 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
     const [copied, setCopied] = useState(false);
     const [secureToken, setSecureToken] = useState('');
     const [generating, setGenerating] = useState(false);
+    
+    // ✅ NEW: Rooms list and existing QR tokens
+    const [rooms, setRooms] = useState<Array<{ number: string; floor: number; type: string }>>([]);
+    const [loadingRooms, setLoadingRooms] = useState(false);
+    const [existingTokens, setExistingTokens] = useState<Array<{ roomNumber: string; token: string; fullUrl: string; createdAt: Date }>>([]);
+    const [loadingExisting, setLoadingExisting] = useState(false);
 
     // UI State
     const [isCollapsed, setIsCollapsed] = useState(true);
 
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    // ✅ Load rooms for dropdown
+    useEffect(() => {
+        if (!tenantId || !branchId) return;
+        const loadRooms = async () => {
+            setLoadingRooms(true);
+            try {
+                const roomsList = await getRooms(branchId, tenantId);
+                setRooms(roomsList.map(r => ({ number: r.number, floor: r.floor, type: r.type })));
+            } catch (error) {
+                console.error('Error loading rooms:', error);
+            } finally {
+                setLoadingRooms(false);
+            }
+        };
+        loadRooms();
+    }, [tenantId, branchId]);
+
+    // ✅ Load existing QR tokens for this branch
+    useEffect(() => {
+        if (!tenantId || !branchId) return;
+        const loadExistingTokens = async () => {
+            setLoadingExisting(true);
+            try {
+                const tokensRef = collection(db, `tenants/${tenantId}/secureAccessTokens`);
+                const q = query(
+                    tokensRef,
+                    where('branchId', '==', branchId),
+                    where('isActive', '==', true)
+                );
+                const snapshot = await getDocs(q);
+                const tokens = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        roomNumber: data.roomNumber,
+                        token: data.token,
+                        fullUrl: `${window.location.origin}/guest?t=${data.token}`,
+                        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || 0)
+                    };
+                });
+                setExistingTokens(tokens);
+            } catch (error) {
+                console.error('Error loading existing tokens:', error);
+            } finally {
+                setLoadingExisting(false);
+            }
+        };
+        loadExistingTokens();
+    }, [tenantId, branchId]);
 
     const generateSecureLink = async () => {
         if (!roomNumber) return;
@@ -122,61 +177,27 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 return;
             }
 
-            // ✅ FIX 2: Check for active room card with QR enabled (Bellman check-in required)
-            // ✅ IMPORTANT: We need to check by branchId too, not just roomNumber
-            const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
-            const roomCardsRef = collection(db, 'roomCards');
-            const roomCardQuery = query(
-                roomCardsRef,
-                where('roomNumber', '==', roomNumber),
-                where('branch', '==', branchId),
-                where('status', '==', 'active'),
-                limit(1)
-            );
-            const roomCardSnapshot = await getDocs(roomCardQuery);
-            
-            if (roomCardSnapshot.empty) {
-                await customConfirm({
-                    title: 'الغرفة غير نشطة',
-                    message: 'عذراً، هذه الغرفة غير نشطة حالياً. يجب أن يقوم البيلمان بتسجيل دخول النزيل أولاً.',
-                    confirmText: 'حسناً',
-                    showCancel: false,
+            // ✅ NEW: Check if QR already exists for this room
+            const existingToken = existingTokens.find(t => t.roomNumber === roomNumber);
+            if (existingToken) {
+                const shouldContinue = await customConfirm({
+                    title: 'تنبيه: QR موجود مسبقاً',
+                    message: `هذه الغرفة (${roomNumber}) لديها QR مولد من قبل. هل تريد توليد QR جديد؟ (سيتم إلغاء تفعيل QR القديم)`,
+                    confirmText: 'نعم، توليد جديد',
+                    cancelText: 'إلغاء',
+                    showCancel: true,
                     type: 'warning'
                 });
-                setGenerating(false);
-                return;
-            }
-            
-            const roomCard = roomCardSnapshot.docs[0].data() as any;
-            const roomCardId = roomCardSnapshot.docs[0].id; // ✅ Get document ID for token linking
-
-            // ✅ FIX 3: Check if QR is active (qrActive field)
-            if (roomCard.qrActive === false) {
-                await customConfirm({
-                    title: 'QR غير مفعل',
-                    message: 'عذراً، خدمة QR غير مفعلة لهذه الغرفة حالياً. يرجى تفعيلها من البيلمان.',
-                    confirmText: 'حسناً',
-                    showCancel: false,
-                    type: 'warning'
-                });
-                setGenerating(false);
-                return;
+                if (!shouldContinue) {
+                    setGenerating(false);
+                    return;
+                }
             }
 
-            // ✅ FIX 4: Verify branch match
-            if (roomCard.branch !== branchId) {
-                await customConfirm({
-                    title: 'الفرع غير متطابق',
-                    message: `عذراً، هذه الغرفة تتبع لفرع آخر (${roomCard.branch}). يرجى اختيار الفرع الصحيح.`,
-                    confirmText: 'حسناً',
-                    showCancel: false,
-                    type: 'warning'
-                });
-                setGenerating(false);
-                return;
-            }
+            // ✅ REMOVED: All roomCard checks - Manager can generate QR for any room
+            // ✅ The validation will happen when guest opens the QR link (in validateSecureAccessToken)
 
-            // ✅ FIX 5: Use secure access token service instead of random token
+            // ✅ Use secure access token service
             const { generateSecureAccessToken } = await import('../../services/secureAccessService');
             const result = await generateSecureAccessToken(
                 roomNumber,
@@ -184,7 +205,7 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 tenantId,
                 user?.id || 'system', // createdBy
                 {
-                    roomCardId: roomCardId, // ✅ Use document ID from snapshot
+                    // roomCardId is optional - will be null if room not checked in
                     maxDevices: 2, // Default max devices per room
                     expiresInHours: null // Never expires (until checkout)
                 }
@@ -192,10 +213,29 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
 
             setSecureToken(result.token);
             
+            // ✅ Reload existing tokens to show the new one
+            const tokensRef = collection(db, `tenants/${tenantId}/secureAccessTokens`);
+            const q = query(
+                tokensRef,
+                where('branchId', '==', branchId),
+                where('isActive', '==', true)
+            );
+            const snapshot = await getDocs(q);
+            const tokens = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    roomNumber: data.roomNumber,
+                    token: data.token,
+                    fullUrl: `${window.location.origin}/guest?t=${data.token}`,
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || 0)
+                };
+            });
+            setExistingTokens(tokens);
+            
             // Show success message
             await customConfirm({
                 title: 'تم توليد الرابط بنجاح',
-                message: 'تم إنشاء رابط آمن للغرفة. يمكنك نسخ الرابط أو طباعة QR code.',
+                message: 'تم إنشاء رابط آمن للغرفة. يمكنك نسخ الرابط أو طباعة QR code. ملاحظة: QR لن يعمل للنزيل إلا بعد تسجيل دخول البيلمان.',
                 confirmText: 'حسناً',
                 showCancel: false,
                 type: 'success'
@@ -264,22 +304,38 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                     <div className="space-y-4">
                         <div className="flex gap-2">
                             <div className="flex-1">
-                                <label className="block text-sm text-white/70 mb-1">رقم الغرفة</label>
-                                <input
-                                    type="text"
-                                    value={roomNumber}
-                                    onChange={(e) => {
-                                        setRoomNumber(e.target.value);
-                                        setSecureToken('');
-                                    }}
-                                    className="input"
-                                    placeholder="مثال: 101"
-                                />
+                                <label className="block text-sm text-white/70 mb-1">اختر الغرفة</label>
+                                {loadingRooms ? (
+                                    <div className="input flex items-center justify-center h-[42px]">
+                                        <AdoraLoaderInline size={16} />
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={roomNumber}
+                                        onChange={(e) => {
+                                            setRoomNumber(e.target.value);
+                                            setSecureToken('');
+                                        }}
+                                        className="input"
+                                    >
+                                        <option value="">-- اختر الغرفة --</option>
+                                        {rooms
+                                            .sort((a, b) => {
+                                                if (a.floor !== b.floor) return a.floor - b.floor;
+                                                return a.number.localeCompare(b.number, undefined, { numeric: true });
+                                            })
+                                            .map((room) => (
+                                                <option key={room.number} value={room.number}>
+                                                    {room.number} - الطابق {room.floor} ({room.type})
+                                                </option>
+                                            ))}
+                                    </select>
+                                )}
                             </div>
                             <div className="flex flex-col justify-end">
                                 <button
                                     onClick={generateSecureLink}
-                                    disabled={!roomNumber || generating}
+                                    disabled={!roomNumber || generating || loadingRooms}
                                     className="btn-primary h-[42px] px-4"
                                 >
                                     {generating ? <AdoraLoaderInline size={16} /> : 'توليد رابط آمن'}
@@ -317,6 +373,75 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                                 <p className="text-xs text-white/40 mt-2">
                                     يحتوي هذا الرابط على رمز مشفر ({secureToken.substring(0, 8)}...) لا يظهر فيه رقم الغرفة.
                                 </p>
+                            </div>
+                        )}
+
+                        {/* ✅ NEW: Existing QR Tokens Section */}
+                        {existingTokens.length > 0 && (
+                            <div className="mt-6 pt-6 border-t border-white/10">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <QrCode className="w-4 h-4 text-white/60" />
+                                    <h4 className="text-sm font-semibold text-white/80">QR المولد مسبقاً ({existingTokens.length})</h4>
+                                </div>
+                                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                                    {existingTokens
+                                        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+                                        .map((token, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`p-3 rounded-xl border ${
+                                                    token.roomNumber === roomNumber && secureToken
+                                                        ? 'bg-primary-500/10 border-primary-500/30'
+                                                        : 'bg-white/5 border-white/10'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-lg bg-primary-500/20 flex items-center justify-center">
+                                                            <span className="text-xs font-bold text-primary-400">{token.roomNumber}</span>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-semibold text-white">غرفة {token.roomNumber}</p>
+                                                            <p className="text-xs text-white/40">
+                                                                {token.createdAt.toLocaleDateString('ar-SA', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                    day: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(token.fullUrl);
+                                                                setCopied(true);
+                                                                setTimeout(() => setCopied(false), 2000);
+                                                            }}
+                                                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                                                            title="نسخ الرابط"
+                                                        >
+                                                            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-white/60" />}
+                                                        </button>
+                                                        <a
+                                                            href={token.fullUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                                                            title="فتح الرابط"
+                                                        >
+                                                            <ExternalLink className="w-4 h-4 text-white/60" />
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                                <code className="text-xs text-white/50 bg-black/20 p-2 rounded block break-all font-mono">
+                                                    {token.fullUrl}
+                                                </code>
+                                            </div>
+                                        ))}
+                                </div>
                             </div>
                         )}
                     </div>
