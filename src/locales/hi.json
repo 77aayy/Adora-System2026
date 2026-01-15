@@ -517,7 +517,10 @@
         "roomComplete": "कमरा पूर्ण - तैयार",
         "roomWithDamages": "कमरे में क्षति है",
         "roomWithMissingItems": "कमरे में खोई वस्तुएं हैं",
-        "minibarConsumptionTitle": "मिनीबार खपत"
+        "minibarConsumptionTitle": "मिनीबार खपत",
+        "guestRegisteredInRoom": "अतिथि वर्तमान में कमरे में पंजीकृत है",
+        "transfer": "स्थानांतरण",
+        "loading": "लोड हो रहा है..."
     },
     "housekeeping": {
         "title": "हाउसकीपिंग डैशबोर्ड",

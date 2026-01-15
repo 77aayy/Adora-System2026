@@ -508,7 +508,10 @@
         "roomComplete": "রুম সম্পূর্ণ - প্রস্তুত",
         "roomWithDamages": "রুমে ক্ষতি আছে",
         "roomWithMissingItems": "রুমে হারানো জিনিস আছে",
-        "minibarConsumptionTitle": "মিনিবার খরচ"
+        "minibarConsumptionTitle": "মিনিবার খরচ",
+        "guestRegisteredInRoom": "অতিথি বর্তমানে রুমে নিবন্ধিত",
+        "transfer": "স্থানান্তর",
+        "loading": "লোড হচ্ছে..."
     },
     "housekeeping": {
         "title": "হাউসকিপিং ড্যাশবোর্ড",

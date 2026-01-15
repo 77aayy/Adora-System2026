@@ -517,7 +517,10 @@
         "roomComplete": "Room Complete - Ready",
         "roomWithDamages": "Room has Damages",
         "roomWithMissingItems": "Room has Missing Items",
-        "minibarConsumptionTitle": "Minibar Consumption"
+        "minibarConsumptionTitle": "Minibar Consumption",
+        "guestRegisteredInRoom": "Guest is currently registered in room",
+        "transfer": "Transfer",
+        "loading": "Loading..."
     },
     "housekeeping": {
         "title": "Housekeeping Dashboard",

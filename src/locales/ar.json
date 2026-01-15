@@ -508,7 +508,10 @@
         "roomComplete": "الغرفة كاملة - جاهزة",
         "roomWithDamages": "الغرفة بها تلفيات",
         "roomWithMissingItems": "الغرفة بها مفقودات",
-        "minibarConsumptionTitle": "استهلاك الميني بار"
+        "minibarConsumptionTitle": "استهلاك الميني بار",
+        "guestRegisteredInRoom": "النزيل مسجل حالياً في غرفة",
+        "transfer": "نقل",
+        "loading": "جاري التحميل..."
     },
     "housekeeping": {
         "title": "الهاوس كيبنج",
