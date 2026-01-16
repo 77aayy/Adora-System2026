@@ -191,7 +191,7 @@ export const GoldenAlertDisplay: React.FC<GoldenAlertDisplayProps> = ({ departme
     if (alerts.length === 0) return null;
 
     return (
-        <div className="space-y-3 mb-4">
+        <div className="space-y-3">
             {alerts.map(alert => {
                 const config = GOLDEN_ALERT_CONFIG[alert.type];
                 const timeLeft = Math.max(0, Math.ceil((alert.expiresAt.getTime() - Date.now()) / 60000));

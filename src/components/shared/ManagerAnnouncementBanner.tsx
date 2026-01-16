@@ -173,15 +173,16 @@ export const ManagerAnnouncementBanner: React.FC<ManagerAnnouncementBannerProps>
     const typeColor = getTypeColor();
 
     return (
-        <div 
-            className="relative w-full border-b-2 shadow-lg transition-all duration-300"
-            style={{
-                background: typeColor.background,
-                borderColor: typeColor.border,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            }}
-        >
-            <div className="flex items-center justify-between px-4 py-3" style={{ color: typeColor.text }}>
+        <div className="w-full mb-3 sm:mb-4">
+            <div 
+                className="relative w-full rounded-xl sm:rounded-2xl overflow-hidden shadow-lg transition-all duration-300"
+                style={{
+                    background: typeColor.background,
+                    border: `2px solid ${typeColor.border}`,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                }}
+            >
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5" style={{ color: typeColor.text }}>
                 {/* Icon and Message */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="flex-shrink-0">
