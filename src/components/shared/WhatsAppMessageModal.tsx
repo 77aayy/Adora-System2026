@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Send, MessageCircle, User, Phone, Building2, Calendar, Clock } from 'lucide-react';
+import { UnifiedRoomInput } from './UnifiedRoomInput';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import {
@@ -15,6 +16,7 @@ import {
     type TemplateVariable
 } from '../../services/whatsappTemplatesService';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 
 interface WhatsAppMessageModalProps {
     isOpen: boolean;
@@ -49,6 +51,7 @@ export const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
     const { user } = useAuth();
     const { tenantId } = useTenant();
     const { success, error } = useUX();
+    const { t } = useTranslation();
 
     const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
     const [loading, setLoading] = useState(true);
@@ -64,8 +67,7 @@ export const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
     const [messageQueue, setMessageQueue] = useState<MessageQueueItem[]>([]);
     const [showQueue, setShowQueue] = useState(false);
     
-    // Room selection
-    const [showRoomSelector, setShowRoomSelector] = useState(false);
+    // ✅ REMOVED: showRoomSelector - now handled by UnifiedRoomInput
 
     useEffect(() => {
         if (!isOpen || !tenantId) return;
@@ -92,6 +94,7 @@ export const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
             setTemplateVariables({});
             setMessageQueue([]);
             setShowQueue(false);
+            // ✅ REMOVED: setShowRoomSelector - now handled by UnifiedRoomInput
         }
     }, [isOpen, defaultRoomNumber]);
 
@@ -384,27 +387,18 @@ export const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
                                 </select>
                             </div>
 
-                            {/* Room Number */}
+                            {/* Room Number - ✅ UNIFIED: Use UnifiedRoomInput */}
                             <div>
-                                <label className="block text-sm text-white/60 mb-2">رقم الغرفة *</label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={roomNumber}
-                                        onChange={(e) => setRoomNumber(e.target.value)}
-                                        placeholder="101"
-                                        className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white focus:border-green-500/50 focus:outline-none transition-all"
-                                    />
-                                    {rooms && rooms.length > 0 && (
-                                        <button
-                                            onClick={() => setShowRoomSelector(true)}
-                                            className="px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white hover:bg-white/20 transition-colors"
-                                            title="اختر الغرفة"
-                                        >
-                                            <Building2 className="w-5 h-5" />
-                                        </button>
-                                    )}
-                                </div>
+                                <UnifiedRoomInput
+                                    value={roomNumber}
+                                    onChange={setRoomNumber}
+                                    availableRooms={rooms?.flatMap(f => f.rooms || []) || []}
+                                    showFloorSelector={true}
+                                    showConfirmButton={false}
+                                    placeholder="101"
+                                    label={t('common.room') || 'رقم الغرفة'}
+                                    autoConfirmOnEnter={false}
+                                />
                             </div>
 
                             {/* Guest First Name */}
@@ -628,56 +622,7 @@ export const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
                 </div>
             </div>
 
-            {/* Room Selector Modal */}
-            {showRoomSelector && rooms && (
-                <RoomSelectorModal
-                    rooms={rooms.flatMap(f => f.rooms)}
-                    selectedRoom={roomNumber}
-                    onSelect={(room) => {
-                        setRoomNumber(room);
-                        setShowRoomSelector(false);
-                    }}
-                    onClose={() => setShowRoomSelector(false)}
-                />
-            )}
-        </div>
-    );
-};
-
-// Room Selector Modal Component
-const RoomSelectorModal: React.FC<{
-    rooms: string[];
-    selectedRoom: string;
-    onSelect: (room: string) => void;
-    onClose: () => void;
-}> = ({ rooms, selectedRoom, onSelect, onClose }) => {
-    return (
-        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4" style={{ backdropFilter: 'none' }}>
-            <div className="w-full max-w-md rounded-2xl modal-enter" style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}>
-                <div className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-white">اختر الغرفة</h3>
-                        <button onClick={onClose} className="text-white/60 hover:text-white">
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto">
-                        {rooms.map(room => (
-                            <button
-                                key={room}
-                                onClick={() => onSelect(room)}
-                                className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-                                    selectedRoom === room
-                                        ? 'bg-green-500 text-white'
-                                        : 'bg-white/10 text-white/60 hover:bg-white/20'
-                                }`}
-                            >
-                                {room}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
+            {/* ✅ REMOVED: RoomSelectorModal - now handled by UnifiedRoomInput internally */}
         </div>
     );
 };

@@ -12,7 +12,9 @@ import { useFeatureGate } from '../../hooks/useFeatureGate';
 import * as ShiftNotesService from '../../services/shiftNotesService';
 import { useVoiceInput } from '../../services/voiceInputService';
 import { FloorRoomSelector } from './FloorRoomSelector';
+import { UnifiedRoomInput } from './UnifiedRoomInput';
 import { useTenantRooms } from '../../hooks/useTenantData';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -30,6 +32,7 @@ interface ShiftNotesProps {
 
 export const ShiftNotes: React.FC<ShiftNotesProps> = ({ isOpen, onClose, roomNumber }) => {
     const { user, branchId: authBranchId } = useAuth();
+    const { t } = useTranslation();
     
     // ✅ Feature Gate: Check if shift notes feature is enabled
     const { isEnabled: isShiftNotesEnabled } = useFeatureGate('shiftNotes');
@@ -43,7 +46,7 @@ export const ShiftNotes: React.FC<ShiftNotesProps> = ({ isOpen, onClose, roomNum
     const [submitting, setSubmitting] = useState(false);
     const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
     const [filterRoom, setFilterRoom] = useState('');
-    const [showRoomSelector, setShowRoomSelector] = useState(false);
+    // ✅ REMOVED: showRoomSelector - now handled by UnifiedRoomInput
 
     const { rooms } = useTenantRooms();
 
@@ -338,36 +341,31 @@ export const ShiftNotes: React.FC<ShiftNotesProps> = ({ isOpen, onClose, roomNum
                 {/* Add Note (only in active mode) */}
                 {viewMode === 'active' && (
                     <div className="p-4 border-t border-white/10 space-y-3">
-                        {/* Room & Priority */}
+                        {/* Room & Priority - ✅ UNIFIED: Use UnifiedRoomInput for consistency */}
                         <div className="flex gap-2">
-                            <div className="flex-1 relative">
-                                <input
-                                    type="text"
+                            <div className="flex-1">
+                                <UnifiedRoomInput
                                     value={selectedRoom}
-                                    onChange={(e) => setSelectedRoom(e.target.value)}
-                                    placeholder={listening ? "جاري الاستماع..." : "رقم الغرفة (اختياري)"}
-                                    className={`w-full pr-4 pl-20 py-2 border rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 transition-all ${listening ? 'bg-red-500/10 border-red-500/50 ring-2 ring-red-500/20' : 'bg-white/10 border-white/10 focus:ring-blue-500/50'
-                                        }`}
+                                    onChange={setSelectedRoom}
+                                    availableRooms={rooms?.map(r => r.number) || []}
+                                    showFloorSelector={true}
+                                    showConfirmButton={false}
+                                    placeholder={listening ? "جاري الاستماع..." : t('common.room') + " (اختياري)" || "رقم الغرفة (اختياري)"}
+                                    autoConfirmOnEnter={false}
+                                    disabled={listening}
                                 />
-                                <div className="absolute left-2 top-1/2 -translate-y-1/2 flex gap-1">
+                                {/* Voice Input Button - Keep separate for ShiftNotes */}
+                                {!listening && (
                                     <button
                                         type="button"
                                         onClick={toggleVoice}
-                                        className={`w-8 h-8 rounded-lg transition-all flex items-center justify-center ${listening ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-white/60 hover:text-white hover:bg-white/20'
-                                            }`}
+                                        className="mt-2 w-full py-2 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/20 transition-all flex items-center justify-center gap-2 text-sm"
                                         title="إدخال صوتي"
                                     >
-                                        {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                                        <Mic className="w-4 h-4" />
+                                        <span>إدخال صوتي</span>
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowRoomSelector(true)}
-                                        className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all flex items-center justify-center"
-                                        title="اختر باللمس"
-                                    >
-                                        <DoorOpen className="w-4 h-4" />
-                                    </button>
-                                </div>
+                                )}
                             </div>
                             <select
                                 value={priority}
@@ -411,16 +409,7 @@ export const ShiftNotes: React.FC<ShiftNotesProps> = ({ isOpen, onClose, roomNum
                 )}
             </div>
 
-            <FloorRoomSelector
-                rooms={rooms.map(r => r.number)}
-                selectedRoom={selectedRoom}
-                onSelect={(room) => {
-                    setSelectedRoom(room);
-                    setShowRoomSelector(false);
-                }}
-                isOpen={showRoomSelector}
-                onClose={() => setShowRoomSelector(false)}
-            />
+            {/* ✅ REMOVED: FloorRoomSelector - now handled by UnifiedRoomInput internally */}
         </div >
     );
 };
