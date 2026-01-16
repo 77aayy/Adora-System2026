@@ -1,0 +1,31 @@
+# 🔄 Git Sync Rules for Cursor AI
+
+## ⚠️ CRITICAL: Always Check for Updates First
+
+**BEFORE starting any work, ALWAYS:**
+
+1. ✅ Run `git fetch origin main` to check for updates
+2. ✅ Check `git status` to see if local branch is behind
+3. ✅ If behind, run `git pull origin main` first
+4. ✅ Then proceed with the requested task
+
+## Workflow
+
+```
+User Request → Check Git Updates → Pull if needed → Execute Task
+```
+
+## Commands to Run First
+
+```bash
+git fetch origin main
+git status
+# If behind: git pull origin main
+```
+
+## Why This Matters
+
+- Prevents working on outdated code
+- Avoids merge conflicts
+- Ensures latest features are included
+- Maintains code consistency
