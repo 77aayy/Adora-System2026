@@ -12,6 +12,7 @@ import { ServiceRequest } from '../../types/request';
 import { db } from '../../services/firebase';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { FloorRoomSelector } from '../shared/FloorRoomSelector';
+import { UnifiedRoomInput } from '../shared/UnifiedRoomInput';
 import { haptic } from '../../utils/uxEffects';
 import { getQuickActions } from '../../utils/quickActionsConfig';
 import type { QuickAction } from '../../utils/quickActionsConfig';
@@ -51,8 +52,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     const [priority, setPriority] = useState<'normal' | 'urgent' | 'scheduled'>('normal');
     const [notes, setNotes] = useState('');
     const [roomNumber, setRoomNumber] = useState('');
-    const [showFloorSelector, setShowFloorSelector] = useState(false);
-    const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
+    // ✅ REMOVED: showFloorSelector, selectedFloor - now handled by UnifiedRoomInput
     const [needsCart, setNeedsCart] = useState(false);
     const [guestsInRoom, setGuestsInRoom] = useState(false);
     const [scheduledDateTime, setScheduledDateTime] = useState('');
@@ -179,7 +179,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
             setRoomNumber('');
             setPriority('normal');
             setNotes('');
-            setSelectedFloor(rooms[0]?.floor || null);
+            // ✅ REMOVED: setSelectedFloor - now handled by UnifiedRoomInput
             setNeedsCart(selectedType === 'bellman');
             setGuestsInRoom(false);
             setScheduledDateTime('');
@@ -389,80 +389,29 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                             )}
 
 
-                            <div className="space-y-3">
-                                <input
-                                    type="text"
-                                    value={roomNumber}
-                                    onChange={(e) => setRoomNumber(e.target.value)}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter' && roomNumber) {
-                                            handleRoomSelect(roomNumber);
-                                        }
-                                    }}
-                                    placeholder={t('reception.enterRoomNumber')}
-                                    className={`input text-center text-xl font-bold transition-all ${activeStats.activeRequest && selectedType !== 'coffee'
-                                        ? 'border-orange-500/50 focus:border-orange-500 focus:ring-orange-500/20'
-                                        : ''
-                                        }`}
-                                    autoFocus
-                                />
-                                <button
-                                    onClick={() => roomNumber && handleRoomSelect(roomNumber)}
-                                    disabled={!roomNumber || !rooms || rooms.length === 0}
-                                    className={`w-full py-3.5 rounded-xl font-bold text-base transition-all flex items-center justify-center gap-2 ${
-                                        roomNumber && rooms && rooms.length > 0
-                                            ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/30 hover:shadow-xl hover:shadow-teal-500/40 active:scale-[0.98]'
-                                            : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-                                    }`}
-                                >
-                                    <CheckCircle className="w-5 h-5" />
-                                    {t('reception.confirmRoomNumber')}
-                                </button>
-                                
-                                {/* ✅ Show warning if rooms not loaded */}
-                                {(!rooms || rooms.length === 0) && (
-                                    <div className="p-3 rounded-xl bg-yellow-500/20 border border-yellow-500/30 flex items-center gap-2 text-yellow-300 text-sm">
-                                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                        <span>{t('reception.pleaseWaitForRooms') || 'يرجى الانتظار حتى يتم تحميل بيانات الغرف...'}</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* ✅ SECURITY: Show validation error if room not found */}
-                            {validationError && step === 'room' && (
-                                <div className="mt-3 p-3 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center gap-2 text-red-300 animate-shake">
-                                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                                    <span className="text-sm flex-1">{validationError}</span>
-                                    <button 
-                                        onClick={() => setValidationError(null)} 
-                                        className="text-red-400 hover:text-red-200 transition-colors"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            )}
-
-                            <div className="flex items-center gap-2 text-white/70">
-                                <div className="flex-1 h-px bg-white/10"></div>
-                                <span className="text-xs">{t('reception.orSelectFromList')}</span>
-                                <div className="flex-1 h-px bg-white/10"></div>
-                            </div>
-
-                            <button
-                                onClick={() => setShowFloorSelector(true)}
-                                className="w-full py-3.5 rounded-2xl pro-card hover:bg-white/15 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm font-semibold"
-                            >
-                                <Building2 className="w-4 h-4 text-primary-400" />
-                                <span className="text-white/80">{t('reception.selectRoomByFloor')}</span>
-                            </button>
-
-                            <FloorRoomSelector
-                                rooms={rooms.flatMap(f => f.rooms)}
-                                selectedRoom={selectedRoom}
-                                onSelect={handleRoomSelect}
-                                isOpen={showFloorSelector}
-                                onClose={() => setShowFloorSelector(false)}
+                            {/* ✅ UNIFIED: Use UnifiedRoomInput component for consistent UX */}
+                            <UnifiedRoomInput
+                                value={roomNumber}
+                                onChange={setRoomNumber}
+                                onConfirm={handleRoomSelect}
+                                availableRooms={rooms?.flatMap(f => f.rooms || []) || []}
                                 blockedRooms={activeStats.blockedRooms}
+                                showFloorSelector={true}
+                                showConfirmButton={true}
+                                placeholder={t('reception.enterRoomNumber')}
+                                error={validationError}
+                                autoConfirmOnEnter={true}
+                                validateRoom={(room) => {
+                                    const allRooms = rooms?.flatMap(f => f.rooms || []) || [];
+                                    if (rooms && rooms.length > 0 && allRooms.length > 0 && !allRooms.includes(room)) {
+                                        return {
+                                            valid: false,
+                                            message: t('reception.roomNotFoundInBranch', { room }) || `Room ${room} does not exist in this branch.`
+                                        };
+                                    }
+                                    return { valid: true };
+                                }}
+                                className="mt-4"
                             />
                         </div>
                     ) : (

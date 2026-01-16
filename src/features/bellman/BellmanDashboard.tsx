@@ -48,6 +48,7 @@ import { PointsTracker } from '../../components/shared/PointsTracker';
 import { ProcurementCartWizard } from '../../components/shared/ProcurementCartWizard';
 import { TeamMembers } from '../../components/shared/TeamMembers';
 import { FloorRoomSelector } from '../../components/shared/FloorRoomSelector';
+import { UnifiedRoomInput } from '../../components/shared/UnifiedRoomInput';
 // ✅ Room Transfer Components
 import { RoomTransferModal } from '../../components/guest/RoomTransferModal';
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge';
@@ -210,7 +211,7 @@ const CheckinModal: React.FC<{
     const [adults, setAdults] = useState(1);
     const [children, setChildren] = useState(0);
     const [notes, setNotes] = useState('');
-    const [showFloorSelector, setShowFloorSelector] = useState(false);
+    // ✅ REMOVED: showFloorSelector - now handled by UnifiedRoomInput
     const [selectedReceptionist, setSelectedReceptionist] = useState<{ id: string; name: string } | null>(null);
 
     // ✅ Get active room numbers (rooms with active cards)
@@ -258,7 +259,7 @@ const CheckinModal: React.FC<{
             setAdults(1);
             setChildren(0);
             setNotes('');
-            setShowFloorSelector(false);
+            // ✅ REMOVED: setShowFloorSelector - now handled by UnifiedRoomInput
         }
     }, [isOpen]);
 
@@ -325,66 +326,26 @@ const CheckinModal: React.FC<{
                 <div className="p-4 overflow-y-auto max-h-[60vh]">
                     {step === 'room' ? (
                         <div className="space-y-4">
-                            {/* Open Floor Selector Button */}
-                            <button
-                                onClick={() => setShowFloorSelector(true)}
-                                className="adora-card w-full py-4 rounded-xl hover:opacity-80 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <DoorOpen className="w-5 h-5 text-green-400" />
-                                <span className="text-white font-medium">{t('bellman.selectRoomByFloor')}</span>
-                            </button>
-
-                            {/* Or direct input */}
-                            <div className="space-y-3">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={roomNumber}
-                                    onChange={(e) => setRoomNumber(e.target.value)}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter' && roomNumber && !roomHasActiveCard) {
-                                            handleRoomSelect(roomNumber);
-                                        }
-                                    }}
-                                    placeholder={t('bellman.orEnterRoomDirectly')}
-                                    className={`input text-center text-lg ${roomHasActiveCard ? 'border-red-500 border-2' : ''}`}
-                                />
-                                
-                                {/* ⚠️ Active Card Warning */}
-                                {roomHasActiveCard && (
-                                    <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/50">
-                                        <div className="flex items-center gap-2 text-red-400">
-                                            <AlertCircle className="w-5 h-5" />
-                                            <div>
-                                                <p className="font-bold text-sm">{t('bellman.roomHasActiveCard')}</p>
-                                                <p className="text-xs text-red-300">{t('bellman.roomHasActiveCardDesc', { room: roomNumber })}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {/* ✅ زر تأكيد منفصل وواضح */}
-                                <button
-                                    onClick={() => roomNumber && !roomHasActiveCard && handleRoomSelect(roomNumber)}
-                                    disabled={!roomNumber || roomHasActiveCard}
-                                    className={`w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${
-                                        roomNumber && !roomHasActiveCard
-                                            ? 'adora-btn-primary' 
-                                            : 'adora-btn-ghost cursor-not-allowed opacity-50'
-                                    }`}
-                                >
-                                    <CheckCircle className="w-5 h-5" />
-                                    {t('bellman.confirmRoomNumber')}
-                                </button>
-                            </div>
-
-                            {/* Floor Room Selector Modal - Only show available rooms */}
-                            <FloorRoomSelector
-                                rooms={availableRooms}
-                                selectedRoom={roomNumber}
-                                onSelect={handleRoomSelect}
-                                isOpen={showFloorSelector}
-                                onClose={() => setShowFloorSelector(false)}
+                            {/* ✅ UNIFIED: Use UnifiedRoomInput component for consistent UX */}
+                            <UnifiedRoomInput
+                                value={roomNumber}
+                                onChange={setRoomNumber}
+                                onConfirm={handleRoomSelect}
+                                availableRooms={availableRooms}
+                                activeRoomNumbers={activeRoomNumbers}
+                                showFloorSelector={true}
+                                showConfirmButton={true}
+                                placeholder={t('bellman.orEnterRoomDirectly')}
+                                autoConfirmOnEnter={true}
+                                validateRoom={(room) => {
+                                    if (!availableRooms.includes(room)) {
+                                        return {
+                                            valid: false,
+                                            message: t('reception.roomNotFoundInBranch', { room }) || `Room ${room} does not exist in this branch.`
+                                        };
+                                    }
+                                    return { valid: true };
+                                }}
                             />
                         </div>
                     ) : (
