@@ -934,14 +934,20 @@ export const ReceptionDashboard: React.FC = () => {
             />
 
             {/* Challenge Timeline */}
-            <ChallengeTimeline />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <ChallengeTimeline />
+            </div>
 
             {/* Golden Alert - Broadcast Messages */}
-            <GoldenAlertDisplay department="reception" />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <GoldenAlertDisplay department="reception" />
+            </div>
 
             {/* ✅ Room Transfer Notifications */}
-            <div className="flex justify-end mb-3">
-                <TransferNotificationBadge department="reception" />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="flex justify-end">
+                    <TransferNotificationBadge department="reception" />
+                </div>
             </div>
 
             {/* 📊 Operations Quick-View Bar (شريط العمليات الذكي) */}

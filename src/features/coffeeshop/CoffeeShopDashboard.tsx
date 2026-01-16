@@ -289,33 +289,37 @@ export const CoffeeShopDashboard: React.FC = () => {
                 </div>
 
                 {/* ✅ تايم لاين الالتزام - تصميم H Rewards */}
-                <div className="mb-4">
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <ChallengeTimeline />
                 </div>
 
                 {/* Search */}
-                <div className="relative mb-4">
-                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 adora-text-tertiary" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="adora-input w-full pr-12 pl-4 py-3 rounded-xl"
-                        placeholder={t('coffeeshop.searchPlaceholder')}
-                    />
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                    <div className="relative">
+                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 adora-text-tertiary" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="adora-input w-full pr-12 pl-4 py-3 rounded-xl"
+                            placeholder={t('coffeeshop.searchPlaceholder')}
+                        />
+                    </div>
                 </div>
 
                 {/* ✅ Unified Tabs - Same as Reception */}
-                <UnifiedRequestTabs
-                    currentTab={currentTab}
-                    onTabChange={(tab) => setCurrentTab(tab)}
-                    newCount={groupedOrders.new.length}
-                    inProgressCount={groupedOrders.in_progress.length}
-                    completedCount={groupedOrders.completed.length}
-                />
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                    <UnifiedRequestTabs
+                        currentTab={currentTab}
+                        onTabChange={(tab) => setCurrentTab(tab)}
+                        newCount={groupedOrders.new.length}
+                        inProgressCount={groupedOrders.in_progress.length}
+                        completedCount={groupedOrders.completed.length}
+                    />
+                </div>
 
                 {/* Orders List */}
-                <div className="space-y-3">
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto space-y-3">
                     {currentOrders.length === 0 ? (
                         <div className="adora-card rounded-2xl transition-colors duration-300 p-12 text-center">
                             <Coffee className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--theme-text-tertiary)' }} />

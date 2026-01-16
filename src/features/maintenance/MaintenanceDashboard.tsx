@@ -1159,7 +1159,7 @@ export const MaintenanceDashboard: React.FC = () => {
             </div>
 
             {/* Progress Tracker */}
-            <div className="mt-6">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
                 <TaskProgress
                     completed={completedRequests.length}
                     total={activeRequests.length + completedRequests.length}
@@ -1169,7 +1169,7 @@ export const MaintenanceDashboard: React.FC = () => {
             </div>
 
             {/* ✅ Unified Tabs - Same as Reception */}
-            <div className="mt-6">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
                 <UnifiedRequestTabs
                     currentTab={currentTab}
                     onTabChange={(tab) => switchTab(tab)}
