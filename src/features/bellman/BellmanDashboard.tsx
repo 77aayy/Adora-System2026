@@ -1054,12 +1054,12 @@ export const BellmanDashboard: React.FC = () => {
             {/* Manager Announcement Banner */}
             <ManagerAnnouncementBanner department="bellman" />
             
-        <div className="min-h-screen p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
-            {/* Flexible Header */}
+            <div className="min-h-screen pb-20 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+            {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
             <FlexibleHeader
                 title={t('bellman.title')}
                 titleIcon={<Bell className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 flex-shrink-0" />}
-                showGreeting={true}
+                showGreeting={false}
                 brandName={brandName}
                 subtitle={undefined}
                 actions={[
@@ -1104,15 +1104,18 @@ export const BellmanDashboard: React.FC = () => {
             </div>
 
             {/* ✅ Room Transfer Notifications */}
-            <div className="flex justify-end mb-3">
-                <TransferNotificationBadge department="bellman" />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto">
+                <div className="flex justify-end mb-3">
+                    <TransferNotificationBadge department="bellman" />
+                </div>
             </div>
 
             {/* Challenge Timeline */}
             <ChallengeTimeline />
 
             {/* Stats - Unified Style */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={occupiedRoomNumbers.length}
@@ -1146,7 +1149,7 @@ export const BellmanDashboard: React.FC = () => {
             </div>
 
             {/* Quick Actions - Premium Hero Button */}
-            <div className="mb-6">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-6">
                 <button
                     onClick={() => setShowCheckinModal(true)}
                     className="w-full relative group overflow-hidden p-[1px] rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
@@ -1170,16 +1173,18 @@ export const BellmanDashboard: React.FC = () => {
             </div>
 
             {/* ✅ Unified Tabs - Same as Reception */}
-            <UnifiedRequestTabs
-                currentTab={currentTab}
-                onTabChange={(tab) => setCurrentTab(tab)}
-                newCount={groupedRequests.new.length}
-                inProgressCount={groupedRequests.in_progress.length}
-                completedCount={groupedRequests.completed.length}
-            />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <UnifiedRequestTabs
+                    currentTab={currentTab}
+                    onTabChange={(tab) => setCurrentTab(tab)}
+                    newCount={groupedRequests.new.length}
+                    inProgressCount={groupedRequests.in_progress.length}
+                    completedCount={groupedRequests.completed.length}
+                />
+            </div>
 
             {/* ✅ Content - Unified Tabs (جديد / قيد التنفيذ / مكتمل) */}
-            <div className="space-y-3">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto space-y-3">
                 {/* Render requests based on current tab */}
                 {(() => {
                     const currentRequests = groupedRequests[currentTab] || [];

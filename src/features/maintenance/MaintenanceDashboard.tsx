@@ -1030,7 +1030,7 @@ export const MaintenanceDashboard: React.FC = () => {
             {/* Manager Announcement Banner */}
             <ManagerAnnouncementBanner department="maintenance" />
             
-            <div className="min-h-screen p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+            <div className="min-h-screen pb-20 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
             {/* Flexible Header with Dynamic Greeting */}
             <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <div className="flex-1 min-w-0">
@@ -1088,8 +1088,10 @@ export const MaintenanceDashboard: React.FC = () => {
             <GoldenAlertDisplay department="maintenance" />
 
             {/* ✅ Room Transfer Notifications */}
-            <div className="flex justify-end mb-3">
-                <TransferNotificationBadge department="maintenance" />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto">
+                <div className="flex justify-end mb-3">
+                    <TransferNotificationBadge department="maintenance" />
+                </div>
             </div>
 
             {/* ✅ Points Notification - Show for active CONFIRMED requests */}
@@ -1105,7 +1107,8 @@ export const MaintenanceDashboard: React.FC = () => {
             )}
 
             {/* Stats Cards - Unified Style */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={activeRequests.filter(r => r.status === 'IN_PROGRESS').length}

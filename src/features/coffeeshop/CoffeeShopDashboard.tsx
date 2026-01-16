@@ -216,11 +216,11 @@ export const CoffeeShopDashboard: React.FC = () => {
             {/* Manager Announcement Banner */}
             <ManagerAnnouncementBanner department="coffee_shop" />
             
-            <div className="min-h-screen p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
-                {/* Header */}
+            <div className="min-h-screen pb-20 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+                {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
                 <FlexibleHeader
-                    title="كوفي شوب"
-                    showGreeting={true}
+                    title={t('coffeeshop.title') || 'كوفي شوب'}
+                    showGreeting={false}
                     brandName={brandName}
                     subtitle={undefined}
                     actions={[
@@ -247,12 +247,15 @@ export const CoffeeShopDashboard: React.FC = () => {
                 />
 
                 {/* ✅ Room Transfer Notifications */}
-                <div className="flex justify-end mb-3">
-                    <TransferNotificationBadge department="coffee_shop" />
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto">
+                    <div className="flex justify-end mb-3">
+                        <TransferNotificationBadge department="coffee_shop" />
+                    </div>
                 </div>
 
                 {/* Stats - الكروت الإحصائية */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3">
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
                     <StatCard
                         count={groupedOrders.new.length}
                         label="🆕 جديد"

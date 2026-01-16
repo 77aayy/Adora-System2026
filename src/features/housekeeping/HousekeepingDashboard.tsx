@@ -1705,12 +1705,12 @@ export const HousekeepingDashboard: React.FC = () => {
             {/* Manager Announcement Banner */}
             <ManagerAnnouncementBanner department="housekeeping" />
             
-            <div className="min-h-screen p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
-            {/* Flexible Header */}
+            <div className="min-h-screen pb-20 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+            {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
             <FlexibleHeader
                 title={t('housekeeping.title')}
                 titleIcon={<Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400 flex-shrink-0" />}
-                showGreeting={true}
+                showGreeting={false}
                 brandName={brandName}
                 subtitle={undefined}
                 actions={[
@@ -1762,8 +1762,10 @@ export const HousekeepingDashboard: React.FC = () => {
             <GoldenAlertDisplay department="housekeeping" />
 
             {/* ✅ Room Transfer Notifications */}
-            <div className="flex justify-end mb-3">
-                <TransferNotificationBadge department="housekeeping" />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto">
+                <div className="flex justify-end mb-3">
+                    <TransferNotificationBadge department="housekeeping" />
+                </div>
             </div>
 
             {/* ✅ Points Notification - Show for active CONFIRMED tasks */}
@@ -1779,7 +1781,8 @@ export const HousekeepingDashboard: React.FC = () => {
             )}
 
             {/* Stats - Unified Style */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={groupedTasks.new.length}
@@ -1813,7 +1816,8 @@ export const HousekeepingDashboard: React.FC = () => {
             </div>
 
             {/* Room Type Filter - Segmented Control Style */}
-            <div className="adora-card p-1 rounded-2xl flex mb-4 relative z-0">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="adora-card p-1 rounded-2xl flex relative z-0">
                 {[
                     { key: 'all', label: t('housekeeping.filterAll'), icon: <DoorOpen className="w-4 h-4" /> },
                     { key: 'occupied', label: t('housekeeping.filterOccupied'), icon: <span>🏠</span> },
@@ -1834,10 +1838,12 @@ export const HousekeepingDashboard: React.FC = () => {
                         <span>{filter.label}</span>
                     </button>
                 ))}
+                </div>
             </div>
 
             {/* Floor Filter */}
-            <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 <span className="adora-text-tertiary text-sm flex-shrink-0">{t('housekeeping.floorFilter')}:</span>
                 {availableFloors.map((floor) => (
                     <button
@@ -1854,10 +1860,12 @@ export const HousekeepingDashboard: React.FC = () => {
                         {floor === 0 ? t('housekeeping.filterAll') : floor}
                     </button>
                 ))}
+                </div>
             </div>
 
             {/* ✅ Unified Tabs - Same as Reception */}
-            <UnifiedRequestTabs
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <UnifiedRequestTabs
                 currentTab={currentTab}
                 onTabChange={(tab) => {
                     setCurrentTab(tab);
@@ -1866,10 +1874,12 @@ export const HousekeepingDashboard: React.FC = () => {
                 newCount={groupedTasks.new.length}
                 inProgressCount={groupedTasks.inProgress.length}
                 completedCount={groupedTasks.completed.length}
-            />
+                />
+            </div>
 
             {/* Tasks List - Grid for Mobile */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {currentTasks.length === 0 ? (
                     <div className="col-span-full adora-card p-8 text-center">
                         <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 adora-bg-tertiary">
