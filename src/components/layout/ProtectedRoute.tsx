@@ -39,9 +39,18 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         return <Navigate to="/firebase-setup" replace />;
     }
 
-    // Not authenticated -> redirect to login
+    // ✅ FIX: Handle session expiry gracefully
+    // Not authenticated -> redirect to login with error message
     if (!isAuthenticated) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
+        // Clear any stale session data
+        try {
+            localStorage.removeItem('adora_session');
+            localStorage.removeItem('adora_employee_id');
+            localStorage.removeItem('adora_tenant_id');
+        } catch (e) {
+            console.warn('Error clearing session:', e);
+        }
+        return <Navigate to="/login" state={{ from: location, error: 'session_expired' }} replace />;
     }
 
     // Check department access if specified

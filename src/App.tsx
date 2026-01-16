@@ -1,4 +1,5 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Main Application Entry
  * Adora Hotel Management System V2
  */
@@ -46,6 +47,35 @@ import { BroadcastMessages } from './components/system/BroadcastMessages';
 import { UpdateNotifications } from './components/system/UpdateNotifications';
 import { UnifiedManagerHeader } from './components/layout/UnifiedManagerHeader';
 import './index.css';
+
+// ============================================================
+// OWNERSHIP WATERMARK (Security Protection)
+// ============================================================
+
+const checkOwnership = () => {
+    if (typeof window === 'undefined') return;
+    
+    const hostname = window.location.hostname;
+    const allowedHosts = ['adora-hotels.com', 'localhost', '127.0.0.1'];
+    
+    if (!allowedHosts.some(host => hostname.includes(host.split(':')[0]))) {
+        const watermark = `
+╔══════════════════════════════════════════════════════════════╗
+║  🛡️  ADORA SYSTEM - PROTECTED BY SAIP                        ║
+║  Registration: 25-12-57961106                                ║
+║                                                               ║
+║  ⚠️  UNAUTHORIZED USE IS STRICTLY PROHIBITED                  ║
+║  Property of Ayman Ahmed                                      ║
+║  Adora Hotels Management System                                ║
+╚══════════════════════════════════════════════════════════════╝
+        `;
+        console.warn(watermark);
+        console.error('Unauthorized domain detected:', hostname);
+    }
+};
+
+// Execute on load
+checkOwnership();
 
 // ✅ CRITICAL: Pre-import Chart.js to ensure vendor-chartjs is in dependency graph
 // This ensures it's added to modulepreload automatically by Vite

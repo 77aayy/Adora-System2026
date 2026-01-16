@@ -268,7 +268,7 @@ export async function awardPointsWithQualityCheck(
         return {
             awarded: false,
             held: true,
-            message: `⚠️ تم تعليق ${points} نقاط للمراجعة: ${suspiciousCheck.message}`
+            message: `⚠️ ${points} points held for review: ${suspiciousCheck.message}`
         };
     }
     
@@ -278,7 +278,7 @@ export async function awardPointsWithQualityCheck(
     return {
         awarded: true,
         held: false,
-        message: `✅ تم منح ${points} نقاط: ${reason}`
+            message: `✅ ${points} points awarded: ${reason}`
     };
 }
 
@@ -403,19 +403,19 @@ export async function awardPerformancePoints(
 
                         let multiplier = 1;
                         let multiplierReason = '';
-                        if (currentStreak >= 5) { multiplier = 1.5; multiplierReason = '🔥 (شعلة x1.5)'; }
-                        else if (currentStreak >= 3) { multiplier = 1.2; multiplierReason = '⚡ (كومبو x1.2)'; }
+                        if (currentStreak >= 5) { multiplier = 1.5; multiplierReason = '🔥 (Streak x1.5)'; }
+                        else if (currentStreak >= 3) { multiplier = 1.2; multiplierReason = '⚡ (Combo x1.2)'; }
 
-                        await awardPointsWithMultiplier(tenantId, employeeId, totalPoints, 'تأكيد سريع', multiplier, multiplierReason);
+                        await awardPointsWithMultiplier(tenantId, employeeId, totalPoints, 'Fast confirmation', multiplier, multiplierReason);
                         return Math.round(totalPoints * multiplier);
                     } else {
                         await updateStreak(tenantId, employeeId, false);
                         if (durationMinutes > (receptionConfig.veryLateConfirmationTime || 10)) {
                             totalPoints += (receptionConfig.veryLateConfirmationPenalty || -2);
-                            bonusReason = ' (خصم تأخير كبير)';
+                            bonusReason = ' (Major delay penalty)';
                         } else if (durationMinutes > (receptionConfig.lateConfirmationTime || 5)) {
                             totalPoints += (receptionConfig.lateConfirmationPenalty || -1);
-                            bonusReason = ' (خصم تأخير بسيط)';
+                            bonusReason = ' (Minor delay penalty)';
                         }
                     }
                 }
@@ -431,13 +431,13 @@ export async function awardPerformancePoints(
                     const earlyThreshold = targetMinutes * 0.8;
                     if (durationMinutes <= earlyThreshold) {
                         totalPoints += (procurementConfig.early || 0);
-                        bonusReason = ` (تبكير: ${durationMinutes}/${targetMinutes} د)`;
+                        bonusReason = ` (Early: ${durationMinutes}/${targetMinutes} min)`;
                     } else if (durationMinutes > targetMinutes) {
                         totalPoints += (procurementConfig.delay || 0);
-                        bonusReason = ` (تأخير: ${durationMinutes}/${targetMinutes} د)`;
+                        bonusReason = ` (Delay: ${durationMinutes}/${targetMinutes} min)`;
                     } else {
                         totalPoints += (procurementConfig.ontime || 0);
-                        bonusReason = ` (بالموعد: ${durationMinutes}/${targetMinutes} د)`;
+                        bonusReason = ` (On time: ${durationMinutes}/${targetMinutes} min)`;
                     }
                 }
                 break;
@@ -474,7 +474,9 @@ export async function awardPerformancePoints(
 
         // Final Award
         if (totalPoints !== 0 || bonusReason !== '') {
-            await awardPoints(tenantId, employeeId, totalPoints, `${getArabicActionName(baseAction)}${bonusReason}`);
+            // ✅ Use reason parameter if provided, otherwise use action name
+            const actionReason = reason || baseAction;
+            await awardPoints(tenantId, employeeId, totalPoints, `${actionReason}${bonusReason}`);
         }
 
         return totalPoints;
@@ -485,24 +487,7 @@ export async function awardPerformancePoints(
     }
 }
 
-function getArabicActionName(action: string): string {
-    const map: Record<string, string> = {
-        'start': 'بدء مهمة',
-        'complete': 'إتمام مهمة',
-        'confirm': 'تأكيد طلب',
-        'inspection': 'فحص',
-        'purchase': 'عملية شراء',
-        'receive': 'استلام',
-        'checkin': 'دخول نزيل',
-        'checkout': 'مغادرة نزيل',
-        'completeOccupied': 'تنظيف (ساكن)',
-        'completeCheckout': 'تنظيف (مغادرة)',
-        'confirmRequest': 'تأكيد طلب',
-        'completeRequest': 'إتمام طلب',
-        'create': 'إنشاء طلب'
-    };
-    return map[action] || action;
-}
+// ✅ Removed getArabicActionName function - use reason parameter from caller instead
 
 /**
  * Award points based on guest rating (5-star mapping)
@@ -615,22 +600,32 @@ export async function awardPoints(
     reason: string = ''
 ): Promise<void> {
     try {
+        // ✅ FIX: Try both employees collection and users collection (backward compatibility)
         const employeeRef = doc(db, `tenants/${tenantId}/employees`, employeeId);
+        const userRef = doc(db, 'users', employeeId);
 
         await runTransaction(db, async (transaction) => {
             const employeeDoc = await transaction.get(employeeRef);
-            if (!employeeDoc.exists()) {
-                throw new Error('Employee not found');
+            const userDoc = await transaction.get(userRef);
+            
+            // ✅ FIX: Use whichever exists (employees collection preferred, users as fallback)
+            if (!employeeDoc.exists() && !userDoc.exists()) {
+                console.warn(`⚠️ Employee/User not found in both collections: ${employeeId}. Skipping points award.`);
+                return; // Skip points award but don't fail the request creation
             }
+            
+            // Use employee doc if exists, otherwise use user doc
+            const targetDoc = employeeDoc.exists() ? employeeDoc : userDoc;
+            const targetRef = employeeDoc.exists() ? employeeRef : userRef;
 
-            const employeeData = employeeDoc.data();
+            const employeeData = targetDoc.data();
 
             // 🛡️ Backward Compatibility: Initialize fields if missing
-            const currentPoints = (employeeData.currentPoints ?? employeeData.personalPoints ?? 0) + points;
-            const lifetimePoints = (employeeData.lifetimePoints ?? 0) + points;
+            const currentPoints = (employeeData.currentPoints ?? employeeData.personalPoints ?? employeeData.points ?? 0) + points;
+            const lifetimePoints = (employeeData.lifetimePoints ?? employeeData.points ?? 0) + points;
 
-            // 1. Update employee financial points
-            transaction.update(employeeRef, {
+            // 1. Update employee/user financial points
+            transaction.update(targetRef, {
                 personalPoints: currentPoints, // Legacy field
                 points: currentPoints,         // Legacy field
                 currentPoints: currentPoints,  // New spendable field
@@ -638,31 +633,33 @@ export async function awardPoints(
                 lastAwardedAt: serverTimestamp()
             });
 
-            // 2. Add to wallet_transactions (New Ledger System)
-            const transactionRef = doc(collection(db, `tenants/${tenantId}/employees/${employeeId}/wallet_transactions`));
-            transaction.set(transactionRef, {
-                userId: employeeId,
-                type: 'earn',
-                points: points,
-                description: reason,
-                createdAt: serverTimestamp()
-            });
-
-            // 3. Add to legacy points history (optional but keeping for audit)
-            const historyRef = doc(collection(db, `tenants/${tenantId}/employees/${employeeId}/pointsHistory`));
-            transaction.set(historyRef, {
-                points,
-                reason,
-                timestamp: serverTimestamp(),
-                previousPoints: employeeData.currentPoints ?? employeeData.personalPoints ?? 0
-            });
-
-            // 4. Update team points if employee is in a team
-            if (employeeData.teamId) {
-                const teamRef = doc(db, `tenants/${tenantId}/teams`, employeeData.teamId);
-                transaction.update(teamRef, {
-                    teamPoints: increment(points)
+            // 2. Add to wallet_transactions (New Ledger System) - only if employee doc exists
+            if (employeeDoc.exists()) {
+                const transactionRef = doc(collection(db, `tenants/${tenantId}/employees/${employeeId}/wallet_transactions`));
+                transaction.set(transactionRef, {
+                    userId: employeeId,
+                    type: 'earn',
+                    points: points,
+                    description: reason,
+                    createdAt: serverTimestamp()
                 });
+
+                // 3. Add to legacy points history (optional but keeping for audit)
+                const historyRef = doc(collection(db, `tenants/${tenantId}/employees/${employeeId}/pointsHistory`));
+                transaction.set(historyRef, {
+                    points,
+                    reason,
+                    timestamp: serverTimestamp(),
+                    previousPoints: employeeData.currentPoints ?? employeeData.personalPoints ?? employeeData.points ?? 0
+                });
+
+                // 4. Update team points if employee is in a team
+                if (employeeData.teamId) {
+                    const teamRef = doc(db, `tenants/${tenantId}/teams`, employeeData.teamId);
+                    transaction.update(teamRef, {
+                        teamPoints: increment(points)
+                    });
+                }
             }
         });
 
@@ -799,7 +796,7 @@ export async function getLeaderboard(tenantId: string, limitCount: number = 10):
             const data = docSnap.data();
             leaderboard.push({
                 id: docSnap.id,
-                name: data.name || 'موظف',
+                name: data.name || 'Employee',
                 points: data.lifetimePoints || data.points || 0,
                 rank: rank++,
                 department: data.department || ''

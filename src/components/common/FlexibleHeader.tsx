@@ -1,4 +1,5 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Flexible Header Component
  * Mobile-first, responsive header for all dashboards
  * Adora Hotel Management System V2
@@ -13,6 +14,7 @@ import { MobileMenu } from './MobileMenu';
 import { ResponsiveActionBar } from './ResponsiveActionBar'; // ✅ New unified action bar
 import { useAuth } from '../../context/AuthContext';
 import { getGreetingParts } from '../../utils/greetings';
+import { useTranslation } from 'react-i18next';
 
 interface HeaderAction {
     id: string;
@@ -49,13 +51,14 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
     brandName
 }) => {
     const { user, logout } = useAuth();
+    const { t } = useTranslation();
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     
-    // Dynamic greeting based on time of day
+    // Dynamic greeting based on time of day with i18n
     const greeting = useMemo(() => {
         if (!showGreeting || !user?.name) return null;
-        return getGreetingParts(user.name);
-    }, [showGreeting, user?.name]);
+        return getGreetingParts(user.name, t);
+    }, [showGreeting, user?.name, t]);
 
     // Filter actions based on user role
     const visibleActions = actions.filter(action => {
@@ -96,7 +99,7 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
                                         className="text-lg sm:text-xl md:text-2xl font-bold truncate"
                                         style={{ color: 'var(--theme-text-primary)' }}
                                     >
-                                        {greeting.emoji} {greeting.timeGreeting}، {greeting.motivational} يا {user?.name}
+                                        {greeting.emoji} {greeting.timeGreeting}, {greeting.motivational} {t('greetings.you') || 'you'} {user?.name}
                                     </h1>
                                     {brandName && (
                                         <div 

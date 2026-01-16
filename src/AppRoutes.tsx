@@ -57,7 +57,7 @@ const GuestDashboard = lazyLoad(() => import(/* webpackChunkName: "guest" */ './
 const GuestLayout = lazyLoad(() => import(/* webpackChunkName: "guest-layout" */ './components/layout/GuestLayout'));
 
 // ✅ Demo Portal (Public access for potential buyers)
-const DemoEntry = lazyLoad(() => import(/* webpackChunkName: "demo" */ './features/demo/DemoEntry'));
+const DemoEntry = lazyLoad(() => import(/* webpackChunkName: "demo" */ './features/demo/DemoEntry').then(m => ({ default: m.DemoEntry })));
 
 // Auth / Setup (keep eager for fast login)
 import LoginScreen from './features/auth/LoginScreen';
@@ -68,6 +68,7 @@ import { FirebaseSetupWizard } from './features/setup/FirebaseSetupWizard';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import { getDepartmentPath } from './services/userService';
+import { ReceptionProvider } from './context/ReceptionContext';
 
 // ======================================================
 // Root Redirect (Smart SaaS Redirect)
@@ -172,7 +173,8 @@ export const AppRoutes: React.FC = () => {
                 />
 
                 {/* ================= Demo (Public - For Potential Buyers) ================= */}
-                <Route path="/demo/:code" element={<DemoEntry />} />
+                <Route path="/demo" element={<DemoEntry />} />
+                <Route path="/demo-access" element={<DemoEntry />} />
 
                 {/* ================= Guest (Public) ================= */}
                 <Route
@@ -189,7 +191,9 @@ export const AppRoutes: React.FC = () => {
                     path="/reception"
                     element={
                         <ProtectedRoute allowedDepartments={['reception', 'admin']}>
-                            <ReceptionDashboard />
+                            <ReceptionProvider>
+                                <ReceptionDashboard />
+                            </ReceptionProvider>
                         </ProtectedRoute>
                     }
                 />

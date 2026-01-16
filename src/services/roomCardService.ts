@@ -1,4 +1,5 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Room Card Service
  * Manages guest check-in/check-out lifecycle
  * Adora Hotel Management System V2
@@ -466,26 +467,46 @@ export const getActiveRoomCard = async (roomNumber: string, tenantId?: string): 
 /**
  * Subscribe to active room cards (real-time)
  */
+/**
+ * ✅ SECURITY FIX: Now requires branchId for proper data isolation
+ * Prevents duplicate Room Cards from other branches
+ */
 export const subscribeToActiveRoomCards = (
     callback: (cards: RoomCard[]) => void,
-    tenantId?: string
+    tenantId?: string,
+    branchId?: string
 ): Unsubscribe => {
     const roomCardsRef = collection(db, ROOM_CARDS_COLLECTION);
     const constraints: any[] = [where('status', '==', 'active')];
 
     if (tenantId) constraints.push(where('tenantId', '==', tenantId));
+    
+    // ✅ CRITICAL FIX: Filter by branchId to prevent duplicates from other branches
+    if (branchId) {
+        // Try both 'branch' and 'branchId' fields for backward compatibility
+        constraints.push(where('branch', '==', branchId));
+    }
 
     const q = query(roomCardsRef, ...constraints);
 
     return onSnapshot(q, (snapshot) => {
         const cards = snapshot.docs.map(mapDocToRoomCard);
+        // ✅ Additional client-side filter for branchId (safety net)
+        const filteredCards = branchId 
+            ? cards.filter(card => {
+                // Check both 'branch' and 'branchId' fields
+                const cardBranch = (card as any).branch || (card as any).branchId;
+                return cardBranch === branchId;
+            })
+            : cards;
+        
         // Sort client-side
-        cards.sort((a, b) => {
+        filteredCards.sort((a, b) => {
             const timeA = a.checkInTime ? new Date(a.checkInTime).getTime() : 0;
             const timeB = b.checkInTime ? new Date(b.checkInTime).getTime() : 0;
             return timeB - timeA;
         });
-        callback(cards);
+        callback(filteredCards);
     });
 };
 

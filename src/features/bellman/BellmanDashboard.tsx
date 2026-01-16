@@ -262,6 +262,13 @@ const CheckinModal: React.FC<{
     }, [isOpen]);
 
     const handleRoomSelect = (room: string) => {
+        // ✅ SECURITY: Validate that room exists in branch (MANDATORY)
+        if (!availableRooms.includes(room)) {
+            // Room not in available rooms list
+            haptic('error');
+            return; // Don't proceed
+        }
+        
         // ✅ Check if room has active card
         if (activeRoomNumbers.has(room)) {
             haptic('error');
@@ -647,10 +654,11 @@ export const BellmanDashboard: React.FC = () => {
         if (!user || !branchId) return;
 
         // Subscribe to room cards
+        // ✅ CRITICAL FIX: Pass branchId to prevent duplicate Room Cards from other branches
         const unsubscribeRoomCards = subscribeToActiveRoomCards((cards: RoomCard[]) => {
             setRoomCards(cards);
             setLoading(false);
-        }, tenantId); // ✅ Pass tenantId
+        }, tenantId, branchId); // ✅ Pass both tenantId and branchId
 
         // Load available rooms - ✅ Fully Dynamic (No Fallback)
         // Subscribe to available rooms - ✅ Fully Dynamic (Real-time)

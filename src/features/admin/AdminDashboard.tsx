@@ -129,7 +129,8 @@ const OverviewPage: React.FC = () => {
         // ✅ Properly scope all dashboard stats to the active tenant/branch
         const unsubRooms = subscribeToRooms(branchId, setRooms, tenantId);
         const unsubEmployees = subscribeToEmployees(setEmployees, tenantId);
-        const unsubCards = subscribeToActiveRoomCards(setActiveCards, tenantId);
+        // ✅ CRITICAL FIX: Pass branchId to prevent duplicate Room Cards from other branches
+        const unsubCards = subscribeToActiveRoomCards(setActiveCards, tenantId, branchId);
 
         // ✅ Perform cleanup locally if needed (optional)
         // autoCleanupOnAdminLoad(); 

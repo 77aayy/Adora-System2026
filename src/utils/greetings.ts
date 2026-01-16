@@ -2,97 +2,15 @@
  * Dynamic Greetings System
  * Adora Hotel Management System
  * 
- * يوفر تحيات ديناميكية حسب الوقت مع رسائل تحفيزية متنوعة
+ * Provides time-based greetings with i18n support
  */
 
-// التحيات حسب الوقت
-type TimeGreeting = {
-    emoji: string;
-    greeting: string;
-};
+import { TFunction } from 'i18next';
 
-// الرسائل التحفيزية
-const motivationalMessages: string[] = [
-    'يوم موفق',
-    'يوم سعيد',
-    'يوم مليء بالإنجازات',
-    'بداية رائعة ليومك',
-    'نتمنى لك التوفيق',
-    'استمتع بيومك',
-    'يوم مثمر',
-    'نحن سعداء بوجودك',
-    'أهلاً بعودتك',
-    'وقت العمل الجاد',
-    'استعد للإنجاز',
-    'يوم جديد فرص جديدة',
-];
+// ============================================================
+// TYPES
+// ============================================================
 
-// تحيات المساء المتنوعة
-const eveningMessages: string[] = [
-    'مساءً هادئاً',
-    'ليلة سعيدة',
-    'مساء الورد',
-    'مساء مليء بالسلام',
-    'نهاية يوم موفقة',
-    'استراحة مستحقة قريباً',
-];
-
-/**
- * الحصول على التحية حسب الوقت الحالي
- */
-export const getTimeGreeting = (): TimeGreeting => {
-    const hour = new Date().getHours();
-    
-    if (hour >= 5 && hour < 12) {
-        return { emoji: '☀️', greeting: 'صباح الخير' };
-    } else if (hour >= 12 && hour < 17) {
-        return { emoji: '🌤️', greeting: 'مساء الخير' };
-    } else if (hour >= 17 && hour < 21) {
-        return { emoji: '🌅', greeting: 'مساء الخير' };
-    } else {
-        return { emoji: '🌙', greeting: 'مساء الخير' };
-    }
-};
-
-/**
- * الحصول على رسالة تحفيزية عشوائية
- */
-export const getMotivationalMessage = (): string => {
-    const hour = new Date().getHours();
-    
-    // في المساء المتأخر استخدم رسائل المساء
-    if (hour >= 20 || hour < 5) {
-        return eveningMessages[Math.floor(Math.random() * eveningMessages.length)];
-    }
-    
-    return motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];
-};
-
-/**
- * الحصول على التحية الكاملة مع الاسم
- * مثال: "☀️ صباح الخير، يوم موفق يا محمد"
- */
-export const getFullGreeting = (name: string): string => {
-    const { emoji, greeting } = getTimeGreeting();
-    const motivational = getMotivationalMessage();
-    
-    return `${emoji} ${greeting}، ${motivational} يا ${name}`;
-};
-
-/**
- * الحصول على التحية بدون اسم
- * مثال: "☀️ صباح الخير، يوم موفق"
- */
-export const getGreetingWithoutName = (): string => {
-    const { emoji, greeting } = getTimeGreeting();
-    const motivational = getMotivationalMessage();
-    
-    return `${emoji} ${greeting}، ${motivational}`;
-};
-
-/**
- * الحصول على أجزاء التحية منفصلة للعرض المرن
- */
 export interface GreetingParts {
     emoji: string;
     timeGreeting: string;
@@ -100,13 +18,47 @@ export interface GreetingParts {
     fullText: string;
 }
 
-export const getGreetingParts = (name?: string): GreetingParts => {
-    const { emoji, greeting: timeGreeting } = getTimeGreeting();
-    const motivational = getMotivationalMessage();
+// ============================================================
+// MAIN FUNCTION
+// ============================================================
+
+/**
+ * Get greeting parts with i18n support
+ */
+export const getGreetingParts = (name?: string, t?: TFunction): GreetingParts => {
+    const hour = new Date().getHours();
+    
+    // Determine time period
+    let emoji: string;
+    let timeGreeting: string;
+    let motivational: string;
+    
+    if (hour >= 5 && hour < 12) {
+        emoji = '☀️';
+        timeGreeting = t ? t('greetings.morning') : 'Good Morning';
+        motivational = t ? t('greetings.motivationalMessages', { returnObjects: true })[Math.floor(Math.random() * 12)] : 'Have a great day';
+    } else if (hour >= 12 && hour < 17) {
+        emoji = '🌤️';
+        timeGreeting = t ? t('greetings.afternoon') : 'Good Afternoon';
+        motivational = t ? t('greetings.motivationalMessages', { returnObjects: true })[Math.floor(Math.random() * 12)] : 'Keep up the great work';
+    } else if (hour >= 17 && hour < 21) {
+        emoji = '🌅';
+        timeGreeting = t ? t('greetings.evening') : 'Good Evening';
+        motivational = t ? t('greetings.eveningMessages', { returnObjects: true })[Math.floor(Math.random() * 6)] : 'Have a peaceful evening';
+    } else {
+        emoji = '🌙';
+        timeGreeting = t ? t('greetings.night') : 'Good Night';
+        motivational = t ? t('greetings.eveningMessages', { returnObjects: true })[Math.floor(Math.random() * 6)] : 'Have a restful night';
+    }
+    
+    // Fallback if t() returns array (shouldn't happen with proper i18n setup)
+    if (Array.isArray(motivational)) {
+        motivational = motivational[0] || 'Have a great day';
+    }
     
     const fullText = name 
-        ? `${emoji} ${timeGreeting}، ${motivational} يا ${name}`
-        : `${emoji} ${timeGreeting}، ${motivational}`;
+        ? `${emoji} ${timeGreeting}, ${motivational} ${t ? t('greetings.you') : 'you'} ${name}`
+        : `${emoji} ${timeGreeting}, ${motivational}`;
     
     return {
         emoji,
@@ -117,17 +69,18 @@ export const getGreetingParts = (name?: string): GreetingParts => {
 };
 
 /**
- * Hook-ready function that returns greeting data
- * Can be used with useState to update periodically
+ * Legacy function for backward compatibility
  */
-export const createGreetingData = (userName: string, brandName?: string) => {
-    const parts = getGreetingParts(userName);
+export const getTimeGreeting = (t?: TFunction): { emoji: string; greeting: string } => {
+    const hour = new Date().getHours();
     
-    return {
-        ...parts,
-        userName,
-        brandName: brandName || '',
-        displayGreeting: `${parts.emoji} ${parts.timeGreeting}، ${parts.motivational} يا ${userName}`,
-        brandDisplay: brandName ? `🏨 ${brandName}` : '',
-    };
+    if (hour >= 5 && hour < 12) {
+        return { emoji: '☀️', greeting: t ? t('greetings.morning') : 'Good Morning' };
+    } else if (hour >= 12 && hour < 17) {
+        return { emoji: '🌤️', greeting: t ? t('greetings.afternoon') : 'Good Afternoon' };
+    } else if (hour >= 17 && hour < 21) {
+        return { emoji: '🌅', greeting: t ? t('greetings.evening') : 'Good Evening' };
+    } else {
+        return { emoji: '🌙', greeting: t ? t('greetings.night') : 'Good Night' };
+    }
 };

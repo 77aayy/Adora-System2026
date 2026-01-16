@@ -652,15 +652,8 @@ interface KeyboardShortcut {
 }
 
 const defaultReceptionShortcuts: Omit<KeyboardShortcut, 'action'>[] = [
-    { key: 'Enter', description: 'تأكيد أول طلب' },
-    { key: 'Escape', description: 'إغلاق النوافذ' },
-    { key: '1', description: 'تبويب الانتظار' },
-    { key: '2', description: 'تبويب المؤكدة' },
-    { key: '3', description: 'تبويب المكتملة' },
-    { key: 'N', description: 'طلب جديد' },
-    { key: 'S', description: 'ملاحظات الشيفت' },
-    { key: 'R', description: 'إعادة الفلاتر' },
-    { key: '?', description: 'المساعدة' }
+    // ✅ Removed hardcoded Arabic - should use t() in component
+    // These will be translated in the component that uses them
 ];
 
 export const getKeyboardShortcutsHelp = (): typeof defaultReceptionShortcuts => {
@@ -734,13 +727,13 @@ export const applyRequestFilters = (
 /**
  * Get reason text for points
  */
-export const getReasonText = (action: string, details: any): string => {
+export const getReasonText = (action: string, details: any, t: (key: string) => string): string => {
     const serviceNames: Record<string, string> = {
-        cleaning: 'تنظيف',
-        maintenance: 'صيانة',
-        bellman: 'بيلمان',
-        inspection: 'فحص',
-        coffee: 'كافي شوب'
+        cleaning: t('reception.serviceNames.cleaning') || 'Cleaning',
+        maintenance: t('reception.serviceNames.maintenance') || 'Maintenance',
+        bellman: t('reception.serviceNames.bellman') || 'Bellman',
+        inspection: t('reception.serviceNames.inspection') || 'Inspection',
+        coffee: t('reception.serviceNames.coffee') || 'Coffee'
     };
 
     const serviceName = serviceNames[details.serviceType] || details.serviceType || '';
@@ -748,15 +741,15 @@ export const getReasonText = (action: string, details: any): string => {
 
     switch (action) {
         case 'create_request':
-            return `إنشاء طلب ${serviceName} ${roomNumber ? `- غرفة ${roomNumber}` : ''}`;
+            return t('reception.points.createRequest', { service: serviceName, room: roomNumber }) || `Create ${serviceName} request${roomNumber ? ` - Room ${roomNumber}` : ''}`;
         case 'confirm_request':
-            return `تأكيد طلب ${serviceName} ${roomNumber ? `- غرفة ${roomNumber}` : ''}`;
+            return t('reception.points.confirmRequest', { service: serviceName, room: roomNumber }) || `Confirm ${serviceName} request${roomNumber ? ` - Room ${roomNumber}` : ''}`;
         case 'complete_request':
-            return `إكمال طلب ${serviceName} ${roomNumber ? `- غرفة ${roomNumber}` : ''}`;
+            return t('reception.points.completeRequest', { service: serviceName, room: roomNumber }) || `Complete ${serviceName} request${roomNumber ? ` - Room ${roomNumber}` : ''}`;
         case 'fast_confirm':
-            return 'مكافأة السرعة في التأكيد';
+            return t('reception.points.fastConfirm') || 'Speed bonus';
         case 'delay_penalty':
-            return 'خصم التأخير';
+            return t('reception.points.delayPenalty') || 'Delay penalty';
         default:
             return action;
     }
@@ -804,7 +797,7 @@ export const isRequestDelayed = (request: any, executionTimes?: Record<string, n
 /**
  * Get time ago string
  */
-export const getTimeAgo = (timestamp: any): string => {
+export const getTimeAgo = (timestamp: any, t: (key: string) => string): string => {
     if (!timestamp) return '--';
 
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -812,10 +805,10 @@ export const getTimeAgo = (timestamp: any): string => {
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
 
-    if (diffMins < 1) return 'الآن';
-    if (diffMins < 60) return `${diffMins} دقيقة`;
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)} ساعة`;
-    return `${Math.floor(diffMins / 1440)} يوم`;
+    if (diffMins < 1) return t('reception.timeAgo.now') || 'Now';
+    if (diffMins < 60) return t('reception.timeAgo.minutes', { minutes: diffMins }) || `${diffMins} minutes`;
+    if (diffMins < 1440) return t('reception.timeAgo.hours', { hours: Math.floor(diffMins / 60) }) || `${Math.floor(diffMins / 60)} hours`;
+    return t('reception.timeAgo.days', { days: Math.floor(diffMins / 1440) }) || `${Math.floor(diffMins / 1440)} days`;
 };
 
 // ============================================================

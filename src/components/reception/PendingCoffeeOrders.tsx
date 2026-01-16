@@ -55,11 +55,12 @@ interface OrderCardProps {
     processing: boolean;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({
+const OrderCard: React.FC<OrderCardProps & { t: (key: string) => string }> = ({
     order,
     onApprove,
     onReject,
-    processing
+    processing,
+    t
 }) => {
     const [expanded, setExpanded] = useState(false);
     const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -103,15 +104,15 @@ const OrderCard: React.FC<OrderCardProps> = ({
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                         <Home className="w-4 h-4 text-white/40" />
-                        <span className="text-white font-bold">غرفة {order.roomNumber}</span>
+                        <span className="text-white font-bold">{t('common.room')} {order.roomNumber}</span>
                         {order.priority === 'urgent' && (
                             <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs animate-pulse">
-                                عاجل!
+                                {t('reception.urgent')}!
                             </span>
                         )}
                     </div>
                     <p className="text-white/50 text-sm">
-                        {order.items.length} أصناف • {order.totalAmount.toFixed(2)} ر.س
+                        {order.items.length} {t('coffeeshop.items', { count: order.items.length })} • {order.totalAmount.toFixed(2)} {t('currency.sar')}
                     </p>
                 </div>
 
@@ -119,7 +120,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                     isCritical ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-white/50'
                 }`}>
                     <Clock className="w-4 h-4" />
-                    <span>{waitingMinutes} د</span>
+                    <span>{waitingMinutes} {t('common.minutes') || 'min'}</span>
                     {isCritical && <AlertTriangle className="w-4 h-4 mr-1" />}
                 </div>
 
@@ -159,7 +160,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                                     <span className="text-white/40 text-sm">x{item.quantity}</span>
                                 </div>
                                 <span className="text-white/70">
-                                    {(item.price * item.quantity).toFixed(2)} ر.س
+                                    {(item.price * item.quantity).toFixed(2)} {t('currency.sar')}
                                 </span>
                             </div>
                         ))}
@@ -169,10 +170,10 @@ const OrderCard: React.FC<OrderCardProps> = ({
                     <div className="flex items-center justify-between p-3 bg-teal-500/10 rounded-lg">
                         <span className="text-white font-bold flex items-center gap-2">
                             <DollarSign className="w-5 h-5 text-teal-400" />
-                            الإجمالي
+                            {t('common.total') || 'Total'}
                         </span>
                         <span className="text-teal-400 font-bold text-lg">
-                            {order.totalAmount.toFixed(2)} ر.س
+                            {order.totalAmount.toFixed(2)} {t('currency.sar')}
                         </span>
                     </div>
 
@@ -194,7 +195,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                                            flex items-center justify-center gap-2"
                             >
                                 <X className="w-5 h-5" />
-                                رفض
+                                {t('common.reject') || 'Reject'}
                             </button>
                             <button
                                 onClick={onApprove}
@@ -208,7 +209,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                                 ) : (
                                     <Check className="w-5 h-5" />
                                 )}
-                                موافقة ✅
+                                {t('common.approve') || 'Approve'}
                             </button>
                         </div>
                     ) : (
@@ -217,7 +218,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                                 type="text"
                                 value={rejectReason}
                                 onChange={(e) => setRejectReason(e.target.value)}
-                                placeholder="سبب الرفض..."
+                                placeholder={t('coffeeshop.rejectReasonPlaceholder') || 'Rejection reason...'}
                                 className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3
                                            text-white placeholder:text-white/40 focus:outline-none focus:border-red-500/50"
                                 autoFocus
@@ -228,7 +229,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                                     className="flex-1 py-2 rounded-xl bg-white/10 text-white/70
                                                hover:bg-white/20 transition-colors"
                                 >
-                                    إلغاء
+                                    {t('common.cancel')}
                                 </button>
                                 <button
                                     onClick={handleReject}
@@ -236,7 +237,7 @@ const OrderCard: React.FC<OrderCardProps> = ({
                                     className="flex-1 py-2 rounded-xl bg-red-500 text-white font-bold
                                                hover:bg-red-600 transition-colors disabled:opacity-50"
                                 >
-                                    تأكيد الرفض
+                                    {t('coffeeshop.confirmReject') || 'Confirm Rejection'}
                                 </button>
                             </div>
                         </div>
@@ -328,8 +329,8 @@ export const PendingCoffeeOrders: React.FC<PendingCoffeeOrdersProps> = ({
                         <Coffee className="w-5 h-5 text-amber-400" />
                     </div>
                     <div>
-                        <h3 className="text-white font-bold">☕ طلبات كوفي شوب</h3>
-                        <p className="text-white/50 text-sm">تنتظر الموافقة</p>
+                        <h3 className="text-white font-bold">☕ {t('coffeeshop.title')}</h3>
+                        <p className="text-white/50 text-sm">{t('coffeeshop.pendingApproval') || 'Awaiting approval'}</p>
                     </div>
                 </div>
 

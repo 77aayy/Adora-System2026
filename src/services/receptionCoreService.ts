@@ -1,10 +1,12 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Reception Core Services - Part 2
  * Capacity, Concurrency, Merging, Scheduling, Load Balancing, SLA
  */
 
 import { collection, query, where, getDocs, Timestamp, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { getRooms } from './roomService';
 
 // ============================================================
 // 6. CAPACITY PLANNING
@@ -19,17 +21,26 @@ export interface CapacityMetrics {
     pendingCheckOuts: number;
 }
 
-export const getCapacityMetrics = async (branch: string): Promise<CapacityMetrics> => {
+/**
+ * ✅ SECURITY FIX: Now requires tenantId and branchId for proper data isolation
+ * @param branchId - The branch ID (required)
+ * @param tenantId - The tenant ID (required for SaaS isolation)
+ * @returns Capacity metrics for the specified branch
+ */
+export const getCapacityMetrics = async (
+    branchId: string,
+    tenantId?: string
+): Promise<CapacityMetrics> => {
     try {
-        const roomsSnapshot = await getDocs(
-            query(collection(db, 'rooms'), where('branch', '==', branch))
-        );
-        const totalRooms = roomsSnapshot.size;
+        // ✅ SECURITY: Use tenant/branch-isolated room service
+        if (!tenantId) {
+            console.warn('getCapacityMetrics: tenantId is required for SaaS isolation. Returning empty metrics.');
+            return { totalRooms: 0, occupiedRooms: 0, availableRooms: 0, occupancyRate: 0, pendingCheckIns: 0, pendingCheckOuts: 0 };
+        }
 
-        const occupiedSnapshot = await getDocs(
-            query(collection(db, 'rooms'), where('branch', '==', branch), where('isOccupied', '==', true))
-        );
-        const occupiedRooms = occupiedSnapshot.size;
+        const rooms = await getRooms(branchId, tenantId);
+        const totalRooms = rooms.length;
+        const occupiedRooms = rooms.filter(r => r.status === 'occupied' || r.currentGuestId).length;
 
         return {
             totalRooms,

@@ -1,6 +1,6 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Room Bill Card
- * بطاقة حساب الغرفة للاستقبال
  * 
  * ✅ Features:
  * - Shows pending/confirmed amounts
@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Receipt,
     Check,
@@ -59,12 +60,13 @@ interface TransactionItemProps {
     processing: boolean;
 }
 
-const TransactionItem: React.FC<TransactionItemProps> = ({
+const TransactionItem: React.FC<TransactionItemProps & { t: (key: string) => string }> = ({
     transaction,
     currency,
     onConfirm,
     onCancel,
-    processing
+    processing,
+    t
 }) => {
     const getTypeIcon = () => {
         switch (transaction.type) {
@@ -78,13 +80,13 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
     const getStatusBadge = () => {
         switch (transaction.status) {
             case 'pending':
-                return <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs">قيد الانتظار</span>;
+                return <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs">{t('roomBill.pending')}</span>;
             case 'confirmed':
-                return <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">✓ تم التأكيد</span>;
+                return <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">✓ {t('roomBill.confirmed')}</span>;
             case 'paid':
-                return <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs">✓ مدفوع</span>;
+                return <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs">✓ {t('roomBill.paid')}</span>;
             case 'cancelled':
-                return <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">ملغي</span>;
+                return <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">{t('roomBill.cancelled')}</span>;
         }
     };
 
@@ -115,7 +117,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
                         disabled={processing}
                         className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 
                                    transition-colors disabled:opacity-50"
-                        title="تأكيد"
+                        title={t('roomBill.confirm')}
                     >
                         {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     </button>
@@ -124,7 +126,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
                         disabled={processing}
                         className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 
                                    transition-colors disabled:opacity-50"
-                        title="إلغاء"
+                        title={t('roomBill.cancel')}
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -145,6 +147,7 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
     currency = 'SAR',
     onUpdate
 }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     
     const [billSummary, setBillSummary] = useState<RoomBillSummary | null>(null);
@@ -194,7 +197,7 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
     };
 
     const handleCancel = async (transactionId: string) => {
-        const reason = prompt('سبب الإلغاء:');
+        const reason = prompt(t('roomBill.cancelReason'));
         if (!reason) return;
         
         setProcessing(transactionId);
@@ -228,7 +231,7 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
         return (
             <div className="bg-slate-900 rounded-xl border border-white/10 p-4 text-center text-white/40">
                 <Receipt className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p>لا توجد مصاريف على الغرفة</p>
+                <p>{t('roomBill.noExpenses')}</p>
             </div>
         );
     }
@@ -248,10 +251,10 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
 
                 <div className="flex-1">
                     <div className="flex items-center gap-2">
-                        <h3 className="text-white font-bold">غرفة {roomNumber}</h3>
+                        <h3 className="text-white font-bold">{t('roomBill.room')} {roomNumber}</h3>
                         {pendingCount > 0 && (
                             <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-bold">
-                                {pendingCount} معلق
+                                {pendingCount} {t('roomBill.pending')}
                             </span>
                         )}
                     </div>
@@ -264,7 +267,7 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
                     <p className="text-white font-bold text-lg">
                         {billSummary.totalAmount.toFixed(2)} {currency}
                     </p>
-                    <p className="text-white/40 text-xs">إجمالي الحساب</p>
+                    <p className="text-white/40 text-xs">{t('roomBill.totalBill')}</p>
                 </div>
 
                 {expanded ? <ChevronUp className="w-5 h-5 text-white/40" /> : <ChevronDown className="w-5 h-5 text-white/40" />}
@@ -277,24 +280,24 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
                         <div className="bg-amber-500/10 rounded-lg p-3 text-center">
                             <Clock className="w-5 h-5 text-amber-400 mx-auto mb-1" />
                             <p className="text-amber-400 font-bold">{billSummary.pendingAmount.toFixed(2)}</p>
-                            <p className="text-white/40 text-xs">معلق</p>
+                            <p className="text-white/40 text-xs">{t('roomBill.pending')}</p>
                         </div>
                         <div className="bg-green-500/10 rounded-lg p-3 text-center">
                             <Check className="w-5 h-5 text-green-400 mx-auto mb-1" />
                             <p className="text-green-400 font-bold">{billSummary.confirmedAmount.toFixed(2)}</p>
-                            <p className="text-white/40 text-xs">مؤكد</p>
+                            <p className="text-white/40 text-xs">{t('roomBill.confirmed')}</p>
                         </div>
                         <div className="bg-blue-500/10 rounded-lg p-3 text-center">
                             <CreditCard className="w-5 h-5 text-blue-400 mx-auto mb-1" />
                             <p className="text-blue-400 font-bold">{billSummary.paidAmount.toFixed(2)}</p>
-                            <p className="text-white/40 text-xs">مدفوع</p>
+                            <p className="text-white/40 text-xs">{t('roomBill.paid')}</p>
                         </div>
                     </div>
 
                     {/* Transactions List */}
                     <div className="border-t border-white/10 p-4 space-y-2 max-h-80 overflow-y-auto">
                         {billSummary.transactions.length === 0 ? (
-                            <p className="text-center text-white/40 py-4">لا توجد معاملات</p>
+                            <p className="text-center text-white/40 py-4">{t('roomBill.noTransactions')}</p>
                         ) : (
                             billSummary.transactions.map(transaction => (
                                 <TransactionItem
@@ -304,6 +307,7 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
                                     onConfirm={() => handleConfirm(transaction.id!)}
                                     onCancel={() => handleCancel(transaction.id!)}
                                     processing={processing === transaction.id}
+                                    t={t}
                                 />
                             ))
                         )}
@@ -318,7 +322,7 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
                                            hover:from-teal-400 hover:to-cyan-400 transition-all"
                             >
                                 <CreditCard className="w-5 h-5" />
-                                تسوية الحساب ({billSummary.confirmedAmount.toFixed(2)} {currency})
+                                {t('roomBill.settleAccount')} ({billSummary.confirmedAmount.toFixed(2)} {currency})
                             </button>
                         </div>
                     )}

@@ -113,24 +113,24 @@ interface ChatRowProps {
     onView: () => void;
 }
 
-const ChatRow: React.FC<ChatRowProps> = ({ chat, onView }) => {
+const ChatRow: React.FC<ChatRowProps & { t: (key: string) => string }> = ({ chat, onView, t }) => {
     const isWarning = chat.waitingTime >= SLA_WARNING && chat.waitingTime < SLA_CRITICAL;
     const isCritical = chat.waitingTime >= SLA_CRITICAL;
 
     const getStatusBadge = () => {
         if (chat.status === 'resolved') {
-            return <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">✓ تم</span>;
+            return <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">✓ {t('admin.resolved') || 'Resolved'}</span>;
         }
         if (isCritical) {
-            return <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs animate-pulse">⚠️ متأخر</span>;
+            return <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs animate-pulse">⚠️ {t('admin.delayed') || 'Delayed'}</span>;
         }
         if (isWarning) {
-            return <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs">تحذير</span>;
+            return <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs">{t('admin.warning') || 'Warning'}</span>;
         }
         if (chat.unreadCount > 0) {
-            return <span className="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-400 text-xs">جديد</span>;
+            return <span className="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-400 text-xs">{t('admin.new') || 'New'}</span>;
         }
-        return <span className="px-2 py-0.5 rounded-full bg-white/10 text-white/50 text-xs">نشط</span>;
+        return <span className="px-2 py-0.5 rounded-full bg-white/10 text-white/50 text-xs">{t('admin.active') || 'Active'}</span>;
     };
 
     return (
@@ -154,7 +154,7 @@ const ChatRow: React.FC<ChatRowProps> = ({ chat, onView }) => {
                     <span className="text-white font-bold">غرفة {chat.roomNumber}</span>
                     {getStatusBadge()}
                 </div>
-                <p className="text-white/50 text-sm truncate">{chat.lastMessage || 'محادثة جديدة'}</p>
+                <p className="text-white/50 text-sm truncate">{chat.lastMessage || t('admin.newConversation') || 'New conversation'}</p>
                 {chat.guestName && (
                     <p className="text-white/40 text-xs mt-0.5">{chat.guestName}</p>
                 )}
@@ -229,8 +229,8 @@ const ConversationViewer: React.FC<ConversationViewerProps> = ({
                             <MessageCircle className="w-5 h-5 text-teal-400" />
                         </div>
                         <div>
-                            <h3 className="text-white font-bold">غرفة {roomNumber}</h3>
-                            <p className="text-white/60 text-xs">مراقبة المحادثة</p>
+                            <h3 className="text-white font-bold">{t('admin.room') || 'Room'} {roomNumber}</h3>
+                            <p className="text-white/60 text-xs">{t('admin.monitorConversation') || 'Monitor conversation'}</p>
                         </div>
                     </div>
                     <button
@@ -276,7 +276,7 @@ const ConversationViewer: React.FC<ConversationViewerProps> = ({
                 {/* Footer Note */}
                 <div className="p-3 bg-slate-800/50 border-t border-white/10">
                     <p className="text-center text-white/40 text-xs">
-                        🔒 هذا العرض للمراقبة فقط - لا يمكن إرسال رسائل من هنا
+                        🔒 {t('admin.readOnlyMonitor') || 'This view is for monitoring only - cannot send messages from here'}
                     </p>
                 </div>
             </div>
@@ -293,6 +293,7 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
     branchId,
     className = ''
 }) => {
+    const { t } = useTranslation();
     // State
     const [chats, setChats] = useState<MonitoredChat[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -408,13 +409,13 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
                             <Radio className="w-6 h-6 text-indigo-400 animate-pulse" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">📡 الرادار الحي</h2>
-                            <p className="text-white/60 text-sm">مراقبة جميع المحادثات</p>
+                            <h2 className="text-xl font-bold text-white">{t('admin.liveRadar') || '📡 Live Radar'}</h2>
+                            <p className="text-white/60 text-sm">{t('admin.monitorAllChats') || 'Monitor all conversations'}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 text-white/40 text-xs">
                         <Activity className="w-3 h-3 text-green-400 animate-pulse" />
-                        <span>تحديث مباشر</span>
+                        <span>{t('admin.liveUpdate') || 'Live Update'}</span>
                     </div>
                 </div>
 
@@ -422,7 +423,7 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <StatCard
                         icon={<MessageCircle className="w-5 h-5" />}
-                        label="محادثات نشطة"
+                        label={t('admin.activeChats') || 'Active Chats'}
                         value={stats.totalActive}
                         color="text-teal-400"
                         bgColor="bg-teal-500/10"
@@ -471,9 +472,9 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
                 {/* Status Filter */}
                 <div className="flex gap-2">
                     {[
-                        { value: 'all', label: 'الكل' },
-                        { value: 'waiting', label: 'تنتظر' },
-                        { value: 'critical', label: '⚠️ متأخر' }
+                        { value: 'all', label: t('admin.all') || 'All' },
+                        { value: 'waiting', label: t('admin.waiting') || 'Waiting' },
+                        { value: 'critical', label: `⚠️ ${t('admin.delayed') || 'Delayed'}` }
                     ].map(opt => (
                         <button
                             key={opt.value}
@@ -495,7 +496,7 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
                 {filteredChats.length === 0 ? (
                     <div className="p-8 text-center text-white/40">
                         <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                        <p>لا توجد محادثات نشطة</p>
+                        <p>{t('admin.noActiveChats') || 'No active chats'}</p>
                     </div>
                 ) : (
                     filteredChats.map(chat => (
@@ -503,6 +504,7 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
                             key={chat.roomId}
                             chat={chat}
                             onView={() => setSelectedChat(chat)}
+                            t={t}
                         />
                     ))
                 )}
@@ -511,7 +513,7 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
             {/* Footer */}
             <div className="p-3 bg-slate-800/30 border-t border-white/10 flex items-center justify-between">
                 <p className="text-white/40 text-xs">
-                    آخر تحديث: {lastRefresh.toLocaleTimeString('ar-SA')}
+                    {t('admin.lastUpdate') || 'Last update'}: {lastRefresh.toLocaleTimeString()}
                 </p>
                 <button
                     onClick={() => setLastRefresh(new Date())}

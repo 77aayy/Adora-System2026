@@ -4,12 +4,17 @@
  * Adora Hotel Management System V2
  */
 
+/**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Building, DoorOpen, ChevronRight } from 'lucide-react';
 import { db } from '../../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { haptic } from '../../utils/uxEffects';
+import { getRooms } from '../../services/roomService';
 
 // ============================================================
 // TYPES
@@ -43,54 +48,63 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
     title = 'اختر الغرفة'
 }) => {
     const { user } = useAuth();
+    const { tenantId } = useTenant();
 
     const [rooms, setRooms] = useState<Room[]>([]);
     const [roomsByFloor, setRoomsByFloor] = useState<Record<number, Room[]>>({});
     const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // ✅ Get branchId from user
+    const branchId = (user as any)?.branchId || (user as any)?.branch;
+
     // Load rooms
     useEffect(() => {
-        if (isOpen && user) {
+        if (isOpen && user && branchId && tenantId) {
             loadRooms();
         }
-    }, [isOpen, user]);
+    }, [isOpen, user, branchId, tenantId]);
 
     const loadRooms = async () => {
+        if (!tenantId || !branchId) {
+            console.warn('RoomSelector: Missing tenantId or branchId');
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
-            // 1. Load active room cards (occupied rooms)
-            const activeCardsRef = collection(db, 'roomCards');
+            // ✅ SECURITY: Use tenant/branch-isolated room service
+            const tenantRooms = await getRooms(branchId, tenantId);
+            
+            // ✅ Load active room cards (occupied rooms) - tenant/branch isolated
+            const activeCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
             const activeQuery = query(
                 activeCardsRef,
-                where('branch', '==', (user as any)?.branch || 'default'),
+                where('branchId', '==', branchId),
                 where('status', '==', 'active')
             );
             const activeSnapshot = await getDocs(activeQuery);
 
             const activeRoomNumbers = new Set<string>();
             activeSnapshot.forEach((doc) => {
-                activeRoomNumbers.add(doc.data().roomNumber);
+                const data = doc.data();
+                activeRoomNumbers.add(data.roomNumber || data.number);
             });
 
-            // 2. Load all rooms structure
-            const roomsRef = collection(db, 'rooms');
-            const roomsQuery = query(
-                roomsRef,
-                where('branch', '==', (user as any)?.branch || 'default')
-            );
-            const roomsSnapshot = await getDocs(roomsQuery);
-
-            const loadedRooms: Room[] = [];
-            roomsSnapshot.forEach((doc) => {
-                const room = { id: doc.id, ...doc.data() } as Room;
-                room.isOccupied = activeRoomNumbers.has(room.roomNumber);
-
-                // Filter based on showOccupiedOnly
-                if (!showOccupiedOnly || room.isOccupied) {
-                    loadedRooms.push(room);
-                }
-            });
+            // ✅ Map tenant rooms to Room interface
+            const loadedRooms: Room[] = tenantRooms
+                .map((room) => ({
+                    id: `${branchId}_${room.number}`,
+                    roomNumber: room.number, // ✅ Map 'number' to 'roomNumber' for component compatibility
+                    floor: room.floor,
+                    type: room.type || 'standard',
+                    isOccupied: activeRoomNumbers.has(room.number) || room.status === 'occupied'
+                }))
+                .filter((room) => {
+                    // Filter based on showOccupiedOnly
+                    return !showOccupiedOnly || room.isOccupied;
+                });
 
             // Group by floor
             const grouped: Record<number, Room[]> = {};

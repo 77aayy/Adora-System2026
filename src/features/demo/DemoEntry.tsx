@@ -1,283 +1,123 @@
 /**
- * Demo Entry Page - V4
- * =====================
- * صفحة الديمو - متوافقة 100% مع بالتة أدورا الموحدة
- * تعمل في Light + Dark Mode بسلاسة
- * 
- * @author Adora System
+ * Demo Entry Component
+ * Handles auto-login for demo instances via URL parameters
+ * Adora Hotel Management System
  */
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { AdoraLoader } from '../../components/common/AdoraLoader';
+import { LoadingSkeleton } from '../../components/reception/LoadingSkeleton';
 import { 
-    Sparkles, Loader2, AlertTriangle, Building2, 
-    Clock, MessageCircle, ArrowRight, CheckCircle, Key,
-    Users, BarChart3, FileText, Settings, Hotel
-} from 'lucide-react';
-import { validateDemoLink, recordDemoUsage, DemoLinkConfig } from '../../services/demoLinkService';
-import { initializeDemoFirebase, saveDemoCode } from '../../services/firebaseMulti';
+    createDemoInstance, 
+    autoLoginDemoManager, 
+    checkDemoInstance, 
+    validateDemoKey,
+    DEMO_CONSTANTS 
+} from '../../services/demoFactory';
+import { useTranslation } from 'react-i18next';
 
-// ============================================================
-// COMPONENT
-// ============================================================
-
-const DemoEntry: React.FC = () => {
-    const { code } = useParams<{ code: string }>();
+export const DemoEntry: React.FC = () => {
     const navigate = useNavigate();
-    
-    const [loading, setLoading] = useState(true);
+    const [searchParams] = useSearchParams();
+    const { login } = useAuth();
+    const { t } = useTranslation();
+    const [status, setStatus] = useState<'loading' | 'creating' | 'logging' | 'error'>('loading');
     const [error, setError] = useState<string | null>(null);
-    const [link, setLink] = useState<DemoLinkConfig | null>(null);
-    const [initializing, setInitializing] = useState(false);
-    
-    // ============ Load Demo Link ============
+
     useEffect(() => {
-        const loadLink = async () => {
-            if (!code) {
-                setError('رابط الديمو غير صالح');
-                setLoading(false);
-                return;
-            }
-            
+        const initializeDemo = async () => {
             try {
-                const validation = await validateDemoLink(code);
-                
-                if (!validation.valid || !validation.link) {
-                    setError(validation.error || 'رابط الديمو غير صالح');
-                    setLoading(false);
+                // 1. Get parameters from URL
+                const key = searchParams.get('key');
+                const tenantId = searchParams.get('tenantId');
+                const branchId = searchParams.get('branchId');
+
+                // 2. Validate demo key (if provided)
+                if (key && !validateDemoKey(key)) {
+                    setError(t('demo.invalidKey') || 'Invalid demo key');
+                    setStatus('error');
+                    setTimeout(() => navigate('/login'), 3000);
                     return;
                 }
-                
-                setLink(validation.link);
+
+                // 3. Check if demo instance exists (for provided tenantId or any demo)
+                setStatus('loading');
+                const exists = tenantId ? await checkDemoInstance(tenantId) : await checkDemoInstance();
+
+                let demoInstance: any;
+                if (!exists) {
+                    // 4. Create demo instance if it doesn't exist
+                    setStatus('creating');
+                    demoInstance = await createDemoInstance({
+                        branchName: 'Demo Hotel Branch',
+                        tenantName: 'Demo Hotel',
+                        populateData: true,
+                        tenantId: tenantId || undefined // Use provided tenantId or generate new one
+                    });
+                }
+
+                // 5. Auto-login as demo manager
+                setStatus('logging');
+                const demoUser = await autoLoginDemoManager(
+                    tenantId || demoInstance?.tenantId,
+                    branchId || demoInstance?.branchId
+                );
+
+                // 6. Login using AuthContext with demo manager PIN
+                await login(DEMO_CONSTANTS.MANAGER_PIN, demoUser.branchId);
+
+                // 7. Navigate to reception dashboard
+                navigate('/reception', { replace: true });
             } catch (err: any) {
-                setError(err.message || 'حدث خطأ');
-            } finally {
-                setLoading(false);
+                console.error('Demo initialization error:', err);
+                setError(err.message || t('demo.initFailed') || 'Failed to initialize demo');
+                setStatus('error');
+                setTimeout(() => navigate('/login'), 3000);
             }
         };
-        
-        loadLink();
-    }, [code]);
-    
-    // ============ Start Demo ============
-    const handleStartDemo = async () => {
-        if (!link || !link.demoFirebaseConfig) {
-            setError('بيانات الديمو غير مكتملة');
-            return;
-        }
-        
-        setInitializing(true);
-        
-        try {
-            await recordDemoUsage(link.linkCode);
-            const demoInstance = await initializeDemoFirebase(link.demoFirebaseConfig, link.linkCode);
-            
-            if (!demoInstance) {
-                throw new Error('فشل تهيئة بيئة الديمو');
-            }
-            
-            saveDemoCode(link.linkCode);
-            navigate('/login');
-            
-        } catch (err: any) {
-            setError(err.message || 'فشل بدء التجربة');
-        } finally {
-            setInitializing(false);
-        }
-    };
-    
-    // ============ WhatsApp Link ============
-    const handleSubscribe = () => {
-        if (!link?.salesWhatsAppNumber) return;
-        const message = encodeURIComponent('السلام عليكم، أنا مهتم بالاشتراك في نظام أدورا لإدارة الفنادق');
-        window.open(`https://wa.me/${link.salesWhatsAppNumber}?text=${message}`, '_blank');
-    };
-    
-    // ============ Render Loading ============
-    if (loading) {
+
+        initializeDemo();
+    }, [searchParams, navigate, login, t]);
+
+    if (status === 'error') {
         return (
-            <div className="adora-page min-h-screen flex items-center justify-center">
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4">
                 <div className="text-center">
-                    <div className="relative inline-block">
-                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[var(--theme-primary-400)] to-[var(--theme-primary-600)] flex items-center justify-center mb-6 animate-pulse shadow-lg">
-                            <Hotel className="w-10 h-10 text-white" />
-                        </div>
-                        <Loader2 className="w-8 h-8 text-[var(--theme-primary-500)] animate-spin absolute -bottom-2 -right-2" />
-                    </div>
-                    <p className="adora-text-secondary text-lg">جاري تحميل بيانات الديمو...</p>
+                    <h1 className="text-2xl font-bold text-white mb-4">{t('demo.error') || 'Error'}</h1>
+                    <p className="text-red-400 mb-4">{error}</p>
+                    <p className="text-white/60 text-sm">{t('demo.redirecting') || 'Redirecting to login...'}</p>
                 </div>
             </div>
         );
     }
-    
-    // ============ Render Error ============
-    if (error) {
-        return (
-            <div className="adora-page min-h-screen flex items-center justify-center p-4">
-                <div className="text-center max-w-md">
-                    <div className="adora-empty-icon w-24 h-24 mx-auto mb-6" style={{ background: 'var(--theme-accent-red-light)' }}>
-                        <AlertTriangle className="w-12 h-12" style={{ color: 'var(--theme-accent-red)' }} />
-                    </div>
-                    <h1 className="text-3xl font-bold adora-text-primary mb-4">
-                        رابط الديمو غير صالح
-                    </h1>
-                    <p className="adora-text-tertiary text-lg mb-8">
-                        {error}
-                    </p>
-                    <button
-                        onClick={() => navigate('/login')}
-                        className="adora-btn adora-btn-secondary adora-btn-lg"
-                    >
-                        العودة للرئيسية
-                    </button>
-                </div>
-            </div>
-        );
-    }
-    
-    // ============ Render Demo Info ============
-    if (!link) return null;
-    
-    const expiresIn = link.expiresAt 
-        ? Math.max(0, Math.ceil((link.expiresAt.toDate().getTime() - Date.now()) / (1000 * 60 * 60)))
-        : null;
-    
+
     return (
-        <div className="adora-page min-h-screen flex items-center justify-center p-4" dir="rtl">
-            <div className="w-full max-w-lg">
-                {/* Logo & Title */}
-                <div className="text-center mb-8">
-                    <div className="relative inline-block">
-                        <img
-                            src="/adora-logo.png"
-                            alt="Adora"
-                            className="w-24 h-24 object-contain mx-auto mb-4"
-                            style={{ filter: 'var(--logo-filter)' }}
-                        />
-                        <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-[var(--theme-accent-purple)] to-[var(--theme-accent-purple-dark)] rounded-lg flex items-center justify-center animate-pulse shadow-lg">
-                            <Sparkles className="w-4 h-4 text-white" />
-                        </div>
-                    </div>
-                    <h1 className="text-4xl font-bold adora-text-primary mb-3">
-                        تجربة أدورا المجانية
-                    </h1>
-                    <p className="adora-text-secondary text-lg">
-                        جرب نظام إدارة الفنادق بنفسك!
-                    </p>
-                </div>
-                
-                {/* Demo Card */}
-                <div className="adora-card overflow-hidden">
-                    {/* Header - Manager Info */}
-                    <div className="adora-card-header" style={{ background: 'var(--theme-accent-purple-light)' }}>
-                        <div className="flex items-center gap-4 w-full">
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--theme-accent-purple)] to-[var(--theme-accent-purple-dark)] flex items-center justify-center shadow-lg">
-                                <Sparkles className="w-8 h-8 text-white" />
-                            </div>
-                            <div className="flex-1">
-                                <h2 className="text-2xl font-bold adora-text-primary">
-                                    {link.demoManager?.name || 'مشترك تجريبي'}
-                                </h2>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <Key className="w-4 h-4" style={{ color: 'var(--theme-primary-500)' }} />
-                                    <span className="adora-text-secondary">كود الدخول:</span>
-                                    <code className="font-mono text-xl font-bold px-3 py-0.5 rounded-lg" style={{
-                                        color: 'var(--theme-primary-500)',
-                                        background: 'var(--theme-primary-100)'
-                                    }}>
-                                        {link.demoManager?.code || '****'}
-                                    </code>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Info Section */}
-                    <div className="adora-card-body space-y-4">
-                        {/* Branch */}
-                        <div className="adora-alert adora-alert-teal">
-                            <Building2 className="w-6 h-6 flex-shrink-0" />
-                            <span className="text-lg">{link.demoManager?.branchName || 'فرع تجريبي'}</span>
-                        </div>
-                        
-                        {/* Expiry Time */}
-                        {expiresIn !== null && (
-                            <div className="adora-alert adora-alert-warning">
-                                <Clock className="w-6 h-6 flex-shrink-0" />
-                                <span className="text-lg">صالح لمدة <strong>{expiresIn}</strong> ساعة</span>
-                            </div>
-                        )}
-                        
-                        {/* Features List */}
-                        <div className="adora-border-t pt-4 mt-4">
-                            <p className="adora-text-tertiary text-sm mb-4">ستتمكن من:</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                {[
-                                    { icon: Users, text: 'إنشاء غرف وموظفين' },
-                                    { icon: FileText, text: 'إدارة طلبات النزلاء' },
-                                    { icon: Settings, text: 'تجربة كل الأقسام' },
-                                    { icon: BarChart3, text: 'رؤية التقارير والإحصائيات' }
-                                ].map((feature, idx) => (
-                                    <div 
-                                        key={idx} 
-                                        className="flex items-center gap-2 p-3 rounded-xl"
-                                        style={{
-                                            background: 'var(--theme-bg-tertiary)',
-                                            border: '1px solid var(--theme-border-secondary)'
-                                        }}
-                                    >
-                                        <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--theme-accent-green)' }} />
-                                        <span className="adora-text-secondary text-sm">{feature.text}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Actions */}
-                    <div className="adora-card-footer flex-col">
-                        {/* Start Demo Button */}
-                        <button
-                            onClick={handleStartDemo}
-                            disabled={initializing}
-                            className="adora-btn adora-btn-primary adora-btn-lg w-full"
-                        >
-                            {initializing ? (
-                                <Loader2 className="w-6 h-6 animate-spin" />
-                            ) : (
-                                <>
-                                    <Sparkles className="w-6 h-6" />
-                                    ابدأ التجربة الآن
-                                    <ArrowRight className="w-5 h-5" />
-                                </>
-                            )}
-                        </button>
-                        
-                        {/* Subscribe via WhatsApp */}
-                        {link.salesWhatsAppNumber && (
-                            <button
-                                onClick={handleSubscribe}
-                                className="adora-btn adora-btn-lg w-full"
-                                style={{
-                                    background: 'var(--theme-accent-green-light)',
-                                    color: 'var(--theme-accent-green)',
-                                    border: '1px solid var(--theme-accent-green)'
-                                }}
-                            >
-                                <MessageCircle className="w-5 h-5" />
-                                اشترك الآن
-                            </button>
-                        )}
-                    </div>
-                </div>
-                
-                {/* Footer Note */}
-                <p className="text-center adora-text-disabled text-sm mt-6">
-                    هذه نسخة تجريبية - البيانات معزولة وآمنة
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4">
+            <div className="text-center">
+                <img
+                    src="/adora-logo.png"
+                    alt="Adora"
+                    className="w-24 h-24 object-contain mx-auto mb-6 animate-pulse"
+                    style={{ filter: 'drop-shadow(0 0 15px rgba(45, 212, 191, 0.4))' }}
+                />
+                <h1 className="text-2xl font-bold text-white mb-4">
+                    {status === 'creating' 
+                        ? (t('demo.creating') || 'Creating Demo Instance...')
+                        : status === 'logging'
+                        ? (t('demo.logging') || 'Logging in...')
+                        : (t('demo.loading') || 'Loading Demo...')
+                    }
+                </h1>
+                <AdoraLoader />
+                <p className="text-white/60 text-sm mt-4">
+                    {status === 'creating' 
+                        ? (t('demo.settingUp') || 'Setting up your demo environment...')
+                        : (t('demo.pleaseWait') || 'Please wait...')
+                    }
                 </p>
             </div>
         </div>
     );
 };
-
-export default DemoEntry;

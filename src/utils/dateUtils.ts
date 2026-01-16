@@ -100,12 +100,23 @@ export function formatHijriDate(
 
 /**
  * 📅 تنسيق الوقت
+ * Enhanced version with locale support for i18n
  */
 export function formatTime(
-    date: Date | string | number | { toDate: () => Date },
-    options: { showSeconds?: boolean; use24Hour?: boolean } = {}
+    date: Date | string | number | { toDate: () => Date } | any,
+    options: { 
+        showSeconds?: boolean; 
+        use24Hour?: boolean;
+        locale?: string;
+        t?: (key: string) => string;
+    } = {}
 ): string {
-    const { showSeconds = false, use24Hour = false } = options;
+    const { showSeconds = false, use24Hour = false, locale, t } = options;
+    
+    // Handle null/undefined
+    if (!date) {
+        return t ? t('reception.notSpecifiedTime') : '—';
+    }
     
     // تحويل التاريخ
     let dateObj: Date;
@@ -117,12 +128,15 @@ export function formatTime(
     } else if (date && typeof date.toDate === 'function') {
         dateObj = date.toDate();
     } else {
-        return '—';
+        return t ? t('reception.notSpecifiedTime') : '—';
     }
     
     if (isNaN(dateObj.getTime())) {
-        return '—';
+        return t ? t('reception.notSpecifiedTime') : '—';
     }
+    
+    // Determine locale
+    const finalLocale = locale || 'ar-SA';
     
     const timeOptions: Intl.DateTimeFormatOptions = {
         hour: '2-digit',
@@ -131,7 +145,52 @@ export function formatTime(
         hour12: !use24Hour,
     };
     
-    return dateObj.toLocaleTimeString('ar-SA', timeOptions);
+    return dateObj.toLocaleTimeString(finalLocale, timeOptions);
+}
+
+/**
+ * 📅 تنسيق التاريخ والوقت مع locale support
+ * Enhanced version for i18n compatibility
+ */
+export function formatDateTimeWithLocale(
+    timestamp: any,
+    currentLanguage: string,
+    t?: (key: string) => string
+): string {
+    if (!timestamp) {
+        return t ? t('reception.notSpecifiedTime') : '—';
+    }
+    
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const locale = currentLanguage === 'ar' ? 'ar-SA' : 
+                   currentLanguage === 'hi' ? 'hi-IN' : 
+                   currentLanguage === 'bn' ? 'bn-BD' : 'en-US';
+    
+    return date.toLocaleString(locale, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+/**
+ * ⏰ Get time ago with i18n support
+ */
+export function getTimeAgo(
+    timestamp: any,
+    t: (key: string, options?: any) => string
+): string {
+    if (!timestamp) return '';
+    
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const diff = Math.floor((Date.now() - date.getTime()) / 60000);
+    
+    if (diff < 1) return t('reception.nowTime');
+    if (diff < 60) return t('reception.minutesAgo', { minutes: diff });
+    if (diff < 1440) return t('reception.hoursAgo', { hours: Math.floor(diff / 60) });
+    return t('reception.daysAgo', { days: Math.floor(diff / 1440) });
 }
 
 /**

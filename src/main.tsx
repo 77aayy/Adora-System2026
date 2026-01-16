@@ -1,4 +1,5 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Application Entry Point
  * Adora Hotel Management System V2
  */

@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Zap, Droplet, Wrench, Info, Bell, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next'; // ✅ FIX: Add i18n support
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import {
@@ -21,6 +22,7 @@ interface ManagerAnnouncementBannerProps {
 }
 
 export const ManagerAnnouncementBanner: React.FC<ManagerAnnouncementBannerProps> = ({ department }) => {
+    const { t } = useTranslation(); // ✅ FIX: Add i18n support
     const { user } = useAuth();
     const { tenantId } = useTenant();
     const branchId = (user as any)?.branchId || (user as any)?.branch;
@@ -49,7 +51,7 @@ export const ManagerAnnouncementBanner: React.FC<ManagerAnnouncementBannerProps>
                             tenantId,
                             announcement.id,
                             user.id,
-                            user.name || 'موظف',
+                            user.name || t('common.employee') || 'موظف',
                             department,
                             branchId
                         );
@@ -62,13 +64,13 @@ export const ManagerAnnouncementBanner: React.FC<ManagerAnnouncementBannerProps>
         return () => unsubscribe();
     }, [tenantId, branchId, user?.id, department, dismissedIds, viewedIds]);
 
-    // Auto-rotate announcements
+    // ✅ FIX: Auto-rotate announcements (increased duration to prevent rapid disappearance)
     useEffect(() => {
         if (announcements.length <= 1) return;
 
         const interval = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % announcements.length);
-        }, 5000); // Change every 5 seconds
+        }, 12000); // ✅ FIX: Changed from 5 seconds to 12 seconds (prevents rapid disappearance)
 
         return () => clearInterval(interval);
     }, [announcements.length]);
@@ -137,36 +139,72 @@ export const ManagerAnnouncementBanner: React.FC<ManagerAnnouncementBannerProps>
         }
     };
 
+    // ✅ FIX: Theme-aware colors using CSS variables (no hardcoded colors per Adora Rules)
     const getTypeColor = () => {
+        // ✅ Use CSS variables from theme system (defined in adora-components.css)
         switch (currentAnnouncement.priority) {
             case 'critical':
-                return 'bg-red-600 border-red-500';
+                return {
+                    background: 'linear-gradient(135deg, var(--adora-emergency, #ef4444), #b91c1c)',
+                    border: 'var(--adora-emergency, #ef4444)',
+                    text: 'white'
+                };
             case 'high':
-                return 'bg-orange-600 border-orange-500';
+                return {
+                    background: 'linear-gradient(135deg, var(--adora-maintenance, #f97316), #c2410c)',
+                    border: 'var(--adora-maintenance, #f97316)',
+                    text: 'white'
+                };
             case 'medium':
-                return 'bg-yellow-600 border-yellow-500';
+                return {
+                    background: 'linear-gradient(135deg, var(--adora-pending, #eab308), #b45309)',
+                    border: 'var(--adora-pending, #eab308)',
+                    text: 'white'
+                };
             default:
-                return 'bg-blue-600 border-blue-500';
+                return {
+                    background: 'linear-gradient(135deg, var(--adora-confirmed, #3b82f6), #1d4ed8)',
+                    border: 'var(--adora-confirmed, #3b82f6)',
+                    text: 'white'
+                };
         }
     };
 
+    const typeColor = getTypeColor();
+
     return (
-        <div className={`relative w-full ${getTypeColor()} border-b-2 shadow-lg animate-pulse`}>
-            <div className="flex items-center justify-between px-4 py-3 text-white">
+        <div 
+            className="relative w-full border-b-2 shadow-lg transition-all duration-300"
+            style={{
+                background: typeColor.background,
+                borderColor: typeColor.border,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            }}
+        >
+            <div className="flex items-center justify-between px-4 py-3" style={{ color: typeColor.text }}>
                 {/* Icon and Message */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="flex-shrink-0 animate-bounce">
+                    <div className="flex-shrink-0">
+                        {/* ✅ FIX: Removed animate-bounce (was annoying) */}
                         {getTypeIcon()}
                     </div>
                     <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-sm sm:text-base whitespace-nowrap">
+                            <span 
+                                className="font-bold text-sm sm:text-base whitespace-nowrap"
+                                style={{ color: typeColor.text }}
+                            >
                                 {currentAnnouncement.titleAr || currentAnnouncement.title}:
                             </span>
-                            <span className="text-sm sm:text-base">
+                            <span 
+                                className="text-sm sm:text-base"
+                                style={{ color: typeColor.text }}
+                            >
                                 {currentAnnouncement.messageAr || currentAnnouncement.message}
                                 {currentAnnouncement.scheduledTime && (
-                                    <span className="font-bold mr-2">- الوقت: {currentAnnouncement.scheduledTime}</span>
+                                    <span className="font-bold mr-2">
+                                        - {t('announcements.scheduledTime') || 'الوقت'}: {currentAnnouncement.scheduledTime}
+                                    </span>
                                 )}
                             </span>
                         </div>
@@ -177,13 +215,17 @@ export const ManagerAnnouncementBanner: React.FC<ManagerAnnouncementBannerProps>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     {/* Multiple announcements indicator */}
                     {announcements.length > 1 && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/20">
+                        <div 
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg transition-all"
+                            style={{ background: 'rgba(255, 255, 255, 0.2)' }}
+                        >
                             {announcements.map((_, idx) => (
                                 <div
                                     key={idx}
-                                    className={`w-1.5 h-1.5 rounded-full transition-all ${
-                                        idx === currentIndex ? 'bg-white' : 'bg-white/40'
-                                    }`}
+                                    className="w-1.5 h-1.5 rounded-full transition-all"
+                                    style={{
+                                        background: idx === currentIndex ? 'white' : 'rgba(255, 255, 255, 0.4)'
+                                    }}
                                 />
                             ))}
                         </div>
@@ -193,8 +235,12 @@ export const ManagerAnnouncementBanner: React.FC<ManagerAnnouncementBannerProps>
                     {currentAnnouncement.dismissible && (
                         <button
                             onClick={() => handleDismiss(currentAnnouncement.id)}
-                            className="p-1.5 rounded-lg hover:bg-white/20 transition-colors flex-shrink-0"
-                            title="إغلاق"
+                            className="p-1.5 rounded-lg transition-colors flex-shrink-0 hover:opacity-80"
+                            style={{ 
+                                background: 'rgba(255, 255, 255, 0.2)',
+                                color: typeColor.text
+                            }}
+                            title={t('common.close') || 'إغلاق'}
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -202,13 +248,19 @@ export const ManagerAnnouncementBanner: React.FC<ManagerAnnouncementBannerProps>
                 </div>
             </div>
 
-            {/* Progress bar for auto-rotation */}
+            {/* ✅ FIX: Progress bar for auto-rotation (updated duration to match 12s interval) */}
             {announcements.length > 1 && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/30">
+                <div 
+                    className="absolute bottom-0 left-0 right-0 h-0.5"
+                    style={{ background: 'rgba(255, 255, 255, 0.3)' }}
+                >
                     <div
-                        className="h-full bg-white transition-all duration-5000"
+                        className="h-full transition-all"
                         style={{
-                            width: `${((currentIndex + 1) / announcements.length) * 100}%`
+                            width: `${((currentIndex + 1) / announcements.length) * 100}%`,
+                            background: 'white',
+                            transitionDuration: '12s', // ✅ FIX: Match the 12s rotation interval
+                            transitionTimingFunction: 'linear'
                         }}
                     />
                 </div>

@@ -218,3 +218,37 @@ export interface UpdateRequestInput {
  * Used for tracking request visibility across departments
  */
 export type ReadReceiptStatus = 'sent' | 'delivered' | 'read';
+
+/**
+ * ServiceRequest - Extended Request interface for Reception Dashboard
+ * Compatible with legacy code while using new Request structure
+ */
+export interface ServiceRequest extends Omit<Request, 'type' | 'status' | 'priority'> {
+    type: 'cleaning' | 'maintenance' | 'bellman' | 'coffee' | 'laundry' | 'minibar' | 'inspection' | 'extension' | 'other';
+    status: 'PENDING' | 'PENDING_RECEPTION' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'NEEDS_INSPECTION' | 'SCHEDULED' | 'WAITING_PARTS';
+    priority: 'normal' | 'urgent' | 'scheduled';
+    // Extended fields for Reception-specific use
+    serviceType?: string;
+    source?: 'bellman_checkout' | 'reception_direct' | 'QR';
+    guestStatus?: 'in' | 'out';
+    isEmergency?: boolean;
+    emergencyStatus?: 'pending' | 'acknowledged' | 'in_progress' | 'completed';
+    acknowledgedBy?: { id: string; name: string } | null;
+    acknowledgedAt?: Timestamp | null;
+    emergencyTargetDepartment?: string;
+    inspectionResult?: 'clean' | 'damages' | 'missing_items';
+    inspectionPhoto?: string;
+    inspectionNotes?: string;
+    inspectedBy?: { id: string; name: string };
+    minibarConsumption?: Array<{
+        productId: string;
+        productName: string;
+        quantity: number;
+        pricePerUnit: number;
+        total: number;
+    }>;
+    minibarTotal?: number;
+    scheduledAt?: Timestamp; // Alias for scheduledDate
+    // Additional compatibility fields
+    [key: string]: any;
+}

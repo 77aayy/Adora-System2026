@@ -244,15 +244,18 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     // ✅ Use filteredBranches for active branch (respects access control)
     const activeBranch = filteredBranches.find(b => b.id === branchId) || filteredBranches[0];
 
+    // ✅ FIX: Remove hardcoded colors - use theme variables to prevent white gaps in dark mode
     return (
-        <div className={`w-80 flex flex-col h-screen overflow-hidden relative shadow-2xl lg:shadow-none transition-colors duration-300 ${className}`} 
-             style={{ 
-                 background: isDark ? '#0f172a' : '#f8fafc',
-                 borderLeft: '1px solid var(--theme-border-primary)',
-                 backdropFilter: 'none',
-                 WebkitBackdropFilter: 'none',
-                 opacity: '1'
-             }}>
+        <div 
+            className={`w-80 flex flex-col h-screen overflow-hidden relative shadow-2xl lg:shadow-none transition-colors duration-300 ${className}`} 
+            style={{ 
+                background: 'var(--theme-bg-secondary)', // ✅ FIX: Theme-aware background (no white gaps)
+                borderLeft: '1px solid var(--theme-border-primary)',
+                backdropFilter: 'none',
+                WebkitBackdropFilter: 'none',
+                opacity: '1'
+            }}
+        >
             {/* 🎨 Header with Dynamic Logo */}
             <div className="p-4 flex-none border-b space-y-4 transition-colors duration-300" style={{ borderColor: 'var(--theme-border-primary)' }}>
                 <div className="flex items-center justify-between">
@@ -474,8 +477,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             </div>
 
             {/* 🚪 Fixed Footer */}
+            {/* ✅ FIX: Remove hardcoded colors - use theme variables */}
             <div className="flex-none p-4 border-t flex items-center justify-between gap-2 z-10 transition-colors duration-300" style={{ 
-                background: isDark ? '#0f172a' : '#f8fafc',
+                background: 'var(--theme-bg-secondary)', // ✅ FIX: Theme-aware (no hardcoded colors)
                 borderColor: 'var(--theme-border-primary)',
                 backdropFilter: 'none',
                 WebkitBackdropFilter: 'none',

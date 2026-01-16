@@ -1,5 +1,6 @@
 /**
- * Operations Quick-View Bar (شريط العمليات الذكي)
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
+ * Operations Quick-View Bar
  * 
  * ✅ Dashboard-at-a-glance for Reception
  * ✅ Compact horizontal tracker with stage counters
@@ -11,6 +12,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Inbox,
     ArrowRightLeft,
@@ -73,11 +75,11 @@ interface OperationsQuickViewProps {
 // STAGE CONFIGURATION
 // ============================================================
 
-// ✅ THEME-AWARE: Using CSS Variables for Light/Dark consistency
-const STAGES: StageConfig[] = [
+// ✅ Helper to get stages with i18n
+const getStages = (t: (key: string) => string): StageConfig[] => [
     {
         key: 'new',
-        label: 'طلب جديد',
+        label: t('operations.newRequest') || 'New Request',
         icon: <Inbox className="w-4 h-4" />,
         color: 'adora-status-warning',
         bgColor: 'adora-status-bg-warning',
@@ -85,7 +87,7 @@ const STAGES: StageConfig[] = [
     },
     {
         key: 'assigning',
-        label: 'قيد التوجيه',
+        label: t('operations.assigning') || 'Assigning',
         icon: <ArrowRightLeft className="w-4 h-4" />,
         color: 'adora-service-housekeeping',
         bgColor: 'adora-service-bg-housekeeping',
@@ -93,7 +95,7 @@ const STAGES: StageConfig[] = [
     },
     {
         key: 'in_progress',
-        label: 'جاري التنفيذ',
+        label: t('operations.inProgress') || 'In Progress',
         icon: <Wrench className="w-4 h-4" />,
         color: 'adora-service-maintenance',
         bgColor: 'adora-service-bg-maintenance',
@@ -101,7 +103,7 @@ const STAGES: StageConfig[] = [
     },
     {
         key: 'awaiting_confirmation',
-        label: 'انتظار التأكيد',
+        label: t('operations.awaitingConfirmation') || 'Awaiting Confirmation',
         icon: <CheckCircle2 className="w-4 h-4" />,
         color: 'adora-status-success',
         bgColor: 'adora-status-bg-success',
@@ -142,7 +144,7 @@ const getUrgencyLevel = (
 /**
  * Get remaining time text
  */
-const getRemainingTime = (request: ActiveRequest): string => {
+const getRemainingTime = (request: ActiveRequest, t: (key: string) => string): string => {
     const startTime = request.startedAt || request.acceptedAt || request.createdAt;
     if (!startTime) return '-';
 
@@ -150,8 +152,8 @@ const getRemainingTime = (request: ActiveRequest): string => {
     const expected = request.expectedDuration || 30;
     const remaining = expected - elapsed;
 
-    if (remaining <= 0) return 'متأخر!';
-    return `${remaining} د متبقية`;
+    if (remaining <= 0) return t('operations.delayed') || 'Delayed!';
+    return t('operations.minutesRemaining', { minutes: remaining }) || `${remaining} min remaining`;
 };
 
 // ============================================================
@@ -164,6 +166,7 @@ interface RoomChipProps {
 }
 
 const RoomChip: React.FC<RoomChipProps> = ({ request, onClick }) => {
+    const { t } = useTranslation(); // ✅ FIX: Add useTranslation hook
     const [showTooltip, setShowTooltip] = useState(false);
     const tooltipRef = useRef<HTMLDivElement>(null);
     const urgency = getUrgencyLevel(request);
@@ -176,6 +179,7 @@ const RoomChip: React.FC<RoomChipProps> = ({ request, onClick }) => {
 
     const startTime = request.startedAt || request.acceptedAt || request.createdAt;
     const elapsed = startTime ? formatDuration(startTime.toDate ? startTime.toDate() : new Date(startTime)) : '-';
+    const remaining = getRemainingTime(request, t);
 
     return (
         <div className="relative inline-block">
@@ -216,7 +220,7 @@ const RoomChip: React.FC<RoomChipProps> = ({ request, onClick }) => {
                     {/* Header */}
                     <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-700">
                         <span className="text-lg font-bold text-white">
-                            غرفة {request.roomNumber}
+                            {t('operations.room') || 'Room'} {request.roomNumber}
                         </span>
                         <span className="text-2xl">{TYPE_ICONS[request.type]}</span>
                     </div>
@@ -233,7 +237,7 @@ const RoomChip: React.FC<RoomChipProps> = ({ request, onClick }) => {
                     {request.assignedToName && (
                         <div className="flex items-center gap-2 text-teal-400 text-sm mb-2">
                             <Wrench className="w-3.5 h-3.5" />
-                            <span>العامل: {request.assignedToName}</span>
+                            <span>{t('operations.worker') || 'Worker'}: {request.assignedToName}</span>
                         </div>
                     )}
 
@@ -244,11 +248,11 @@ const RoomChip: React.FC<RoomChipProps> = ({ request, onClick }) => {
                                 urgency === 'critical' ? 'text-red-400' :
                                 urgency === 'warning' ? 'text-amber-400' : 'text-teal-400'
                             }`}>
-                                {getRemainingTime(request)}
+                                {remaining}
                             </span>
                             <div className="flex items-center gap-1 text-slate-400">
                                 <Clock className="w-3 h-3" />
-                                <span>مضى: {elapsed}</span>
+                                <span>{t('operations.elapsed') || 'Elapsed'}: {elapsed}</span>
                             </div>
                         </div>
 
@@ -279,13 +283,13 @@ const RoomChip: React.FC<RoomChipProps> = ({ request, onClick }) => {
                                            py-1.5 rounded-lg bg-teal-600 text-white text-xs
                                            hover:bg-teal-700 transition-colors">
                             <Eye className="w-3 h-3" />
-                            عرض
+                            {t('operations.view') || 'View'}
                         </button>
                         <button className="flex-1 flex items-center justify-center gap-1 
                                            py-1.5 rounded-lg bg-slate-700 text-white text-xs
                                            hover:bg-slate-600 transition-colors">
                             <Phone className="w-3 h-3" />
-                            اتصال
+                            {t('operations.call') || 'Call'}
                         </button>
                     </div>
                 </div>
@@ -304,7 +308,7 @@ interface StageCardProps {
     onRequestClick?: (request: ActiveRequest) => void;
 }
 
-const StageCard: React.FC<StageCardProps> = ({ stage, requests, onRequestClick }) => {
+const StageCard: React.FC<StageCardProps & { t: (key: string) => string }> = ({ stage, requests, onRequestClick, t }) => {
     const criticalCount = requests.filter(r => getUrgencyLevel(r) === 'critical').length;
     const warningCount = requests.filter(r => getUrgencyLevel(r) === 'warning').length;
 
@@ -344,13 +348,14 @@ const StageCard: React.FC<StageCardProps> = ({ stage, requests, onRequestClick }
             {/* Room Chips */}
             <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto scrollbar-thin">
                 {requests.length === 0 ? (
-                    <span className="text-xs adora-text-tertiary italic">لا يوجد طلبات</span>
+                    <span className="text-xs adora-text-tertiary italic">{t('operations.noRequests') || 'No requests'}</span>
                 ) : (
                     requests.map(request => (
                         <RoomChip
                             key={request.id}
                             request={request}
                             onClick={() => onRequestClick?.(request)}
+                            t={t}
                         />
                     ))
                 )}
@@ -369,8 +374,12 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
     onRequestClick,
     className = ''
 }) => {
+    const { t } = useTranslation();
     const [requests, setRequests] = useState<ActiveRequest[]>([]);
     const [isExpanded, setIsExpanded] = useState(true);
+    
+    // Get stages with i18n
+    const STAGES = useMemo(() => getStages(t), [t]);
 
     // ============================================================
     // REAL-TIME LISTENER
@@ -483,14 +492,14 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
                 `}
             >
                 <div className="flex items-center gap-3">
-                    <span className="adora-text-secondary text-sm">📊 شريط العمليات</span>
+                    <span className="adora-text-secondary text-sm">📊 {t('operations.operationsBar') || 'Operations Bar'}</span>
                     <div className="flex items-center gap-2">
                         <span className="adora-badge adora-badge-teal text-xs font-bold">
-                            {stats.total} طلب
+                            {stats.total} {t('operations.request') || 'request'}
                         </span>
                         {stats.critical > 0 && (
                             <span className="adora-badge adora-badge-red text-xs font-bold animate-pulse">
-                                {stats.critical} متأخر!
+                                {stats.critical} {t('operations.delayed') || 'delayed'}!
                             </span>
                         )}
                     </div>
@@ -508,17 +517,17 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
             {/* Header - ✅ THEME-AWARE */}
             <div className="flex items-center justify-between px-4 py-2.5 adora-border-b">
                 <div className="flex items-center gap-3">
-                    <span className="adora-text-primary font-bold text-sm">📊 شريط العمليات</span>
+                    <span className="adora-text-primary font-bold text-sm">📊 {t('operations.operationsBar') || 'Operations Bar'}</span>
                     
                     {/* Quick Stats */}
                     <div className="flex items-center gap-2">
                         <span className="adora-badge adora-badge-teal text-xs font-medium">
-                            {stats.total} طلب نشط
+                            {stats.total} {t('operations.activeRequest') || 'active request'}
                         </span>
                         {stats.critical > 0 && (
                             <span className="adora-badge adora-badge-red text-xs font-bold animate-pulse flex items-center gap-1">
                                 <AlertTriangle className="w-3 h-3" />
-                                {stats.critical} متأخر
+                                {stats.critical} {t('operations.delayed') || 'delayed'}
                             </span>
                         )}
                         {stats.vip > 0 && (
@@ -540,6 +549,7 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
                             stage={stage}
                             requests={requestsByStage[stage.key] || []}
                             onRequestClick={onRequestClick}
+                            t={t}
                         />
                     ))}
                 </div>
@@ -548,15 +558,15 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
             {/* Flow Arrow Visualization - ✅ THEME-AWARE */}
             <div className="px-4 pb-3">
                 <div className="flex items-center justify-center gap-2 text-xs flex-wrap">
-                    <span className="adora-status-warning">📥 جديد</span>
+                    <span className="adora-status-warning">📥 {t('operations.new') || 'New'}</span>
                     <span className="adora-text-disabled">→</span>
-                    <span className="adora-service-housekeeping">🔃 توجيه</span>
+                    <span className="adora-service-housekeeping">🔃 {t('operations.assigning') || 'Assigning'}</span>
                     <span className="adora-text-disabled">→</span>
-                    <span className="adora-service-maintenance">🛠️ تنفيذ</span>
+                    <span className="adora-service-maintenance">🛠️ {t('operations.inProgress') || 'In Progress'}</span>
                     <span className="adora-text-disabled">→</span>
-                    <span className="adora-status-success">✅ تأكيد</span>
+                    <span className="adora-status-success">✅ {t('operations.confirmation') || 'Confirmation'}</span>
                     <span className="adora-text-disabled">→</span>
-                    <span className="adora-status-success font-bold">🎉 إغلاق</span>
+                    <span className="adora-status-success font-bold">🎉 {t('operations.closed') || 'Closed'}</span>
                 </div>
             </div>
 

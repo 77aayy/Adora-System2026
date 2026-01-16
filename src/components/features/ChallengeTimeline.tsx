@@ -14,7 +14,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { checkDailyAttendance, getChallengeConfig } from '../../services/challengeService';
-import { soundManager } from '../../utils/soundManager';
+import { playSound } from '../../services/soundService';
 import { UserChallengeProgress, ChallengeMilestone } from '../../types';
 import confetti from 'canvas-confetti';
 
@@ -56,7 +56,7 @@ export const ChallengeTimeline: React.FC = () => {
             const result = await checkDailyAttendance(tenantId, user.id);
 
             if (result.success && result.unlocked) {
-                soundManager.playUnlock();
+                playSound('success');
                 confetti({
                     particleCount: 150,
                     spread: 70,

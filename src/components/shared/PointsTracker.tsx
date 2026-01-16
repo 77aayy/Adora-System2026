@@ -19,6 +19,7 @@ import { AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import * as PointsService from '../../services/pointsService';
 import { requestPayout, getEmployeePayoutHistory } from '../../services/payoutService';
 import { PayoutRequest } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -611,7 +612,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                     <span className={`text-lg font-black ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
                                                         {isPositive ? '+' : ''}{item.points}
                                                     </span>
-                                                    <p className="text-xs adora-text-tertiary">نقطة</p>
+                                                    <p className="text-xs adora-text-tertiary">{t('points.point') || 'point'}</p>
                                                 </div>
                                             </div>
                                         );

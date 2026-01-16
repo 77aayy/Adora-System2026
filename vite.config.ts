@@ -216,20 +216,70 @@ export default defineConfig({
     build: {
         outDir: 'dist',
         sourcemap: false,
-        // ✅ تحسين حجم الـ chunks
-        chunkSizeWarningLimit: 600,
+        // ✅ تحسين حجم الـ chunks - increased limit for better chunking strategy
+        chunkSizeWarningLimit: 800,
         // ✅ Use esbuild for minification (safer than Terser, less aggressive)
         minify: 'esbuild',
         target: 'es2020',
         // ✅ CSS code splitting
         cssCodeSplit: true,
-        // ✅ Optimize asset names
-        assetsInlineLimit: 4096, // Inline assets smaller than 4KB
+        // ✅ Optimize asset names - increased for better caching
+        assetsInlineLimit: 8192, // Inline assets smaller than 8KB
         rollupOptions: {
             output: {
-                // ✅ Let Vite/Rollup handle chunking automatically
-                // Manual chunks cause circular dependency issues with chart libraries
-                manualChunks: undefined,
+                // ✅ PERFORMANCE: Manual chunks for better code splitting and caching
+                manualChunks: (id) => {
+                    // Vendor chunks - separate by library
+                    if (id.includes('node_modules')) {
+                        // React core
+                        if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+                            return 'vendor-react';
+                        }
+                        // Firebase - large library, separate chunk
+                        if (id.includes('firebase')) {
+                            return 'vendor-firebase';
+                        }
+                        // Chart libraries - heavy, separate chunk
+                        if (id.includes('chart.js') || id.includes('recharts') || id.includes('react-chartjs')) {
+                            return 'vendor-charts';
+                        }
+                        // Other large vendors
+                        if (id.includes('xlsx') || id.includes('jspdf')) {
+                            return 'vendor-export';
+                        }
+                        // i18n libraries
+                        if (id.includes('i18next') || id.includes('react-i18next')) {
+                            return 'vendor-i18n';
+                        }
+                        // Lucide icons - large but frequently used
+                        if (id.includes('lucide-react')) {
+                            return 'vendor-icons';
+                        }
+                        // All other node_modules
+                        return 'vendor';
+                    }
+                    // Feature chunks - split large dashboards
+                    if (id.includes('/features/reception/')) {
+                        return 'feature-reception';
+                    }
+                    if (id.includes('/features/admin/')) {
+                        return 'feature-admin';
+                    }
+                    if (id.includes('/features/super-admin/')) {
+                        return 'feature-super-admin';
+                    }
+                    if (id.includes('/features/guest/')) {
+                        return 'feature-guest';
+                    }
+                    // Service chunks - group services together
+                    if (id.includes('/services/')) {
+                        return 'services';
+                    }
+                    // Component chunks
+                    if (id.includes('/components/')) {
+                        return 'components';
+                    }
+                },
                 // أسماء ملفات مُحسَّنة
                 chunkFileNames: 'assets/[name]-[hash].js',
                 entryFileNames: 'assets/[name]-[hash].js',

@@ -1,10 +1,11 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Unified Manager Header
  * Sticky navigation header for managers with department tabs
  * Adora Hotel Management System V2
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -29,6 +30,7 @@ import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { PointsTracker } from '../shared/PointsTracker';
 import { ThemeToggleButton } from '../common/ThemeToggle';
 import { LanguageSwitcher } from '../common/LanguageSwitcher';
+import { getGreetingParts } from '../../utils/greetings';
 
 interface DepartmentTab {
     id: string;
@@ -54,6 +56,12 @@ export const UnifiedManagerHeader: React.FC = () => {
     // Current branch name
     const currentBranch = branches.find(b => b.id === branchId);
     const branchName = currentBranch?.name || t('sidebar.branch') || 'الفرع';
+
+    // ✅ FIX: Smart Time-based Greeting (replaces static "مرحباً")
+    const greeting = useMemo(() => {
+        if (!user?.name) return null;
+        return getGreetingParts(user.name, t);
+    }, [user?.name, t]);
 
     // Define department tabs (i18n-aware)
     const departmentTabs: DepartmentTab[] = [
@@ -165,25 +173,20 @@ export const UnifiedManagerHeader: React.FC = () => {
         <>
             {/* Main Header - Solid background to prevent visual pollution on scroll */}
             <header 
-                className="fixed top-0 left-0 right-0 z-50"
+                className="fixed top-0 left-0 right-0 z-50 transition-colors duration-300"
                 style={{
-                    background: '#ffffff', // Solid white - no transparency
-                    borderBottom: '1px solid var(--theme-border-primary)',
+                    background: 'var(--theme-bg-primary)', // ✅ FIX: Theme-aware background (no white gaps in dark mode)
+                    borderBottom: '1px solid var(--theme-border-primary)', // ✅ FIX: Theme-aware border
                     boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
                     backdropFilter: 'none',
                     WebkitBackdropFilter: 'none',
                 }}
             >
-            {/* Dark mode override for header */}
-            <style>{`
-                .dark header[class*="fixed"] {
-                    background: #0f172a !important;
-                }
-            `}</style>
                 {/* Top Bar - Logo, Branch, User Info, Actions */}
-                <div className="px-3 lg:px-6 py-2 flex items-center justify-between">
+                {/* ✅ FIX: Improved spacing - using gap-2 sm:gap-3 for better breathing room */}
+                <div className="px-3 lg:px-6 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
                     {/* Right Side - Menu Button (Mobile) + Logo + Branch */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                         {/* ✅ Admin Menu Button - Mobile Only */}
                         <button
                             id="admin-menu-trigger"
@@ -275,25 +278,44 @@ export const UnifiedManagerHeader: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Center - Welcome Message & User Name (Desktop) */}
-                    <div className="hidden md:flex items-center gap-2">
-                        <span className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
-                            {t('common.welcome') || 'مرحباً'}،
-                        </span>
-                        <span className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>
-                            {user?.name || t('common.user') || 'المستخدم'}
-                        </span>
-                        <span className="text-lg">👋</span>
+                    {/* Center - Smart Time-based Greeting (Desktop) - Moved to right side */}
+                    {/* ✅ FIX: Removed center greeting - now only in right side profile area */}
+                    <div className="hidden md:flex items-center gap-2 flex-1 justify-center min-w-0">
+                        {/* Empty center for better spacing */}
                     </div>
 
-                    {/* Left Side - Actions */}
-                    <div className="flex items-center gap-2">
-                        {/* Mobile: Show user name */}
+                    {/* Right Side - Actions + Smart Greeting */}
+                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                        {/* ✅ FIX: Smart Greeting in profile area (right side) */}
+                        {greeting && (
+                            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--theme-bg-secondary)' }}>
+                                <span className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    {greeting.emoji} {greeting.timeGreeting}،
+                                </span>
+                                <span className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                    {user?.name || t('common.user') || 'المستخدم'}
+                                </span>
+                            </div>
+                        )}
+                        {/* Mobile: Show Smart Greeting */}
                         <div className="md:hidden flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: 'var(--theme-bg-secondary)' }}>
-                            <span className="text-xs font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                                {user?.name?.split(' ')[0] || t('common.user') || 'مستخدم'}
-                            </span>
-                            <span className="text-sm">👋</span>
+                            {greeting ? (
+                                <>
+                                    <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                                        {greeting.emoji} {greeting.timeGreeting}
+                                    </span>
+                                    <span className="text-xs font-medium" style={{ color: 'var(--theme-text-primary)' }}>
+                                        {user?.name?.split(' ')[0] || t('common.user') || 'مستخدم'}
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-xs font-medium" style={{ color: 'var(--theme-text-primary)' }}>
+                                        {user?.name?.split(' ')[0] || t('common.user') || 'مستخدم'}
+                                    </span>
+                                    <span className="text-sm">👋</span>
+                                </>
+                            )}
                         </div>
                         
                         {/* 🏆 Points Tracker - Golden Cup */}
@@ -325,7 +347,7 @@ export const UnifiedManagerHeader: React.FC = () => {
                 <div 
                     className="relative px-2 lg:px-4 overflow-x-auto scrollbar-hide"
                     style={{ 
-                        background: '#ffffff', // Solid white background
+                        background: 'var(--theme-bg-primary)', // Theme-aware background
                         borderTop: '1px solid var(--theme-border-primary)',
                     }}
                 >
