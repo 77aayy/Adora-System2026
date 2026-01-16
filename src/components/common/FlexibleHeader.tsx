@@ -81,17 +81,17 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
 
     return (
         <>
-            {/* Header - Fully Responsive & Theme-Aware - ✅ CLEAN LAYOUT */}
+            {/* Header - Fully Responsive & Theme-Aware - ✅ MOBILE-FIRST CLEAN LAYOUT */}
             <div 
-                className={`flex items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 ${className}`}
+                className={`flex items-center justify-between gap-2 sm:gap-3 md:gap-4 mb-3 sm:mb-4 md:mb-6 ${className}`}
                 style={{ 
                     background: 'transparent', // ✅ FIX: No white gap
                     borderBottom: 'none' // ✅ FIX: No border causing visual pollution
                 }}
             >
-                {/* Left: Title & Subtitle - ✅ Clean spacing */}
+                {/* Left: Title & Subtitle - ✅ Mobile-First Clean Spacing */}
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
                         {titleIcon && (
                             <div className="flex-shrink-0" style={{ color: 'var(--theme-primary-500)' }}>
                                 {titleIcon}
@@ -99,17 +99,17 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
                         )}
                         <div className="flex-1 min-w-0">
                             {/* ✅ REMOVED: Static greeting - now only Smart Time-based greeting in right side */}
-                            {/* Standard Title Mode Only */}
+                            {/* Standard Title Mode Only - Mobile-First Responsive */}
                             <>
                                 <h1 
-                                    className="text-xl sm:text-2xl md:text-3xl font-bold truncate"
+                                    className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold truncate leading-tight"
                                     style={{ color: 'var(--theme-text-primary)' }}
                                 >
                                     {title}
                                 </h1>
                                 {subtitle && (
                                     <div 
-                                        className="mt-1 sm:mt-1.5 text-xs sm:text-sm truncate"
+                                        className="mt-0.5 sm:mt-1 md:mt-1.5 text-[10px] sm:text-xs md:text-sm truncate"
                                         style={{ color: 'var(--theme-text-secondary)' }}
                                     >
                                         {subtitle}
@@ -117,10 +117,11 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
                                 )}
                                 {showGreeting && brandName && (
                                     <div 
-                                        className="mt-1 sm:mt-1.5 text-xs sm:text-sm flex items-center gap-1.5"
+                                        className="mt-0.5 sm:mt-1 md:mt-1.5 text-[10px] sm:text-xs md:text-sm flex items-center gap-1"
                                         style={{ color: 'var(--theme-text-secondary)' }}
                                     >
-                                        🏨 {brandName}
+                                        <span className="text-xs">🏨</span>
+                                        <span className="truncate">{brandName}</span>
                                     </div>
                                 )}
                             </>
@@ -128,30 +129,51 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Right: Smart Greeting + Actions - ✅ Proper spacing with gap-2 sm:gap-3 */}
-                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                    {/* ✅ NEW: Smart Time-based Greeting in Profile Area (Right Side) */}
+                {/* Right: Smart Greeting + Actions - ✅ Mobile-First Responsive */}
+                <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
+                    {/* ✅ NEW: Smart Time-based Greeting - Mobile Compact / Desktop Full */}
                     {showGreeting && greeting && user?.name && (
-                        <div 
-                            className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all"
-                            style={{ 
-                                background: 'var(--theme-bg-secondary)',
-                                border: '1px solid var(--theme-border-primary)'
-                            }}
-                        >
-                            <span 
-                                className="text-sm font-medium"
-                                style={{ color: 'var(--theme-text-secondary)' }}
+                        <>
+                            {/* Mobile: Icon + Name Only (Compact) */}
+                            <div 
+                                className="flex md:hidden items-center gap-1 px-2 py-1 rounded-lg transition-all"
+                                style={{ 
+                                    background: 'var(--theme-bg-secondary)',
+                                    border: '1px solid var(--theme-border-primary)'
+                                }}
+                                title={`${greeting.emoji} ${greeting.timeGreeting}, ${user.name}`}
                             >
-                                {greeting.emoji} {greeting.timeGreeting}
-                            </span>
-                            <span 
-                                className="text-sm font-bold"
-                                style={{ color: 'var(--theme-text-primary)' }}
+                                <span className="text-xs">{greeting.emoji}</span>
+                                <span 
+                                    className="text-xs font-bold truncate max-w-[60px]"
+                                    style={{ color: 'var(--theme-text-primary)' }}
+                                >
+                                    {user.name.split(' ')[0]}
+                                </span>
+                            </div>
+                            
+                            {/* Tablet/Desktop: Full Greeting */}
+                            <div 
+                                className="hidden md:flex items-center gap-1.5 lg:gap-2 px-2.5 md:px-3 py-1.5 rounded-lg transition-all"
+                                style={{ 
+                                    background: 'var(--theme-bg-secondary)',
+                                    border: '1px solid var(--theme-border-primary)'
+                                }}
                             >
-                                {user.name}
-                            </span>
-                        </div>
+                                <span 
+                                    className="text-xs md:text-sm font-medium whitespace-nowrap"
+                                    style={{ color: 'var(--theme-text-secondary)' }}
+                                >
+                                    {greeting.emoji} {greeting.timeGreeting}
+                                </span>
+                                <span 
+                                    className="text-xs md:text-sm font-bold whitespace-nowrap"
+                                    style={{ color: 'var(--theme-text-primary)' }}
+                                >
+                                    {user.name}
+                                </span>
+                            </div>
+                        </>
                     )}
 
                     {/* Actions - ✅ Unified Responsive Action Bar */}
