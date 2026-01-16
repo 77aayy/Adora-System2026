@@ -188,8 +188,8 @@ export const KPIStatsOverview: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            {/* Cards Grid - Unified Style like Owner Dashboard */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* Cards Grid - ✅ Mobile-First Responsive */}
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
                 {cards.map((c) => (
                     <div key={c.id} className="stat-card-pro-compact">
                         <StatCard

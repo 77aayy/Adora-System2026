@@ -25,7 +25,8 @@ export const ReceptionStats: React.FC<ReceptionStatsProps> = React.memo(({
     t
 }) => {
     return (
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-3 mb-4">
+        <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-3">
             <StatCard
                 count={newCount}
                 label={t('reception.newTab')}
@@ -48,6 +49,7 @@ export const ReceptionStats: React.FC<ReceptionStatsProps> = React.memo(({
                 status="success"
                 trend="+12%"
             />
+            </div>
         </div>
     );
 }, (prevProps, nextProps) => {

@@ -1034,20 +1034,8 @@ export const MaintenanceDashboard: React.FC = () => {
             <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
             
             <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
-            {/* Flexible Header with Dynamic Greeting */}
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <div className="flex-1 min-w-0">
-                    <h1 className="text-lg sm:text-xl lg:text-2xl font-bold mb-1" style={{ color: 'var(--theme-text-primary)' }}>
-                        {greeting.emoji} {greeting.timeGreeting}، {greeting.motivational} يا {user?.name}
-                    </h1>
-                    {brandName && (
-                        <div className="text-xs sm:text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
-                            🏨 {brandName}
-                        </div>
-                    )}
-                </div>
-
-                {/* ✅ Unified Responsive Action Bar - Same Order as Reception */}
+            {/* ✅ Unified Responsive Action Bar - Same Order as Reception */}
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                 <ResponsiveActionBar
                     actions={[
                         {
@@ -1113,9 +1101,9 @@ export const MaintenanceDashboard: React.FC = () => {
                 />
             )}
 
-            {/* Stats Cards - Unified Style */}
+            {/* Stats Cards - Unified Style - ✅ Mobile-First Compact */}
             <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={activeRequests.filter(r => r.status === 'IN_PROGRESS').length}

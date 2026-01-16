@@ -1118,9 +1118,9 @@ export const BellmanDashboard: React.FC = () => {
                 <ChallengeTimeline />
             </div>
 
-            {/* Stats - Unified Style */}
+            {/* Stats - Unified Style - ✅ Mobile-First Compact */}
             <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                 <div className="stat-card-pro-compact">
                     <StatCard
                         count={occupiedRoomNumbers.length}

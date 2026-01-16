@@ -572,7 +572,7 @@ export const ProcurementDashboard: React.FC = () => {
                 <FlexibleHeader
                 title="المشتريات"
                 titleIcon={<ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 flex-shrink-0" />}
-                showGreeting={true}
+                showGreeting={false}
                 brandName={brandName}
                 subtitle={undefined}
                 actions={[
@@ -610,26 +610,9 @@ export const ProcurementDashboard: React.FC = () => {
                 onResetErrors={resetErrors}
             />
 
-            {/* ✅ Challenge Timeline - شريط الالتزام */}
-            <ChallengeTimeline />
-
-            {/* Golden Alert - Broadcast Messages */}
-            <GoldenAlertDisplay department="procurement" />
-
-            {/* ✅ Points Notification - Show for active APPROVED or PENDING_APPROVAL requests */}
-            {notificationRequest && tenantId && (
-                <PointsNotification
-                    requestId={notificationRequest.id}
-                    requestType="procurement"
-                    department="procurement"
-                    createdAt={notificationRequest.createdAt}
-                    tenantId={tenantId}
-                    onDismiss={() => setNotificationRequest(null)}
-                />
-            )}
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-4">
+            {/* Stats - ✅ Moved BEFORE Challenge Timeline to prevent hiding - Mobile-First */}
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                 <StatCard
                     count={pendingApproval.length}
                     label="⏳ بانتظار التعميد"
@@ -654,7 +637,32 @@ export const ProcurementDashboard: React.FC = () => {
                     status="success"
                     lastUpdate="تم التحديث الآن"
                 />
+                </div>
             </div>
+
+            {/* ✅ Challenge Timeline - شريط الالتزام */}
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <ChallengeTimeline />
+            </div>
+
+            {/* Golden Alert - Broadcast Messages */}
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <GoldenAlertDisplay department="procurement" />
+            </div>
+
+            {/* ✅ Points Notification - Show for active APPROVED or PENDING_APPROVAL requests */}
+            {notificationRequest && tenantId && (
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <PointsNotification
+                        requestId={notificationRequest.id}
+                        requestType="procurement"
+                        department="procurement"
+                        createdAt={notificationRequest.createdAt}
+                        tenantId={tenantId}
+                        onDismiss={() => setNotificationRequest(null)}
+                    />
+                </div>
+            )}
 
             {/* ✅ Unified Tabs - Same as Reception */}
             <UnifiedRequestTabs

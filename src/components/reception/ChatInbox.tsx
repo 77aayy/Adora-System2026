@@ -196,17 +196,17 @@ const MessageView: React.FC<MessageViewProps> = ({
 
     return (
         <div className="flex flex-col h-full">
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.map((msg, index) => {
-                    const isGuest = msg.sender === 'guest';
-                    const time = msg.createdAt instanceof Timestamp
-                        ? msg.createdAt.toDate().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
-                        : '';
+                        {/* Messages - ✅ Mobile-First Responsive */}
+                        <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-2 sm:space-y-3">
+                            {messages.map((msg, index) => {
+                                const isGuest = msg.sender === 'guest';
+                                const time = msg.createdAt instanceof Timestamp
+                                    ? msg.createdAt.toDate().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+                                    : '';
 
-                    return (
-                        <div key={msg.id || index} className={`flex ${isGuest ? 'justify-start' : 'justify-end'}`}>
-                            <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                                return (
+                                    <div key={msg.id || index} className={`flex ${isGuest ? 'justify-start' : 'justify-end'}`}>
+                                        <div className={`max-w-[85%] sm:max-w-[70%] rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base ${
                                 isGuest 
                                     ? 'bg-white/10 text-white rounded-bl-sm' 
                                     : msg.sender === 'bot'
@@ -225,23 +225,24 @@ const MessageView: React.FC<MessageViewProps> = ({
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Action Buttons (for pending requests) */}
+            {/* Action Buttons (for pending requests) - ✅ Mobile-First Responsive */}
             {pendingRequest && (
-                <div className="p-3 border-t border-white/10 bg-slate-800/50">
-                    <p className="text-white/60 text-xs mb-2 text-center">
+                <div className="p-2 sm:p-3 border-t border-white/10 bg-slate-800/50 flex-shrink-0">
+                    <p className="text-white/60 text-[10px] sm:text-xs mb-2 text-center truncate">
                         طلب: {pendingRequest.notes || pendingRequest.type}
                     </p>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 sm:gap-2">
                         {/* Approve Button */}
                         <button
                             onClick={() => onApprove(pendingRequest.id)}
                             disabled={sending}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl
-                                       bg-primary-600 hover:bg-green-700 text-white font-bold
+                            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 rounded-lg sm:rounded-xl
+                                       bg-primary-600 hover:bg-green-700 text-white text-xs sm:text-sm font-bold
                                        transition-colors disabled:opacity-50"
                         >
-                            <Check className="w-5 h-5" />
-                            <span>موافقة ✅</span>
+                            <Check className="w-4 h-4 sm:w-5 sm:h-5" />
+                            <span className="hidden sm:inline">موافقة ✅</span>
+                            <span className="sm:hidden">✅</span>
                         </button>
 
                         {/* Forward Button */}
@@ -249,18 +250,19 @@ const MessageView: React.FC<MessageViewProps> = ({
                             <button
                                 onClick={() => setShowForwardMenu(!showForwardMenu)}
                                 disabled={sending}
-                                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
-                                           bg-blue-600 hover:bg-blue-700 text-white font-bold
+                                className="w-full flex items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 rounded-lg sm:rounded-xl
+                                           bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold
                                            transition-colors disabled:opacity-50"
                             >
-                                <Forward className="w-5 h-5" />
-                                <span>توجيه ➡️</span>
+                                <Forward className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <span className="hidden sm:inline">توجيه ➡️</span>
+                                <span className="sm:hidden">➡️</span>
                             </button>
 
-                            {/* Forward Menu */}
+                            {/* Forward Menu - ✅ Mobile-First Responsive */}
                             {showForwardMenu && (
                                 <div className="absolute bottom-full left-0 right-0 mb-2 
-                                               bg-slate-800 border border-white/10 rounded-xl 
+                                               bg-slate-800 border border-white/10 rounded-lg sm:rounded-xl 
                                                shadow-xl overflow-hidden z-10">
                                     {DEPARTMENTS.map(dept => (
                                         <button
@@ -269,8 +271,8 @@ const MessageView: React.FC<MessageViewProps> = ({
                                                 onForward(pendingRequest.id, dept.id);
                                                 setShowForwardMenu(false);
                                             }}
-                                            className="w-full flex items-center gap-3 px-4 py-3 
-                                                       text-white hover:bg-white/10 transition-colors"
+                                            className="w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 
+                                                       text-white hover:bg-white/10 transition-colors text-sm sm:text-base"
                                         >
                                             {dept.icon}
                                             <span>{dept.label}</span>
@@ -283,25 +285,25 @@ const MessageView: React.FC<MessageViewProps> = ({
                 </div>
             )}
 
-            {/* Input Area */}
-            <div className="p-3 border-t border-white/10">
-                <div className="flex items-center gap-2">
+            {/* Input Area - ✅ Mobile-First Responsive */}
+            <div className="p-2 sm:p-3 border-t border-white/10 flex-shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                     <input
                         type="text"
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder="اكتب رسالة للنزيل..."
-                        className="flex-1 bg-white/10 border border-white/10 rounded-xl
-                                   px-4 py-2.5 text-white placeholder:text-white/70
+                        placeholder="اكتب رسالة..."
+                        className="flex-1 bg-white/10 border border-white/10 rounded-lg sm:rounded-xl
+                                   px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base text-white placeholder:text-white/70
                                    focus:outline-none focus:border-teal-500/50"
                         dir="rtl"
                     />
                     <button
                         onClick={handleSend}
                         disabled={!inputText.trim() || sending}
-                        className="p-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 
-                                   text-white transition-colors disabled:opacity-50"
+                        className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-teal-600 hover:bg-teal-700 
+                                   text-white transition-colors disabled:opacity-50 flex-shrink-0"
                     >
                         {sending ? (
                             <Loader2 className="w-5 h-5 animate-spin" />
@@ -536,12 +538,21 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
     // RENDER
     // ============================================================
 
+    // ✅ Mobile height calculation
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    const containerHeight = isMobile ? 'calc(100vh - 140px)' : 'calc(100vh - 200px)';
+    const containerMaxHeight = isMobile ? 'calc(100vh - 140px)' : '80vh';
+    
     return (
-        <div className={`adora-card rounded-2xl overflow-hidden flex ${className}`}
-             style={{ height: '500px', maxHeight: '70vh' }}>
+        <div className={`adora-card rounded-xl sm:rounded-2xl overflow-hidden flex flex-col sm:flex-row ${className}`}
+             style={{ 
+                 height: containerHeight, 
+                 minHeight: '300px', 
+                 maxHeight: containerMaxHeight 
+             }}>
             
-            {/* Sidebar - Room List */}
-            <div className="w-72 sm:w-80 adora-border-l flex flex-col">
+            {/* Sidebar - Room List - ✅ Mobile-First Responsive */}
+            <div className={`${selectedRoom ? 'hidden sm:flex' : 'flex'} w-full sm:w-56 md:w-64 lg:w-72 sm:adora-border-l flex flex-col flex-shrink-0 border-b sm:border-b-0 adora-border-b`}>
                 {/* Header */}
                 <div className="p-3 sm:p-4 adora-border-b">
                     <div className="flex items-center justify-between mb-3">
@@ -608,26 +619,26 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
                 </div>
             </div>
 
-            {/* Main - Message View */}
-            <div className="flex-1 flex flex-col">
+            {/* Main - Message View - ✅ Mobile-First */}
+            <div className={`flex-1 flex flex-col ${!selectedRoom ? 'hidden sm:flex' : 'flex'}`}>
                 {selectedRoom ? (
                     <>
-                        {/* Room Header */}
-                        <div className="p-4 border-b border-white/10 bg-slate-800/30 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center">
-                                    <Home className="w-5 h-5 text-teal-400" />
+                        {/* Room Header - ✅ Mobile-First Responsive */}
+                        <div className="p-2 sm:p-4 border-b border-white/10 bg-slate-800/30 flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                                    <Home className="w-4 h-4 sm:w-5 sm:h-5 text-teal-400" />
                                 </div>
-                                <div>
-                                    <h4 className="text-white font-bold">غرفة {selectedRoom.roomNumber}</h4>
+                                <div className="min-w-0">
+                                    <h4 className="text-white font-bold text-sm sm:text-base truncate">غرفة {selectedRoom.roomNumber}</h4>
                                     {selectedRoom.guestName && (
-                                        <p className="text-white/60 text-sm">{selectedRoom.guestName}</p>
+                                        <p className="text-white/60 text-xs sm:text-sm truncate">{selectedRoom.guestName}</p>
                                     )}
                                 </div>
                             </div>
                             <button
                                 onClick={() => setSelectedRoom(null)}
-                                className="p-2 rounded-lg hover:bg-white/10 transition-colors sm:hidden"
+                                className="p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors sm:hidden flex-shrink-0"
                             >
                                 <X className="w-5 h-5 text-white/60" />
                             </button>
