@@ -1030,7 +1030,10 @@ export const MaintenanceDashboard: React.FC = () => {
             {/* Manager Announcement Banner */}
             <ManagerAnnouncementBanner department="maintenance" />
             
-            <div className="min-h-screen pb-20 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+            {/* Spacer for UnifiedManagerHeader */}
+            <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
+            
+            <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
             {/* Flexible Header with Dynamic Greeting */}
             <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <div className="flex-1 min-w-0">
@@ -1082,14 +1085,18 @@ export const MaintenanceDashboard: React.FC = () => {
             </div>
 
             {/* ✅ Challenge Timeline - شريط الالتزام */}
-            <ChallengeTimeline />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <ChallengeTimeline />
+            </div>
 
             {/* Golden Alert - Broadcast Messages */}
-            <GoldenAlertDisplay department="maintenance" />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <GoldenAlertDisplay department="maintenance" />
+            </div>
 
             {/* ✅ Room Transfer Notifications */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto">
-                <div className="flex justify-end mb-3">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="flex justify-end">
                     <TransferNotificationBadge department="maintenance" />
                 </div>
             </div>
@@ -1173,7 +1180,8 @@ export const MaintenanceDashboard: React.FC = () => {
             </div>
 
             {/* Issue Type Filter */}
-            <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -webkit-overflow-scrolling-touch">
                 <span className="adora-text-tertiary text-sm flex-shrink-0">{t('maintenance.issueType')}:</span>
                 {[
                     { key: 'all', label: t('maintenance.all'), icon: '🔧' },
@@ -1197,10 +1205,11 @@ export const MaintenanceDashboard: React.FC = () => {
                         <span>{type.label}</span>
                     </button>
                 ))}
+                </div>
             </div>
 
             {/* Content - ✅ Unified 3 tabs */}
-            <div className="space-y-4">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto space-y-4">
                 {currentTab === 'new' && filteredNewRequests.map(renderMaintenanceCard)}
                 {currentTab === 'in_progress' && filteredInProgressRequests.map(renderMaintenanceCard)}
                 {currentTab === 'completed' && filteredCompletedRequests.map(renderMaintenanceCard)}

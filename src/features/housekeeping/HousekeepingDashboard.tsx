@@ -1705,7 +1705,10 @@ export const HousekeepingDashboard: React.FC = () => {
             {/* Manager Announcement Banner */}
             <ManagerAnnouncementBanner department="housekeeping" />
             
-            <div className="min-h-screen pb-20 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+            {/* Spacer for UnifiedManagerHeader */}
+            <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
+            
+            <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
             {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
             <FlexibleHeader
                 title={t('housekeeping.title')}
@@ -1756,14 +1759,18 @@ export const HousekeepingDashboard: React.FC = () => {
             />
 
             {/* Challenge Timeline */}
-            <ChallengeTimeline />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <ChallengeTimeline />
+            </div>
 
             {/* Golden Alert - Broadcast Messages */}
-            <GoldenAlertDisplay department="housekeeping" />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <GoldenAlertDisplay department="housekeeping" />
+            </div>
 
             {/* ✅ Room Transfer Notifications */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto">
-                <div className="flex justify-end mb-3">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="flex justify-end">
                     <TransferNotificationBadge department="housekeeping" />
                 </div>
             </div>
@@ -1878,8 +1885,8 @@ export const HousekeepingDashboard: React.FC = () => {
             </div>
 
             {/* Tasks List - Grid for Mobile */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                 {currentTasks.length === 0 ? (
                     <div className="col-span-full adora-card p-8 text-center">
                         <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 adora-bg-tertiary">

@@ -1054,7 +1054,10 @@ export const BellmanDashboard: React.FC = () => {
             {/* Manager Announcement Banner */}
             <ManagerAnnouncementBanner department="bellman" />
             
-            <div className="min-h-screen pb-20 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+            {/* Spacer for UnifiedManagerHeader */}
+            <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
+            
+            <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
             {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
             <FlexibleHeader
                 title={t('bellman.title')}
@@ -1099,19 +1102,21 @@ export const BellmanDashboard: React.FC = () => {
             />
             
             {/* Golden Alert - Broadcast Messages */}
-            <div className="mb-4">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                 <GoldenAlertDisplay department="bellman" />
             </div>
 
             {/* ✅ Room Transfer Notifications */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto">
-                <div className="flex justify-end mb-3">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="flex justify-end">
                     <TransferNotificationBadge department="bellman" />
                 </div>
             </div>
 
             {/* Challenge Timeline */}
-            <ChallengeTimeline />
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <ChallengeTimeline />
+            </div>
 
             {/* Stats - Unified Style */}
             <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
@@ -1212,7 +1217,7 @@ export const BellmanDashboard: React.FC = () => {
                     }
 
                     return (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
                             {currentRequests.map(request => (
                                 <div key={request.id} 
                                     className="p-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] adora-card border shadow-sm adora-border"

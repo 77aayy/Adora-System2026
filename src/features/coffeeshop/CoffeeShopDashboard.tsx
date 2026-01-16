@@ -216,7 +216,10 @@ export const CoffeeShopDashboard: React.FC = () => {
             {/* Manager Announcement Banner */}
             <ManagerAnnouncementBanner department="coffee_shop" />
             
-            <div className="min-h-screen pb-20 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+            {/* Spacer for UnifiedManagerHeader */}
+            <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
+            
+            <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
                 {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
                 <FlexibleHeader
                     title={t('coffeeshop.title') || 'كوفي شوب'}
