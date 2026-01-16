@@ -81,9 +81,15 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
 
     return (
         <>
-            {/* Header - Fully Responsive & Theme-Aware */}
-            <div className={`flex items-center justify-between gap-2 sm:gap-3 mb-4 sm:mb-6 ${className}`}>
-                {/* Left: Title & Subtitle */}
+            {/* Header - Fully Responsive & Theme-Aware - ✅ CLEAN LAYOUT */}
+            <div 
+                className={`flex items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 ${className}`}
+                style={{ 
+                    background: 'transparent', // ✅ FIX: No white gap
+                    borderBottom: 'none' // ✅ FIX: No border causing visual pollution
+                }}
+            >
+                {/* Left: Title & Subtitle - ✅ Clean spacing */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 sm:gap-3">
                         {titleIcon && (
@@ -92,70 +98,78 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
                             </div>
                         )}
                         <div className="flex-1 min-w-0">
-                            {/* Dynamic Greeting Mode */}
-                            {showGreeting && greeting ? (
-                                <>
-                                    <h1 
-                                        className="text-lg sm:text-xl md:text-2xl font-bold truncate"
-                                        style={{ color: 'var(--theme-text-primary)' }}
+                            {/* ✅ REMOVED: Static greeting - now only Smart Time-based greeting in right side */}
+                            {/* Standard Title Mode Only */}
+                            <>
+                                <h1 
+                                    className="text-xl sm:text-2xl md:text-3xl font-bold truncate"
+                                    style={{ color: 'var(--theme-text-primary)' }}
+                                >
+                                    {title}
+                                </h1>
+                                {subtitle && (
+                                    <div 
+                                        className="mt-1 sm:mt-1.5 text-xs sm:text-sm truncate"
+                                        style={{ color: 'var(--theme-text-secondary)' }}
                                     >
-                                        {greeting.emoji} {greeting.timeGreeting}, {greeting.motivational} {t('greetings.you') || 'you'} {user?.name}
-                                    </h1>
-                                    {brandName && (
-                                        <div 
-                                            className="mt-1 sm:mt-1.5 text-xs sm:text-sm flex items-center gap-1.5"
-                                            style={{ color: 'var(--theme-text-secondary)' }}
-                                        >
-                                            🏨 {brandName}
-                                        </div>
-                                    )}
-                                    {subtitle && (
-                                        <div 
-                                            className="mt-1 text-xs truncate"
-                                            style={{ color: 'var(--theme-text-tertiary)' }}
-                                        >
-                                            {subtitle}
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                /* Standard Title Mode */
-                                <>
-                                    <h1 
-                                        className="text-xl sm:text-2xl md:text-3xl font-bold truncate"
-                                        style={{ color: 'var(--theme-text-primary)' }}
+                                        {subtitle}
+                                    </div>
+                                )}
+                                {showGreeting && brandName && (
+                                    <div 
+                                        className="mt-1 sm:mt-1.5 text-xs sm:text-sm flex items-center gap-1.5"
+                                        style={{ color: 'var(--theme-text-secondary)' }}
                                     >
-                                        {title}
-                                    </h1>
-                                    {subtitle && (
-                                        <div 
-                                            className="mt-1 sm:mt-1.5 text-xs sm:text-sm truncate"
-                                            style={{ color: 'var(--theme-text-secondary)' }}
-                                        >
-                                            {subtitle}
-                                        </div>
-                                    )}
-                                </>
-                            )}
+                                        🏨 {brandName}
+                                    </div>
+                                )}
+                            </>
                         </div>
                     </div>
                 </div>
 
-                {/* Right: Actions - ✅ Unified Responsive Action Bar */}
-                <div className="flex-shrink-0">
-                    <ResponsiveActionBar
-                        actions={visibleActions.map(action => ({
-                            id: action.id,
-                            icon: action.icon,
-                            label: action.label,
-                            onClick: action.onClick,
-                            color: action.variant === 'danger' ? '#ef4444' 
-                                 : action.variant === 'primary' ? '#14b8a6'
-                                 : action.variant === 'warning' ? '#f59e0b'
-                                 : undefined,
-                            badge: action.count
-                        }))}
-                    />
+                {/* Right: Smart Greeting + Actions - ✅ Proper spacing with gap-2 sm:gap-3 */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                    {/* ✅ NEW: Smart Time-based Greeting in Profile Area (Right Side) */}
+                    {showGreeting && greeting && user?.name && (
+                        <div 
+                            className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all"
+                            style={{ 
+                                background: 'var(--theme-bg-secondary)',
+                                border: '1px solid var(--theme-border-primary)'
+                            }}
+                        >
+                            <span 
+                                className="text-sm font-medium"
+                                style={{ color: 'var(--theme-text-secondary)' }}
+                            >
+                                {greeting.emoji} {greeting.timeGreeting}
+                            </span>
+                            <span 
+                                className="text-sm font-bold"
+                                style={{ color: 'var(--theme-text-primary)' }}
+                            >
+                                {user.name}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Actions - ✅ Unified Responsive Action Bar */}
+                    <div className="flex-shrink-0">
+                        <ResponsiveActionBar
+                            actions={visibleActions.map(action => ({
+                                id: action.id,
+                                icon: action.icon,
+                                label: action.label,
+                                onClick: action.onClick,
+                                color: action.variant === 'danger' ? '#ef4444' 
+                                     : action.variant === 'primary' ? '#14b8a6'
+                                     : action.variant === 'warning' ? '#f59e0b'
+                                     : undefined,
+                                badge: action.count
+                            }))}
+                        />
+                    </div>
                 </div>
             </div>
 
