@@ -160,6 +160,25 @@ export const UnifiedRoomInput: React.FC<UnifiedRoomInputProps> = ({
         setLocalError(null);
     }, [onChange]);
 
+    // ✅ NEW: Handle onBlur - validate when user finishes typing
+    const handleBlur = useCallback(() => {
+        if (!value || value.trim() === '') {
+            setLocalError(null);
+            return;
+        }
+
+        // Validate room exists in branch
+        if (availableRooms.length > 0 && !availableRooms.includes(value)) {
+            setLocalError(
+                t('reception.roomNotFoundInBranch', { room: value }) || 
+                `الغرفة رقم ${value} غير موجودة في هذا الفرع. يرجى إدخال رقم غرفة صحيح.`
+            );
+            haptic('error');
+        } else {
+            setLocalError(null);
+        }
+    }, [value, availableRooms, t]);
+
     // Handle Enter key
     const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && autoConfirmOnEnter && validationState.valid && onConfirm) {
@@ -224,6 +243,7 @@ export const UnifiedRoomInput: React.FC<UnifiedRoomInputProps> = ({
                         inputMode="numeric"
                         value={value}
                         onChange={handleInputChange}
+                        onBlur={handleBlur}
                         onKeyPress={handleKeyPress}
                         placeholder={placeholder || t('reception.enterRoomNumber') || 'Enter room number'}
                         disabled={disabled}

@@ -240,7 +240,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
             }
             
             if (!allRooms.includes(selectedRoom)) {
-                setValidationError(t('reception.roomNotFoundInBranch', { room: selectedRoom }) || `الغرفة رقم ${selectedRoom} غير موجودة في هذا الفرع`);
+                setValidationError(t('reception.roomNotFoundInBranch', { room: selectedRoom }) || `الغرفة رقم ${selectedRoom} غير موجودة في هذا الفرع. يرجى إدخال رقم غرفة صحيح.`);
                 haptic('error');
                 setStep('room');
                 return;
@@ -248,6 +248,22 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
         } else {
             // Rooms not loaded - show error and prevent submission
             setValidationError(t('reception.roomsNotLoaded') || 'لم يتم تحميل بيانات الغرف بعد. يرجى الانتظار...');
+            haptic('error');
+            setStep('room');
+            return;
+        }
+
+        // ✅ NEW: Check if room has active request of the SAME TYPE (prevent duplicates)
+        if (activeStats.activeRequest) {
+            const activeReq = activeStats.activeRequest;
+            const requestTypeName = serviceNames[selectedType] || selectedType;
+            setValidationError(
+                t('reception.duplicateRequestSameType', { 
+                    room: selectedRoom, 
+                    type: requestTypeName 
+                }) || 
+                `يوجد طلب ${requestTypeName} نشط بالفعل للغرفة ${selectedRoom}. لا يمكن رفع طلب آخر من نفس النوع.`
+            );
             haptic('error');
             setStep('room');
             return;
@@ -392,8 +408,47 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                             {/* ✅ UNIFIED: Use UnifiedRoomInput component for consistent UX */}
                             <UnifiedRoomInput
                                 value={roomNumber}
-                                onChange={setRoomNumber}
-                                onConfirm={handleRoomSelect}
+                                onChange={(newRoom) => {
+                                    setRoomNumber(newRoom);
+                                    setValidationError(null); // Clear error when room changes
+                                }}
+                                onConfirm={(confirmedRoom) => {
+                                    // ✅ Validate room exists in branch
+                                    const allRooms = rooms?.flatMap(f => f.rooms || []) || [];
+                                    if (rooms && rooms.length > 0 && allRooms.length > 0 && !allRooms.includes(confirmedRoom)) {
+                                        setValidationError(
+                                            t('reception.roomNotFoundInBranch', { room: confirmedRoom }) || 
+                                            `الغرفة رقم ${confirmedRoom} غير موجودة في هذا الفرع. يرجى إدخال رقم غرفة صحيح.`
+                                        );
+                                        haptic('error');
+                                        return;
+                                    }
+                                    
+                                    // ✅ Check if room has active request of the SAME TYPE
+                                    const activeReqs = requests.filter(r =>
+                                        (r.status === 'CONFIRMED' || r.status === 'IN_PROGRESS' || r.status === 'NEEDS_INSPECTION' || r.status === 'SCHEDULED' || r.status === 'PENDING') &&
+                                        r.roomNumber === confirmedRoom &&
+                                        r.type === selectedType
+                                    );
+                                    
+                                    if (activeReqs.length > 0) {
+                                        const requestTypeName = serviceNames[selectedType] || selectedType;
+                                        setValidationError(
+                                            t('reception.duplicateRequestSameType', { 
+                                                room: confirmedRoom, 
+                                                type: requestTypeName 
+                                            }) || 
+                                            `يوجد طلب ${requestTypeName} نشط بالفعل للغرفة ${confirmedRoom}. لا يمكن رفع طلب آخر من نفس النوع.`
+                                        );
+                                        haptic('error');
+                                        return;
+                                    }
+                                    
+                                    // Room is valid, proceed to details step
+                                    setSelectedRoom(confirmedRoom);
+                                    setStep('details');
+                                    haptic('light');
+                                }}
                                 availableRooms={rooms?.flatMap(f => f.rooms || []) || []}
                                 blockedRooms={activeStats.blockedRooms}
                                 showFloorSelector={true}
@@ -409,6 +464,26 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                                             message: t('reception.roomNotFoundInBranch', { room }) || `Room ${room} does not exist in this branch.`
                                         };
                                     }
+                                    
+                                    // ✅ Check if room has active request of the SAME TYPE
+                                    const activeReqs = requests.filter(r =>
+                                        (r.status === 'CONFIRMED' || r.status === 'IN_PROGRESS' || r.status === 'NEEDS_INSPECTION' || r.status === 'SCHEDULED' || r.status === 'PENDING') &&
+                                        r.roomNumber === room &&
+                                        r.type === selectedType
+                                    );
+                                    
+                                    if (activeReqs.length > 0) {
+                                        const requestTypeName = serviceNames[selectedType] || selectedType;
+                                        return {
+                                            valid: false,
+                                            message: t('reception.duplicateRequestSameType', { 
+                                                room, 
+                                                type: requestTypeName 
+                                            }) || 
+                                            `يوجد طلب ${requestTypeName} نشط بالفعل للغرفة ${room}. لا يمكن رفع طلب آخر من نفس النوع.`
+                                        };
+                                    }
+                                    
                                     return { valid: true };
                                 }}
                                 className="mt-4"
