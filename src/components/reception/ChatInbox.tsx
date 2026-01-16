@@ -336,6 +336,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
     const [searchQuery, setSearchQuery] = useState('');
     const [sending, setSending] = useState(false);
     const [showOnlyUnread, setShowOnlyUnread] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     
     // ✅ Track previous unread count for smart notification
     const prevUnreadRef = useRef<number>(0);
@@ -343,6 +344,14 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
     // ============================================================
     // SUBSCRIPTIONS
     // ============================================================
+
+    // ✅ Mobile detection - SSR safe
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 640);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // Subscribe to chat rooms
     useEffect(() => {
@@ -538,8 +547,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
     // RENDER
     // ============================================================
 
-    // ✅ Mobile height calculation
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    // ✅ Mobile height calculation - SSR safe (isMobile from useState above)
     const containerHeight = isMobile ? 'calc(100vh - 140px)' : 'calc(100vh - 200px)';
     const containerMaxHeight = isMobile ? 'calc(100vh - 140px)' : '80vh';
     

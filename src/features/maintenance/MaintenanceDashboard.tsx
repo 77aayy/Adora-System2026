@@ -56,7 +56,6 @@ import { GeneralInstructionsView } from '../../components/shared/GeneralInstruct
 import { SupportTicketModal } from '../../components/shared/SupportTicketModal'; // ✅ Support ticket modal
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
 import { useBrandName } from '../../hooks/useBrandName';
-import { getGreetingParts } from '../../utils/greetings';
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline'; // ✅ Commitment Timeline
 
 // Creative Dashboard Components
@@ -102,7 +101,6 @@ export const MaintenanceDashboard: React.FC = () => {
     const { t } = useTranslation();
     const { tenantId, setTenant } = useTenant(); // ✅ Use Tenant Context - moved early
     const brandName = useBrandName();
-    const greeting = getGreetingParts(user?.name);
 
     // State
     const [currentTab, setCurrentTab] = useState<'new' | 'in_progress' | 'completed'>('new'); // ✅ Unified tabs
