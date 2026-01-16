@@ -75,7 +75,7 @@ export const ResponsiveActionBar: React.FC<ResponsiveActionBarProps> = ({
                             hover:scale-105 active:scale-95
                             ${action.isActive 
                                 ? 'bg-teal-50 dark:bg-teal-500/20 border-teal-400 dark:border-teal-500 shadow-md shadow-teal-500/20' 
-                                : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-teal-400 dark:hover:border-teal-500 hover:bg-teal-50 dark:hover:bg-teal-500/10'
+                                : 'bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-slate-200 dark:border-slate-700 hover:border-teal-400 dark:hover:border-teal-500 hover:bg-teal-50/90 dark:hover:bg-teal-500/10'
                             }`}
                     >
                         {/* Badge */}
@@ -135,8 +135,9 @@ export const ResponsiveActionBar: React.FC<ResponsiveActionBarProps> = ({
             <div 
                 className={`
                     absolute top-full right-0 mt-2 z-50
-                    bg-white dark:bg-slate-800
-                    border border-slate-200 dark:border-white/10
+                    backdrop-blur-xl
+                    bg-white/95 dark:bg-slate-800/95
+                    border border-slate-200/50 dark:border-white/10
                     rounded-2xl shadow-2xl shadow-black/20
                     overflow-hidden
                     transition-all duration-300 ease-out origin-top-right

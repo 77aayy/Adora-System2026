@@ -85,7 +85,7 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
             <div 
                 className={`flex items-center justify-between gap-2 sm:gap-3 md:gap-4 mb-3 sm:mb-4 md:mb-6 ${className}`}
                 style={{ 
-                    background: 'transparent', // ✅ FIX: No white gap
+                    background: 'var(--theme-bg-primary)', // ✅ FIX: Use theme background to match page
                     borderBottom: 'none' // ✅ FIX: No border causing visual pollution
                 }}
             >
