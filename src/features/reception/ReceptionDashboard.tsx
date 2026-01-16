@@ -842,7 +842,7 @@ export const ReceptionDashboard: React.FC = () => {
             <div className="min-h-screen pb-20 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
             {/* 🧠 Smart Genius Insight (Top of Dashboard) */}
             {pricingInsight && (
-                <div className="px-4 pt-4 sm:px-6 max-w-7xl mx-auto animate-in slide-in-from-top-4 duration-700">
+                <div className="px-4 pt-2 sm:pt-3 sm:px-6 max-w-7xl mx-auto animate-in slide-in-from-top-4 duration-700">
                     <SmartInsight
                         type={pricingInsight.type}
                         title={pricingInsight.title}
@@ -859,7 +859,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             {/* 🔄 Overflow Alert - تنبيه ضغط العمل */}
             {tenantId && branchId && (
-                <div className="px-4 pt-4 sm:px-6 max-w-7xl mx-auto">
+                <div className="px-4 pt-2 sm:pt-3 sm:px-6 max-w-7xl mx-auto">
                     <OverflowAlert
                         tenantId={tenantId}
                         branchId={branchId}

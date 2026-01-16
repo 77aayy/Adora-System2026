@@ -83,10 +83,10 @@ export const FlexibleHeader: React.FC<FlexibleHeaderProps> = ({
         <>
             {/* Header - Fully Responsive & Theme-Aware - ✅ MOBILE-FIRST CLEAN LAYOUT */}
             <div 
-                className={`flex items-center justify-between gap-2 sm:gap-3 md:gap-4 mb-3 sm:mb-4 md:mb-6 ${className}`}
+                className={`flex items-center justify-between gap-2 sm:gap-3 md:gap-4 mb-2 sm:mb-3 ${className}`}
                 style={{ 
-                    background: 'var(--theme-bg-primary)', // ✅ FIX: Use theme background to match page
-                    borderBottom: 'none' // ✅ FIX: No border causing visual pollution
+                    background: 'var(--theme-bg-primary)',
+                    borderBottom: 'none'
                 }}
             >
                 {/* Left: Title & Subtitle - ✅ Mobile-First Clean Spacing */}

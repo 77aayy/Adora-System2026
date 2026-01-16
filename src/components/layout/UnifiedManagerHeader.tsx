@@ -401,11 +401,11 @@ export const UnifiedManagerHeader: React.FC = () => {
                                     `}
                                     style={{
                                         background: isActive 
-                                            ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.2) 0%, rgba(13, 148, 136, 0.15) 100%)'
+                                            ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.25) 0%, rgba(13, 148, 136, 0.2) 100%)'
                                             : 'transparent',
                                         color: isActive ? '#14b8a6' : 'var(--theme-text-secondary)',
-                                        boxShadow: isActive ? '0 2px 12px rgba(20, 184, 166, 0.2)' : 'none',
-                                        border: isActive ? '1px solid rgba(20, 184, 166, 0.4)' : '1px solid transparent',
+                                        boxShadow: isActive ? '0 2px 12px rgba(20, 184, 166, 0.25)' : 'none',
+                                        border: isActive ? '1px solid rgba(20, 184, 166, 0.5)' : '1px solid transparent',
                                     }}
                                 >
                                     {/* Icon - Responsive sizing */}

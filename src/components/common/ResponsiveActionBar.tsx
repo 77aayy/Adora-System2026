@@ -74,8 +74,8 @@ export const ResponsiveActionBar: React.FC<ResponsiveActionBarProps> = ({
                             border transition-all duration-200
                             hover:scale-105 active:scale-95
                             ${action.isActive 
-                                ? 'bg-teal-50 dark:bg-teal-500/20 border-teal-400 dark:border-teal-500 shadow-md shadow-teal-500/20' 
-                                : 'bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-slate-200 dark:border-slate-700 hover:border-teal-400 dark:hover:border-teal-500 hover:bg-teal-50/90 dark:hover:bg-teal-500/10'
+                                ? 'bg-teal-500/20 dark:bg-teal-500/20 border-teal-400 dark:border-teal-500 shadow-md shadow-teal-500/20' 
+                                : 'bg-white/10 dark:bg-slate-800/40 backdrop-blur-sm border-white/20 dark:border-slate-700/50 hover:border-teal-400 dark:hover:border-teal-500 hover:bg-teal-500/10 dark:hover:bg-teal-500/10'
                             }`}
                     >
                         {/* Badge */}
@@ -85,21 +85,25 @@ export const ResponsiveActionBar: React.FC<ResponsiveActionBarProps> = ({
                             </span>
                         )}
                         
-                        {/* Icon - Gray by default, Teal when active/hover */}
+                        {/* Icon - Theme-aware colors */}
                         <span className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-200
                             ${action.isActive 
-                                ? 'text-teal-600 dark:text-teal-400' 
-                                : 'text-slate-500 dark:text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400'
-                            }`}>
+                                ? 'text-teal-500 dark:text-teal-400' 
+                                : 'text-slate-400 dark:text-slate-400 group-hover:text-teal-500 dark:group-hover:text-teal-400'
+                            }`}
+                            style={action.isActive ? {} : { color: 'var(--theme-text-secondary)' }}
+                        >
                             {action.icon}
                         </span>
                         
-                        {/* Label - Small and Compact */}
-                        <span className={`text-[9px] sm:text-[10px] font-medium text-center whitespace-nowrap leading-tight
+                        {/* Label - Small and Compact - Theme-aware */}
+                        <span className={`text-[9px] sm:text-[10px] font-medium text-center whitespace-nowrap leading-tight transition-colors duration-200
                             ${action.isActive 
-                                ? 'text-teal-700 dark:text-teal-300' 
-                                : 'text-slate-600 dark:text-slate-400 group-hover:text-teal-700 dark:group-hover:text-teal-300'
-                            }`}>
+                                ? 'text-teal-600 dark:text-teal-300' 
+                                : ''
+                            }`}
+                            style={action.isActive ? {} : { color: 'var(--theme-text-secondary)' }}
+                        >
                             {action.label}
                         </span>
                     </button>
