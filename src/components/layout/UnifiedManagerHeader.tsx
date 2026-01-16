@@ -182,11 +182,10 @@ export const UnifiedManagerHeader: React.FC = () => {
                     WebkitBackdropFilter: 'none',
                 }}
             >
-                {/* Top Bar - Logo, Branch, User Info, Actions */}
-                {/* ✅ FIX: Improved spacing - using gap-2 sm:gap-3 for better breathing room */}
-                <div className="px-3 lg:px-6 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
-                    {/* Right Side - Menu Button (Mobile) + Logo + Branch */}
-                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                {/* Top Bar - Logo, Branch, User Info, Actions - ✅ MOBILE-FIRST */}
+                <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3 md:gap-4">
+                    {/* Right Side - Menu Button (Mobile) + Logo + Branch - ✅ MOBILE-FIRST */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
                         {/* ✅ Admin Menu Button - Mobile Only */}
                         <button
                             id="admin-menu-trigger"
@@ -194,7 +193,7 @@ export const UnifiedManagerHeader: React.FC = () => {
                                 // Dispatch custom event for AdminDashboard to handle
                                 window.dispatchEvent(new CustomEvent('toggle-admin-sidebar'));
                             }}
-                            className="lg:hidden p-2 rounded-xl transition-all active:scale-95"
+                            className="lg:hidden p-1.5 sm:p-2 rounded-xl transition-all active:scale-95 flex-shrink-0"
                             style={{
                                 background: activeTab === 'admin' 
                                     ? 'linear-gradient(135deg, #14b8a6, #0d9488)' 
@@ -204,38 +203,38 @@ export const UnifiedManagerHeader: React.FC = () => {
                             aria-label={t('sidebar.openAdminMenu') || 'فتح القائمة الإدارية'}
                         >
                             <Menu 
-                                className="w-5 h-5" 
+                                className="w-4 h-4 sm:w-5 sm:h-5" 
                                 style={{ 
                                     color: activeTab === 'admin' ? 'white' : 'var(--theme-text-secondary)' 
                                 }} 
                             />
                         </button>
 
-                        <Link to="/admin" className="flex items-center">
+                        <Link to="/admin" className="flex items-center flex-shrink-0">
                             <img
                                 src="/adora-logo.png"
                                 alt="Adora"
-                                className="h-8 w-auto object-contain"
+                                className="h-7 w-auto sm:h-8 object-contain"
                                 style={{ filter: 'var(--logo-filter, none)' }}
                             />
                         </Link>
 
-                        {/* Branch Selector */}
+                        {/* Branch Selector - ✅ MOBILE-FIRST */}
                         {branches.length > 0 && (
-                            <div className="relative">
+                            <div className="relative flex-shrink-0">
                                 <button
                                     onClick={() => branches.length > 1 && setShowBranchMenu(!showBranchMenu)}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${branches.length > 1 ? 'hover:bg-teal-500/10 cursor-pointer' : 'cursor-default'}`}
+                                    className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all active:scale-[0.98] ${branches.length > 1 ? 'hover:bg-teal-500/10 cursor-pointer' : 'cursor-default'}`}
                                     style={{
                                         background: 'var(--theme-bg-secondary)',
                                         border: '1px solid var(--theme-border-primary)',
                                         color: 'var(--theme-text-primary)',
                                     }}
                                 >
-                                    <Building2 className="w-4 h-4 text-teal-500" />
-                                    <span className="text-sm font-medium">{branchName}</span>
+                                    <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-500 flex-shrink-0" />
+                                    <span className="text-xs sm:text-sm font-medium truncate max-w-[80px] sm:max-w-none">{branchName}</span>
                                     {branches.length > 1 && (
-                                        <ChevronDown className={`w-4 h-4 transition-transform ${showBranchMenu ? 'rotate-180' : ''}`} />
+                                        <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform flex-shrink-0 ${showBranchMenu ? 'rotate-180' : ''}`} />
                                     )}
                                 </button>
 
@@ -284,80 +283,93 @@ export const UnifiedManagerHeader: React.FC = () => {
                         {/* Empty center for better spacing */}
                     </div>
 
-                    {/* Right Side - Actions + Smart Greeting */}
-                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                        {/* ✅ FIX: Smart Greeting in profile area (right side) */}
-                        {greeting && (
-                            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: 'var(--theme-bg-secondary)' }}>
-                                <span className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
-                                    {greeting.emoji} {greeting.timeGreeting}،
-                                </span>
-                                <span className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>
-                                    {user?.name || t('common.user') || 'المستخدم'}
-                                </span>
-                            </div>
-                        )}
-                        {/* Mobile: Show Smart Greeting */}
-                        <div className="md:hidden flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: 'var(--theme-bg-secondary)' }}>
-                            {greeting ? (
-                                <>
-                                    <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                    {/* Right Side - Actions + Smart Greeting - ✅ MOBILE-FIRST */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
+                        {/* ✅ Smart Greeting - Always Visible on Mobile & Desktop */}
+                        {greeting && user?.name && (
+                            <>
+                                {/* Mobile: Compact Greeting Badge */}
+                                <div className="md:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all" 
+                                     style={{ 
+                                         background: 'var(--theme-bg-secondary)',
+                                         borderColor: 'var(--theme-border-primary)'
+                                     }}>
+                                    <span className="text-xs">{greeting.emoji}</span>
+                                    <span className="text-xs font-bold truncate max-w-[60px]" style={{ color: 'var(--theme-text-primary)' }}>
+                                        {user.name.split(' ')[0]}
+                                    </span>
+                                </div>
+                                
+                                {/* Desktop: Full Greeting */}
+                                <div className="hidden md:flex lg:hidden items-center gap-2 px-3 py-1.5 rounded-lg border transition-all" 
+                                     style={{ 
+                                         background: 'var(--theme-bg-secondary)',
+                                         borderColor: 'var(--theme-border-primary)'
+                                     }}>
+                                    <span className="text-xs font-medium" style={{ color: 'var(--theme-text-secondary)' }}>
                                         {greeting.emoji} {greeting.timeGreeting}
                                     </span>
-                                    <span className="text-xs font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                                        {user?.name?.split(' ')[0] || t('common.user') || 'مستخدم'}
+                                    <span className="text-xs font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                        {user.name}
                                     </span>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="text-xs font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                                        {user?.name?.split(' ')[0] || t('common.user') || 'مستخدم'}
+                                </div>
+                                
+                                {/* Large Desktop: Full Greeting with Comma */}
+                                <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all" 
+                                     style={{ 
+                                         background: 'var(--theme-bg-secondary)',
+                                         borderColor: 'var(--theme-border-primary)'
+                                     }}>
+                                    <span className="text-sm font-medium" style={{ color: 'var(--theme-text-secondary)' }}>
+                                        {greeting.emoji} {greeting.timeGreeting}،
                                     </span>
-                                    <span className="text-sm">👋</span>
-                                </>
-                            )}
-                        </div>
-                        
-                        {/* 🏆 Points Tracker - Golden Cup */}
-                        {user?.id && (
-                            <PointsTracker 
-                                employeeId={user.id} 
-                                inline 
-                                showHistory 
-                            />
+                                    <span className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                        {user.name}
+                                    </span>
+                                </div>
+                            </>
                         )}
                         
-                        {/* 🌍 Language Switcher */}
-                        <LanguageSwitcher />
+                        {/* 🏆 Points Tracker - Golden Cup - Hidden on mobile to save space */}
+                        {user?.id && (
+                            <div className="hidden md:block">
+                                <PointsTracker 
+                                    employeeId={user.id} 
+                                    inline 
+                                    showHistory 
+                                />
+                            </div>
+                        )}
                         
-                        {/* 🌙 Dark Mode Toggle */}
-                        <ThemeToggleButton />
+                        {/* 🌍 Language Switcher - Hidden on very small mobile */}
+                        <div className="hidden sm:block">
+                            <LanguageSwitcher />
+                        </div>
+                        
+                        {/* 🌙 Dark Mode Toggle - Hidden on very small mobile */}
+                        <div className="hidden sm:block">
+                            <ThemeToggleButton />
+                        </div>
                         
                         <button
                             onClick={logout}
-                            className="p-2 rounded-lg transition-all hover:bg-red-500/10 text-red-500"
+                            className="p-1.5 sm:p-2 rounded-lg transition-all hover:bg-red-500/10 active:scale-95 text-red-500 flex-shrink-0"
                             title={t('auth.logout') || 'تسجيل الخروج'}
                         >
-                            <LogOut className="w-5 h-5" />
+                            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                     </div>
                 </div>
 
-                {/* Department Tabs - Solid background to prevent text overlap */}
+                {/* Department Tabs - ✅ MOBILE-FIRST Smooth Navigation */}
                 <div 
-                    className="relative px-2 lg:px-4 overflow-x-auto scrollbar-hide"
+                    className="relative px-2 sm:px-3 lg:px-4 overflow-x-auto scrollbar-hide"
                     style={{ 
-                        background: 'var(--theme-bg-primary)', // Theme-aware background
+                        background: 'var(--theme-bg-primary)',
                         borderTop: '1px solid var(--theme-border-primary)',
                     }}
                 >
-                    {/* Dark mode override */}
-                    <style>{`
-                        .dark [data-tabs-container] {
-                            background: #1e293b !important;
-                        }
-                    `}</style>
-                    <div className="flex items-center gap-1 py-1.5 relative min-w-max" data-tabs-container>
+                    <div className="flex items-center gap-1 sm:gap-1.5 py-1.5 sm:py-2 relative min-w-max" data-tabs-container>
                         {/* Animated Indicator */}
                         <div
                             className="absolute bottom-0 h-0.5 bg-gradient-to-r from-teal-400 to-cyan-400 rounded-full transition-all duration-300 ease-out"
@@ -367,7 +379,7 @@ export const UnifiedManagerHeader: React.FC = () => {
                             }}
                         />
 
-                        {/* Tabs - Icons with Labels below - ✅ Soft Teal with Animation */}
+                        {/* Tabs - ✅ MOBILE-FIRST Modern Design with Smooth Animations */}
                         {departmentTabs.map((tab) => {
                             const isActive = activeTab === tab.id;
                             return (
@@ -377,30 +389,33 @@ export const UnifiedManagerHeader: React.FC = () => {
                                     onClick={() => handleTabClick(tab)}
                                     title={tab.label}
                                     className={`
-                                        relative flex flex-col items-center justify-center gap-0.5 px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-xl min-w-[44px] sm:min-w-[56px]
-                                        transition-all duration-300 ease-out
+                                        relative flex flex-col items-center justify-center gap-0.5 sm:gap-1 
+                                        px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 
+                                        rounded-lg sm:rounded-xl 
+                                        min-w-[48px] sm:min-w-[56px] lg:min-w-[64px]
+                                        transition-all duration-200 ease-out
                                         ${isActive 
-                                            ? 'scale-105' 
-                                            : 'hover:bg-teal-50/50 dark:hover:bg-teal-900/20 hover:scale-102 active:scale-95'
+                                            ? 'scale-[1.02]' 
+                                            : 'hover:bg-teal-50/50 dark:hover:bg-teal-900/20 active:scale-[0.98]'
                                         }
                                     `}
                                     style={{
                                         background: isActive 
-                                            ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(13, 148, 136, 0.1) 100%)'
+                                            ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.2) 0%, rgba(13, 148, 136, 0.15) 100%)'
                                             : 'transparent',
-                                        color: isActive ? '#0d9488' : 'var(--theme-text-secondary)',
-                                        boxShadow: isActive ? '0 2px 10px rgba(20, 184, 166, 0.15)' : 'none',
-                                        border: isActive ? '1px solid rgba(20, 184, 166, 0.3)' : '1px solid transparent',
+                                        color: isActive ? '#14b8a6' : 'var(--theme-text-secondary)',
+                                        boxShadow: isActive ? '0 2px 12px rgba(20, 184, 166, 0.2)' : 'none',
+                                        border: isActive ? '1px solid rgba(20, 184, 166, 0.4)' : '1px solid transparent',
                                     }}
                                 >
-                                    {/* Icon - Always visible, larger */}
-                                    <span className={`text-lg sm:text-base transition-transform duration-300 ${isActive ? '' : ''}`}>
+                                    {/* Icon - Responsive sizing */}
+                                    <span className="transition-transform duration-200">
                                         {React.cloneElement(tab.icon as React.ReactElement, {
-                                            className: `w-5 h-5 sm:w-4 sm:h-4 ${isActive ? 'text-teal-600 dark:text-teal-400' : ''}`
+                                            className: `w-5 h-5 sm:w-5 sm:h-5 lg:w-4 lg:h-4 transition-colors duration-200 ${isActive ? 'text-teal-500 dark:text-teal-400' : 'text-current'}`
                                         })}
                                     </span>
-                                    {/* Label - Hidden on xs, short on sm, full on lg */}
-                                    <span className={`hidden sm:block text-[10px] lg:text-xs font-medium whitespace-nowrap leading-tight ${isActive ? 'text-teal-700 dark:text-teal-300' : ''}`}>
+                                    {/* Label - Responsive: hidden on mobile, short on tablet, full on desktop */}
+                                    <span className={`hidden sm:block text-[10px] lg:text-xs font-semibold whitespace-nowrap leading-tight transition-colors duration-200 ${isActive ? 'text-teal-600 dark:text-teal-300' : 'text-current'}`}>
                                         <span className="hidden lg:inline">{tab.label}</span>
                                         <span className="lg:hidden">{tab.shortLabel}</span>
                                     </span>
@@ -411,8 +426,8 @@ export const UnifiedManagerHeader: React.FC = () => {
                 </div>
             </header>
 
-            {/* Spacer to prevent content from going under fixed header */}
-            <div className="h-[100px] lg:h-[92px]" />
+            {/* Spacer to prevent content from going under fixed header - ✅ MOBILE-FIRST */}
+            <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
         </>
     );
 };
