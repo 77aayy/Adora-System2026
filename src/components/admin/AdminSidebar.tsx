@@ -244,41 +244,38 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     // ✅ Use filteredBranches for active branch (respects access control)
     const activeBranch = filteredBranches.find(b => b.id === branchId) || filteredBranches[0];
 
-    // ✅ FIX: Remove hardcoded colors - use theme variables to prevent white gaps in dark mode
+    // ✅ MOBILE-FIRST DESIGN: Modern glassmorphism sidebar
     return (
         <div 
-            className={`w-80 flex flex-col h-screen overflow-hidden relative shadow-2xl lg:shadow-none transition-colors duration-300 ${className}`} 
+            className={`w-full sm:w-72 lg:w-80 flex flex-col h-screen overflow-hidden relative transition-all duration-300 ${className}`} 
             style={{ 
-                background: 'var(--theme-bg-secondary)', // ✅ FIX: Theme-aware background (no white gaps)
+                background: 'var(--theme-bg-primary)',
                 borderLeft: '1px solid var(--theme-border-primary)',
-                backdropFilter: 'none',
-                WebkitBackdropFilter: 'none',
-                opacity: '1'
             }}
         >
-            {/* 🎨 Header with Dynamic Logo */}
-            <div className="p-4 flex-none border-b space-y-4 transition-colors duration-300" style={{ borderColor: 'var(--theme-border-primary)' }}>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+            {/* 🎨 Header with Dynamic Logo - ✅ MOBILE-FIRST */}
+            <div className="p-3 sm:p-4 flex-none border-b space-y-3 sm:space-y-4 transition-colors duration-300" style={{ borderColor: 'var(--theme-border-primary)' }}>
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                         {/* Check if active branch has logo, else fallback */}
                         {activeBranch?.logoUrl ? (
                             <img
                                 src={activeBranch.logoUrl}
                                 alt="Hotel Logo"
-                                className="w-10 h-10 rounded-xl object-cover shadow-lg border transition-colors duration-300"
+                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-lg border transition-all duration-300 flex-shrink-0"
                                 style={{ borderColor: 'var(--theme-border-primary)' }}
                             />
                         ) : (
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-500/20">
-                                <Crown className="w-5 h-5 text-white" />
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-500/20 flex-shrink-0">
+                                <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                             </div>
                         )}
 
-                        <div className="min-w-0">
-                            <h1 className="text-lg font-bold truncate leading-tight transition-colors duration-300" style={{ color: 'var(--theme-text-primary)' }}>
+                        <div className="min-w-0 flex-1">
+                            <h1 className="text-base sm:text-lg font-bold truncate leading-tight transition-colors duration-300" style={{ color: 'var(--theme-text-primary)' }}>
                                 {activeBranch?.name || 'Adora Admin'}
                             </h1>
-                            <p className="text-[9px] text-teal-500 font-bold tracking-wider uppercase opacity-80">
+                            <p className="text-[8px] sm:text-[9px] text-teal-500 font-bold tracking-wider uppercase opacity-80 truncate">
                                 {isOwner ? (t('admin.ownerDashboard') || 'لوحة المالك') : (t('admin.managerDashboard') || 'مدير النظام')}
                             </p>
                         </div>
@@ -288,21 +285,21 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     {onClose && (
                         <button
                             onClick={onClose}
-                            className="lg:hidden w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-300"
+                            className="lg:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-all duration-300 active:scale-95 flex-shrink-0"
                             style={{ background: 'var(--theme-bg-tertiary)', color: 'var(--theme-text-secondary)' }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--theme-text-primary)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--theme-text-secondary)'; }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--theme-text-primary)'; e.currentTarget.style.background = 'var(--theme-bg-secondary)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--theme-text-secondary)'; e.currentTarget.style.background = 'var(--theme-bg-tertiary)'; }}
                         >
                             <ArrowLeft className="w-4 h-4 flip-rtl" />
                         </button>
                     )}
                 </div>
 
-                {/* ✅ Branch Selector - MANAGER ONLY: Owner doesn't have branches */}
+                {/* ✅ Branch Selector - MANAGER ONLY: Owner doesn't have branches - ✅ MOBILE-FIRST */}
                 {!isOwnerRole && filteredBranches.length > 1 && (
-                    <div className="p-1 rounded-xl border transition-colors duration-300" style={{ background: 'var(--theme-bg-secondary)', borderColor: 'var(--theme-border-primary)' }}>
-                        <div className="flex items-center gap-2 px-2 py-1.5">
-                            <Building2 className="w-3.5 h-3.5 transition-colors duration-300" style={{ color: 'var(--theme-text-tertiary)' }} />
+                    <div className="p-1.5 rounded-xl border transition-all duration-300 hover:border-teal-500/50" style={{ background: 'var(--theme-bg-secondary)', borderColor: 'var(--theme-border-primary)' }}>
+                        <div className="flex items-center gap-2 px-2.5 py-2">
+                            <Building2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 transition-colors duration-300 flex-shrink-0" style={{ color: 'var(--theme-text-tertiary)' }} />
                             <select
                                 value={branchId || ''}
                                 onChange={(e) => {
@@ -310,7 +307,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                     // ✅ Trigger page reload to update all branch-scoped data
                                     window.dispatchEvent(new CustomEvent('branch-changed', { detail: { branchId: e.target.value } }));
                                 }}
-                                className="flex-1 bg-transparent text-xs outline-none cursor-pointer appearance-none transition-colors duration-300"
+                                className="flex-1 bg-transparent text-xs sm:text-[11px] outline-none cursor-pointer appearance-none transition-colors duration-300 truncate"
                                 style={{ color: 'var(--theme-text-primary)' }}
                             >
                                 {filteredBranches.map(b => (
@@ -319,41 +316,54 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                     </option>
                                 ))}
                             </select>
-                            <ChevronDown className="w-3 h-3 transition-colors duration-300" style={{ color: 'var(--theme-text-tertiary)' }} />
+                            <ChevronDown className="w-3.5 h-3.5 sm:w-3 sm:h-3 transition-colors duration-300 flex-shrink-0" style={{ color: 'var(--theme-text-tertiary)' }} />
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* 🔗 Scrollable Navigation */}
-            <div className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar space-y-4 pb-24">
+            {/* 🔗 Scrollable Navigation - ✅ MOBILE-FIRST */}
+            <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 custom-scrollbar space-y-3 sm:space-y-4 pb-20 sm:pb-24">
                 <nav className="space-y-1">
                     {sections.map((section) => {
                         const isExpanded = expandedSections.includes(section.id);
                         return (
-                            <div key={section.id} className="mb-2">
+                            <div key={section.id} className="mb-1.5 sm:mb-2">
                                 <button
                                     onClick={() => toggleSection(section.id)}
-                                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all group transition-colors duration-300"
-                                    style={{ color: 'var(--theme-text-secondary)' }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--theme-bg-tertiary)'; e.currentTarget.style.color = 'var(--theme-text-primary)'; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--theme-text-secondary)'; }}
+                                    className="w-full flex items-center justify-between px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-xl transition-all group active:scale-[0.98]"
+                                    style={{ 
+                                        color: 'var(--theme-text-secondary)',
+                                        background: isExpanded ? 'var(--theme-bg-tertiary)' : 'transparent'
+                                    }}
+                                    onMouseEnter={(e) => { 
+                                        if (!isExpanded) {
+                                            e.currentTarget.style.background = 'var(--theme-bg-tertiary)'; 
+                                            e.currentTarget.style.color = 'var(--theme-text-primary)'; 
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => { 
+                                        if (!isExpanded) {
+                                            e.currentTarget.style.background = 'transparent'; 
+                                            e.currentTarget.style.color = 'var(--theme-text-secondary)'; 
+                                        }
+                                    }}
                                 >
-                                    <div className="flex items-center gap-2.5">
-                                        <div className={`p-1.5 rounded-lg transition-colors duration-300 ${isExpanded ? 'bg-teal-500/10' : ''}`}
-                                             style={!isExpanded ? { background: 'var(--theme-bg-tertiary)' } : {}}>
+                                    <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
+                                        <div className={`p-1.5 sm:p-1.5 rounded-lg transition-all duration-300 flex-shrink-0 ${isExpanded ? 'bg-teal-500/20 shadow-sm' : ''}`}
+                                             style={!isExpanded ? { background: 'var(--theme-bg-secondary)' } : {}}>
                                             {section.icon}
                                         </div>
-                                        <span className="text-xs font-bold uppercase tracking-widest">{section.label}</span>
+                                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate">{section.label}</span>
                                     </div>
                                     <ChevronDown
-                                        className={`w-3 h-3 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+                                        className={`w-3.5 h-3.5 sm:w-3 sm:h-3 transition-transform duration-300 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
                                         style={{ color: isExpanded ? 'var(--theme-primary-500)' : 'var(--theme-text-tertiary)' }}
                                     />
                                 </button>
 
                                 {isExpanded && (
-                                    <div className="mt-1 ml-4 border-l space-y-1 animate-in slide-in-from-top-2 duration-300 transition-colors duration-300" style={{ borderColor: 'var(--theme-border-primary)' }}>
+                                    <div className="mt-1.5 sm:mt-1 ml-3 sm:ml-4 border-l-2 space-y-0.5 sm:space-y-1 animate-in slide-in-from-top-2 duration-200 transition-colors duration-300" style={{ borderColor: 'var(--theme-primary-500)' }}>
                                         {section.items.map((item) => {
                                             // ✅ Check if this is a tab link (contains ?tab=)
                                             const isTabLink = item.to.includes('?tab=');
@@ -381,20 +391,20 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                     <button
                                                         key={item.to}
                                                         onClick={handleClick}
-                                                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all relative transition-colors duration-300 ${isActive
-                                                            ? 'bg-teal-500/10 text-teal-400 font-bold'
+                                                        className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all relative active:scale-[0.98] ${isActive
+                                                            ? 'bg-teal-500/15 text-teal-400 font-bold shadow-sm'
                                                             : ''
                                                         }`}
                                                         style={{
                                                             color: isActive ? 'var(--theme-primary-500)' : 'var(--theme-text-secondary)',
-                                                            background: isActive ? 'rgba(20, 184, 166, 0.1)' : 'transparent'
+                                                            background: isActive ? 'rgba(20, 184, 166, 0.15)' : 'transparent'
                                                         }}
                                                     >
-                                                        {isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-teal-500 rounded-l-full shadow-[0_0_8px_rgba(20,184,166,0.5)]" />}
-                                                        <span style={{ color: 'inherit' }}>{item.icon}</span>
-                                                        <span className="text-right flex-1">{item.label}</span>
+                                                        {isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 sm:w-1 h-4 sm:h-5 bg-teal-500 rounded-l-full shadow-[0_0_8px_rgba(20,184,166,0.5)]" />}
+                                                        <span className="flex-shrink-0 w-4 h-4 sm:w-4 sm:h-4" style={{ color: 'inherit' }}>{item.icon}</span>
+                                                        <span className="text-right flex-1 truncate">{item.label}</span>
                                                         {(item as any).badge && (item as any).badge > 0 && (
-                                                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[18px] text-center">
+                                                            <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[16px] sm:min-w-[18px] text-center flex-shrink-0">
                                                                 {(item as any).badge}
                                                             </span>
                                                         )}
@@ -403,54 +413,54 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                             }
                                             
                                             return (
-                                            <NavLink
-                                                key={item.to}
-                                                to={item.to}
-                                                end={(item as any).end}
-                                                onClick={onClose}
-                                                className={({ isActive }) =>
-                                                    `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all relative transition-colors duration-300 ${isActive
-                                                        ? 'bg-teal-500/10 text-teal-400 font-bold'
-                                                        : ''
-                                                    }`
-                                                }
-                                                style={({ isActive }) => ({
-                                                    color: isActive ? 'var(--theme-primary-500)' : 'var(--theme-text-secondary)',
-                                                    background: isActive ? 'rgba(20, 184, 166, 0.1)' : 'transparent'
-                                                })}
-                                                onMouseEnter={(e) => {
-                                                    if (!e.currentTarget.classList.contains('bg-teal-500/10')) {
-                                                        e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
-                                                        e.currentTarget.style.color = 'var(--theme-text-primary)';
+                                                <NavLink
+                                                    key={item.to}
+                                                    to={item.to}
+                                                    end={(item as any).end}
+                                                    onClick={onClose}
+                                                    className={({ isActive }) =>
+                                                        `flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all relative active:scale-[0.98] ${isActive
+                                                            ? 'bg-teal-500/15 text-teal-400 font-bold shadow-sm'
+                                                            : ''
+                                                        }`
                                                     }
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    if (!e.currentTarget.classList.contains('bg-teal-500/10')) {
-                                                        e.currentTarget.style.background = 'transparent';
-                                                        e.currentTarget.style.color = 'var(--theme-text-secondary)';
-                                                    }
-                                                }}
-                                            >
-                                                {({ isActive }) => (
-                                                    <>
-                                                        {isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-teal-500 rounded-l-full shadow-[0_0_8px_rgba(20,184,166,0.5)]" />}
-                                                        <span className="transition-colors duration-300" style={{ color: 'inherit' }}>
-                                                            {item.icon}
-                                                        </span>
-                                                        <span>{item.label}</span>
-                                                        {(item as any).badge && (item as any).badge > 0 && (
-                                                            <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-bold ${
-                                                                isActive 
-                                                                    ? 'bg-red-500 text-white animate-pulse' 
-                                                                    : 'bg-red-500/20 text-red-400'
-                                                            }`}>
-                                                                {(item as any).badge}
+                                                    style={({ isActive }) => ({
+                                                        color: isActive ? 'var(--theme-primary-500)' : 'var(--theme-text-secondary)',
+                                                        background: isActive ? 'rgba(20, 184, 166, 0.15)' : 'transparent'
+                                                    })}
+                                                    onMouseEnter={(e) => {
+                                                        if (!e.currentTarget.classList.contains('bg-teal-500/15')) {
+                                                            e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
+                                                            e.currentTarget.style.color = 'var(--theme-text-primary)';
+                                                        }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        if (!e.currentTarget.classList.contains('bg-teal-500/15')) {
+                                                            e.currentTarget.style.background = 'transparent';
+                                                            e.currentTarget.style.color = 'var(--theme-text-secondary)';
+                                                        }
+                                                    }}
+                                                >
+                                                    {({ isActive }) => (
+                                                        <>
+                                                            {isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 sm:w-1 h-4 sm:h-5 bg-teal-500 rounded-l-full shadow-[0_0_8px_rgba(20,184,166,0.5)]" />}
+                                                            <span className="flex-shrink-0 w-4 h-4 sm:w-4 sm:h-4 transition-colors duration-300" style={{ color: 'inherit' }}>
+                                                                {item.icon}
                                                             </span>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </NavLink>
-                                        );
+                                                            <span className="flex-1 truncate">{item.label}</span>
+                                                            {(item as any).badge && (item as any).badge > 0 && (
+                                                                <span className={`ml-auto px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-xs font-bold flex-shrink-0 ${
+                                                                    isActive 
+                                                                        ? 'bg-red-500 text-white animate-pulse' 
+                                                                        : 'bg-red-500/20 text-red-400'
+                                                                }`}>
+                                                                    {(item as any).badge}
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </NavLink>
+                                            );
                                         })}
                                     </div>
                                 )}
@@ -460,15 +470,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
 
 
 
-                    {/* 🏥 Data Health Indicator - More Compact */}
-                    <div className="mt-8 mx-1 px-3 py-3 rounded-xl border flex items-center gap-3 transition-colors duration-300" style={{ background: 'var(--theme-bg-secondary)', borderColor: 'var(--theme-border-primary)' }}>
-                        <Activity className="w-4 h-4 shrink-0" style={{ color: 'var(--theme-primary-500)' }} />
-                        <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-[10px] font-bold uppercase transition-colors duration-300" style={{ color: 'var(--theme-primary-500)' }}>{t('admin.safeWorkEnvironment') || 'بيئة العمل آمنة'}</span>
-                                <span className="text-[10px] transition-colors duration-300" style={{ color: 'var(--theme-primary-500)' }}>100%</span>
+                    {/* 🏥 Data Health Indicator - ✅ MOBILE-FIRST COMPACT */}
+                    <div className="mt-6 sm:mt-8 mx-0.5 sm:mx-1 px-2.5 sm:px-3 py-2.5 sm:py-3 rounded-xl border flex items-center gap-2.5 sm:gap-3 transition-all duration-300 hover:border-teal-500/30" style={{ background: 'var(--theme-bg-secondary)', borderColor: 'var(--theme-border-primary)' }}>
+                        <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" style={{ color: 'var(--theme-primary-500)' }} />
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1 sm:mb-1.5 gap-1">
+                                <span className="text-[9px] sm:text-[10px] font-bold uppercase transition-colors duration-300 truncate" style={{ color: 'var(--theme-primary-500)' }}>{t('admin.safeWorkEnvironment') || 'بيئة العمل آمنة'}</span>
+                                <span className="text-[9px] sm:text-[10px] transition-colors duration-300 flex-shrink-0" style={{ color: 'var(--theme-primary-500)' }}>100%</span>
                             </div>
-                            <div className="h-1 w-full rounded-full overflow-hidden transition-colors duration-300" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                            <div className="h-0.5 sm:h-1 w-full rounded-full overflow-hidden transition-colors duration-300" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                 <div className="h-full w-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full shadow-[0_0_8px_rgba(20,184,166,0.5)]"></div>
                             </div>
                         </div>
@@ -476,25 +486,21 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 </nav>
             </div>
 
-            {/* 🚪 Fixed Footer */}
-            {/* ✅ FIX: Remove hardcoded colors - use theme variables */}
-            <div className="flex-none p-4 border-t flex items-center justify-between gap-2 z-10 transition-colors duration-300" style={{ 
-                background: 'var(--theme-bg-secondary)', // ✅ FIX: Theme-aware (no hardcoded colors)
+            {/* 🚪 Fixed Footer - ✅ MOBILE-FIRST */}
+            <div className="flex-none p-3 sm:p-4 border-t flex items-center justify-center gap-2 z-10 transition-colors duration-300" style={{ 
+                background: 'var(--theme-bg-primary)',
                 borderColor: 'var(--theme-border-primary)',
-                backdropFilter: 'none',
-                WebkitBackdropFilter: 'none',
-                opacity: '1'
             }}>
-                {/* ✅ Logout Button - Full width since العودة للرئيسية removed (use unified header tabs) */}
+                {/* ✅ Logout Button - Centered, Mobile-optimized */}
                 <button
                     onClick={() => {
                         if (onClose) onClose();
                         logout();
                     }}
-                    className="flex items-center justify-center w-11 h-11 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 active:scale-95 transition-all outline-none border border-red-500/10"
+                    className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 active:scale-95 transition-all outline-none border border-red-500/20 hover:border-red-500/40"
                     title={t('auth.logout') || 'تسجيل الخروج'}
                 >
-                    <LogOut className="w-5 h-5 flip-rtl" />
+                    <LogOut className="w-4 h-4 sm:w-5 sm:h-5 flip-rtl" />
                 </button>
             </div>
         </div>
