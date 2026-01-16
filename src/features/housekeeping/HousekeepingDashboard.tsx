@@ -1,4 +1,5 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Modern Housekeeping Dashboard V2
  * Built from scratch with best UX practices
  * Adora Hotel Management System

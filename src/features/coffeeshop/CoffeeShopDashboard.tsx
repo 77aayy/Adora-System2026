@@ -1,4 +1,5 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Coffee Shop Dashboard
  * Manage coffee shop orders from QR codes and reception
  * Adora Hotel Management System V2

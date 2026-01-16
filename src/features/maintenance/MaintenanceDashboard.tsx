@@ -1,4 +1,5 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Maintenance Dashboard - COMPLETE Implementation
  * All 54 functions from legacy maintenance.js
  * Adora Hotel Management System V2

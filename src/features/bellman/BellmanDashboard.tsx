@@ -1,4 +1,5 @@
 /**
+ * @license Property of Ayman Ahmed - Adora Hotels Management System
  * Modern Bellman Dashboard V2
  * Built from scratch with best UX practices
  * Adora Hotel Management System
@@ -266,12 +267,14 @@ const CheckinModal: React.FC<{
         if (!availableRooms.includes(room)) {
             // Room not in available rooms list
             haptic('error');
+            error(t('reception.roomNotFoundInBranch', { room }) || `Room ${room} does not exist in this branch. Please select a room from the list.`);
             return; // Don't proceed
         }
         
         // ✅ Check if room has active card
         if (activeRoomNumbers.has(room)) {
             haptic('error');
+            error(t('bellman.roomHasActiveCardDesc', { room }) || `Room ${room} has an active card - must check out first.`);
             return; // Don't proceed
         }
         setRoomNumber(room);
