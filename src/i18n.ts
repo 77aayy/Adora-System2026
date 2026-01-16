@@ -14,33 +14,42 @@ import hi from './locales/hi.json';
 import bn from './locales/bn.json';
 
 // Initialize i18n
-i18n
-    .use(LanguageDetector)
-    .use(initReactI18next)
-    .init({
-        resources: {
-            en: { translation: en },
-            ar: { translation: ar },
-            hi: { translation: hi },
-            bn: { translation: bn },
-        },
-        fallbackLng: 'ar', // Default to Arabic
-        supportedLngs: ['ar', 'en', 'hi', 'bn'],
+// ✅ Safe initialization with error handling
+try {
+    i18n
+        .use(LanguageDetector)
+        .use(initReactI18next)
+        .init({
+            resources: {
+                en: { translation: en },
+                ar: { translation: ar },
+                hi: { translation: hi },
+                bn: { translation: bn },
+            },
+            fallbackLng: 'ar', // Default to Arabic
+            supportedLngs: ['ar', 'en', 'hi', 'bn'],
 
-        detection: {
-            order: ['localStorage', 'navigator'],
-            caches: ['localStorage'],
-            lookupLocalStorage: 'adora-language',
-        },
+            detection: {
+                order: ['localStorage', 'navigator'],
+                caches: ['localStorage'],
+                lookupLocalStorage: 'adora-language',
+            },
 
-        interpolation: {
-            escapeValue: false, // React already escapes
-        },
+            interpolation: {
+                escapeValue: false, // React already escapes
+            },
 
-        react: {
-            useSuspense: false,
-        },
-    });
+            react: {
+                useSuspense: false,
+            },
+        })
+        .catch((error) => {
+            console.error('❌ i18n initialization error:', error);
+            // Fallback: continue with default language
+        });
+} catch (error) {
+    console.error('❌ i18n setup error:', error);
+}
 
 // RTL handler
 export const updateDirection = (lang: string) => {
