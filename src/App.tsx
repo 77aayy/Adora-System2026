@@ -943,9 +943,10 @@ const App: React.FC = () => {
     // ✅ Provider Composer - Clean provider composition
     // Providers are applied in order (first = outermost, last = innermost)
     // CRITICAL: TenantProvider MUST be first to identify which tenant before loading anything else
+    // ✅ I18nProvider is now in main.tsx (wraps entire app) - no need here
     const providers = [
         { Component: TenantProvider },      // 1️⃣ Tenant identification (SaaS context)
-        { Component: I18nProvider },        // 1.5️⃣ Custom i18n provider (for usei18n hook)
+        // ✅ I18nProvider is in main.tsx (wraps I18nextProvider)
         // ✅ react-i18next is initialized globally in main.tsx (I18nextProvider)
         { Component: ThemeProvider },        // 2️⃣ Visual theme
         { Component: AuthProvider },         // 3️⃣ User authentication

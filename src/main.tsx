@@ -7,6 +7,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
+import { I18nProvider } from './i18n/i18nContext';
 import App from './App';
 import './index.css';
 import './styles/animations.css';
@@ -46,9 +47,11 @@ if (import.meta.env.DEV) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-        <I18nextProvider i18n={i18n}>
-            <App />
-        </I18nextProvider>
+        <I18nProvider>
+            <I18nextProvider i18n={i18n}>
+                <App />
+            </I18nextProvider>
+        </I18nProvider>
     </React.StrictMode>
 );
 
