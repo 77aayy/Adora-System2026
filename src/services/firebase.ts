@@ -82,6 +82,7 @@ const getEnvConfig = (): FirebaseConfig | null => {
     const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET;
     const messagingSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID;
     const appId = import.meta.env.VITE_FIREBASE_APP_ID;
+    const measurementId = import.meta.env.VITE_FIREBASE_MEASUREMENT_ID;
 
     // All required fields must be present (not empty placeholders)
     if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey.includes('YOUR_')) return null;
@@ -94,7 +95,8 @@ const getEnvConfig = (): FirebaseConfig | null => {
         projectId,
         storageBucket: storageBucket || `${projectId}.appspot.com`,
         messagingSenderId,
-        appId
+        appId,
+        measurementId: measurementId && measurementId !== 'YOUR_MEASUREMENT_ID' && !measurementId.includes('YOUR_') ? measurementId : undefined
     };
 };
 
