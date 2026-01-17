@@ -59,6 +59,9 @@ const GuestLayout = lazyLoad(() => import(/* webpackChunkName: "guest-layout" */
 // ✅ Demo Portal (Public access for potential buyers)
 const DemoEntry = lazyLoad(() => import(/* webpackChunkName: "demo" */ './features/demo/DemoEntry').then(m => ({ default: m.DemoEntry })));
 
+// ✅ About Us Page (Public access)
+const AboutUs = lazyLoad(() => import(/* webpackChunkName: "about" */ './pages/AboutUs'));
+
 // Auth / Setup (keep eager for fast login)
 import LoginScreen from './features/auth/LoginScreen';
 import { SetupWizard } from './features/setup/SetupWizard';
@@ -175,6 +178,9 @@ export const AppRoutes: React.FC = () => {
                 {/* ================= Demo (Public - For Potential Buyers) ================= */}
                 <Route path="/demo" element={<DemoEntry />} />
                 <Route path="/demo-access" element={<DemoEntry />} />
+
+                {/* ================= About Us (Public) ================= */}
+                <Route path="/about" element={<AboutUs />} />
 
                 {/* ================= Guest (Public) ================= */}
                 <Route

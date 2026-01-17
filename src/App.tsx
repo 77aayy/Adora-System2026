@@ -638,6 +638,19 @@ const DeveloperFooter: React.FC = () => {
                 >
                     {config.email}
                 </a>
+                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
+                
+                {/* About Us Link */}
+                <Link
+                    to="/about"
+                    className={`hover:underline transition-colors ${
+                        isDark 
+                            ? 'text-slate-300 hover:text-teal-400' 
+                            : 'text-slate-600 hover:text-teal-600'
+                    }`}
+                >
+                    About Us
+                </Link>
             </p>
         </footer>
     );
