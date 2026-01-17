@@ -8,8 +8,10 @@
     <meta name="description" content="Adora Hotel Management System - نظام إدارة الفنادق الذكي" />
     
     <!-- ✅ Content Security Policy (CSP) for Security -->
+    <!-- Note: CSP headers are now managed via vercel.json for production -->
     <!-- Note: Scripts from infird.com are blocked (likely browser extension) - this is intentional for security -->
     <!-- CSP violation for infird.com is EXPECTED and SAFE - it's blocked intentionally -->
+    <!-- Development CSP (more permissive for hot reload) -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
         script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://www.gstatic.com https://*.firebaseio.com https://*.googleapis.com https://www.googletagmanager.com;
