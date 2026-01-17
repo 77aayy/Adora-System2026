@@ -315,20 +315,29 @@ requestService.completeRequest()
 - `src/services/pointsService.ts:awardPointsWithQualityCheck()` → `checkSuspiciousSpeed()`
 - `src/services/pointsService.ts:awardPointsWithQualityCheck()` → `awardPoints()`
 
-### **E. Staff Assignment Integration:**
+### **E. Staff Assignment Integration (✅ Protected with Workload Check & Online Status):**
 
 ```
 staffService.assignRequest()
-  ├─→ getStaffWorkload() [Workload check]
-  ├─→ validateOnlineStatus() [Online status check]
-  ├─→ requestService.updateRequest() [Assignment update]
-  └─→ notificationService.sendNotification() [Assignment notification]
+  ├─→ validateStaffStatus() [Active status check]
+  ├─→ validateOnlineStatus() [lastActiveAt within 5 minutes - Online status check]
+  ├─→ runTransaction() [ATOMIC: Workload check + Request assignment]
+  │    ├─→ Check workload: query(requests where assignedTo.id == staffId, status in ['CONFIRMED', 'IN_PROGRESS'])
+  │    ├─→ Validate: currentWorkload < maxWorkload (default: 5)
+  │    └─→ Update request: assignedTo, status = 'CONFIRMED' (if PENDING_RECEPTION)
+  └─→ Repository Integration: FirebaseRequestRepository.assignRequest() → staffService.assignRequest()
 ```
 
 **الملفات:**
-- `src/services/staffService.ts:assignRequest()` → `getStaffWorkload()`
-- `src/services/staffService.ts:assignRequest()` → `requestService.updateRequest()`
-- `src/services/staffService.ts:assignRequest()` → `notificationService.sendNotification()`
+- `src/services/staffService.ts:assignRequest()` - ✅ Protected with Workload Check (ATOMIC via runTransaction)
+- `src/repositories/firebase/FirebaseRequestRepository.ts:assignRequest()` → `staffService.assignRequest()`
+- **Workload Check:** Atomically checks workload + assigns request in single transaction (prevents race conditions)
+- **Online Status Check:** Validates `lastActiveAt` within 5 minutes (prevents assigning to offline staff)
+
+**الحماية المطبقة:**
+- ✅ **Workload Check (ATOMIC):** يستخدم `runTransaction` لفحص Workload وتعيين الطلب بشكل atomical
+- ✅ **Online Status Check:** يتحقق من `lastActiveAt` (يجب أن يكون خلال آخر 5 دقائق)
+- ✅ **Repository Integration:** `FirebaseRequestRepository.assignRequest()` → `staffService.assignRequest()` (يضمن Atomic Workload Check)
 
 ### **F. Auto Transfer Integration:**
 

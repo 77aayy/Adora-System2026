@@ -7,6 +7,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { QrCode, AlertTriangle } from 'lucide-react';
+import { logger } from '../services/loggerService';
 
 // ============================================================
 // ROOM CONTEXT
@@ -42,10 +43,8 @@ export const GuestLayout: React.FC<GuestLayoutProps> = ({ children }) => {
     // Only check for token - token is the ONLY source of truth
     const token = searchParams.get('t') || searchParams.get('token');
     
-    console.log('🔍 [GuestLayout] SECURITY: Token-only validation - ignoring room param:', {
-        token: token ? `${token.substring(0, 8)}...` : 'NOT FOUND',
-        urlRoom: searchParams.get('room') // Logged for debugging only - NOT used
-    });
+    // ✅ SECURITY: No sensitive data in logs
+    logger.debug('Token-only validation - ignoring room param', { hasToken: !!token }, 'GuestLayout');
 
     // 🛡️ SECURITY: Only show QR scan prompt if NO token
     // If token exists, GuestDashboard will validate it and extract room data from token

@@ -227,7 +227,8 @@ export async function rejectOrder(
 
     // Notify guest (if phone available)
     if (order.guestPhone) {
-        console.log(`📱 Would notify guest about rejection: ${order.guestPhone}`);
+        // ✅ SECURITY: No phone number in logs
+        logger.info('Order rejected - notification queued', undefined, 'coffeeShopFlowService');
     }
 
     console.log(`❌ Order ${orderId} rejected: ${reason}`);

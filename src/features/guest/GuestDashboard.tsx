@@ -86,6 +86,7 @@ import { GuestChatWidget } from '../../components/guest/GuestChatWidget';
 import { VIPGuestTheme, VIPWelcomeBanner } from '../../components/guest/VIPGuestTheme';
 import { QuickIssueReporter } from '../../components/guest/QuickIssueReporter';
 import { MicroFeedback } from '../../components/guest/MicroFeedback';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -384,12 +385,10 @@ export const GuestDashboard: React.FC = () => {
         
         // 🔐 SECURITY: Token is the ONLY source of truth
         const token = getParam('t') || getParam('token');
-        console.log('🔍 [GuestDashboard] Token from URL:', token ? `${token.substring(0, 8)}...` : 'NOT FOUND');
-        console.log('⚠️ [GuestDashboard] SECURITY: Ignoring URL params (can be manipulated):', {
-            room: urlRoomNum,
-            branch: urlBranchId,
-            tenant: urlTenantId
-        });
+        // ✅ SECURITY: Token validation logging (no sensitive data exposed)
+        if (token) {
+            logger.debug(`Token found in URL (length: ${token.length})`, undefined, 'GuestDashboard');
+        }
         
         // Initialize as null - will be set from Token validation only
         let roomNum: string | null = null;
@@ -429,19 +428,16 @@ export const GuestDashboard: React.FC = () => {
         // 🔒 Secure Token Resolution (REQUIRED unless demo mode)
         if (token) {
             try {
-                console.log(`🔍 [GuestDashboard] Token found in URL: ${token.substring(0, 8)}...`);
+                // ✅ SECURITY: No sensitive data in logs
+                logger.debug('Validating secure access token', undefined, 'GuestDashboard');
                 // Get device fingerprint for security tracking
                 const fingerprint = getSavedDeviceFingerprint() || generateDeviceFingerprint();
                 saveDeviceFingerprint(fingerprint);
-                console.log(`🔍 [GuestDashboard] Calling validateSecureAccessToken...`);
                 
                 // Validate token using secure service
                 const validationResult = await validateSecureAccessToken(token, fingerprint);
-                console.log(`🔍 [GuestDashboard] Validation result:`, {
-                    valid: validationResult.valid,
-                    errorCode: validationResult.errorCode,
-                    error: validationResult.error?.substring(0, 50)
-                });
+                // ✅ SECURITY: Log validation result without sensitive data
+                logger.debug(`Token validation result: ${validationResult.valid ? 'VALID' : 'INVALID'}`, { errorCode: validationResult.errorCode }, 'GuestDashboard');
                 
                 if (!validationResult.valid) {
                     console.warn(`🔐 Token validation failed: ${validationResult.errorCode}`);
@@ -536,11 +532,8 @@ export const GuestDashboard: React.FC = () => {
                     return;
                 }
                 
-                console.log('✅ [GuestDashboard] SECURITY: Token validated - using data from token ONLY (URL params ignored):', {
-                    room: roomNum,
-                    branch: branchId,
-                    tenant: tenantId
-                });
+                // ✅ SECURITY: Log validation success without exposing room/branch/tenant in console
+                logger.info('Token validated successfully', { hasRoom: !!roomNum, hasBranch: !!branchId, hasTenant: !!tenantId }, 'GuestDashboard');
                 
                 setResolvedRoom(roomNum);
                 setResolvedBranch(branchId);
@@ -548,7 +541,7 @@ export const GuestDashboard: React.FC = () => {
                 // 🔐 Initialize rate limiting for this guest session
                 await initializeGuestRateLimit(tenantId, roomNum);
                 
-                console.log(`🔐 Secure token validated for Room ${roomNum}`);
+                logger.info('Secure token validated', undefined, 'GuestDashboard');
                 
             } catch (error) {
                 console.error("Token resolution error:", error);
@@ -558,7 +551,7 @@ export const GuestDashboard: React.FC = () => {
             }
         } else if (!demo) {
             // 🚨 No token and not demo mode - require secure access
-            console.log('⚠️ [GuestDashboard] No token found in URL and not demo mode');
+            logger.debug('No token found in URL (not demo mode)', undefined, 'GuestDashboard');
             // Allow existing session to continue (for page refresh)
             const existingSession = checkExistingSession();
             if (!existingSession) {
@@ -568,7 +561,7 @@ export const GuestDashboard: React.FC = () => {
                 return;
             }
             // If there's an existing session, let it continue below
-            console.log('📱 Continuing with existing session (no token in URL)');
+            logger.debug('Continuing with existing session', undefined, 'GuestDashboard');
         }
 
         // 🚨 CRITICAL: SaaS Hierarchy Enforcement

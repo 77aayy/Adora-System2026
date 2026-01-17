@@ -8,6 +8,7 @@
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, orderBy, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { isFeatureEnabled } from './systemSettingsService';
+import { logger } from './loggerService';
 
 // ============================================================
 // NOTIFICATION CONFIGURATION
@@ -203,7 +204,8 @@ export const sendSMS = async (
 
     // 3. In a real implementation, this would call the SMS provider API
     // For now, we mark as sent (Cloud Functions would handle actual sending)
-    console.log(`📱 SMS queued to ${phoneNumber}: ${message.substring(0, 50)}...`);
+    // ✅ SECURITY: No phone number in logs
+    logger.info('SMS queued', { messageLength: message.length }, 'communicationService');
 
     await updateDoc(doc(db, 'smsMessages', docRef.id), {
         status: 'queued',
@@ -384,7 +386,8 @@ export const sendWhatsApp = async (
     });
 
     // Would integrate with WhatsApp Business API
-    console.log(`WhatsApp to ${phoneNumber}: ${message}`);
+    // ✅ SECURITY: No phone number in logs
+    logger.info('WhatsApp message sent', { messageLength: message.length }, 'communicationService');
     return docRef.id;
 };
 

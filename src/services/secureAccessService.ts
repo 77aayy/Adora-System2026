@@ -20,6 +20,7 @@ import {
     deleteDoc
 } from 'firebase/firestore';
 import { sendSecurityAlert } from './securityAlertService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -209,7 +210,8 @@ export const validateSecureAccessToken = async (
     token: string,
     deviceFingerprint?: string
 ): Promise<TokenValidationResult> => {
-    console.log(`🔍 [validateSecureAccessToken] Starting validation for token: ${token.substring(0, 8)}...`);
+    // ✅ SECURITY: No sensitive data in logs
+    logger.debug('Starting token validation', { tokenLength: token.length }, 'secureAccessService');
     
     if (!db) {
         console.error(`🔍 [validateSecureAccessToken] Firebase db is null!`);
@@ -232,24 +234,23 @@ export const validateSecureAccessToken = async (
     try {
         // Search for token across all tenants (since we don't know tenant from URL)
         // This is a global search - consider indexing for performance
-        console.log(`🔍 [validateSecureAccessToken] Searching for token across all tenants...`);
+        logger.debug('Searching for token across tenants', undefined, 'secureAccessService');
         const tenantsRef = collection(db, 'tenants');
         const tenantsSnapshot = await getDocs(tenantsRef);
-        console.log(`🔍 [validateSecureAccessToken] Found ${tenantsSnapshot.docs.length} tenant(s) to search`);
+        logger.debug(`Found ${tenantsSnapshot.docs.length} tenant(s) to search`, undefined, 'secureAccessService');
         
         for (const tenantDoc of tenantsSnapshot.docs) {
             const tenantId = tenantDoc.id;
-            console.log(`🔍 [validateSecureAccessToken] Checking tenant: ${tenantId}`);
+            // ✅ SECURITY: No tenantId/token in logs
             const tokensRef = collection(db, `tenants/${tenantId}/secureAccessTokens`);
             const q = query(tokensRef, where('token', '==', token));
             const snapshot = await getDocs(q);
             
-            console.log(`🔍 [validateSecureAccessToken] Tenant ${tenantId}: Found ${snapshot.size} token(s)`);
-            
             if (!snapshot.empty) {
                 const tokenDoc = snapshot.docs[0];
                 const tokenData = tokenDoc.data() as any;
-                console.log(`🔍 [validateSecureAccessToken] Token found! Room: ${tokenData.roomNumber}, Branch: ${tokenData.branchId}, Active: ${tokenData.isActive}`);
+                // ✅ SECURITY: Log validation success without sensitive data
+                logger.debug('Token found', { isActive: tokenData.isActive }, 'secureAccessService');
                 
                 // Check if active
                 if (!tokenData.isActive) {
@@ -323,7 +324,8 @@ export const validateSecureAccessToken = async (
                 });
                 
                 // Verify there's an active check-in for this room
-                console.log(`🔍 [QR Validation] Checking room card for Room ${tokenData.roomNumber}, Branch ${tokenData.branchId}, Tenant ${tenantId}`);
+                // ✅ SECURITY: No room/branch/tenant in logs
+                logger.debug('Checking room card for active check-in', undefined, 'secureAccessService');
                 const roomCardValid = await verifyActiveCheckIn(
                     tokenData.roomNumber,
                     tokenData.branchId,
@@ -567,7 +569,7 @@ export const deactivateToken = async (
                     deactivatedAt: Timestamp.now(),
                     deactivationReason: reason
                 });
-                console.log(`🔐 Token deactivated: ${token.substring(0, 8)}... (${reason})`);
+                logger.info(`Token deactivated: ${reason}`, undefined, 'secureAccessService');
                 return;
             }
         }
@@ -587,7 +589,7 @@ export const deactivateTokenOnCheckout = async (
     if (!db) return;
     
     await deactivateExistingTokens(roomNumber, branchId, tenantId);
-    console.log(`🔐 Token deactivated for Room ${roomNumber} on checkout`);
+    logger.info('Token deactivated on checkout', undefined, 'secureAccessService');
 };
 
 /**

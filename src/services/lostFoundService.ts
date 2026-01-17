@@ -291,7 +291,7 @@ export const addLostFoundItem = async (
                     item.tenantId
                 );
                 
-                console.log(`✅ WhatsApp notification sent to ${lastGuest.phone} for Room ${item.roomNumber}`);
+                logger.info(`WhatsApp notification sent for Room ${item.roomNumber}`, undefined, 'lostFoundService');
             } else {
                 console.warn(`⚠️ [Lost & Found] Could not find phone number for last guest in Room ${item.roomNumber}`);
             }
