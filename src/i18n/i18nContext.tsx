@@ -25,24 +25,47 @@ const i18nContext = createContext<i18nContextType | undefined>(undefined);
  * i18n Provider Component
  */
 export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    // ✅ CRITICAL: Safe localStorage access with try-catch and null check
     const [language, setLanguage] = useState<'ar' | 'en'>(() => {
-        const stored = localStorage.getItem('adora_language');
-        return (stored === 'en' || stored === 'ar') ? stored : 'ar'; // Default to Arabic
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                const stored = localStorage.getItem('adora_language');
+                if (stored === 'en' || stored === 'ar') {
+                    return stored;
+                }
+            }
+        } catch (e) {
+            // localStorage not available (SSR, private mode, etc.)
+            console.warn('localStorage not available, defaulting to Arabic:', e);
+        }
+        return 'ar'; // Default to Arabic
     });
 
     const changeLanguage = useCallback((newLang: 'ar' | 'en') => {
         setLanguage(newLang);
-        localStorage.setItem('adora_language', newLang);
+        
+        // ✅ CRITICAL: Safe localStorage access
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                localStorage.setItem('adora_language', newLang);
+            }
+        } catch (e) {
+            console.warn('Could not save language to localStorage:', e);
+        }
 
         // Update document direction and lang attribute
-        document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
-        document.documentElement.lang = newLang;
+        if (typeof document !== 'undefined') {
+            document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+            document.documentElement.lang = newLang;
+        }
     }, []);
 
     // Set initial direction on mount
     useEffect(() => {
-        document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
-        document.documentElement.lang = language;
+        if (typeof document !== 'undefined') {
+            document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+            document.documentElement.lang = language;
+        }
     }, [language]);
 
     // Translation function
@@ -70,11 +93,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return typeof value === 'string' ? value : key;
     };
 
-    // Set initial direction
-    useEffect(() => {
-        document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
-        document.documentElement.lang = language;
-    }, [language]);
+    // ✅ Duplicate effect removed - already handled above
 
     return (
         <i18nContext.Provider value={{ language, t, changeLanguage }}>
