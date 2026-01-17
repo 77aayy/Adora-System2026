@@ -36,7 +36,6 @@ import { ProviderComposer } from './components/providers/ProviderComposer';
 import { UXProvider, useUX } from './context/UXContext';
 import { AIProvider } from './context/AIContext';
 import { VoiceInputButton } from './components/shared/VoiceInputButton';
-import { I18nProvider } from './i18n/i18nContext';
 import { useFeatureGate } from './hooks/useFeatureGate';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { ToastContainer } from './components/common/EnhancedToast';
