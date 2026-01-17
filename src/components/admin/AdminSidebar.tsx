@@ -401,13 +401,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 )}
             </div>
 
-            {/* 🔗 Navigation - ✅ NO SCROLL (as requested) */}
+            {/* 🔗 Navigation - ✅ Scrollable with proper flex layout */}
             <div 
-                className="flex-1"
+                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
                 style={{
                     padding: isCollapsed ? '12px 4px' : '16px 8px',
                     paddingBottom: '8px',
-                    overflow: 'hidden', // ✅ NO SCROLL - as requested
                 }}
             >
                 <nav className="space-y-1">
