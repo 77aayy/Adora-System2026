@@ -4,11 +4,20 @@ import {
     Medal, Trophy, ThumbsUp, Heart, Shield, Flag, Sparkles,
     Eye, Timer, Wrench, Clock
 } from 'lucide-react';
-import { db } from '../../services/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { Achievement } from '../../types';
 import { haptic, playSound } from '../../utils/uxEffects';
+import { logger } from '../../services/loggerService';
+import {
+    subscribeToAchievements,
+    createAchievement,
+    updateAchievement,
+    deleteAchievement,
+    deleteAchievementsBatch,
+    createAchievementsBatch
+} from '../../services/achievementService';
+import { useTranslation } from 'react-i18next';
 
 const ICONS = [
     { name: 'Award', icon: Award },
@@ -83,19 +92,26 @@ export const AchievementsTab: React.FC = () => {
         requirement: { type: 'points', value: 100 }
     } as any);
 
-    const tenantId = user?.tenantId || (user?.role === 'owner' ? user.id : null);
+    const { tenantId } = useTenant();
 
+    // ✅ Null Safety: Check tenantId before subscribing
     useEffect(() => {
-        if (!tenantId) return;
+        if (!tenantId) {
+            logger.warn('AchievementsTab: Missing tenantId', null, 'AchievementsTab');
+            setLoading(false);
+            return;
+        }
 
-        const q = query(collection(db, `tenants/${tenantId}/achievements`), orderBy('requirement.value', 'asc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Achievement));
-            setAchievements(data);
+        // ✅ Architecture: Use service instead of direct Firebase call
+        const unsubscribe = subscribeToAchievements(tenantId, (achievements) => {
+            // ✅ Null Safety: Ensure achievements is never undefined
+            setAchievements(achievements || []);
             setLoading(false);
         });
 
-        return () => unsubscribe();
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
     }, [tenantId]);
 
     const handleSave = async () => {
@@ -122,51 +138,74 @@ export const AchievementsTab: React.FC = () => {
             }
             resetForm();
         } catch (error) {
-            console.error('Error saving achievement:', error);
+            logger.error('Error saving achievement', error, 'AchievementsTab');
             haptic('error');
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!tenantId || !window.confirm('هل أنت متأكد من حذف هذه الرتبة؟')) return;
+        // ✅ Null Safety: Check tenantId
+        if (!tenantId) {
+            logger.warn('Cannot delete achievement: Missing tenantId', null, 'AchievementsTab');
+            return;
+        }
+
+        if (!window.confirm(t('admin.achievements.deleteConfirm') || 'هل أنت متأكد من حذف هذه الرتبة؟')) return;
+
         try {
-            await deleteDoc(doc(db, `tenants/${tenantId}/achievements`, id));
-            haptic('success');
-        } catch (error) {
-            console.error('Error deleting achievement:', error);
+            // ✅ Architecture: Use service instead of direct Firebase call
+            const result = await deleteAchievement(tenantId, id);
+            if (result.success) {
+                haptic('success');
+            } else {
+                throw new Error(result.error || 'Failed to delete achievement');
+            }
+        } catch (error: any) {
+            logger.error('Error deleting achievement', error, 'AchievementsTab');
+            haptic('error');
         }
     };
 
     const loadDefaults = async () => {
-        if (!tenantId) return;
+        // ✅ Null Safety: Check tenantId
+        if (!tenantId) {
+            logger.warn('Cannot load defaults: Missing tenantId', null, 'AchievementsTab');
+            return;
+        }
 
         // Confirmation Dialog
-        if (!window.confirm('⚠️ تنبيه: سيتم حذف جميع الرتب الحالية واستبدالها بنظام "السلّم الوظيفي" التلقائي من 100 إلى 2000 نقطة.\nهل أنت متأكد؟')) return;
+        if (!window.confirm(t('admin.achievements.loadDefaultsConfirm') || '⚠️ تنبيه: سيتم حذف جميع الرتب الحالية واستبدالها بنظام "السلّم الوظيفي" التلقائي من 100 إلى 2000 نقطة.\nهل أنت متأكد؟')) return;
 
         setLoading(true);
         try {
             // 1. Delete ALL existing achievements
-            const deletePromises = achievements.map(ach =>
-                deleteDoc(doc(db, `tenants/${tenantId}/achievements`, ach.id))
-            );
-            await Promise.all(deletePromises);
+            const achievementIds = achievements.map(ach => ach.id);
+            if (achievementIds.length > 0) {
+                const deleteResult = await deleteAchievementsBatch(tenantId, achievementIds);
+                if (!deleteResult.success) {
+                    throw new Error(deleteResult.error || 'Failed to delete existing achievements');
+                }
+            }
 
             // 2. Add New Defaults
-            const batchPromises = DEFAULT_ACHIEVEMENTS.map(async (ach) => {
-                await addDoc(collection(db, `tenants/${tenantId}/achievements`), {
+            const createResult = await createAchievementsBatch(
+                tenantId,
+                DEFAULT_ACHIEVEMENTS.map(ach => ({
                     ...ach,
-                    active: true, // ✅ FIX: Ensure default achievements are active
-                    createdAt: serverTimestamp()
-                });
-            });
-            await Promise.all(batchPromises);
+                    active: true
+                } as Omit<Achievement, 'id' | 'createdAt' | 'updatedAt'>))
+            );
+
+            if (!createResult.success) {
+                throw new Error(createResult.error || 'Failed to create default achievements');
+            }
 
             haptic('success');
             playSound('success');
-            success('تم تفعيل نظام الرتب التلقائي بنجاح! 🚀');
-        } catch (err) {
-            console.error('Error loading defaults:', err);
-            showError('حدث خطأ أثناء التحديث');
+            success(t('admin.achievements.loadDefaultsSuccess') || 'تم تفعيل نظام الرتب التلقائي بنجاح! 🚀');
+        } catch (err: any) {
+            logger.error('Error loading defaults', err, 'AchievementsTab');
+            showError(t('admin.achievements.loadDefaultsError') || 'حدث خطأ أثناء التحديث');
         } finally {
             setLoading(false);
         }

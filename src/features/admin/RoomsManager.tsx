@@ -46,6 +46,7 @@ import { Building2, ChevronDown } from 'lucide-react';
 import { PremiumSelect } from '../../components/ui/PremiumSelect';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { RoomsManagerHelp } from '../../components/common/ContextualHelp'; // ✅ Contextual Help
+import { logger } from '../../services/loggerService';
 
 // Status colors
 const STATUS_COLORS: Record<RoomStatus, { bg: string; text: string; label: string }> = {
@@ -166,7 +167,7 @@ const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, 
             }
             onClose();
         } catch (err) {
-            console.error('Error adding room:', err);
+            logger.error('Error adding room', err, 'RoomsManager');
         } finally {
             setIsSubmitting(false);
         }

@@ -8,10 +8,10 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUX } from '../../../context/UXContext';
 import { subscribeToLostFound, returnItem, LostFoundItem } from '../../../services/lostFoundService';
+import { createLiveFeedEntry } from '../../../services/liveFeedService';
+import { logger } from '../../../services/loggerService';
 import { CheckCircle2, X, Package } from 'lucide-react';
 import { AdoraLoader } from '../../common/AdoraLoader';
-import { db } from '../../../services/firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { getTimeAgo } from '../../../utils/dateUtils';
 
 interface LostFoundModalProps {
@@ -71,11 +71,11 @@ export const LostFoundModal: React.FC<LostFoundModalProps> = ({
             }
             await returnItem(itemId, { id: userId, name: userName }, tenantId);
             
-            // ✅ Create Live Feed entry for return
+            // ✅ Create Live Feed entry for return (using service)
             try {
                 const item = items.find(i => i.id === itemId);
                 if (item) {
-                    await addDoc(collection(db, 'live_feed'), {
+                    await createLiveFeedEntry({
                         type: 'missing_items_returned',
                         branchId: branchId,
                         tenantId: tenantId,
@@ -83,18 +83,17 @@ export const LostFoundModal: React.FC<LostFoundModalProps> = ({
                         description: `${t('reception.lostFoundDeliverySuccess').split(' ')[0]}: ${item.description}`,
                         photoUrl: item.imageUrl || null,
                         returnedBy: { id: userId, name: userName },
-                        createdAt: Timestamp.now(),
                         status: 'returned',
                         itemId: itemId
                     });
                 }
             } catch (e) {
-                console.warn('Failed to create live feed entry:', e);
+                // Silent fail - live feed is non-critical
             }
 
             success(t('reception.lostFoundDeliverySuccess'));
         } catch (err: any) {
-            console.error('Error returning item:', err);
+            logger.error('Error returning item', err, 'LostFoundModal');
             error(t('reception.lostFoundDeliveryFailed') + ' ' + (err.message || t('reception.unknownError')));
         }
     };

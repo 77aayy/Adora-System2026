@@ -59,7 +59,7 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
 }) => {
     const modalRef = useRef<HTMLDivElement>(null);
 
-    // Handle escape key
+    // Handle escape key - Keep scroll position visible
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && isOpen) {
@@ -69,13 +69,12 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
         };
 
         if (isOpen) {
+            // Don't prevent body scroll - let modal appear in current viewport
             document.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
 
         return () => {
             document.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = '';
         };
     }, [isOpen, onClose]);
 
@@ -91,8 +90,24 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
 
     return (
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            className="fixed inset-0 z-[100] flex items-start justify-center p-4"
             onClick={handleBackdropClick}
+            style={{
+                // ✅ Modal appears in current viewport position (top of viewport)
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                overflowY: 'auto',
+                padding: '1rem',
+                paddingTop: 'max(1rem, env(safe-area-inset-top))',
+                // Scroll to top of viewport, not center
+                scrollBehavior: 'auto'
+            }}
         >
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/90 animate-fade-in" style={{ backdropFilter: 'none' }} />
@@ -106,7 +121,12 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
                     animate-modal-in
                     ${className}
                 `}
-                style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}
+                style={{ 
+                    background: 'var(--theme-bg-secondary)', 
+                    border: '1px solid var(--theme-border-primary)',
+                    marginTop: 'max(2rem, 5vh)',
+                    maxHeight: 'calc(100vh - max(4rem, 10vh))'
+                }}
             >
                 {/* Header */}
                 {(title || showCloseButton) && (

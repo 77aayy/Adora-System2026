@@ -22,6 +22,7 @@ import {
     type QRService,
     type QRServiceField
 } from '../../services/qrServiceService';
+import { logger } from '../../services/loggerService';
 
 interface QRServicesManagerProps {
     branchId: string;
@@ -67,7 +68,7 @@ export const QRServicesManager: React.FC<QRServicesManagerProps> = ({ branchId, 
             const loaded = await getQRServices(branchId, tenantId);
             setServices(loaded);
         } catch (err) {
-            console.error('Error loading QR services:', err);
+            logger.error('Error loading QR services', err, 'QRServicesManager');
             error('فشل تحميل الخدمات');
         } finally {
             setLoading(false);

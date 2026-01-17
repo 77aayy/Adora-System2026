@@ -68,9 +68,137 @@ const fixModulePreloadOrder = () => {
     };
 };
 
+// ✅ Plugin removed - using direct script injection in index.html instead
+
+// ✅ Plugin to customize Vite Error Overlay with Adora Theme
+const customizeViteOverlay = () => {
+    return {
+        name: 'customize-vite-overlay',
+        enforce: 'pre' as const,
+        configureServer(server) {
+            // Inject custom overlay styles via middleware
+            server.middlewares.use((req, res, next) => {
+                if (req.url === '/@vite/client' || req.url?.includes('vite')) {
+                    // This runs on every request - we'll inject via transformIndexHtml instead
+                }
+                next();
+            });
+        },
+        transformIndexHtml(html: string) {
+            // Inject aggressive overlay styling script
+            const overlayScript = `
+                <script>
+                    (function() {
+                        var styled = false;
+                        
+                        function injectOverlayStyles() {
+                            var overlay = document.querySelector('vite-error-overlay');
+                            if (!overlay) return;
+                            
+                            var shadowRoot = overlay.shadowRoot;
+                            if (!shadowRoot) return;
+                            
+                            if (shadowRoot.querySelector('style[data-adora-theme]')) {
+                                styled = true;
+                                return;
+                            }
+                            
+                            // Get theme colors
+                            var root = document.documentElement;
+                            var getColor = function(v) {
+                                return getComputedStyle(root).getPropertyValue(v).trim() || 
+                                       (v.includes('bg') ? '#ffffff' : 
+                                        v.includes('text') ? '#1e293b' : 
+                                        v.includes('primary') ? '#0d9488' : 
+                                        v.includes('red') ? '#dc2626' : '#cbd5e1');
+                            };
+                            
+                            var bgSecondary = getColor('--theme-bg-secondary');
+                            var bgTertiary = getColor('--theme-bg-tertiary');
+                            var borderPrimary = getColor('--theme-border-primary');
+                            var textPrimary = getColor('--theme-text-primary');
+                            var textSecondary = getColor('--theme-text-secondary');
+                            var textTertiary = getColor('--theme-text-tertiary');
+                            var primary600 = getColor('--theme-primary-600');
+                            var primary700 = getColor('--theme-primary-700');
+                            var accentRedDark = getColor('--theme-accent-red-dark');
+                            var shadowCard = getColor('--theme-shadow-card') || '0 4px 16px rgba(0, 0, 0, 0.15)';
+                            
+                            var style = document.createElement('style');
+                            style.setAttribute('data-adora-theme', 'true');
+                            style.textContent = \`
+                                * {
+                                    font-family: 'Cairo', 'Tajawal', sans-serif !important;
+                                }
+                                :host {
+                                    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+                                }
+                                .overlay, .container, .wrapper, [class*="overlay"], div {
+                                    background: \${bgSecondary} !important;
+                                    border: 1px solid \${borderPrimary} !important;
+                                    border-radius: 24px !important;
+                                    box-shadow: \${shadowCard} !important;
+                                    color: \${textPrimary} !important;
+                                    padding: 24px !important;
+                                }
+                                .message, .title, h1, h2, h3 {
+                                    color: \${accentRedDark} !important;
+                                    font-weight: 600 !important;
+                                }
+                                .file, code, pre {
+                                    color: \${primary600} !important;
+                                    font-weight: 500 !important;
+                                }
+                                .stack, .frame, pre {
+                                    color: \${textTertiary} !important;
+                                    background: \${bgTertiary} !important;
+                                    border: 1px solid \${borderPrimary} !important;
+                                    border-radius: 12px !important;
+                                    padding: 12px !important;
+                                }
+                                button, .dismiss, .btn {
+                                    background: \${primary600} !important;
+                                    border: none !important;
+                                    border-radius: 12px !important;
+                                    color: white !important;
+                                    font-weight: 700 !important;
+                                    padding: 10px 20px !important;
+                                }
+                                button:hover, .dismiss:hover {
+                                    background: \${primary700} !important;
+                                    transform: translateY(-2px) !important;
+                                }
+                                p, span {
+                                    color: \${textSecondary} !important;
+                                }
+                            \`;
+                            
+                            shadowRoot.insertBefore(style, shadowRoot.firstChild);
+                            styled = true;
+                            console.log('✅ Adora theme applied to Vite overlay');
+                        }
+                        
+                        // Aggressive injection
+                        setInterval(injectOverlayStyles, 50);
+                        new MutationObserver(injectOverlayStyles).observe(document.body, { 
+                            childList: true, subtree: true 
+                        });
+                        requestAnimationFrame(function raf() {
+                            injectOverlayStyles();
+                            requestAnimationFrame(raf);
+                        });
+                    })();
+                </script>
+            `;
+            return html.replace('</head>', overlayScript + '</head>');
+        },
+    };
+};
+
 export default defineConfig({
     plugins: [
         react(),
+        customizeViteOverlay(), // ✅ Customize Vite Error Overlay
         fixModulePreloadOrder(),
         // PWA Configuration
         VitePWA({

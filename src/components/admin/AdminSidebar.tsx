@@ -30,7 +30,7 @@ import {
     Menu,
     X
 } from 'lucide-react';
-import { BookOpen, MessageCircle, Radio, Languages } from 'lucide-react';
+import { BookOpen, MessageCircle, Radio, Languages, Share2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { useTenant } from '../../context/TenantContext';
@@ -99,25 +99,37 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
         );
     };
 
+    // ✅ CRITICAL FIX: Feature Gates MUST be defined BEFORE using them in ownerSections
+    // ✅ Feature Gates: Check which features are enabled
+    const { isEnabled: isInventoryEnabled } = useFeatureGate('inventoryManagement');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { isEnabled: _isProcurementEnabled } = useFeatureGate('procurementSystem');
+    const { isEnabled: isLaundryEnabled } = useFeatureGate('laundryManagement');
+    const { isEnabled: isPointsEnabled } = useFeatureGate('pointsSystem');
+    const { isEnabled: isScheduledTasksEnabled } = useFeatureGate('scheduledTasks');
+    const { isEnabled: isWhatsAppEnabled } = useFeatureGate('whatsappIntegration');
+
     // ✅ OWNER vs MANAGER: Completely different menu structures
     const isOwnerRole = isOwner || user?.role === 'owner';
     
-    // ✅ OWNER MENU: Streamlined - all tabs point to EnhancedOwnerDashboard
+    // ✅ OWNER MENU: ONLY System-Level Functions (Demo, Settings, Create Manager)
+    // ✅ CRITICAL: Owner does NOT manage branches, rooms, employees - that's Manager's job
     const ownerSections = [
         {
             id: 'dashboard',
             label: t('sidebar.dashboard') || 'لوحة التحكم',
             icon: <Crown className="w-4 h-4" style={{ color: 'var(--theme-accent-yellow)' }} />,
             items: [
-                { to: '/owner-dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: t('sidebar.overview') || 'الرئيسية', end: true },
-                { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: t('admin.manageTenants') || 'إدارة المشتركين' },
-                { to: '/owner-dashboard?tab=billing', icon: <DollarSign className="w-4 h-4" />, label: t('admin.billing') || 'الفواتير' },
-                { to: '/owner-dashboard?tab=broadcasts', icon: <Bell className="w-4 h-4" />, label: t('admin.broadcasts') || 'الرسائل والإعلانات' },
+                { to: '/owner-dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: t('admin.overview') || t('admin.mainDashboard') || 'Overview', end: true },
+                { to: '/owner-panel', icon: <ShieldCheck className="w-4 h-4" />, label: t('admin.ownerDashboard') || 'Owner Dashboard' },
+                { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: t('admin.createManager') || 'Create Manager' },
+                { to: '/owner-dashboard?tab=billing', icon: <DollarSign className="w-4 h-4" />, label: t('admin.billing') || 'Billing' },
+                { to: '/owner-dashboard?tab=demo', icon: <Share2 className="w-4 h-4" />, label: t('admin.demoLinks') || 'Demo Links' },
             ]
         },
         {
             id: 'settings',
-            label: t('sidebar.settings') || 'الإعدادات',
+            label: t('admin.settingsAndConfiguration') || 'إعدادات النظام',
             icon: <Settings className="w-4 h-4" style={{ color: 'var(--theme-accent-blue)' }} />,
             items: [
                 { to: '/owner-dashboard?tab=settings', icon: <Settings className="w-4 h-4" />, label: t('admin.systemSettings') || 'إعدادات النظام' },
@@ -138,15 +150,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             ]
         }
     ];
-    
-    // ✅ Feature Gates: Check which features are enabled
-    const { isEnabled: isInventoryEnabled } = useFeatureGate('inventoryManagement');
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { isEnabled: _isProcurementEnabled } = useFeatureGate('procurementSystem');
-    const { isEnabled: isLaundryEnabled } = useFeatureGate('laundryManagement');
-    const { isEnabled: isPointsEnabled } = useFeatureGate('pointsSystem');
-    const { isEnabled: isScheduledTasksEnabled } = useFeatureGate('scheduledTasks');
-    const { isEnabled: isWhatsAppEnabled } = useFeatureGate('whatsappIntegration');
 
     // ✅ MANAGER MENU: Reorganized with professional grouping (i18n-aware)
     const managerSections = [
@@ -157,6 +160,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             items: [
                 { to: '/admin', icon: <LayoutDashboard className="w-4 h-4" />, label: t('sidebar.overview') || 'نظرة عامة', end: true },
                 { to: '/admin/pulse', icon: <Activity className="w-4 h-4" />, label: t('admin.pulse') || '⏱️ النبض اللحظي' },
+                { to: '/admin/kpi', icon: <BarChart3 className="w-4 h-4" />, label: t('admin.kpiDashboard') || '📊 لوحة المؤشرات' },
             ]
         },
         {
@@ -203,6 +207,16 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             ]
         },
         {
+            id: 'communications',
+            label: t('admin.communicationsAndAnnouncements') || 'الاتصالات والإعلانات',
+            icon: <Bell className="w-4 h-4" style={{ color: 'var(--theme-accent-yellow)' }} />,
+            items: [
+                { to: '/admin/manager-announcements', icon: <Bell className="w-4 h-4" />, label: t('admin.urgentMessages') || 'الرسائل العاجلة للأقسام' },
+                { to: '/admin/general-instructions', icon: <BookOpen className="w-4 h-4" />, label: t('admin.generalInstructions') || 'التعليمات العامة' },
+                ...(isWhatsAppEnabled ? [{ to: '/admin/whatsapp-templates', icon: <MessageCircle className="w-4 h-4" />, label: t('admin.whatsappTemplates') || 'نماذج WhatsApp' }] : []),
+            ]
+        },
+        {
             id: 'settings',
             label: t('admin.settingsAndConfiguration') || 'الإعدادات والتكوين',
             icon: <Settings className="w-4 h-4" style={{ color: 'var(--theme-text-tertiary)' }} />,
@@ -210,16 +224,18 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 { to: '/admin/settings', icon: <Settings className="w-4 h-4" />, label: t('admin.appManagement') || 'إدارة التطبيق' },
                 { to: '/admin/auto-transfer', icon: <Activity className="w-4 h-4" />, label: t('admin.autoTransfer') || 'التحويل التلقائي' },
                 { to: '/admin/translations', icon: <Languages className="w-4 h-4" />, label: t('admin.translations') || '🌍 إدارة الترجمات' },
-                ...(isWhatsAppEnabled ? [{ to: '/admin/whatsapp-templates', icon: <MessageCircle className="w-4 h-4" />, label: t('admin.whatsappTemplates') || 'نماذج WhatsApp' }] : []),
             ]
         },
         {
-            id: 'communications',
-            label: t('admin.communicationsAndAnnouncements') || 'الاتصالات والإعلانات',
-            icon: <Bell className="w-4 h-4" style={{ color: 'var(--theme-accent-yellow)' }} />,
+            id: 'support',
+            label: t('admin.technicalSupport') || 'الدعم الفني',
+            icon: <Mail className="w-4 h-4" style={{ color: 'var(--theme-accent-purple)' }} />,
             items: [
-                { to: '/admin/manager-announcements', icon: <Bell className="w-4 h-4" />, label: t('admin.urgentMessages') || 'الرسائل العاجلة للأقسام' },
-                { to: '/admin/general-instructions', icon: <BookOpen className="w-4 h-4" />, label: t('admin.generalInstructions') || 'التعليمات العامة' },
+                { 
+                    to: '/admin/support-tickets', 
+                    icon: <Mail className="w-4 h-4" />, 
+                    label: t('admin.supportTickets') || 'تذاكر الدعم'
+                }
             ]
         }
     ];
@@ -264,8 +280,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             style={{ 
                 width: isCollapsed ? '80px' : '280px',
                 height: '100vh',
-                background: '#ffffff',
-                borderRight: '1px solid #f1f5f9',
+                minHeight: '100vh',
+                background: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
+                backdropFilter: isDark ? 'blur(20px) saturate(180%)' : 'none',
+                borderRight: isDark ? '1px solid rgba(32, 178, 170, 0.2)' : '1px solid #f1f5f9',
+                boxShadow: isDark ? '0 4px 24px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.05)',
                 padding: isCollapsed ? '15px 8px' : '15px 16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -277,7 +296,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             <div 
                 className="flex-none border-b relative transition-colors duration-300" 
                 style={{ 
-                    borderColor: '#f1f5f9',
+                    borderColor: isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(241, 245, 249, 1)',
                     padding: isCollapsed ? '12px 8px' : '16px 12px',
                     minHeight: '64px',
                 }}
@@ -285,16 +304,24 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 {/* ✅ Toggle Button - Circular on Sidebar Edge */}
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
-                    className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border border-gray-200 shadow-md flex items-center justify-center z-10 hover:bg-gray-50 transition-all duration-200"
+                    className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full shadow-md flex items-center justify-center z-10 transition-all duration-200"
                     style={{
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        background: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 1)',
+                        border: isDark ? '1px solid rgba(32, 178, 170, 0.3)' : '1px solid rgba(226, 232, 240, 1)',
+                        boxShadow: isDark ? '0 2px 8px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0,0,0,0.1)',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(241, 245, 249, 1)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 1)';
                     }}
                     aria-label={isCollapsed ? t('sidebar.expand') || 'توسيع' : t('sidebar.collapse') || 'طي'}
                 >
                     {isCollapsed ? (
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-600" />
+                        <ChevronRight className="w-3.5 h-3.5" style={{ color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(71, 85, 105, 1)' }} />
                     ) : (
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-600 rotate-180" />
+                        <ChevronRight className="w-3.5 h-3.5 rotate-180" style={{ color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(71, 85, 105, 1)' }} />
                     )}
                 </button>
 
@@ -333,7 +360,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                             <h1 
                                 className="text-base font-bold leading-tight transition-colors duration-300" 
                                 style={{ 
-                                    color: '#1e293b',
+                                    color: isDark ? 'rgba(255, 255, 255, 0.95)' : 'rgba(30, 41, 59, 1)',
                                     fontSize: '16px',
                                     fontFamily: 'Cairo, sans-serif',
                                     fontWeight: 600,
@@ -342,8 +369,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                 {activeBranch?.name || 'Adora Admin'}
                             </h1>
                             <p 
-                                className="text-[9px] text-teal-500 font-bold tracking-wider uppercase opacity-80"
+                                className="text-[9px] font-bold tracking-wider uppercase opacity-80"
                                 style={{
+                                    color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(20, 184, 166, 1)',
                                     fontFamily: 'Cairo, sans-serif',
                                 }}
                             >
@@ -358,12 +386,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     <div 
                         className="p-1.5 rounded-xl border transition-all duration-300 hover:border-teal-500/50 mt-3" 
                         style={{ 
-                            background: '#f8fafc', 
-                            borderColor: '#f1f5f9',
+                            background: isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 1)', 
+                            borderColor: isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(241, 245, 249, 1)',
                         }}
                     >
                         <div className="flex items-center gap-2 px-2.5 py-2">
-                            <Building2 className="w-4 h-4 transition-colors duration-300 flex-shrink-0" style={{ color: '#64748b' }} />
+                            <Building2 className="w-4 h-4 transition-colors duration-300 flex-shrink-0" style={{ color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(100, 116, 139, 1)' }} />
                             <select
                                 value={branchId || ''}
                                 onChange={(e) => {
@@ -372,17 +400,17 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                 }}
                                 className="flex-1 bg-transparent text-xs outline-none cursor-pointer appearance-none transition-colors duration-300"
                                 style={{ 
-                                    color: '#1e293b',
+                                    color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 41, 59, 1)',
                                     fontFamily: 'Cairo, sans-serif',
                                 }}
                             >
                                 {filteredBranches.map(b => (
-                                    <option key={b.id} value={b.id} style={{ background: '#ffffff', color: '#1e293b' }}>
+                                    <option key={b.id} value={b.id} style={{ background: isDark ? 'rgba(15, 23, 42, 1)' : 'rgba(255, 255, 255, 1)', color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 41, 59, 1)' }}>
                                         {(b as any).name || `فرع ${(b as any).code || b.id}`}
                                     </option>
                                 ))}
                             </select>
-                            <ChevronDown className="w-3.5 h-3.5 transition-colors duration-300 flex-shrink-0" style={{ color: '#64748b' }} />
+                            <ChevronDown className="w-3.5 h-3.5 transition-colors duration-300 flex-shrink-0" style={{ color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(100, 116, 139, 1)' }} />
                         </div>
                     </div>
                 )}
@@ -392,9 +420,18 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     <button
                         onClick={onClose}
                         className="lg:hidden absolute top-2 right-2 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 active:scale-95"
-                        style={{ background: '#f8fafc', color: '#64748b' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = '#1e293b'; e.currentTarget.style.background = '#e2e8f0'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.background = '#f8fafc'; }}
+                        style={{ 
+                            background: isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 1)', 
+                            color: isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(100, 116, 139, 1)' 
+                        }}
+                        onMouseEnter={(e) => { 
+                            e.currentTarget.style.color = isDark ? 'rgba(255, 255, 255, 1)' : 'rgba(30, 41, 59, 1)'; 
+                            e.currentTarget.style.background = isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(226, 232, 240, 1)'; 
+                        }}
+                        onMouseLeave={(e) => { 
+                            e.currentTarget.style.color = isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(100, 116, 139, 1)'; 
+                            e.currentTarget.style.background = isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 1)'; 
+                        }}
                     >
                         <ArrowLeft className="w-4 h-4 flip-rtl" />
                     </button>
@@ -424,18 +461,31 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                     className="w-full flex items-center justify-between px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-xl transition-all group active:scale-[0.98]"
                                     style={{ 
                                         color: 'var(--theme-text-secondary)',
-                                        background: isExpanded ? 'var(--theme-bg-tertiary)' : 'transparent'
+                                        background: isExpanded ? 'var(--theme-bg-tertiary)' : 'transparent',
+                                        transform: 'scale(1)',
+                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        boxShadow: 'none',
                                     }}
                                     onMouseEnter={(e) => { 
                                         if (!isExpanded) {
-                                            e.currentTarget.style.background = 'var(--theme-bg-tertiary)'; 
-                                            e.currentTarget.style.color = 'var(--theme-text-primary)'; 
+                                            e.currentTarget.style.background = isDark ? 'rgba(30, 41, 59, 0.6)' : 'rgba(248, 250, 252, 1)'; 
+                                            e.currentTarget.style.color = 'var(--theme-text-primary)';
+                                            e.currentTarget.style.transform = 'scale(1.02) translateX(-2px)'; // ✅ Zoom + slight slide
+                                            e.currentTarget.style.boxShadow = isDark 
+                                                ? '0 4px 12px rgba(32, 178, 170, 0.15)' 
+                                                : '0 2px 8px rgba(0, 0, 0, 0.08)';
+                                        } else {
+                                            e.currentTarget.style.transform = 'scale(1.01) translateX(-1px)'; // ✅ Subtle zoom for expanded
                                         }
                                     }}
                                     onMouseLeave={(e) => { 
                                         if (!isExpanded) {
                                             e.currentTarget.style.background = 'transparent'; 
-                                            e.currentTarget.style.color = 'var(--theme-text-secondary)'; 
+                                            e.currentTarget.style.color = 'var(--theme-text-secondary)';
+                                            e.currentTarget.style.transform = 'scale(1) translateX(0)'; // ✅ Reset transform
+                                            e.currentTarget.style.boxShadow = 'none';
+                                        } else {
+                                            e.currentTarget.style.transform = 'scale(1) translateX(0)';
                                         }
                                     }}
                                 >
@@ -450,6 +500,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                 whiteSpace: 'normal',
                                                 wordBreak: 'break-word',
                                                 lineHeight: '1.4',
+                                                color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'var(--theme-text-secondary)',
                                             }}
                                         >
                                             {section.label}
@@ -476,6 +527,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                 : location.pathname.startsWith(item.to));
                                             const isActive = isActiveTab || isActiveRoute;
                                             
+                                            // ✅ Check if this is the "الفواتير" (Invoices) item
+                                            const isInvoicesItem = item.label === 'الفواتير' || item.label === t('admin.billing');
+                                            
                                             // ✅ Handle click for tab links
                                             const handleClick = () => {
                                                 if (isTabLink) {
@@ -491,34 +545,63 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         key={item.to}
                                                         onClick={handleClick}
                                                         className={`w-full flex items-center relative active:scale-[0.98] ${isActive ? 'font-semibold' : ''}`}
-                                                        style={{
-                                                            height: '40px', // ✅ Strict height
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '10px', // ✅ Strict gap
-                                                            padding: '0 12px', // ✅ Strict padding
-                                                            marginBottom: '2px', // ✅ Minimal margin
-                                                            borderRadius: '8px', // ✅ Strict border radius
-                                                            fontSize: '13.5px', // ✅ Strict font size
-                                                            fontWeight: 500, // ✅ Strict font weight
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.15s ease-in-out', // ✅ Strict transition
-                                                            color: isActive ? '#20B2AA' : '#475569', // ✅ Active: Turquoise | Inactive: Slate gray
-                                                            background: isActive ? 'rgba(32, 178, 170, 0.06)' : 'transparent', // ✅ Active: Light turquoise | Inactive: Transparent
-                                                            position: 'relative', // ✅ For ActiveBar positioning
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            if (!isActive) {
-                                                                e.currentTarget.style.background = '#f8fafc'; // ✅ Hover: Light gray
-                                                                e.currentTarget.style.color = '#20B2AA'; // ✅ Hover: Turquoise
-                                                            }
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            if (!isActive) {
-                                                                e.currentTarget.style.background = 'transparent'; // ✅ Reset to transparent
-                                                                e.currentTarget.style.color = '#475569'; // ✅ Reset to slate gray
-                                                            }
-                                                        }}
+                                                    style={{
+                                                        height: '40px', // ✅ Strict height
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '10px', // ✅ Strict gap
+                                                        padding: '0 12px', // ✅ Strict padding
+                                                        marginBottom: '2px', // ✅ Minimal margin
+                                                        borderRadius: '8px', // ✅ Strict border radius
+                                                        fontSize: '13.5px', // ✅ Strict font size
+                                                        fontWeight: 500, // ✅ Strict font weight
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', // ✅ Smooth transition with easing
+                                                        transform: 'scale(1)', // ✅ Initial scale
+                                                        color: isActive ? '#20B2AA' : '#475569', // ✅ Active: Turquoise | Inactive: Slate gray
+                                                        background: isActive ? 'rgba(32, 178, 170, 0.06)' : 'transparent', // ✅ Active: Light turquoise | Inactive: Transparent
+                                                        position: 'relative', // ✅ For ActiveBar positioning
+                                                        // ✅ Premium Turquoise Border for Invoices when active
+                                                        border: isActive && isInvoicesItem ? '2px solid #20B2AA' : 'none',
+                                                        borderWidth: isActive && isInvoicesItem ? '2px' : '0',
+                                                        borderStyle: isActive && isInvoicesItem ? 'solid' : 'none',
+                                                        borderColor: isActive && isInvoicesItem ? '#20B2AA' : 'transparent',
+                                                        boxShadow: isActive && isInvoicesItem ? '0 0 0 2px rgba(32, 178, 170, 0.2), 0 4px 12px rgba(32, 178, 170, 0.15)' : 'none',
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        if (!isActive) {
+                                                            e.currentTarget.style.background = isDark ? 'rgba(30, 41, 59, 0.6)' : '#f1f5f9'; // ✅ Hover: Dark bg (dark mode) or Light gray (light mode)
+                                                            e.currentTarget.style.color = '#20B2AA'; // ✅ Hover: Turquoise
+                                                            e.currentTarget.style.transform = 'scale(1.02) translateX(-2px)'; // ✅ Zoom + slight slide
+                                                            e.currentTarget.style.boxShadow = isDark 
+                                                                ? '0 4px 12px rgba(32, 178, 170, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1)' 
+                                                                : '0 2px 8px rgba(32, 178, 170, 0.15)'; // ✅ Subtle shadow on hover
+                                                        } else if (isInvoicesItem) {
+                                                            // ✅ Enhanced hover for active invoices item
+                                                            e.currentTarget.style.boxShadow = '0 0 0 2px rgba(32, 178, 170, 0.3), 0 6px 16px rgba(32, 178, 170, 0.2)';
+                                                            e.currentTarget.style.transform = 'scale(1.03) translateX(-2px)'; // ✅ Slightly more zoom for active
+                                                        } else {
+                                                            // ✅ Hover effect for active items (non-invoices)
+                                                            e.currentTarget.style.transform = 'scale(1.02) translateX(-2px)';
+                                                            e.currentTarget.style.boxShadow = isDark 
+                                                                ? '0 4px 12px rgba(32, 178, 170, 0.15)' 
+                                                                : '0 2px 8px rgba(32, 178, 170, 0.1)';
+                                                        }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        if (!isActive) {
+                                                            e.currentTarget.style.background = 'transparent'; // ✅ Reset to transparent
+                                                            e.currentTarget.style.color = isDark ? 'rgba(255, 255, 255, 0.7)' : '#475569'; // ✅ Reset to white (dark) or slate gray (light)
+                                                            e.currentTarget.style.transform = 'scale(1) translateX(0)'; // ✅ Reset transform
+                                                            e.currentTarget.style.boxShadow = 'none'; // ✅ Reset shadow
+                                                        } else if (isInvoicesItem) {
+                                                            e.currentTarget.style.boxShadow = '0 0 0 2px rgba(32, 178, 170, 0.2), 0 4px 12px rgba(32, 178, 170, 0.15)';
+                                                            e.currentTarget.style.transform = 'scale(1) translateX(0)';
+                                                        } else {
+                                                            e.currentTarget.style.transform = 'scale(1) translateX(0)';
+                                                            e.currentTarget.style.boxShadow = 'none';
+                                                        }
+                                                    }}
                                                     >
                                                         {/* ✅ ActiveBar - Thin vertical indicator on the right (RTL) */}
                                                         {isActive && (
@@ -615,20 +698,24 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         fontWeight: 500, // ✅ Strict font weight
                                                         cursor: 'pointer',
                                                         transition: 'all 0.15s ease-in-out', // ✅ Strict transition
-                                                        color: isActive ? '#20B2AA' : '#475569', // ✅ Active: Turquoise | Inactive: Slate gray
-                                                        background: isActive ? 'rgba(32, 178, 170, 0.06)' : 'transparent', // ✅ Active: Light turquoise | Inactive: Transparent
+                                                        color: isActive 
+                                                            ? '#20B2AA' 
+                                                            : (isDark ? 'rgba(255, 255, 255, 0.7)' : '#475569'), // ✅ Active: Turquoise | Inactive: White (dark) or Slate (light)
+                                                        background: isActive 
+                                                            ? (isDark ? 'rgba(32, 178, 170, 0.15)' : 'rgba(32, 178, 170, 0.06)') 
+                                                            : 'transparent', // ✅ Active: Turquoise bg | Inactive: Transparent
                                                         position: 'relative', // ✅ For ActiveBar positioning
                                                     })}
                                                     onMouseEnter={(e) => {
                                                         if (!e.currentTarget.classList.contains('bg-teal-500/15')) {
-                                                            e.currentTarget.style.background = '#f8fafc'; // ✅ Hover: Light gray
+                                                            e.currentTarget.style.background = isDark ? 'rgba(30, 41, 59, 0.5)' : '#f8fafc'; // ✅ Hover: Dark bg (dark mode) or Light gray (light mode)
                                                             e.currentTarget.style.color = '#20B2AA'; // ✅ Hover: Turquoise
                                                         }
                                                     }}
                                                     onMouseLeave={(e) => {
                                                         if (!e.currentTarget.classList.contains('bg-teal-500/15')) {
                                                             e.currentTarget.style.background = 'transparent'; // ✅ Reset to transparent
-                                                            e.currentTarget.style.color = '#475569'; // ✅ Reset to slate gray
+                                                            e.currentTarget.style.color = isDark ? 'rgba(255, 255, 255, 0.7)' : '#475569'; // ✅ Reset to white (dark) or slate gray (light)
                                                         }
                                                     }}
                                                 >
@@ -707,8 +794,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                         <div 
                             className="mt-6 mx-0.5 px-2.5 py-2.5 rounded-xl border flex items-center gap-2.5 transition-all duration-300 hover:border-teal-500/30" 
                             style={{ 
-                                background: '#f8fafc', 
-                                borderColor: '#f1f5f9',
+                                background: isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 1)', 
+                                borderColor: isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(241, 245, 249, 1)',
                                 marginTop: '16px',
                             }}
                         >
@@ -733,7 +820,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                         100%
                                     </span>
                                 </div>
-                                <div className="h-1 w-full rounded-full overflow-hidden transition-colors duration-300" style={{ background: '#e2e8f0' }}>
+                                <div className="h-1 w-full rounded-full overflow-hidden transition-colors duration-300" style={{ background: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(226, 232, 240, 1)' }}>
                                     <div className="h-full w-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full shadow-[0_0_8px_rgba(20,184,166,0.5)]"></div>
                                 </div>
                             </div>
@@ -742,110 +829,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 </nav>
             </div>
 
-            {/* 🚪 Logout Button - ✅ Fixed at bottom, never overlaps */}
-            <div 
-                className="flex-none mt-auto"
-                style={{
-                    padding: isCollapsed ? '8px 4px' : '12px 8px',
-                    paddingTop: '12px',
-                    borderTop: '1px solid #f1f5f9',
-                }}
-            >
-                <button
-                    onClick={() => {
-                        if (onClose) onClose();
-                        logout();
-                    }}
-                    className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} relative active:scale-[0.98]`}
-                    style={{
-                        height: '44px', // ✅ Same height as nav items
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: isCollapsed ? 'center' : 'flex-start',
-                        gap: isCollapsed ? '0' : '12px',
-                        padding: isCollapsed ? '0' : '0 12px',
-                        borderRadius: '10px', // ✅ Same border radius
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                        color: '#64748B', // ✅ Default gray
-                        background: 'transparent',
-                        position: 'relative',
-                        fontFamily: 'Cairo, sans-serif',
-                        border: '1px solid #f1f5f9', // ✅ Border like other items
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#F8FAFC'; // ✅ Hover: Light background
-                        e.currentTarget.style.color = '#ef4444'; // ✅ Hover: Red color
-                        e.currentTarget.style.borderColor = '#fecaca'; // ✅ Hover: Light red border
-                        if (!isCollapsed) {
-                            e.currentTarget.style.transform = 'translateX(-5px)'; // ✅ RTL slide animation
-                        }
-                        setHoveredItem('logout'); // ✅ Show tooltip
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = '#64748B';
-                        e.currentTarget.style.borderColor = '#f1f5f9';
-                        e.currentTarget.style.transform = 'translateX(0)';
-                        setHoveredItem(null); // ✅ Hide tooltip
-                    }}
-                    title={t('auth.logout') || 'تسجيل الخروج'}
-                >
-                    {/* ✅ Icon */}
-                    <span 
-                        className="flex-shrink-0 transition-colors duration-300" 
-                        style={{ 
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}
-                    >
-                        <LogOut 
-                            className={isCollapsed ? 'w-5.5 h-5.5' : 'w-5 h-5'}
-                            size={22}
-                            strokeWidth={2.5}
-                            style={{ 
-                                color: 'inherit',
-                                opacity: 1,
-                            }}
-                        />
-                    </span>
-                    {/* ✅ Label - Hidden when collapsed */}
-                    {!isCollapsed && (
-                        <span 
-                            className="flex-1"
-                            style={{
-                                fontFamily: 'Cairo, sans-serif',
-                                fontSize: '14px',
-                                fontWeight: 600,
-                                whiteSpace: 'normal',
-                                wordBreak: 'break-word',
-                                lineHeight: '1.4',
-                            }}
-                        >
-                            {t('auth.logout') || 'تسجيل الخروج'}
-                        </span>
-                    )}
-                    {/* ✅ Tooltip - Shows when collapsed and hovered */}
-                    {isCollapsed && hoveredItem === 'logout' && (
-                        <div
-                            className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50 whitespace-nowrap"
-                            style={{
-                                fontFamily: 'Cairo, sans-serif',
-                                fontSize: '12px',
-                                fontWeight: 500,
-                            }}
-                        >
-                            {t('auth.logout') || 'تسجيل الخروج'}
-                            <div 
-                                className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-4 border-t-transparent border-r-4 border-r-gray-900 border-b-4 border-b-transparent"
-                            />
-                        </div>
-                    )}
-                </button>
-            </div>
+            {/* 🚪 Logout Button - ✅ REMOVED: Moved to header next to refresh button in EnhancedOwnerDashboard */}
         </aside>
     );
 };

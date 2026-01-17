@@ -12,28 +12,17 @@ import {
     Trash2,
     Upload
 } from 'lucide-react';
-import {
-    collection,
-    query,
-    onSnapshot,
-    addDoc,
-    updateDoc,
-    deleteDoc,
-    doc,
-    Timestamp
-} from 'firebase/firestore';
-import { db } from '../../services/firebase';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
+import { useTenantBranches } from '../../hooks/useTenantData';
+import { subscribeToRooms, addRoom, updateRoom, deleteRoom, createRoomBatch } from '../../services/roomService';
 import { haptic, playSound } from '../../utils/uxEffects';
+import { logger } from '../../services/loggerService';
+import { useTranslation } from 'react-i18next';
+import { AdoraLoader } from '../../components/common/AdoraLoader';
+import { Room } from '../../types';
 
-interface Room {
-    id: string;
-    number: string;
-    type: 'standard' | 'deluxe' | 'suite' | 'presidential';
-    floor: number;
-    status: string;
-    createdAt?: Date;
-}
+// ✅ Types: Use shared Room type from types/index.ts
 
 export const RoomManagement: React.FC = () => {
     const { user: currentUser } = useAuth();
@@ -41,19 +30,27 @@ export const RoomManagement: React.FC = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
-    // Load rooms
+    // ✅ Null Safety: Check required params before loading
     useEffect(() => {
-        const q = query(collection(db, 'rooms'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const roomList: Room[] = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            } as Room));
-            setRooms(roomList.sort((a, b) => parseInt(a.number) - parseInt(b.number)));
-        });
+        if (!tenantId || !branchId) {
+            logger.warn('RoomManagement: Missing tenantId or branchId', null, 'RoomManagement');
+            setLoading(false);
+            return;
+        }
+
+        // ✅ Architecture: Use service instead of direct Firebase call
+        const unsubscribe = subscribeToRooms(branchId, (roomList) => {
+            // ✅ Null Safety: Ensure roomList is never undefined
+            if (roomList && Array.isArray(roomList)) {
+                setRooms(roomList.sort((a, b) => parseInt(a.number) - parseInt(b.number)));
+            } else {
+                setRooms([]);
+            }
+            setLoading(false);
+        }, tenantId);
 
         return () => unsubscribe();
-    }, []);
+    }, [tenantId, branchId]);
 
     // Add room
     const handleAddRoom = async (data: {
@@ -61,23 +58,30 @@ export const RoomManagement: React.FC = () => {
         type: string;
         floor: number;
     }) => {
+        // ✅ Null Safety: Check required params
+        if (!tenantId || !branchId) {
+            logger.error('Cannot add room: Missing tenantId or branchId', null, 'RoomManagement');
+            return;
+        }
+
         try {
-            await addDoc(collection(db, 'rooms'), {
+            // ✅ Architecture: Use service instead of direct Firebase call
+            await addRoom({
                 number: data.number,
-                type: data.type,
+                type: data.type as any,
                 floor: data.floor,
                 status: 'ready',
-                createdAt: Timestamp.now(),
-                createdBy: currentUser?.id
+                branchId,
+                tenantId
             });
 
             haptic('success');
             playSound('success');
             setShowAddModal(false);
-        } catch (error) {
-            console.error('Error adding room:', error);
+        } catch (error: any) {
+            logger.error('Error adding room', error, 'RoomManagement');
             haptic('error');
-            alert('حدث خطأ في إضافة الغرفة');
+            alert(t('admin.rooms.addError') || 'حدث خطأ في إضافة الغرفة');
         }
     };
 
@@ -90,15 +94,21 @@ export const RoomManagement: React.FC = () => {
             haptic('success');
             playSound('notification');
         } catch (error) {
-            console.error('Error deleting room:', error);
+            logger.error('Error deleting room', error, 'RoomManagement');
             haptic('error');
         }
     };
 
     // Bulk import
     const handleBulkImport = async () => {
+        // ✅ Null Safety: Check required params
+        if (!tenantId || !branchId) {
+            logger.error('Cannot bulk import: Missing tenantId or branchId', null, 'RoomManagement');
+            return;
+        }
+
         const input = prompt(
-            'أدخل أرقام الغرف (مفصولة بفواصل)\nمثال: 101,102,103,201,202,203'
+            t('admin.rooms.bulkImportPrompt') || 'أدخل أرقام الغرف (مفصولة بفواصل)\nمثال: 101,102,103,201,202,203'
         );
 
         if (!input) return;
@@ -106,33 +116,30 @@ export const RoomManagement: React.FC = () => {
         const numbers = input.split(',').map(n => n.trim());
 
         try {
-            for (const number of numbers) {
-                const floor = Math.floor(parseInt(number) / 100);
-                await addDoc(collection(db, 'rooms'), {
-                    number,
-                    type: 'standard',
-                    floor,
-                    status: 'ready',
-                    createdAt: Timestamp.now(),
-                    createdBy: currentUser?.id
-                });
-            }
+            // ✅ Architecture: Use service batch function instead of direct Firebase calls
+            const rooms = numbers.map(number => ({
+                number,
+                type: 'standard' as any,
+                floor: Math.floor(parseInt(number) / 100),
+                status: 'ready' as any,
+                branchId,
+                tenantId
+            }));
 
+            await createRoomBatch(rooms[0]?.floor || 1, parseInt(rooms[0]?.number || '101'), parseInt(rooms[rooms.length - 1]?.number || '101'), 'standard', branchId, tenantId);
             haptic('success');
             playSound('success');
-            alert(`تم إضافة ${numbers.length} غرفة بنجاح`);
-        } catch (error) {
-            console.error('Error bulk importing:', error);
+            alert(t('admin.rooms.bulkImportSuccess', { count: numbers.length }) || `تم إضافة ${numbers.length} غرفة بنجاح`);
+        } catch (error: any) {
+            logger.error('Error bulk importing', error, 'RoomManagement');
             haptic('error');
         }
     };
 
-    const roomTypeLabels: Record<string, string> = {
-        standard: 'عادية',
-        deluxe: 'ديلوكس',
-        suite: 'جناح',
-        presidential: 'رئاسية'
-    };
+    // ✅ Null Safety: Show loading if data not ready
+    if (loading || !tenantId || !branchId) {
+        return <AdoraLoader size="lg" message={t('common.loading') || 'جاري التحميل...'} />;
+    }
 
     return (
         <div className="space-y-6">
@@ -140,7 +147,7 @@ export const RoomManagement: React.FC = () => {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Home className="w-8 h-8 text-purple-400" />
-                    <h2 className="text-2xl font-bold text-white">إدارة الغرف</h2>
+                    <h2 className="text-2xl font-bold text-white">{t('admin.rooms.title') || 'إدارة الغرف'}</h2>
                 </div>
                 <div className="flex gap-3">
                     <button
@@ -148,14 +155,14 @@ export const RoomManagement: React.FC = () => {
                         className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl text-white hover:bg-white/10 transition-all"
                     >
                         <Upload className="w-5 h-5" />
-                        <span>استيراد مجموعة</span>
+                        <span>{t('admin.rooms.bulkImport') || 'استيراد مجموعة'}</span>
                     </button>
                     <button
                         onClick={() => setShowAddModal(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl text-white hover:from-purple-600 hover:to-purple-700 transition-all"
                     >
                         <Plus className="w-5 h-5" />
-                        <span>إضافة غرفة</span>
+                        <span>{t('admin.rooms.addRoom') || 'إضافة غرفة'}</span>
                     </button>
                 </div>
             </div>
@@ -164,25 +171,25 @@ export const RoomManagement: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass rounded-xl p-4">
                     <div className="text-2xl font-bold text-white">{rooms.length}</div>
-                    <div className="text-sm text-white/60">إجمالي الغرف</div>
+                    <div className="text-sm text-white/60">{t('admin.rooms.totalRooms') || 'إجمالي الغرف'}</div>
                 </div>
                 <div className="glass rounded-xl p-4">
                     <div className="text-2xl font-bold text-green-400">
                         {rooms.filter(r => r.status === 'ready').length}
                     </div>
-                    <div className="text-sm text-white/60">جاهزة</div>
+                    <div className="text-sm text-white/60">{t('admin.rooms.ready') || 'جاهزة'}</div>
                 </div>
                 <div className="glass rounded-xl p-4">
                     <div className="text-2xl font-bold text-blue-400">
                         {rooms.filter(r => r.status === 'occupied').length}
                     </div>
-                    <div className="text-sm text-white/60">مشغولة</div>
+                    <div className="text-sm text-white/60">{t('admin.rooms.occupied') || 'مشغولة'}</div>
                 </div>
                 <div className="glass rounded-xl p-4">
                     <div className="text-2xl font-bold text-red-400">
                         {rooms.filter(r => r.status === 'maintenance').length}
                     </div>
-                    <div className="text-sm text-white/60">صيانة</div>
+                    <div className="text-sm text-white/60">{t('admin.rooms.maintenance') || 'صيانة'}</div>
                 </div>
             </div>
 
@@ -192,8 +199,8 @@ export const RoomManagement: React.FC = () => {
                     <div key={room.id} className="glass rounded-xl p-4 group relative">
                         <div className="text-center">
                             <div className="text-2xl font-bold text-white mb-1">{room.number}</div>
-                            <div className="text-xs text-white/60">{roomTypeLabels[room.type]}</div>
-                            <div className="text-xs text-white/40 mt-2">الدور {room.floor}</div>
+                            <div className="text-xs text-white/60">{t(`admin.rooms.types.${room.type}`) || room.type}</div>
+                            <div className="text-xs text-white/40 mt-2">{t('admin.rooms.floor', { floor: room.floor }) || `الدور ${room.floor}`}</div>
                         </div>
 
                         {/* Actions (on hover) */}
@@ -208,7 +215,7 @@ export const RoomManagement: React.FC = () => {
                             <button
                                 onClick={() => handleDeleteRoom(room.id, room.number)}
                                 className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
-                                title="حذف"
+                                title={t('common.delete') || 'حذف'}
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
@@ -241,6 +248,7 @@ const AddRoomModal: React.FC<{
     onClose: () => void;
     onSubmit: (data: any) => void;
 }> = ({ onClose, onSubmit }) => {
+    const { t } = useTranslation();
     const [number, setNumber] = useState('');
     const [type, setType] = useState('standard');
     const [floor, setFloor] = useState(1);
@@ -250,39 +258,41 @@ const AddRoomModal: React.FC<{
         onSubmit({ number, type, floor });
     };
 
+    const { t } = useTranslation();
+
     return (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
             <div className="glass rounded-2xl p-6 max-w-md w-full">
-                <h3 className="text-xl font-bold text-white mb-4">إضافة غرفة جديدة</h3>
+                <h3 className="text-xl font-bold text-white mb-4">{t('admin.rooms.addRoomTitle') || 'إضافة غرفة جديدة'}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm text-white/60 mb-2">رقم الغرفة</label>
+                        <label className="block text-sm text-white/60 mb-2">{t('admin.rooms.roomNumber') || 'رقم الغرفة'}</label>
                         <input
                             type="text"
                             value={number}
                             onChange={(e) => setNumber(e.target.value)}
                             required
-                            placeholder="مثال: 101"
+                            placeholder={t('admin.rooms.roomNumberPlaceholder') || 'مثال: 101'}
                             className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-400"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm text-white/60 mb-2">نوع الغرفة</label>
+                        <label className="block text-sm text-white/60 mb-2">{t('admin.rooms.roomType') || 'نوع الغرفة'}</label>
                         <select
                             value={type}
                             onChange={(e) => setType(e.target.value)}
                             className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-400"
                         >
-                            <option value="standard">عادية</option>
-                            <option value="deluxe">ديلوكس</option>
-                            <option value="suite">جناح</option>
-                            <option value="presidential">رئاسية</option>
+                            <option value="standard">{t('admin.rooms.types.standard') || 'عادية'}</option>
+                            <option value="deluxe">{t('admin.rooms.types.deluxe') || 'ديلوكس'}</option>
+                            <option value="suite">{t('admin.rooms.types.suite') || 'جناح'}</option>
+                            <option value="presidential">{t('admin.rooms.types.presidential') || 'رئاسية'}</option>
                         </select>
                     </div>
 
                     <div>
-                        <label className="block text-sm text-white/60 mb-2">الدور</label>
+                        <label className="block text-sm text-white/60 mb-2">{t('admin.rooms.floor') || 'الدور'}</label>
                         <input
                             type="number"
                             value={floor}
@@ -299,13 +309,13 @@ const AddRoomModal: React.FC<{
                             onClick={onClose}
                             className="flex-1 px-4 py-2 bg-white/5 rounded-xl text-white hover:bg-white/10 transition-all"
                         >
-                            إلغاء
+                            {t('common.cancel') || 'إلغاء'}
                         </button>
                         <button
                             type="submit"
                             className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl text-white hover:from-purple-600 hover:to-purple-700 transition-all"
                         >
-                            إضافة
+                            {t('common.add') || 'إضافة'}
                         </button>
                     </div>
                 </form>
@@ -325,17 +335,28 @@ const EditRoomModal: React.FC<{
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // ✅ Null Safety: Check required params
+        const { tenantId } = useTenant();
+        const { branchId } = useAuth();
+        
+        if (!tenantId || !branchId) {
+            logger.error('Cannot update room: Missing tenantId or branchId', null, 'RoomManagement');
+            return;
+        }
+
         try {
-            await updateDoc(doc(db, 'rooms', room.id), {
+            // ✅ Architecture: Use service instead of direct Firebase call
+            await updateRoom(tenantId, branchId, room.number, {
                 number,
-                type,
+                type: type as any,
                 floor
             });
             haptic('success');
             playSound('success');
             onClose();
-        } catch (error) {
-            console.error('Error updating room:', error);
+        } catch (error: any) {
+            logger.error('Error updating room', error, 'RoomManagement');
             haptic('error');
         }
     };

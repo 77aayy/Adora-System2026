@@ -215,8 +215,8 @@ export const PremiumHeader: React.FC = () => {
                     position: 'sticky',
                     top: 0,
                     zIndex: ADORA_THEME.zIndex.header,
-                    background: '#ffffff',
-                    borderBottom: '1px solid #f1f5f9',
+                    background: 'var(--theme-bg-primary)',
+                    borderBottom: '1px solid var(--theme-border-primary)',
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'visible',
@@ -244,8 +244,8 @@ export const PremiumHeader: React.FC = () => {
                                 style={{
                                     background: activeTab === 'admin' 
                                         ? `linear-gradient(135deg, ${ADORA_THEME.colors.primary}, #0d9488)` 
-                                        : ADORA_THEME.colors.background,
-                                    border: `1px solid ${ADORA_THEME.colors.border}`,
+                                        : 'var(--theme-bg-secondary)',
+                                    border: '1px solid var(--theme-border-primary)',
                                 }}
                                 aria-label={t('sidebar.openAdminMenu') || 'فتح القائمة الإدارية'}
                             >
@@ -292,10 +292,10 @@ export const PremiumHeader: React.FC = () => {
                                             : 'cursor-default'
                                         }
                                     `}
-                                    style={{
-                                        background: ADORA_THEME.colors.background,
-                                        border: `1px solid ${ADORA_THEME.colors.border}`,
-                                        color: ADORA_THEME.colors.text,
+                                    style={{ 
+                                        background: 'var(--theme-bg-secondary)',
+                                        border: '1px solid var(--theme-border-primary)',
+                                        color: 'var(--theme-text-primary)',
                                     }}
                                 >
                                     <Building2 className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 transition-colors duration-200" style={{ color: ADORA_THEME.colors.primary }} />
@@ -320,11 +320,11 @@ export const PremiumHeader: React.FC = () => {
                                                 top: 'calc(100% + 5px)',
                                                 right: 0,
                                                 zIndex: ADORA_THEME.zIndex.dropdown,
-                                                background: 'white',
+                                                background: 'var(--theme-bg-secondary)',
                                                 minWidth: '220px',
                                                 borderRadius: '16px',
-                                                border: '1px solid #f1f5f9',
-                                                boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
+                                                border: '1px solid var(--theme-border-primary)',
+                                                boxShadow: 'var(--theme-shadow-lg)',
                                                 overflow: 'hidden',
                                             }}
                                         >
@@ -450,8 +450,8 @@ export const PremiumHeader: React.FC = () => {
                                         width: '42px',
                                         height: '42px',
                                         borderRadius: '12px',
-                                        background: ADORA_THEME.colors.background,
-                                        border: `1px solid ${ADORA_THEME.colors.border}`,
+                                        background: 'var(--theme-bg-secondary)',
+                                        border: '1px solid var(--theme-border-primary)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -459,27 +459,27 @@ export const PremiumHeader: React.FC = () => {
                                         transition: 'all 0.2s ease',
                                         ...(showActionsMenu ? {
                                             borderColor: ADORA_THEME.colors.primary,
-                                            background: '#ffffff',
+                                            background: 'var(--theme-bg-primary)',
                                             boxShadow: '0 4px 12px rgba(32, 178, 170, 0.1)',
                                         } : {}),
                                     }}
                                     onMouseEnter={(e) => {
                                         if (!showActionsMenu) {
                                             e.currentTarget.style.borderColor = ADORA_THEME.colors.primary;
-                                            e.currentTarget.style.background = '#ffffff';
+                                            e.currentTarget.style.background = 'var(--theme-bg-primary)';
                                             e.currentTarget.style.boxShadow = '0 4px 12px rgba(32, 178, 170, 0.1)';
                                         }
                                     }}
                                     onMouseLeave={(e) => {
                                         if (!showActionsMenu) {
-                                            e.currentTarget.style.background = ADORA_THEME.colors.background;
-                                            e.currentTarget.style.borderColor = ADORA_THEME.colors.border;
+                                            e.currentTarget.style.background = 'var(--theme-bg-secondary)';
+                                            e.currentTarget.style.borderColor = 'var(--theme-border-primary)';
                                             e.currentTarget.style.boxShadow = 'none';
                                         }
                                     }}
                                     aria-label="الإعدادات"
                                 >
-                                    <MoreVertical className="w-5 h-5 transition-transform duration-200" style={{ color: ADORA_THEME.colors.text }} />
+                                    <MoreVertical className="w-5 h-5 transition-transform duration-200" style={{ color: 'var(--theme-text-primary)' }} />
                                     {/* Badge for Points on Mobile - ADORA MASTER UI PROTOCOL V3.1 */}
                                     {user?.id && (
                                         <span 
@@ -495,7 +495,7 @@ export const PremiumHeader: React.FC = () => {
                                                 minWidth: '18px',
                                                 height: '18px',
                                                 borderRadius: '50%',
-                                                border: '2px solid #ffffff !important',
+                                                border: '2px solid var(--theme-bg-primary) !important',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -516,11 +516,11 @@ export const PremiumHeader: React.FC = () => {
                                             top: 'calc(100% + 5px)',
                                             right: 0,
                                             zIndex: ADORA_THEME.zIndex.dropdown,
-                                            background: 'white',
+                                            background: 'var(--theme-bg-secondary)',
                                             minWidth: '220px',
                                             borderRadius: '16px',
-                                            border: '1px solid #f1f5f9',
-                                            boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
+                                            border: '1px solid var(--theme-border-primary)',
+                                            boxShadow: 'var(--theme-shadow-lg)',
                                             overflow: 'hidden',
                                         }}
                                     >
@@ -575,7 +575,7 @@ export const PremiumHeader: React.FC = () => {
                 <nav 
                     className="relative"
                     style={{ 
-                        background: ADORA_THEME.colors.background,
+                        background: 'var(--theme-bg-primary)',
                         display: 'flex',
                         justifyContent: 'center',
                         gap: '16px',
@@ -624,7 +624,7 @@ export const PremiumHeader: React.FC = () => {
                                         background: isActive 
                                             ? `linear-gradient(135deg, ${ADORA_THEME.colors.primary}18, ${ADORA_THEME.colors.primary}12)`
                                             : 'transparent',
-                                        color: isActive ? ADORA_THEME.colors.primary : ADORA_THEME.colors.text,
+                                        color: isActive ? ADORA_THEME.colors.primary : 'var(--theme-text-primary)',
                                         border: isActive 
                                             ? `1px solid ${ADORA_THEME.colors.primary}4D` 
                                             : '1px solid transparent',
@@ -657,7 +657,7 @@ export const PremiumHeader: React.FC = () => {
                                             style: {
                                                 color: isActive 
                                                     ? ADORA_THEME.colors.primary 
-                                                    : ADORA_THEME.colors.text,
+                                                    : 'var(--theme-text-primary)',
                                                 opacity: isActive ? 1 : 0.6,
                                             }
                                         })}

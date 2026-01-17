@@ -37,8 +37,10 @@ import { subscribeToActiveRoomCards } from '../../services/roomCardService';
 import { autoCleanupOnAdminLoad } from '../../services/cleanupService';
 import { Room, RoomCard, User } from '../../types';
 import { useUX } from '../../context/UXContext';
+import { createAdminTask } from '../../services/adminTasksService';
 import { db } from '../../services/firebase';
-import { addDoc, collection, doc, onSnapshot, serverTimestamp } from 'firebase/firestore'; // ✅ Added for DB actions
+import { doc, onSnapshot } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
 
 // Admin Components
 import { RoomsManager } from './RoomsManager';
@@ -114,10 +116,12 @@ const OverviewPage: React.FC = () => {
     const [showProcurement, setShowProcurement] = useState(false);
     const [showSupportTicket, setShowSupportTicket] = useState(false);
 
-    // ✅ OWNER: Redirect to multi-branch dashboard (they don't have a specific branch)
+    // ✅ OWNER: Redirect to owner dashboard (unified interface)
+    // NOTE: Removed redirect to /admin/multi-branch as it conflicts with AdminDashboard's redirect
+    // Owner should use /owner-dashboard directly
     useEffect(() => {
         if (isOwner) {
-            navigate('/admin/multi-branch', { replace: true });
+            navigate('/owner-dashboard', { replace: true });
             return;
         }
     }, [isOwner, navigate]);
@@ -187,20 +191,21 @@ const OverviewPage: React.FC = () => {
         if (!oracleForecast || !tenantId || !branchId) return;
 
         try {
-            // Dispatch task to Firestore
-            await addDoc(collection(db, `tenants/${tenantId}/branches/${branchId}/adminTasks`), {
+            // ✅ Architecture: Use service instead of direct Firebase call
+            const result = await createAdminTask(tenantId, branchId, {
                 type: 'oracle_recommendation',
                 title: oracleForecast.title,
                 description: oracleForecast.description,
-                createdAt: serverTimestamp(),
-                status: 'dispatched',
                 priority: 'high',
                 createdBy: user?.name || 'Admin Oracle'
             });
 
-            success(`🔮 تم إرسال توصية العراف لرؤساء الأقسام بنجاح!`);
-        } catch (err) {
-            console.error('Oracle Action Error:', err);
+            if (result.success) {
+                success(`🔮 تم إرسال توصية العراف لرؤساء الأقسام بنجاح!`);
+            } else {
+                error(result.error || 'فشل في إرسال التوصية');
+            }
+        } catch (err: any) {
             error('فشل في إرسال التوصية');
         }
     };
@@ -270,7 +275,11 @@ const OverviewPage: React.FC = () => {
                                     {/* حصاد اليوم - Daily Insight */}
                                     <button
                                         onClick={() => setShowDailyInsight(true)}
-                                        className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 hover:border-teal-400 hover:shadow-lg hover:shadow-teal-500/10 transition-all group"
+                                        className="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group"
+                                        style={{
+                                            background: 'var(--theme-bg-secondary)',
+                                            borderColor: 'var(--theme-border-primary)',
+                                        }}
                                         title="حصاد اليوم"
                                     >
                                         <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -283,24 +292,40 @@ const OverviewPage: React.FC = () => {
                                     <button
                                         onClick={() => setShowProcurement(true)}
                                         className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 transition-all group"
+                                        style={{
+                                            background: 'var(--theme-bg-secondary)',
+                                            borderColor: 'var(--theme-border-primary)',
+                                        }}
                                         title="طلب مشتريات"
                                     >
-                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <ShoppingCart className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-indigo-500/20 dark:from-blue-500/30 dark:to-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <ShoppingCart 
+                                                className="w-5 h-5 text-blue-600 dark:text-blue-400" 
+                                            />
                                         </div>
-                                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-blue-600">المشتريات</span>
+                                        <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                            المشتريات
+                                        </span>
                                     </button>
 
                                     {/* الدعم الفني - Support */}
                                     <button
                                         onClick={() => setShowSupportTicket(true)}
                                         className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 transition-all group"
+                                        style={{
+                                            background: 'var(--theme-bg-secondary)',
+                                            borderColor: 'var(--theme-border-primary)',
+                                        }}
                                         title="طلب دعم فني"
                                     >
-                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                            <Headphones className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20 dark:from-amber-500/30 dark:to-orange-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <Headphones 
+                                                className="w-5 h-5 text-amber-600 dark:text-amber-400" 
+                                            />
                                         </div>
-                                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-amber-600">دعم فني</span>
+                                        <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                                            دعم فني
+                                        </span>
                                     </button>
                                 </div>
 
@@ -455,8 +480,15 @@ export const AdminDashboard: React.FC = () => {
     }, []);
 
     // ✅ OWNER: Redirect to unified owner dashboard (no duplicate interface)
+    // ✅ CRITICAL FIX: Allow Owner to access /admin/support-tickets
     useEffect(() => {
         if (isOwner) {
+            const currentPath = window.location.pathname;
+            // ✅ Allow Owner to access support-tickets route
+            if (currentPath.includes('/admin/support-tickets')) {
+                return; // Don't redirect - Owner can access support tickets
+            }
+            // ✅ Redirect to owner dashboard for all other /admin/* routes
             navigate('/owner-dashboard', { replace: true });
         }
     }, [isOwner, navigate]);
@@ -469,7 +501,8 @@ export const AdminDashboard: React.FC = () => {
 
     // 🦅 HAWK-EYE FIX: Sync "Phantom Toggles" (Sound/Notifications) from DB to LocalStorage
     useEffect(() => {
-        if (!user?.tenantId || !user?.branchId) return;
+        // ✅ CRITICAL FIX: Owner doesn't have tenantId/branchId - skip this for owner
+        if (isOwner || !user?.tenantId || !user?.branchId || !db) return;
 
         // Listen to System Settings (where soundEnabled lives)
         // Note: Assuming 'system' doc. If it's in a different doc, this path needs to match SettingsManager.
@@ -478,7 +511,10 @@ export const AdminDashboard: React.FC = () => {
         // Based on earlier view, 'maintenanceMode' and 'soundEnabled' were in 'settings' state.
         // I will listen to the most likely path: branches/{id}/settings/system
 
-        const systemSettingsRef = doc(db as any, `tenants/${user.tenantId}/branches/${user.branchId}/settings`, 'system');
+        // ✅ Null Safety: Check db before operations
+        if (!db || !user?.tenantId || !user?.branchId) return;
+
+        const systemSettingsRef = doc(db, `tenants/${user.tenantId}/branches/${user.branchId}/settings`, 'system');
         const unsub = onSnapshot(systemSettingsRef, (snap) => {
             if (snap.exists()) {
                 const data = snap.data();
@@ -490,31 +526,22 @@ export const AdminDashboard: React.FC = () => {
                 }
                 // Sync Maintenance (Optional trigger)
                 if (data.maintenanceMode) {
-                    console.warn('⚠️ Maintenance Mode is ON');
+                    logger.warn('Maintenance Mode is ON', null, 'AdminDashboard');
                 }
             }
+        }, (error) => {
+            logger.error('Error in system settings subscription', error, 'AdminDashboard');
         });
         return () => unsub();
-    }, [user?.tenantId, user?.branchId]);
+    }, [isOwner, user?.tenantId, user?.branchId]);
 
     return (
         <div className="flex min-h-screen transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
             <ScheduledTaskRunner />
             
-            {/* ✅ Desktop Sidebar - Shown only on lg screens (1024px+) */}
-            <div className="desktop-sidebar-container">
-                <style>{`
-                    .desktop-sidebar-container {
-                        display: none;
-                        flex-shrink: 0;
-                    }
-                    @media screen and (min-width: 1024px) {
-                        .desktop-sidebar-container {
-                            display: flex;
-                        }
-                    }
-                `}</style>
-                <aside id="admin-sidebar">
+            {/* ✅ ALWAYS VISIBLE SIDEBAR - Premium Professional Design */}
+            <div className="desktop-sidebar-container flex-shrink-0 fixed top-0 right-0 h-screen z-30">
+                <aside id="admin-sidebar" className="h-full">
                     <AdminSidebar 
                         isOwner={isOwner} 
                         onCollapseChange={setIsSidebarCollapsed}
@@ -557,8 +584,8 @@ export const AdminDashboard: React.FC = () => {
             {/* Owner Announcement Banner */}
             <OwnerAnnouncementBanner />
 
-            {/* Main Content Area */}
-            <main className="flex-1 p-4 pb-24 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col">
+            {/* Main Content Area - Adjusted for fixed sidebar */}
+            <main className="flex-1 p-4 pb-24 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col" style={{ marginRight: '280px' }}>
                 <div className="flex-1">
                     <Routes>
                         <Route index element={<OverviewPage />} />
@@ -567,6 +594,9 @@ export const AdminDashboard: React.FC = () => {
                             <Route path="kpi" element={<KPIDashboard />} />
                         )}
                         {/* ✅ multi-branch route is handled in AppRoutes.tsx - no need to duplicate */}
+                        
+                        {/* ✅ Points Configuration - Available for both Owner and Manager */}
+                        <Route path="points" element={<PointsConfiguration />} />
                         
                         {/* ✅ MANAGER ONLY: Branch-specific operations */}
                         {!isOwner && (
@@ -580,7 +610,6 @@ export const AdminDashboard: React.FC = () => {
                                 <Route path="tasks" element={<ScheduledTasksManager />} />
                                 <Route path="settings" element={<SettingsManager />} />
                                 <Route path="prices" element={<PricingSettings />} />
-                                <Route path="points" element={<PointsConfiguration />} />
                                 <Route path="payouts" element={<PayoutsManager />} />
                                 <Route path="auto-transfer" element={<AutoTransferSettings />} />
                                 <Route path="manager-announcements" element={<ManagerAnnouncementsManager />} />
@@ -598,11 +627,13 @@ export const AdminDashboard: React.FC = () => {
                             </>
                         )}
                         
+                        {/* ✅ SUPPORT TICKETS: Available for both Manager (to create/view their tickets) and Owner (to manage all tickets) */}
+                        <Route path="support-tickets" element={<SupportTicketsManager />} />
+                        
                         {/* ✅ OWNER ONLY: Owner-specific features - MUST BE VISIBLE */}
                         {isOwner && (
                             <>
                                 <Route path="managers" element={<OwnerPanel />} />
-                                <Route path="support-tickets" element={<SupportTicketsManager />} />
                                 <Route path="owner-announcements" element={<OwnerAnnouncementsManager />} />
                             </>
                         )}

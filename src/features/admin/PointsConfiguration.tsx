@@ -19,6 +19,7 @@ import { getChallengeConfig, getAvailableMilestones, saveChallengeConfig } from 
 import { AchievementsTab } from './AchievementsTab';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { generateRulebookPDF, generateQuickSummaryPDF } from '../../services/pdfRulebookService';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES (Unified with pointsService)
@@ -540,7 +541,7 @@ const DepartmentSection: React.FC<DepartmentSectionProps> = ({
 // ============================================================
 
 export const PointsConfiguration: React.FC = () => {
-    const { user } = useAuth();
+    const { user, authReady } = useAuth();
     const [config, setConfig] = useState<FullPointsConfig>(DEFAULT_CONFIG);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -555,21 +556,53 @@ export const PointsConfiguration: React.FC = () => {
     const [generatingPDF, setGeneratingPDF] = useState(false);
     const [ranks, setRanks] = useState<any[]>([]);
 
-    const tenantId = user?.tenantId || (user?.role === 'owner' ? user.id : null);
+    // ✅ CRITICAL FIX: Owner should use 'system-owner' or handle differently
+    // Owner doesn't have a tenantId - they manage all tenants
+    // For points config, owner should either:
+    // 1. Select a specific tenant, OR
+    // 2. Use a global/system config
+    // For now, we'll use 'system-owner' as fallback for owner
+    const tenantId = user?.tenantId || (user?.role === 'owner' ? 'system-owner' : null);
     
     // Hotel name for PDF
     const hotelName = (user as any)?.hotelName || (user as any)?.branchName || 'فندق أدورا';
 
+    // ✅ CRITICAL: Show loading while auth is not ready
+    if (!authReady) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#0F172A]">
+                <AdoraLoader size="lg" message="جاري تحميل بيانات المستخدم..." />
+            </div>
+        );
+    }
+
+    // ✅ CRITICAL: Show error if user is not authenticated
+    if (!user) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#0F172A]">
+                <div className="text-center text-white">
+                    <p className="text-xl mb-4">⚠️ يجب تسجيل الدخول للوصول إلى هذه الصفحة</p>
+                </div>
+            </div>
+        );
+    }
+
     useEffect(() => {
+        logger.info('PointsConfiguration initialized', { tenantId, userId: user?.id, role: user?.role }, 'PointsConfiguration');
         if (tenantId) {
+            logger.info('Loading config for tenantId', { tenantId }, 'PointsConfiguration');
             loadConfig();
             loadRanks();
+        } else {
+            // ✅ CRITICAL: If no tenantId after auth is ready, stop loading
+            logger.warn('No tenantId found, stopping loading', null, 'PointsConfiguration');
+            setLoading(false);
         }
     }, [tenantId]);
     
     // Load ranks for PDF generation
     const loadRanks = async () => {
-        if (!tenantId) return;
+        if (!tenantId || !db) return;
         try {
             const ranksRef = collection(db, `tenants/${tenantId}/achievements`);
             const ranksSnap = await getDocs(ranksRef);
@@ -579,7 +612,7 @@ export const PointsConfiguration: React.FC = () => {
             }));
             setRanks(ranksData.sort((a: any, b: any) => a.minPoints - b.minPoints));
         } catch (e) {
-            console.error('Error loading ranks:', e);
+            logger.error('Error loading ranks', e, 'PointsConfiguration');
         }
     };
     
@@ -616,7 +649,7 @@ export const PointsConfiguration: React.FC = () => {
             haptic('success');
             playSound('success');
         } catch (error) {
-            console.error('PDF generation error:', error);
+            logger.error('PDF generation error', error, 'PointsConfiguration');
             haptic('error');
         } finally {
             setGeneratingPDF(false);
@@ -624,9 +657,21 @@ export const PointsConfiguration: React.FC = () => {
     };
 
     const loadConfig = async () => {
-        if (!tenantId) return;
+        if (!tenantId) {
+            logger.warn('loadConfig called without tenantId', null, 'PointsConfiguration');
+            setLoading(false);
+            return;
+        }
+        logger.info('Loading config', { tenantId }, 'PointsConfiguration');
         setLoading(true);
         try {
+            // ✅ CRITICAL: Check db before use
+            if (!db) {
+                logger.error('Firebase Firestore not initialized', null, 'PointsConfiguration');
+                setLoading(false);
+                return;
+            }
+
             // Load Points Config
             const configRef = doc(db, `tenants/${tenantId}/settings/pointsConfig`);
             const configSnap = await getDoc(configRef);
@@ -651,12 +696,13 @@ export const PointsConfiguration: React.FC = () => {
                 const cfg = await getChallengeConfig(tenantId);
                 setChallengeConfig(cfg);
             } catch (e) {
-                console.error('Error loading challenge config:', e);
+                logger.error('Error loading challenge config', e, 'PointsConfiguration');
             }
 
         } catch (error) {
-            console.error('Error loading points config:', error);
+            logger.error('Error loading points config', error, 'PointsConfiguration');
         } finally {
+            logger.info('loadConfig finished', null, 'PointsConfiguration');
             setLoading(false);
         }
     };
@@ -675,7 +721,7 @@ export const PointsConfiguration: React.FC = () => {
 
             setChallengeConfig(cfg);
         } catch (e) {
-            console.error('Challenge load error:', e);
+            logger.error('Challenge load error', e, 'PointsConfiguration');
             // Quick fallback using static import
             setChallengeConfig({ isEnabled: true, milestones: getAvailableMilestones() });
         }
@@ -689,14 +735,14 @@ export const PointsConfiguration: React.FC = () => {
     };
 
     const handleSaveChallengeConfig = async () => {
-        if (!tenantId || !challengeConfig) return;
+        if (!tenantId || !challengeConfig || !db) return;
         setChallengeSyncing(true);
         try {
             await saveChallengeConfig(tenantId, challengeConfig);
             haptic('success');
             playSound('success');
         } catch (err) {
-            console.error(err);
+            logger.error('Error', err, 'PointsConfiguration');
             haptic('error');
         } finally {
             setChallengeSyncing(false);
@@ -712,7 +758,10 @@ export const PointsConfiguration: React.FC = () => {
     };
 
     const handleSave = async () => {
-        if (!tenantId) return;
+        if (!tenantId || !db) {
+            logger.error('Cannot save: tenantId or db is missing', null, 'PointsConfiguration');
+            return;
+        }
         setSaving(true);
         try {
             const configRef = doc(db, `tenants/${tenantId}/settings/pointsConfig`);
@@ -726,7 +775,7 @@ export const PointsConfiguration: React.FC = () => {
             haptic('success');
             playSound('success');
         } catch (error) {
-            console.error('Error saving points config:', error);
+            logger.error('Error saving points config', error, 'PointsConfiguration');
             haptic('error');
         } finally {
             setSaving(false);

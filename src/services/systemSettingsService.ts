@@ -95,6 +95,18 @@ export interface SystemSettings {
         requiredUpdate: boolean; // If true, blocks access until update is acknowledged
     }[];
     
+    // ✅ UI Configuration: Visible Tabs in Owner Dashboard
+    // Controls which tabs appear in horizontal navigation (to avoid duplication with sidebar)
+    visibleTabs?: {
+        overview?: boolean;      // الرئيسية (always visible)
+        tenants?: boolean;       // المشتركين (in sidebar)
+        billing?: boolean;       // الفواتير (in sidebar)
+        settings?: boolean;      // الإعدادات (in sidebar)
+        broadcasts?: boolean;    // الرسائل (in sidebar)
+        demo?: boolean;          // روابط الديمو (not in sidebar - keep visible)
+        'core-config'?: boolean; // التأسيس (in sidebar)
+    };
+    
     // System Messages (Broadcasts to all tenants)
     broadcastMessages: {
         id: string;

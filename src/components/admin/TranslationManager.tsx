@@ -251,7 +251,7 @@ const TranslationManager: React.FC<TranslationManagerProps> = ({
     
     return (
         <Wrapper>
-            <div className={`bg-white dark:bg-slate-800 rounded-2xl w-full ${standalone ? '' : 'max-w-6xl max-h-[90vh]'} overflow-hidden shadow-2xl`}>
+            <div className={`rounded-2xl w-full ${standalone ? '' : 'max-w-6xl max-h-[90vh]'} overflow-hidden shadow-2xl`} style={{ background: 'var(--theme-bg-secondary)' }}>
                 {/* Header */}
                 <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-teal-500 to-cyan-500">
                     <div className="flex items-center justify-between">
@@ -350,7 +350,7 @@ const TranslationManager: React.FC<TranslationManagerProps> = ({
                         </div>
                     ) : (
                         <table className="w-full">
-                            <thead className="bg-slate-50 dark:bg-slate-900 sticky top-0">
+                            <thead className="sticky top-0" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                 <tr>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400">المفتاح</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400">🇸🇦 عربي</th>
@@ -363,7 +363,7 @@ const TranslationManager: React.FC<TranslationManagerProps> = ({
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                 {filteredTranslations.map(row => (
-                                    <tr key={row.key} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                    <tr key={row.key} className="hover:bg-slate-50 dark:hover:bg-slate-700/50" style={{ '--hover-bg': 'var(--theme-bg-tertiary)' } as React.CSSProperties}>
                                         <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300 font-mono text-xs">
                                             {row.key.substring(0, 20)}...
                                         </td>

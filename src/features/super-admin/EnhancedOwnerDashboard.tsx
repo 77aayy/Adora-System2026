@@ -11,10 +11,11 @@ import {
     Bell, AlertTriangle, CheckCircle, MessageSquare, DollarSign,
     Activity, Shield, Database, RefreshCw, Save, Plus, X,
     Play, Pause, Eye, Edit2, Trash2, Upload, ChevronDown, Check, DoorOpen, Search, Calendar, Clock,
-    LayoutDashboard, CreditCard, BarChart3, Menu, ChevronLeft, ChevronRight
+    LayoutDashboard, CreditCard, BarChart3, Menu, ChevronLeft, ChevronRight, LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import {
     getSystemSettings,
     updateSystemSettings,
@@ -33,6 +34,7 @@ import {
     TenantAnalytics
 } from '../../services/analyticsService';
 import { getAllManagers, createManager, isPinAvailable, toggleLicenseStatus, renewLicense, softDeleteManager, restoreManager, getDeletedManagers, getDemoStats } from '../../services/ownerService';
+import { getAllTrialRequests, type TrialRequest } from '../../services/trialRequestService';
 import type { SystemSettings } from '../../services/systemSettingsService';
 import { PageTransition } from '../../components/common/PageTransition';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
@@ -55,6 +57,8 @@ import {
     createReceiptVoucher,
     getAllReceiptVouchers,
     getAllInvoices,
+    getDeletedBillingCount,
+    calculateTotalRevenue,
     type ReceiptVoucher,
     type Invoice
 } from '../../services/billingService';
@@ -90,7 +94,7 @@ import { DemoLinkManager } from '../../components/owner/DemoLinkManager';
 // TYPES
 // ============================================================
 
-type TabType = 'overview' | 'tenants' | 'settings' | 'updates' | 'broadcasts' | 'billing' | 'core-config' | 'demo';
+type TabType = 'overview' | 'tenants' | 'settings' | 'billing' | 'core-config' | 'demo' | 'subscription-requests';
 
 // ============================================================
 // HELPER: Safe Date Conversion (handles Firestore Timestamps)
@@ -171,8 +175,9 @@ const clearOwnerCache = (): void => {
 
 export const EnhancedOwnerDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const { success, error } = useUX();
+    const { t } = useTranslation();
 
     // ✅ SaaS Integration: Get all branches dynamically
     // ✅ Memoize to prevent unnecessary re-renders
@@ -189,7 +194,32 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
     // System Settings State
     const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+    
+    // ✅ Core Config Access Control
+    const [showCoreConfigModal, setShowCoreConfigModal] = useState(false);
+    const [coreConfigPassword, setCoreConfigPassword] = useState('');
+    const [coreConfigAccessGranted, setCoreConfigAccessGranted] = useState(false);
+    
+    // ✅ Get visible tabs configuration (default: only show non-duplicated tabs)
+    // ✅ CRITICAL: Must be defined AFTER systemSettings state
+    const visibleTabs = systemSettings?.visibleTabs || {
+        overview: true,      // الرئيسية - always visible
+        tenants: false,      // المشتركين - in sidebar, hide by default
+        billing: false,      // الفواتير - in sidebar, hide by default
+        settings: false,     // الإعدادات - in sidebar, hide by default
+        broadcasts: false,   // الرسائل - in sidebar, hide by default
+        demo: true,          // روابط الديمو - not in sidebar, keep visible
+        'core-config': false // التأسيس - in sidebar, hide by default
+    };
     const [analytics, setAnalytics] = useState<any>(null);
+
+    // ✅ Auto-show password modal when core-config tab is accessed
+    useEffect(() => {
+        if (activeTab === 'core-config' && !coreConfigAccessGranted && !showCoreConfigModal) {
+            setShowCoreConfigModal(true);
+            setCoreConfigPassword('');
+        }
+    }, [activeTab, coreConfigAccessGranted, showCoreConfigModal]);
     const [tenants, setTenants] = useState<TenantAnalytics[]>([]);
 
     // Revenue & Subscription Data
@@ -219,6 +249,12 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         expired: number;
         total: number;
     }>({ active: 0, suspended: 0, deleted: 0, expired: 0, total: 0 });
+    
+    // ✅ Billing Deleted Count (invoices + vouchers)
+    const [deletedBillingCount, setDeletedBillingCount] = useState(0);
+    
+    // ✅ Total Revenue (all invoices, not just paid)
+    const [totalRevenue, setTotalRevenue] = useState(0);
 
     // ✅ Live Activity Feed (On-demand updates only)
     const [activityLogs, setActivityLogs] = useState<AuditLog[]>([]);
@@ -276,6 +312,14 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             clearTimeout(bgLoadingTimeout);
         };
     }, []); // ✅ Empty deps - only run once
+
+    // ✅ Auto-show password modal when core-config tab is accessed (from sidebar or URL)
+    useEffect(() => {
+        if (activeTab === 'core-config' && !coreConfigAccessGranted && !showCoreConfigModal) {
+            setShowCoreConfigModal(true);
+            setCoreConfigPassword('');
+        }
+    }, [activeTab, coreConfigAccessGranted, showCoreConfigModal]);
 
     // ✅ Fetch activity when entering overview tab (ON-DEMAND only, no real-time)
     // 🔥 SAVES FIREBASE QUOTA: Only fetches on page load/refresh, manual refresh button available
@@ -382,17 +426,19 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             }
 
             // ✅ PHASE 2: Load revenue data
-            const [monthlyRev, annualRev, renewalRev, nearest] = await Promise.all([
+            const [monthlyRev, annualRev, renewalRev, nearest, totalRev] = await Promise.all([
                 calculateMonthlyRecurringRevenue().catch(() => 0),
                 calculateAnnualRecurringRevenue().catch(() => 0),
                 calculateMonthlyRenewalRevenue().catch(() => 0),
-                getNearestExpiringSubscription().catch(() => null)
+                getNearestExpiringSubscription().catch(() => null),
+                calculateTotalRevenue().catch(() => 0) // ✅ FIX: Calculate total revenue from ALL invoices
             ]);
 
             setMrr(monthlyRev);
             setArr(annualRev);
             setMonthlyRenewalRevenue(renewalRev);
             setNearestExpiring(nearest);
+            setTotalRevenue(totalRev); // ✅ FIX: Set total revenue
 
             // Cache revenue data
             setCachedData('revenue', {
@@ -441,18 +487,20 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             }
 
             // Revenue
-            const [monthlyRev, annualRev, renewalRev, nearest] = await Promise.all([
+            const [monthlyRev, annualRev, renewalRev, nearest, totalRev] = await Promise.all([
                 calculateMonthlyRecurringRevenue().catch(() => 0),
                 calculateAnnualRecurringRevenue().catch(() => 0),
                 calculateMonthlyRenewalRevenue().catch(() => 0),
-                getNearestExpiringSubscription().catch(() => null)
+                getNearestExpiringSubscription().catch(() => null),
+                calculateTotalRevenue().catch(() => 0) // ✅ FIX: Calculate total revenue
             ]);
 
             setMrr(monthlyRev);
             setArr(annualRev);
             setMonthlyRenewalRevenue(renewalRev);
             setNearestExpiring(nearest);
-            setCachedData('revenue', { mrr: monthlyRev, arr: annualRev, monthlyRenewal: renewalRev, nearestExpiring: nearest });
+            setTotalRevenue(totalRev); // ✅ FIX: Set total revenue
+            setCachedData('revenue', { mrr: monthlyRev, arr: annualRev, monthlyRenewal: renewalRev, nearestExpiring: nearest, totalRevenue: totalRev });
 
             // Heavy data
             await loadHeavyDataInBackground();
@@ -487,15 +535,20 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 else if (status === 'expired' || status === 'inactive') expired++;
             });
 
+            // ✅ FIX: Include deleted billing documents (invoices + vouchers) in deleted count
+            const deletedBilling = await getDeletedBillingCount().catch(() => 0);
+            const totalDeleted = deletedManagers.length + deletedBilling;
+
             const stats = {
                 active,
                 suspended,
-                deleted: deletedManagers.length,
+                deleted: totalDeleted, // ✅ Now includes managers + billing documents
                 expired,
-                total: active + suspended + expired + deletedManagers.length
+                total: active + suspended + expired + totalDeleted
             };
 
             setManagerStats(stats);
+            setDeletedBillingCount(deletedBilling);
             setCachedData('managerStats', stats); // ✅ Cache locally
         } catch (err) {
             console.warn('Error loading manager stats:', err);
@@ -685,9 +738,12 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
             // ✅ No need to reload all data - just update the feature state
             // Components using useFeatureGate will automatically re-check and hide/show
-            success(`تم ${enabled ? 'تفعيل' : 'تعطيل'} الميزة بنجاح${!enabled ? ' - سيتم إخفاؤها من جميع الفروع تلقائياً' : ''}`);
+            success(t('admin.featureEnabled', { 
+                action: enabled ? t('admin.featureEnabledAction') : t('admin.featureDisabledAction'),
+                hidden: !enabled ? t('admin.featureHiddenNote') : ''
+            }));
         } catch (err: any) {
-            error('حدث خطأ في تحديث الميزة');
+            error(t('admin.errorUpdatingFeature'));
             // ✅ Rollback on error
             if (systemSettings) {
                 setSystemSettings({
@@ -708,9 +764,9 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         try {
             await setMaintenanceMode(enabled, message, user?.id);
             await loadData(true); // Force refresh after change
-            success(`تم ${enabled ? 'تفعيل' : 'تعطيل'} وضع الصيانة`);
+            success(enabled ? t('admin.maintenanceEnabled') : t('admin.maintenanceDisabled'));
         } catch (err: any) {
-            error('حدث خطأ في تحديث وضع الصيانة');
+            error(t('admin.errorUpdatingMaintenance'));
         } finally {
             setSaving(false);
         }
@@ -739,9 +795,9 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 localStorage.setItem(localKey, JSON.stringify({ ...existing, ...updates, updatedAt: new Date().toISOString() }));
             }
 
-            success('تم حفظ الإعدادات بنجاح');
+            success(t('admin.settingsSaved'));
         } catch (err: any) {
-            error('حدث خطأ في حفظ الإعدادات');
+            error(t('admin.errorSavingSettings'));
         } finally {
             setSaving(false);
         }
@@ -756,18 +812,31 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 <div className="text-center">
                     <AdoraLoader
                         size="xl"
-                        message="جاري تحميل البيانات الأساسية..."
+                        message={t('admin.loadingBasicData')}
                         showMessage={true}
                     />
                     {loadingHeavyData && (
                         <p className="text-sm mt-4 animate-pulse" style={{ color: 'var(--theme-text-tertiary)' }}>
-                            جاري تحميل البيانات الإضافية في الخلفية...
+                            {t('admin.loadingAdditionalData')}
                         </p>
                     )}
                 </div>
             </div>
         );
     }
+
+    // ✅ Handle Core Config Access
+    const handleCoreConfigAccess = () => {
+        if (coreConfigPassword.trim().toLowerCase() === 'adora') {
+            setCoreConfigAccessGranted(true);
+            setShowCoreConfigModal(false);
+            setCoreConfigPassword('');
+            setSearchParams({ tab: 'core-config' });
+            success(t('admin.configModeAccessGranted'));
+        } else {
+            error(t('admin.wrongPassword'));
+        }
+    };
 
     // ✅ Use default settings if not loaded yet (Progressive Loading)
     const effectiveSettings = (systemSettings || {
@@ -789,66 +858,93 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         <PageTransition>
             {/* ✅ Schedulers are already in GlobalServicesProvider - no need to duplicate */}
             <div
-                className="min-h-screen transition-colors duration-300"
-                style={{ background: 'var(--theme-gradient-page)' }}
+                className="flex transition-colors duration-300"
+                style={{ 
+                    background: 'var(--theme-gradient-page)',
+                    minHeight: '100vh',
+                    width: '100%',
+                    position: 'relative'
+                }}
             >
-                <FlexibleHeader
-                    title="لوحة التحكم الرئيسية"
-                    titleIcon={<Crown className="w-6 h-6" />}
-                    subtitle={`${allBranches.length} فرع نشط • إدارة النظام الكاملة`}
-                    actions={[
-                        {
-                            id: 'refresh',
-                            icon: saving ? <AdoraLoaderInline size={20} /> : <RefreshCw className="w-4 h-4" />,
-                            label: 'تحديث',
-                            onClick: () => loadData(true), // ✅ Force refresh from Firebase
-                            variant: 'primary' as const,
-                            showOnMobile: true,
-                            showLabel: true
-                        }
-                    ]}
-                />
+                {/* ✅ ALWAYS VISIBLE SIDEBAR - Premium Professional Design */}
+                <div className="desktop-sidebar-container flex-shrink-0 fixed top-0 right-0 h-screen z-30">
+                    <aside id="admin-sidebar" className="h-full">
+                        <AdminSidebar 
+                            isOwner={user?.role === 'owner'} 
+                        />
+                    </aside>
+                </div>
 
-                <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-                    {/* ✅ Navigation Bar - Responsive */}
-                    <div
-                        className="solid-modal rounded-xl sm:rounded-2xl p-2 overflow-hidden md:overflow-x-auto scrollbar-hide"
-                        style={{
-                            background: 'var(--theme-bg-secondary)',
-                            border: '1px solid var(--theme-border-primary)'
-                        }}
-                    >
-                        <div className="flex items-center gap-2 sm:gap-3 w-full">
-                            {/* ✅ Modern Hamburger Menu Button */}
-                            <button
-                                onClick={() => setShowSidebar(true)}
-                                className="group flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex-shrink-0"
-                                style={{
-                                    background: 'linear-gradient(135deg, var(--theme-primary-500) 0%, var(--theme-primary-600) 100%)',
-                                    boxShadow: '0 4px 15px rgba(20, 184, 166, 0.3)'
-                                }}
-                                title="القائمة الجانبية"
-                            >
-                                <div className="flex flex-col gap-1 items-center justify-center">
-                                    <span className="block w-4 h-0.5 bg-white rounded-full transition-all duration-200 group-hover:w-5"></span>
-                                    <span className="block w-5 h-0.5 bg-white rounded-full transition-all duration-200 group-hover:w-4"></span>
-                                    <span className="block w-3 h-0.5 bg-white rounded-full transition-all duration-200 group-hover:w-5"></span>
+                {/* Main Content Area - Same structure as AdminDashboard */}
+                <main 
+                    className="flex-1 p-4 pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col w-full" 
+                    style={{ 
+                        marginRight: '280px',
+                        minHeight: '100vh',
+                        paddingBottom: '8rem'
+                    }}
+                >
+                    <div className="flex-1 w-full min-h-full">
+                        {/* ✅ Header - Same style as other pages */}
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center">
+                                        <Crown className="w-6 h-6 text-teal-400" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-2xl font-bold text-white">{t('admin.mainDashboard')}</h1>
+                                        <p className="text-sm text-white/60">{allBranches.length} {t('sidebar.branch')} {t('auth.activeLabel')} • {t('admin.appManagement')}</p>
+                                    </div>
                                 </div>
-                            </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => loadData(true)}
+                                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 border border-teal-500/30 hover:border-teal-500/50 transition-all"
+                                    >
+                                        {saving ? <AdoraLoaderInline size={16} /> : <RefreshCw className="w-4 h-4" />}
+                                        <span className="text-sm font-medium">{t('admin.refresh')}</span>
+                                    </button>
+                                    <button
+                                        onClick={logout}
+                                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 border border-teal-500/30 hover:border-teal-500/50 transition-all"
+                                        title={t('admin.logoutTitle')}
+                                    >
+                                        <LogOut className="w-4 h-4 flip-rtl" />
+                                        <span className="text-sm font-medium">{t('admin.logout')}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ✅ Navigation Bar - Responsive */}
+                        <div
+                            className="solid-modal rounded-xl sm:rounded-2xl p-2 overflow-hidden md:overflow-x-auto scrollbar-hide mb-4"
+                            style={{
+                                background: 'var(--theme-bg-secondary)',
+                                border: '1px solid var(--theme-border-primary)'
+                            }}
+                        >
+                        <div className="flex items-center gap-2 sm:gap-3 w-full">
+                            {/* ✅ Sidebar is always visible - No hamburger menu needed */}
 
                             {/* 📱 MOBILE: Show current tab name only */}
                             <div className="flex md:hidden items-center gap-2 flex-1">
                                 {(() => {
                                     const tabs = [
-                                        { id: 'overview', label: 'الرئيسية', icon: LayoutDashboard },
-                                        { id: 'tenants', label: 'المشتركين', icon: Users },
-                                        { id: 'billing', label: 'الفواتير', icon: CreditCard },
-                                        { id: 'settings', label: 'الإعدادات', icon: Settings },
-                                        // { id: 'analytics', label: 'التحليلات', icon: BarChart3 }, // ✅ دُمج في الرئيسية
-                                        { id: 'broadcasts', label: 'الرسائل', icon: MessageSquare },
-                                        { id: 'demo', label: 'روابط الديمو', icon: Share2 },
-                                        { id: 'core-config', label: '🔐 التأسيس', icon: Shield },
-                                    ];
+                                        { id: 'overview', label: t('admin.overview'), icon: LayoutDashboard, key: 'overview' },
+                                        { id: 'tenants', label: t('admin.createManager'), icon: Users, key: 'tenants' },
+                                        { id: 'billing', label: t('admin.billing'), icon: CreditCard, key: 'billing' },
+                                        { id: 'settings', label: t('admin.systemSettings'), icon: Settings, key: 'settings' },
+                                        { id: 'demo', label: t('admin.demoLinks'), icon: Share2, key: 'demo' },
+                                        { id: 'core-config', label: t('admin.coreSetup'), icon: Shield, key: 'core-config' },
+                                        // ✅ REMOVED: broadcasts (not owner's responsibility)
+                                    ]
+                                    .filter(tab => {
+                                        // ✅ Filter: Only show tabs that are enabled in visibleTabs config
+                                        const tabKey = (tab as any).key;
+                                        return visibleTabs[tabKey as keyof typeof visibleTabs] !== false;
+                                    });
                                     const currentTab = tabs.find(t => t.id === activeTab) || tabs[0];
                                     const Icon = currentTab.icon;
                                     return (
@@ -858,7 +954,15 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                         </div>
                                     );
                                 })()}
-                                <span className="text-xs text-white/40 mr-auto">اختر من القائمة ←</span>
+                                <button
+                                    onClick={() => navigate('/owner-panel')}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 hover:border-blue-500/50 transition-all"
+                                    title={t('admin.ownerDashboardTitle')}
+                                >
+                                    <Shield className="w-4 h-4" />
+                                    <span className="text-sm font-medium">{t('admin.ownerDashboard')}</span>
+                                </button>
+                                <span className="text-xs text-white/40 mr-auto">{t('admin.selectFromMenu')}</span>
                             </div>
 
                             {/* 🖥️ DESKTOP: Show all tabs */}
@@ -869,15 +973,21 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 {/* Tabs */}
                                 <div className="flex gap-1 sm:gap-2">
                                     {[
-                                        { id: 'overview' as TabType, label: 'الرئيسية', icon: LayoutDashboard },
-                                        { id: 'tenants' as TabType, label: 'المشتركين', icon: Users },
-                                        { id: 'billing' as TabType, label: 'الفواتير', icon: CreditCard },
-                                        { id: 'settings' as TabType, label: 'الإعدادات', icon: Settings },
-                                        // { id: 'analytics' as TabType, label: 'التحليلات', icon: BarChart3 }, // ✅ دُمج في الرئيسية
-                                        { id: 'broadcasts' as TabType, label: 'الرسائل', icon: MessageSquare },
-                                        { id: 'demo' as TabType, label: 'روابط الديمو', icon: Share2 },
-                                        { id: 'core-config' as TabType, label: '🔐 التأسيس', icon: Shield, hidden: true },
-                                    ].map(tab => {
+                                        { id: 'overview' as TabType, label: t('admin.overview'), icon: LayoutDashboard, key: 'overview' },
+                                        { id: 'tenants' as TabType, label: t('admin.createManager'), icon: Users, key: 'tenants' },
+                                        { id: 'billing' as TabType, label: t('admin.billing'), icon: CreditCard, key: 'billing' },
+                                        { id: 'settings' as TabType, label: t('admin.systemSettings'), icon: Settings, key: 'settings' },
+                                        { id: 'subscription-requests' as TabType, label: t('admin.subscriptionRequests'), icon: MessageSquare, key: 'subscription-requests' },
+                                        { id: 'demo' as TabType, label: t('admin.demoLinks'), icon: Share2, key: 'demo' },
+                                        { id: 'core-config' as TabType, label: t('admin.coreSetup'), icon: Shield, hidden: true, key: 'core-config' },
+                                        // ✅ REMOVED: broadcasts (not owner's responsibility)
+                                    ]
+                                    .filter(tab => {
+                                        // ✅ Filter: Only show tabs that are enabled in visibleTabs config
+                                        const tabKey = (tab as any).key;
+                                        return visibleTabs[tabKey as keyof typeof visibleTabs] !== false;
+                                    })
+                                    .map(tab => {
                                         const Icon = tab.icon;
                                         const isActive = activeTab === tab.id;
                                         const isHidden = (tab as any).hidden;
@@ -885,7 +995,15 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                         return (
                                             <button
                                                 key={tab.id}
-                                                onClick={() => setSearchParams({ tab: tab.id })}
+                                                onClick={() => {
+                                                    if (tab.id === 'core-config') {
+                                                        // ✅ Show password modal for core-config
+                                                        setShowCoreConfigModal(true);
+                                                        setCoreConfigPassword('');
+                                                    } else {
+                                                        setSearchParams({ tab: tab.id });
+                                                    }
+                                                }}
                                                 className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm font-medium ${isActive
                                                         ? isHidden
                                                             ? 'bg-red-500/20 text-red-400 shadow-sm ring-1 ring-red-500/30'
@@ -901,7 +1019,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                                             : 'var(--theme-primary-400, #2dd4bf)'
                                                         : 'var(--theme-text-secondary)',
                                                 }}
-                                                title={isHidden ? 'صفحة مخفية - للمالك فقط' : undefined}
+                                                title={isHidden ? t('admin.hiddenPageOwnerOnly') : undefined}
                                             >
                                                 <Icon className="w-4 h-4" />
                                                 <span>{tab.label}</span>
@@ -924,7 +1042,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         >
                             <AdoraLoader size="sm" showMessage={false} />
                             <span className="text-xs sm:text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
-                                ⏳ جاري جلب البيانات في الخلفية...
+                                ⏳ {t('admin.fetchingData')}
                             </span>
                         </div>
                     )}
@@ -941,7 +1059,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             <div className="flex items-center gap-2">
                                 <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
                                 <span className="text-xs sm:text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                                    ✅ تم تحديث البيانات بنجاح
+                                    ✅ {t('common.success')}
                                 </span>
                             </div>
                             <button
@@ -959,7 +1077,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     <LicenseNotificationWidget forOwner={true} maxNotifications={5} />
 
                     {/* Tab Content */}
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                         {activeTab === 'overview' && (
                             <OverviewTab
                                 systemSettings={effectiveSettings}
@@ -969,6 +1087,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 mrr={mrr}
                                 arr={arr}
                                 monthlyRenewalRevenue={monthlyRenewalRevenue}
+                                totalRevenue={totalRevenue} // ✅ Pass totalRevenue to OverviewTab
                                 nearestExpiring={nearestExpiring}
                                 multiBranchData={multiBranchData}
                                 managerStats={managerStats} // ✅ Manager status stats
@@ -1003,19 +1122,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             />
                         )}
 
-                        {activeTab === 'updates' && (
-                            <UpdatesTab
-                                updates={(effectiveSettings as any).systemUpdates || []}
-                                onAddUpdate={() => setShowUpdateModal(true)}
-                            />
-                        )}
-
-                        {activeTab === 'broadcasts' && (
-                            <BroadcastsTab
-                                broadcasts={effectiveSettings.broadcastMessages || []}
-                                onAddBroadcast={() => setShowBroadcastModal(true)}
-                            />
-                        )}
+                        {/* ✅ REMOVED: updates and broadcasts tabs - not owner's responsibility */}
 
                         {activeTab === 'billing' && (
                             <BillingDashboard embedded />
@@ -1031,15 +1138,29 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         )}
 
                         {/* 🔐 Hidden Core Config Tab - Only for Super Admin */}
-                        {activeTab === 'core-config' && (
+                        {activeTab === 'core-config' && coreConfigAccessGranted && (
                             <CoreConfigTemplate
-                                onSave={() => success('تم حفظ قوالب التأسيس بنجاح')}
+                                onSave={() => success(t('admin.coreConfigSaved'))}
                             />
                         )}
-                    </div>
-                </div>
+                        {activeTab === 'core-config' && !coreConfigAccessGranted && (
+                            <div className="flex items-center justify-center min-h-[400px]">
+                                <div className="text-center">
+                                    <Shield className="w-16 h-16 text-teal-400 mx-auto mb-4 opacity-50" />
+                                    <p className="text-white/60">{t('admin.enterPasswordForConfigMode')}</p>
+                                </div>
+                            </div>
+                        )}
 
-                {/* Modals */}
+                        {/* 📋 Subscription Requests Tab */}
+                        {activeTab === 'subscription-requests' && (
+                            <SubscriptionRequestsTab />
+                        )}
+                    </div>
+                    </div>
+                </main>
+
+                {/* Modals - Rendered OUTSIDE main container */}
                 {showUpdateModal && (
                     <UpdateModal
                         onClose={() => setShowUpdateModal(false)}
@@ -1047,7 +1168,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             await addSystemUpdate(update, user?.id || 'system');
                             await loadData(true); // Force refresh
                             setShowUpdateModal(false);
-                            success('تم إضافة التحديث بنجاح');
+                            success(t('admin.updateAdded'));
                         }}
                     />
                 )}
@@ -1059,32 +1180,135 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             await addBroadcastMessage(message, user?.id || 'system');
                             await loadData(true); // Force refresh
                             setShowBroadcastModal(false);
-                            success('تم إضافة الرسالة بنجاح');
+                            success(t('admin.messageAdded'));
                         }}
                     />
                 )}
-
-                {/* ✅ Owner Sidebar with Overlay */}
-                {showSidebar && (
-                    <>
-                        {/* Backdrop */}
-                        <div
-                            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-in fade-in duration-200"
-                            onClick={() => setShowSidebar(false)}
-                        />
-                        {/* Sidebar */}
-                        <div className="fixed top-0 right-0 h-full z-50 animate-in slide-in-from-right duration-300">
-                            <AdminSidebar
-                                onClose={() => setShowSidebar(false)}
-                                isOwner={true}
-                            />
-                        </div>
-                    </>
-                )}
-
-                {/* 📝 Developer Signature is in GlobalFooter (App.tsx) */}
-
             </div>
+
+            {/* ✅ Core Config Password Modal */}
+            {showCoreConfigModal && (
+                <div
+                    className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.8)',
+                        backdropFilter: 'blur(8px)',
+                    }}
+                    onClick={(e) => {
+                        // Close only if clicking backdrop, not modal content
+                        if (e.target === e.currentTarget) {
+                            setShowCoreConfigModal(false);
+                            setCoreConfigPassword('');
+                        }
+                    }}
+                >
+
+                    {/* Modal Content */}
+                    <div
+                        className="relative w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl"
+                        style={{
+                            background: 'rgba(30, 41, 59, 0.98)',
+                            border: '2px solid rgba(32, 178, 170, 0.5)',
+                            zIndex: 100000,
+                            position: 'relative',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(32, 178, 170, 0.2)',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center">
+                                <Shield className="w-6 h-6 text-teal-400" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-xl font-bold" style={{ color: 'rgba(255, 255, 255, 0.95)' }}>Configuration Mode</h3>
+                                <p className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>{t('admin.enterRequiredPassword')}</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowCoreConfigModal(false);
+                                    setCoreConfigPassword('');
+                                }}
+                                className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                                style={{ color: 'rgba(255, 255, 255, 0.6)' }}
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium mb-2" style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                <span dangerouslySetInnerHTML={{ __html: t('admin.typeAdoraToEnter') }} />
+                            </label>
+                            <input
+                                type="text"
+                                value={coreConfigPassword}
+                                onChange={(e) => setCoreConfigPassword(e.target.value)}
+                                onKeyPress={(e) => {
+                                    if (e.key === 'Enter' && coreConfigPassword.trim().toLowerCase() === 'adora') {
+                                        handleCoreConfigAccess();
+                                    }
+                                }}
+                                className="w-full px-4 py-3 rounded-xl border transition-all text-center font-mono text-lg tracking-wider"
+                                style={{
+                                    background: 'rgba(15, 23, 42, 0.8)',
+                                    border: '1px solid rgba(32, 178, 170, 0.3)',
+                                    color: 'rgba(255, 255, 255, 0.95)',
+                                    placeholder: 'rgba(255, 255, 255, 0.4)',
+                                }}
+                                placeholder={t('admin.enterPassword')}
+                                autoFocus
+                            />
+                            {coreConfigPassword && coreConfigPassword.trim().toLowerCase() !== 'adora' && (
+                                <p className="text-xs mt-2 flex items-center gap-1" style={{ color: 'rgb(248, 113, 113)' }}>
+                                    <AlertTriangle className="w-3 h-3" />
+                                    {t('admin.passwordIncorrect')}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowCoreConfigModal(false);
+                                    setCoreConfigPassword('');
+                                }}
+                                className="flex-1 px-6 py-3 rounded-xl border font-medium transition-all"
+                                style={{
+                                    background: 'rgba(30, 41, 59, 0.5)',
+                                    border: '1px solid rgba(32, 178, 170, 0.2)',
+                                    color: 'rgba(255, 255, 255, 0.9)',
+                                }}
+                            >
+                                إلغاء
+                            </button>
+                            <button
+                                onClick={handleCoreConfigAccess}
+                                disabled={coreConfigPassword.trim().toLowerCase() !== 'adora'}
+                                className="flex-1 px-6 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{
+                                    background: coreConfigPassword.trim().toLowerCase() === 'adora' 
+                                        ? 'linear-gradient(to right, #14b8a6, #0d9488)' 
+                                        : 'rgba(20, 184, 166, 0.3)',
+                                    color: 'white',
+                                    boxShadow: coreConfigPassword.trim().toLowerCase() === 'adora' 
+                                        ? '0 10px 25px rgba(20, 184, 166, 0.3)' 
+                                        : 'none',
+                                }}
+                            >
+                                {t('admin.enter')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ✅ Add Manager Modal - Rendered OUTSIDE main container */}
             {showAddManagerModal && (
@@ -1094,8 +1318,8 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     onSuccess={async () => {
                         setShowAddManagerModal(false);
                         await loadData(true); // Force refresh after adding manager
-                        success('تم إضافة المدير وإنشاء سند القبض بنجاح');
-                        // ✅ الانتقال التلقائي إلى تبويب الفواتير
+                        success(t('admin.managerAdded'));
+                        // ✅ {t('admin.autoNavigateToBilling')}
                         setSearchParams({ tab: 'billing' });
                     }}
                 />
@@ -1109,7 +1333,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/20 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-transparent dark:to-transparent">
                             <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                 <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                                تفاصيل المدير
+                                {t('admin.managerDetails')}
                             </h3>
                             <div className="flex items-center gap-2">
                                 {/* Print Button */}
@@ -1122,7 +1346,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                             <html dir="rtl" lang="ar">
                                             <head>
                                                 <meta charset="UTF-8">
-                                                <title>تقرير اشتراك - ${selectedManager.tenantName}</title>
+                                                <title>${t('admin.subscriptionReportTitle', { name: selectedManager.tenantName })}</title>
                                                 <style>
                                                     * { font-family: 'Segoe UI', Tahoma, sans-serif; box-sizing: border-box; }
                                                     body { padding: 40px; background: white; color: #1e293b; line-height: 1.6; }
@@ -1144,80 +1368,80 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                             </head>
                                             <body>
                                                 <div class="header">
-                                                    <h1>🏨 تقرير اشتراك Adora</h1>
+                                                    <h1>${t('admin.adoraSubscriptionReport')}</h1>
                                                     <p><strong>${selectedManager.tenantName}</strong></p>
-                                                    <p>كود المدير: ${selectedManager.managerCode || 'غير محدد'}</p>
-                                                    <p>تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                                    <p>${t('admin.managerCode')}: ${selectedManager.managerCode || t('admin.notSpecified')}</p>
+                                                    <p>${t('admin.reportDate')}: ${new Date().toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                                                 </div>
                                                 
                                                 <div class="section">
-                                                    <h3>📋 معلومات المشترك</h3>
+                                                    <h3>${t('admin.subscriberInfo')}</h3>
                                                     <div class="grid">
                                                         <div class="stat">
-                                                            <div class="stat-label">اسم الفندق</div>
+                                                            <div class="stat-label">${t('admin.hotelName')}</div>
                                                             <div class="stat-value">${selectedManager.tenantName}</div>
                                                         </div>
                                                         <div class="stat">
-                                                            <div class="stat-label">اسم المدير</div>
-                                                            <div class="stat-value">${selectedManager.managerName || 'غير محدد'}</div>
+                                                            <div class="stat-label">${t('admin.managerName')}</div>
+                                                            <div class="stat-value">${selectedManager.managerName || t('admin.notSpecified')}</div>
                                                         </div>
                                                         <div class="stat">
-                                                            <div class="stat-label">رمز المدير</div>
-                                                            <div class="stat-value">${selectedManager.managerCode || 'غير محدد'}</div>
+                                                            <div class="stat-label">${t('admin.managerCodeLabel')}</div>
+                                                            <div class="stat-value">${selectedManager.managerCode || t('admin.notSpecified')}</div>
                                                         </div>
                                                         <div class="stat">
-                                                            <div class="stat-label">الخطة</div>
+                                                            <div class="stat-label">${t('admin.plan')}</div>
                                                             <div class="stat-value">${selectedManager.plan}</div>
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 <div class="section">
-                                                    <h3>📊 الإحصائيات</h3>
+                                                    <h3>${t('admin.statistics')}</h3>
                                                     <div class="grid">
                                                         <div class="stat">
-                                                            <div class="stat-label">عدد الموظفين</div>
+                                                            <div class="stat-label">${t('admin.totalEmployees')}</div>
                                                             <div class="stat-value">${selectedManager.totalEmployees}</div>
                                                         </div>
                                                         <div class="stat">
-                                                            <div class="stat-label">عدد الفروع</div>
+                                                            <div class="stat-label">${t('admin.totalBranches')}</div>
                                                             <div class="stat-value">${selectedManager.totalBranches}</div>
                                                         </div>
                                                         <div class="stat">
-                                                            <div class="stat-label">عدد الغرف</div>
+                                                            <div class="stat-label">${t('admin.totalRooms')}</div>
                                                             <div class="stat-value">${selectedManager.totalRooms}</div>
                                                         </div>
                                                         <div class="stat">
-                                                            <div class="stat-label">إجمالي الطلبات</div>
+                                                            <div class="stat-label">${t('admin.totalRequests')}</div>
                                                             <div class="stat-value">${selectedManager.totalRequests}</div>
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 <div class="section">
-                                                    <h3>📅 معلومات الترخيص</h3>
+                                                    <h3>${t('admin.licenseInfo')}</h3>
                                                     <div class="grid">
                                                         <div class="stat">
-                                                            <div class="stat-label">تاريخ البدء</div>
+                                                            <div class="stat-label">${t('admin.startDate')}</div>
                                                             <div class="stat-value">${toSafeDate(selectedManager.subscriptionStartDate).toLocaleDateString('ar-EG')}</div>
                                                         </div>
                                                         <div class="stat">
-                                                            <div class="stat-label">تاريخ الانتهاء</div>
+                                                            <div class="stat-label">${t('admin.endDate')}</div>
                                                             <div class="stat-value">${toSafeDate(selectedManager.licenseExpiryDate).toLocaleDateString('ar-EG')}</div>
                                                         </div>
                                                         <div class="stat">
-                                                            <div class="stat-label">الأيام المتبقية</div>
+                                                            <div class="stat-label">${t('admin.remainingDays')}</div>
                                                             <div class="stat-value">
                                                                 <span class="badge ${selectedManager.daysUntilExpiry > 30 ? 'badge-green' : selectedManager.daysUntilExpiry > 7 ? 'badge-yellow' : 'badge-red'}">
-                                                                    ${selectedManager.daysUntilExpiry} يوم
+                                                                    ${selectedManager.daysUntilExpiry} ${t('admin.days')}
                                                                 </span>
                                                             </div>
                                                         </div>
                                                         <div class="stat">
-                                                            <div class="stat-label">الحالة</div>
+                                                            <div class="stat-label">${t('admin.status')}</div>
                                                             <div class="stat-value">
                                                                 <span class="badge ${selectedManager.status === 'active' ? 'badge-green' : selectedManager.status === 'suspended' ? 'badge-yellow' : 'badge-red'}">
-                                                                    ${selectedManager.status === 'active' ? 'نشط' : selectedManager.status === 'suspended' ? 'موقوف' : 'منتهي'}
+                                                                    ${selectedManager.status === 'active' ? t('admin.active') : selectedManager.status === 'suspended' ? t('admin.suspended') : t('admin.expired')}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -1225,7 +1449,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                                 </div>
 
                                                 <div class="footer">
-                                                    <p>تم إنشاء هذا التقرير بواسطة نظام Adora لإدارة الفنادق</p>
+                                                    <p>{t('admin.reportGeneratedBy')}</p>
                                                     <p>© ${new Date().getFullYear()} Adora Hotel Management System</p>
                                                 </div>
                                             </body>
@@ -1235,10 +1459,10 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                         printWindow.print();
                                     }}
                                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-500/30 transition-colors border border-teal-300 dark:border-teal-500/30"
-                                    title="طباعة تقرير الاشتراك"
+                                    title={t('admin.printSubscriptionReport')}
                                 >
                                     <Printer className="w-5 h-5" />
-                                    <span className="hidden sm:inline">طباعة</span>
+                                    <span className="hidden sm:inline">{t('admin.print')}</span>
                                 </button>
                                 {/* Close Button */}
                                 <button
@@ -1258,43 +1482,43 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             {/* Basic Info */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">اسم الفندق</p>
+                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.hotelName')}</p>
                                     <p className="text-lg font-bold text-slate-800 dark:text-white">{selectedManager.tenantName}</p>
                                 </div>
                                 <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">اسم المدير</p>
-                                    <p className="text-lg font-bold text-slate-800 dark:text-white">{selectedManager.managerName || 'غير محدد'}</p>
+                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.managerName')}</p>
+                                    <p className="text-lg font-bold text-slate-800 dark:text-white">{selectedManager.managerName || t('admin.notSpecified')}</p>
                                 </div>
                                 <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">رمز المدير</p>
-                                    <p className="text-lg font-bold text-teal-600 dark:text-teal-400">{selectedManager.managerCode || 'غير محدد'}</p>
+                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.managerCodeLabel')}</p>
+                                    <p className="text-lg font-bold text-teal-600 dark:text-teal-400">{selectedManager.managerCode || t('admin.notSpecified')}</p>
                                 </div>
                                 <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">الخطة</p>
+                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.plan')}</p>
                                     <p className="text-lg font-bold text-slate-800 dark:text-white capitalize">{selectedManager.plan}</p>
                                 </div>
                             </div>
 
                             {/* Status */}
                             <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                <p className="text-sm text-slate-500 dark:text-white/60 mb-2">الحالة</p>
+                                <p className="text-sm text-slate-500 dark:text-white/60 mb-2">{t('admin.status')}</p>
                                 <div className="flex items-center gap-2">
                                     {selectedManager.status === 'active' && (
                                         <span className="px-3 py-1 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-full text-sm border border-green-300 dark:border-green-500/30 flex items-center gap-1">
                                             <CheckCircle className="w-4 h-4" />
-                                            نشط
+                                            {t('admin.activeStatus')}
                                         </span>
                                     )}
                                     {selectedManager.status === 'suspended' && (
                                         <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 rounded-full text-sm border border-yellow-300 dark:border-yellow-500/30 flex items-center gap-1">
                                             <Pause className="w-4 h-4" />
-                                            موقوف مؤقتاً
+                                            {t('admin.suspendedStatus')}
                                         </span>
                                     )}
                                     {selectedManager.status === 'expired' && (
                                         <span className="px-3 py-1 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-full text-sm border border-red-300 dark:border-red-500/30 flex items-center gap-1">
                                             <X className="w-4 h-4" />
-                                            منتهي
+                                            {t('admin.expiredLicense')}
                                         </span>
                                     )}
                                 </div>
@@ -1302,56 +1526,56 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
                             {/* Statistics */}
                             <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                <p className="text-sm text-slate-500 dark:text-white/60 mb-3">الإحصائيات</p>
+                                <p className="text-sm text-slate-500 dark:text-white/60 mb-3">{t('admin.statistics')}</p>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div className="bg-blue-50 dark:bg-white/5 rounded-xl p-4 text-center border border-blue-200 dark:border-transparent">
                                         <Users className="w-6 h-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
                                         <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalEmployees}</p>
-                                        <p className="text-xs text-slate-500 dark:text-white/60">موظف</p>
+                                        <p className="text-xs text-slate-500 dark:text-white/60">{t('common.employee')}</p>
                                     </div>
                                     <div className="bg-purple-50 dark:bg-white/5 rounded-xl p-4 text-center border border-purple-200 dark:border-transparent">
                                         <Building2 className="w-6 h-6 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
                                         <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalBranches}</p>
-                                        <p className="text-xs text-slate-500 dark:text-white/60">فرع</p>
+                                        <p className="text-xs text-slate-500 dark:text-white/60">{t('sidebar.branch')}</p>
                                     </div>
                                     <div className="bg-teal-50 dark:bg-white/5 rounded-xl p-4 text-center border border-teal-200 dark:border-transparent">
                                         <DoorOpen className="w-6 h-6 text-teal-600 dark:text-teal-400 mx-auto mb-2" />
                                         <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalRooms}</p>
-                                        <p className="text-xs text-slate-500 dark:text-white/60">غرفة</p>
+                                        <p className="text-xs text-slate-500 dark:text-white/60">{t('common.room')}</p>
                                     </div>
                                     <div className="bg-green-50 dark:bg-white/5 rounded-xl p-4 text-center border border-green-200 dark:border-transparent">
                                         <Activity className="w-6 h-6 text-green-600 dark:text-green-400 mx-auto mb-2" />
                                         <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalRequests}</p>
-                                        <p className="text-xs text-slate-500 dark:text-white/60">طلب</p>
+                                        <p className="text-xs text-slate-500 dark:text-white/60">{t('common.request')}</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* License Info */}
                             <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                <p className="text-sm text-slate-500 dark:text-white/60 mb-3">معلومات الترخيص</p>
+                                <p className="text-sm text-slate-500 dark:text-white/60 mb-3">{t('admin.licenseInfo')}</p>
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-                                        <span className="text-slate-700 dark:text-white/80">تاريخ البدء</span>
+                                        <span className="text-slate-700 dark:text-white/80">{t('admin.startDate')}</span>
                                         <span className="text-slate-800 dark:text-white font-medium">
                                             {toSafeDate(selectedManager.subscriptionStartDate).toLocaleDateString('ar-EG')}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-                                        <span className="text-slate-700 dark:text-white/80">تاريخ الانتهاء</span>
+                                        <span className="text-slate-700 dark:text-white/80">{t('admin.endDate')}</span>
                                         <span className="text-slate-800 dark:text-white font-medium">
                                             {toSafeDate(selectedManager.licenseExpiryDate).toLocaleDateString('ar-EG')}
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-                                        <span className="text-slate-700 dark:text-white/80">الأيام المتبقية</span>
+                                        <span className="text-slate-700 dark:text-white/80">{t('admin.remainingDays')}</span>
                                         <span className={`font-bold ${selectedManager.daysUntilExpiry <= 7
                                                 ? 'text-red-600 dark:text-red-400'
                                                 : selectedManager.daysUntilExpiry <= 30
                                                     ? 'text-yellow-600 dark:text-yellow-400'
                                                     : 'text-green-600 dark:text-green-400'
                                             }`}>
-                                            {selectedManager.daysUntilExpiry} يوم
+                                            {selectedManager.daysUntilExpiry} {t('admin.days')}
                                         </span>
                                     </div>
                                 </div>
@@ -1359,7 +1583,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
                             {/* Last Activity - ✅ Human-readable format */}
                             <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                <p className="text-sm text-slate-500 dark:text-white/60 mb-1">آخر نشاط</p>
+                                <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.lastActivity')}</p>
                                 <p className="text-slate-800 dark:text-white">
                                     {(() => {
                                         const lastDate = selectedManager.lastActivity instanceof Date
@@ -1371,12 +1595,12 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                         const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
                                         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-                                        if (diffMins < 1) return 'الآن';
-                                        if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
-                                        if (diffHours < 24) return `منذ ${diffHours} ساعة`;
-                                        if (diffDays === 1) return 'أمس';
-                                        if (diffDays < 7) return `منذ ${diffDays} أيام`;
-                                        if (diffDays < 30) return `منذ ${Math.floor(diffDays / 7)} أسبوع`;
+                                        if (diffMins < 1) return t('admin.now');
+                                        if (diffMins < 60) return t('admin.minutesAgo', { minutes: diffMins });
+                                        if (diffHours < 24) return t('admin.hoursAgo', { hours: diffHours });
+                                        if (diffDays === 1) return t('admin.yesterday');
+                                        if (diffDays < 7) return t('admin.daysAgo', { days: diffDays });
+                                        if (diffDays < 30) return t('admin.weeksAgo', { weeks: Math.floor(diffDays / 7) });
 
                                         return lastDate.toLocaleDateString('ar-SA', {
                                             year: 'numeric',
@@ -1399,7 +1623,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 }}
                                 className="px-6 py-2 rounded-lg bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white transition-colors"
                             >
-                                إغلاق
+                                {t('common.close')}
                             </button>
                         </div>
                     </div>
@@ -1421,6 +1645,7 @@ const OverviewTab: React.FC<{
     mrr?: number;
     arr?: number;
     monthlyRenewalRevenue?: number;
+    totalRevenue?: number; // ✅ Total revenue from all invoices
     nearestExpiring?: {
         subscription: any;
         daysUntilExpiry: number;
@@ -1455,6 +1680,7 @@ const OverviewTab: React.FC<{
     mrr = 0,
     arr = 0,
     monthlyRenewalRevenue = 0,
+    totalRevenue = 0, // ✅ Default to 0 if not provided
     nearestExpiring = null,
     multiBranchData = null,
     managerStats = { active: 0, suspended: 0, deleted: 0, expired: 0, total: 0 },
@@ -1463,8 +1689,10 @@ const OverviewTab: React.FC<{
     demoStats = { total: 0, nearestExpiry: null, farthestExpiry: null }
 }) => {
         const { user } = useAuth(); // ✅ Get user for DataHealthReportCard
+        const { t } = useTranslation();
         const [isBranchesExpanded, setIsBranchesExpanded] = useState(false); // ✅ Collapsed by default, show 5 only
-        const [isActivityExpanded, setIsActivityExpanded] = useState(true); // ✅ Activity feed expanded by default
+        const [isActivityExpanded, setIsActivityExpanded] = useState(false); // ✅ Activity feed collapsed by default (saves space)
+        const [isStatsExpanded, setIsStatsExpanded] = useState(false); // ✅ Stats cards collapsed by default (saves space)
         const [refreshingActivity, setRefreshingActivity] = useState(false);
         const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
 
@@ -1487,7 +1715,7 @@ const OverviewTab: React.FC<{
                     <button
                         onClick={() => {
                             if (!analytics || Object.keys(analytics).length === 0) {
-                                alert('لا توجد بيانات للتصدير. انتظر حتى يتم تحميل البيانات.');
+                                alert(t('common.noData'));
                                 return;
                             }
                             try {
@@ -1505,12 +1733,12 @@ const OverviewTab: React.FC<{
                                 exportToPDF(exportData, 'adora-dashboard-report.pdf');
                             } catch (err) {
                                 console.error('PDF export failed:', err);
-                                alert('فشل في تصدير PDF. حاول مرة أخرى.');
+                                alert(t('admin.exportPdfFailed'));
                             }
                         }}
                         disabled={!analytics}
                         className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={analytics ? "تصدير PDF" : "انتظر تحميل البيانات..."}
+                        title={analytics ? t('admin.exportPdf') : t('admin.waitForData')}
                     >
                         <FileText className="w-4 h-4" />
                         <span className="hidden sm:inline text-xs">PDF</span>
@@ -1518,7 +1746,7 @@ const OverviewTab: React.FC<{
                     <button
                         onClick={() => {
                             if (!analytics || Object.keys(analytics).length === 0) {
-                                alert('لا توجد بيانات للتصدير. انتظر حتى يتم تحميل البيانات.');
+                                alert(t('common.noData'));
                                 return;
                             }
                             try {
@@ -1536,12 +1764,12 @@ const OverviewTab: React.FC<{
                                 exportToExcel(exportData, 'adora-dashboard-report.xlsx');
                             } catch (err) {
                                 console.error('Excel export failed:', err);
-                                alert('فشل في تصدير Excel. حاول مرة أخرى.');
+                                alert(t('admin.exportExcelFailed'));
                             }
                         }}
                         disabled={!analytics}
                         className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={analytics ? "تصدير Excel" : "انتظر تحميل البيانات..."}
+                        title={analytics ? t('admin.exportExcel') : t('admin.waitForData')}
                     >
                         <Download className="w-4 h-4" />
                         <span className="hidden sm:inline text-xs">Excel</span>
@@ -1555,7 +1783,7 @@ const OverviewTab: React.FC<{
                             <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
                                 <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 flex-shrink-0 mt-0.5 sm:mt-0" />
                                 <div className="min-w-0 flex-1">
-                                    <h3 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-0">وضع الصيانة مفعّل</h3>
+                                    <h3 className="text-base sm:text-lg font-bold text-white mb-1 sm:mb-0">{t('admin.maintenanceModeEnabled')}</h3>
                                     <p className="text-sm sm:text-base text-white/60 leading-relaxed">{systemSettings.maintenanceMessage}</p>
                                 </div>
                             </div>
@@ -1563,45 +1791,66 @@ const OverviewTab: React.FC<{
                                 onClick={() => onMaintenanceToggle(false)}
                                 className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-500/20 text-green-400 rounded-lg sm:rounded-xl hover:bg-green-500/30 transition-colors border border-green-500/20 text-sm whitespace-nowrap"
                             >
-                                إلغاء الصيانة
+                                {t('admin.cancelMaintenance')}
                             </button>
                         </div>
                     </div>
                 )}
 
-                {/* Quick Stats - ✅ ADORA PREMIUM COMPACT DESIGN */}
-                <div 
-                    className="grid"
-                    style={{
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                        gap: '24px',
-                        padding: '24px',
-                    }}
-                >
-                    <StatCard
-                        icon={Building2}
-                        iconColor="teal"
-                        label="إجمالي الفروع"
-                        count={allBranches.length}
-                    />
-                    <StatCard
-                        icon={Users}
-                        iconColor="blue"
-                        label="إجمالي المستخدمين"
-                        count={multiBranchData?.totalUsers || analytics?.totalUsers || 0}
-                    />
-                    <StatCard
-                        icon={Activity}
-                        iconColor="orange"
-                        label="إجمالي الطلبات"
-                        count={multiBranchData?.totalRequests || analytics?.totalRequestsToday || 0}
-                    />
-                    <StatCard
-                        icon={DoorOpen}
-                        iconColor="green"
-                        label="إجمالي الغرف"
-                        count={multiBranchData?.totalRooms || 0}
-                    />
+                {/* Quick Stats - ✅ ADORA PREMIUM COMPACT DESIGN - Collapsible & Fully Responsive */}
+                <div className="glass rounded-xl sm:rounded-2xl overflow-hidden">
+                    {/* Header - Clickable */}
+                    <div
+                        onClick={() => setIsStatsExpanded(!isStatsExpanded)}
+                        className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                    >
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-teal-500/20 flex items-center justify-center shadow-lg shadow-teal-500/10 flex-shrink-0">
+                                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-teal-400" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-sm sm:text-base font-bold text-white mb-0.5 sm:mb-1">الإحصائيات السريعة</h3>
+                                <p className="text-xs sm:text-sm text-white/50 hidden sm:block">
+                                    إجمالي الفروع، المستخدمين، الطلبات، والغرف
+                                </p>
+                            </div>
+                        </div>
+                        <div className={`p-2 rounded-lg bg-white/5 transition-transform duration-300 flex-shrink-0 ${isStatsExpanded ? '' : 'rotate-180'}`}>
+                            <ChevronDown className="w-4 h-4 text-white/60" />
+                        </div>
+                    </div>
+
+                    {/* Collapsible Content */}
+                    <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isStatsExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+                        <div className="p-3 sm:p-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                <StatCard
+                                    icon={Building2}
+                                    iconColor="teal"
+                                    label={t('admin.totalBranches')}
+                                    count={allBranches.length}
+                                />
+                                <StatCard
+                                    icon={Users}
+                                    iconColor="blue"
+                                    label={t('admin.totalUsers')}
+                                    count={multiBranchData?.totalUsers || analytics?.totalUsers || 0}
+                                />
+                                <StatCard
+                                    icon={Activity}
+                                    iconColor="orange"
+                                    label={t('admin.totalRequests')}
+                                    count={multiBranchData?.totalRequests || analytics?.totalRequestsToday || 0}
+                                />
+                                <StatCard
+                                    icon={DoorOpen}
+                                    iconColor="green"
+                                    label={t('admin.totalRooms')}
+                                    count={multiBranchData?.totalRooms || 0}
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* ✅ Demo Stats Card - Separate from main stats */}
@@ -1613,22 +1862,22 @@ const OverviewTab: React.FC<{
                             </div>
                             <div className="flex-1 min-w-0">
                                 <h3 className="text-base sm:text-lg font-bold text-white mb-1">
-                                    حسابات الديمو
+                                    {t('admin.demoAccounts')}
                                 </h3>
                                 <p className="text-xl sm:text-2xl font-bold text-purple-400 mb-2">
-                                    {demoStats.total} حساب
+                                    {demoStats.total} {t('admin.account')}
                                 </p>
                                 <div className="space-y-1 text-xs sm:text-sm text-white/60">
                                     {demoStats.nearestExpiry && (
                                         <div className="flex items-center gap-2">
                                             <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                                            <span>أقرب انتهاء: {demoStats.nearestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                            <span>{t('admin.nearestExpiry')}: {demoStats.nearestExpiry.toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                         </div>
                                     )}
                                     {demoStats.farthestExpiry && demoStats.farthestExpiry.getTime() !== demoStats.nearestExpiry?.getTime() && (
                                         <div className="flex items-center gap-2">
                                             <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                                            <span>أبعد انتهاء: {demoStats.farthestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                            <span>{t('admin.farthestExpiry')}: {demoStats.farthestExpiry.toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                         </div>
                                     )}
                                 </div>
@@ -1637,79 +1886,131 @@ const OverviewTab: React.FC<{
                     </div>
                 )}
 
-                {/* ✅ Manager Status Cards - Small badges for quick overview */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                    <div className="glass rounded-xl p-3 sm:p-4 border border-green-500/30 bg-green-500/10">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
+                {/* ✅ Manager Status Cards - Unified Design & Fully Responsive with Enhanced Shadows */}
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div 
+                        className="solid-modal rounded-xl p-4 border border-green-500/30 bg-green-500/10 hover:border-green-500/50 transition-all"
+                        style={{
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.12)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.boxShadow = '0 8px 16px rgba(34, 197, 94, 0.2), 0 4px 8px rgba(0, 0, 0, 0.15)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.12)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                                <CheckCircle className="w-5 h-5 text-green-400" />
                             </div>
-                            <div>
-                                <p className="text-lg sm:text-xl font-bold text-green-400">{managerStats.active}</p>
-                                <p className="text-xs text-white/60">مشترك نشط</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="glass rounded-xl p-3 sm:p-4 border border-yellow-500/30 bg-yellow-500/10">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-                                <Pause className="w-4 h-4 text-yellow-400" />
-                            </div>
-                            <div>
-                                <p className="text-lg sm:text-xl font-bold text-yellow-400">{managerStats.suspended}</p>
-                                <p className="text-xs text-white/60">موقوف مؤقتاً</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="glass rounded-xl p-3 sm:p-4 border border-red-500/30 bg-red-500/10">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                                <X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
-                            </div>
-                            <div>
-                                <p className="text-lg sm:text-xl font-bold text-red-400">{managerStats.expired}</p>
-                                <p className="text-xs text-white/60">منتهي الترخيص</p>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xl font-bold text-green-400 truncate">{managerStats.active}</p>
+                                <p className="text-xs text-white/60 truncate">{t('admin.activeLicense')}</p>
                             </div>
                         </div>
                     </div>
-                    <div className="glass rounded-xl p-3 sm:p-4 border border-gray-500/30 bg-gray-500/10">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gray-500/20 flex items-center justify-center">
-                                <Trash2 className="w-4 h-4 text-gray-400" />
+                    <div 
+                        className="solid-modal rounded-xl p-4 border border-yellow-500/30 bg-yellow-500/10 hover:border-yellow-500/50 transition-all"
+                        style={{
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.12)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.boxShadow = '0 8px 16px rgba(234, 179, 8, 0.2), 0 4px 8px rgba(0, 0, 0, 0.15)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.12)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                                <Pause className="w-5 h-5 text-yellow-400" />
                             </div>
-                            <div>
-                                <p className="text-lg sm:text-xl font-bold text-gray-400">{managerStats.deleted}</p>
-                                <p className="text-xs text-white/60">محذوف</p>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xl font-bold text-yellow-400 truncate">{managerStats.suspended}</p>
+                                <p className="text-xs text-white/60 truncate">{t('admin.suspendedLicense')}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div 
+                        className="solid-modal rounded-xl p-4 border border-red-500/30 bg-red-500/10 hover:border-red-500/50 transition-all"
+                        style={{
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.12)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.boxShadow = '0 8px 16px rgba(239, 68, 68, 0.2), 0 4px 8px rgba(0, 0, 0, 0.15)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.12)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                                <X className="w-5 h-5 text-red-400" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xl font-bold text-red-400 truncate">{managerStats.expired}</p>
+                                <p className="text-xs text-white/60 truncate">{t('admin.expiredLicense')}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div 
+                        className="solid-modal rounded-xl p-4 border border-gray-500/30 bg-gray-500/10 hover:border-gray-500/50 transition-all"
+                        style={{
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.12)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.boxShadow = '0 8px 16px rgba(107, 114, 128, 0.2), 0 4px 8px rgba(0, 0, 0, 0.15)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.12)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gray-500/20 flex items-center justify-center flex-shrink-0">
+                                <Trash2 className="w-5 h-5 text-gray-400" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xl font-bold text-gray-400 truncate">{managerStats.deleted}</p>
+                                <p className="text-xs text-white/60 truncate">{t('admin.deletedLicense')}</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Revenue Cards - ✅ COMPACT PREMIUM DESIGN */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                {/* Revenue Cards - ✅ COMPACT PREMIUM DESIGN - Fully Responsive */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <StatCard
                         icon={DollarSign}
                         iconColor="purple"
-                        label="إجمالي الإيرادات"
-                        value={`${(multiBranchData?.revenue || 0).toLocaleString()} ر.س`}
+                        label={t('admin.totalRevenue')}
+                        value={`${(totalRevenue || 0).toLocaleString()} ${t('common.rs')}`}
                     />
                     <StatCard
                         icon={TrendingUp}
                         iconColor="green"
-                        label="MRR الشهرية"
-                        value={`${mrr.toLocaleString()} ر.س`}
+                        label={t('admin.monthlyRecurringRevenue')}
+                        value={`${mrr.toLocaleString()} ${t('common.rs')}`}
                     />
                     <StatCard
                         icon={DollarSign}
                         iconColor="blue"
-                        label="ARR السنوية"
-                        value={`${arr.toLocaleString()} ر.س`}
+                        label={t('admin.annualRecurringRevenue')}
+                        value={`${arr.toLocaleString()} ${t('common.rs')}`}
                     />
                     <StatCard
                         icon={Calendar}
                         iconColor="yellow"
-                        label="تجديدات الشهر"
-                        value={`${monthlyRenewalRevenue.toLocaleString()} ر.س`}
+                        label={t('admin.monthlyRenewals')}
+                        value={`${monthlyRenewalRevenue.toLocaleString()} ${t('common.rs')}`}
                     />
                 </div>
 
@@ -1719,12 +2020,12 @@ const OverviewTab: React.FC<{
                         <div className="flex items-start gap-2 sm:gap-3">
                             <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
-                                <div className="text-[10px] sm:text-xs text-white/60 mb-1">أقرب اشتراك سوف ينتهي</div>
+                                <div className="text-[10px] sm:text-xs text-white/60 mb-1">{t('admin.nearestSubscriptionExpiring')}</div>
                                 <div className="text-xs sm:text-sm font-bold text-white mb-1 truncate">
-                                    {nearestExpiring.branchName || nearestExpiring.tenantName || 'فرع'}
+                                    {nearestExpiring.branchName || nearestExpiring.tenantName || t('admin.branch')}
                                 </div>
                                 <div className="text-[10px] sm:text-xs text-yellow-400">
-                                    باقي له {nearestExpiring.daysUntilExpiry} يوم
+                                    {t('admin.daysRemainingFor', { days: nearestExpiring.daysUntilExpiry })}
                                 </div>
                             </div>
                         </div>
@@ -1733,22 +2034,22 @@ const OverviewTab: React.FC<{
 
                 {/* System Status - Mobile First */}
                 <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
-                    <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4" style={{ color: 'var(--theme-text-primary)' }}>حالة النظام</h3>
+                    <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4" style={{ color: 'var(--theme-text-primary)' }}>{t('admin.systemStatus')}</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                         <StatusItem
-                            label="الإصدار"
+                            label={t('admin.version')}
                             value={systemSettings.systemVersion}
                             icon={Zap}
                             color="blue"
                         />
                         <StatusItem
-                            label="معدل الأداء"
+                            label={t('admin.performanceRate')}
                             value={`${analytics?.uptime || 99.9}%`}
                             icon={CheckCircle}
                             color="green"
                         />
                         <StatusItem
-                            label="معدل الخطأ"
+                            label={t('admin.errorRate')}
                             value={`${analytics?.errorRate || 0}%`}
                             icon={AlertTriangle}
                             color={analytics?.errorRate > 1 ? 'red' : 'yellow'}
@@ -1796,7 +2097,7 @@ const OverviewTab: React.FC<{
                                                         <h4 className="font-medium text-white text-sm truncate">{branch.name || branch.id}</h4>
                                                         {branch.managerName && (
                                                             <p className="text-xs text-white/50 truncate">
-                                                                المدير: {branch.managerName}
+                                                                {t('admin.manager')}: {branch.managerName}
                                                             </p>
                                                         )}
                                                     </div>
@@ -1808,7 +2109,7 @@ const OverviewTab: React.FC<{
                                 {!isBranchesExpanded && allBranches.length > 5 && (
                                     <div className="text-center pt-4 mt-4 border-t border-white/5">
                                         <p className="text-xs text-white/40">
-                                            و {allBranches.length - 5} فرع آخر
+                                            {t('admin.andMoreBranches', { count: allBranches.length - 5 })}
                                         </p>
                                     </div>
                                 )}
@@ -1821,7 +2122,7 @@ const OverviewTab: React.FC<{
                                             }}
                                             className="text-xs text-white/60 hover:text-white transition-colors"
                                         >
-                                            إخفاء
+                                            {t('admin.hide')}
                                         </button>
                                     </div>
                                 )}
@@ -1852,10 +2153,10 @@ const OverviewTab: React.FC<{
                             </div>
                             <div className="min-w-0 flex-1">
                                 <h3 className="text-base sm:text-xl font-bold mb-0.5 sm:mb-1" style={{ color: 'var(--theme-text-primary)' }}>
-                                    📡 البث الحي للنشاط
+                                    {t('admin.liveActivityFeed')}
                                 </h3>
                                 <p className="text-xs sm:text-sm hidden sm:block" style={{ color: 'var(--theme-text-secondary)' }}>
-                                    سجل كل الأحداث • اضغط 🔄 للتحديث
+                                    {t('admin.logAllEvents')}
                                 </p>
                             </div>
                         </div>
@@ -1872,7 +2173,7 @@ const OverviewTab: React.FC<{
                                     background: 'var(--theme-bg-tertiary)',
                                     border: '1px solid var(--theme-border-primary)',
                                 }}
-                                title="تحديث يدوي"
+                                title={t('admin.manualRefresh')}
                             >
                                 <RefreshCw className={`w-4 h-4 ${refreshingActivity ? 'animate-spin' : ''}`} style={{ color: 'var(--theme-text-secondary)' }} />
                             </button>
@@ -1930,7 +2231,7 @@ const OverviewTab: React.FC<{
                                                 </div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
-                                                        👤 {log.userName || 'النظام'}
+                                                        👤 {log.userName || t('admin.system')}
                                                     </span>
                                                     {log.department && log.department !== 'system' && (
                                                         <span className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
@@ -1964,16 +2265,16 @@ const OverviewTab: React.FC<{
                             <div className="mt-4 pt-3 border-t flex items-center justify-between flex-wrap gap-2"
                                 style={{ borderColor: 'var(--theme-border-primary)' }}>
                                 <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                    🔋 وضع التوفير: تحديث يدوي فقط (صفر استهلاك تلقائي)
+                                    {t('admin.powerSavingMode')}
                                 </p>
                                 <div className="flex items-center gap-3">
                                     {lastRefreshTime && (
                                         <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                            آخر تحديث: {formatTimeAgo(lastRefreshTime)}
+                                            {t('admin.lastUpdate')}: {formatTimeAgo(lastRefreshTime)}
                                         </p>
                                     )}
                                     <p className="text-xs font-medium" style={{ color: 'var(--theme-text-secondary)' }}>
-                                        {activityLogs.length} سجل
+                                        {activityLogs.length} {t('admin.logs')}
                                     </p>
                                 </div>
                             </div>
@@ -2001,6 +2302,7 @@ const TenantsTab: React.FC<{
     const [showDeleted, setShowDeleted] = useState(false);
     const [processing, setProcessing] = useState<string | null>(null);
     const { success, error } = useUX();
+    const { t } = useTranslation();
     const { user } = useAuth();
 
     // Load deleted managers on mount
@@ -2035,7 +2337,7 @@ const TenantsTab: React.FC<{
 
         return {
             tenantId: manager.tenantId || manager.id,
-            tenantName: manager.hotelName || manager.tenantBackup?.info?.name || manager.name || 'غير محدد',
+            tenantName: manager.hotelName || manager.tenantBackup?.info?.name || manager.name || t('admin.notSpecified'),
             managerName: manager.name,
             managerCode: manager.code,
             plan: (manager.plan || manager.tenantBackup?.info?.plan || 'basic') as 'basic' | 'pro' | 'enterprise',
@@ -2114,10 +2416,10 @@ const TenantsTab: React.FC<{
             });
         } else if (activeFilter === 'expiring') {
             // Show ALL tenants sorted by expiry date (closest first)
-            // ✅ FIX: استثناء المحذوفين من "الأقرب للانتهاء"
+            // ✅ FIX: {t('admin.excludeDeletedFromExpiring')}
             const deletedIds = new Set(deletedManagers.map((m: any) => m.tenantId || m.id));
             filtered = filtered.filter(t => {
-                // ✅ استثناء المحذوفين
+                // ✅ {t('admin.excludeDeleted')}
                 if ((t as any).isDeleted || deletedIds.has(t.tenantId)) {
                     return false;
                 }
@@ -2205,7 +2507,7 @@ const TenantsTab: React.FC<{
             const manager = managers.find(m => m.tenantId === tenant.tenantId);
 
             if (!manager) {
-                error('لم يتم العثور على بيانات المدير');
+                error(t('admin.managerNotFound'));
                 return;
             }
 
@@ -2245,11 +2547,11 @@ const TenantsTab: React.FC<{
                     // Count requests by department
                     const departmentCounts: Record<string, number> = {};
                     requests.forEach(req => {
-                        const dept = req.department || 'غير محدد';
+                        const dept = req.department || t('admin.notSpecified');
                         departmentCounts[dept] = (departmentCounts[dept] || 0) + 1;
                     });
                     const topDepartment = Object.entries(departmentCounts)
-                        .sort(([, a], [, b]) => b - a)[0]?.[0] || 'لا يوجد';
+                        .sort(([, a], [, b]) => b - a)[0]?.[0] || t('admin.noData');
 
                     // Get enabled features from branch settings
                     const settingsRef = doc(db, `tenants/${tenant.tenantId}/branches/${branch.id}/settings`, 'branch');
@@ -2282,7 +2584,7 @@ const TenantsTab: React.FC<{
             setSelectedTenant(tenant);
         } catch (err: any) {
             console.error('Error loading manager details:', err);
-            error('حدث خطأ في تحميل بيانات المدير');
+            error(t('admin.errorLoadingManager'));
         } finally {
             setLoadingDetails(false);
         }
@@ -2295,13 +2597,29 @@ const TenantsTab: React.FC<{
 
             <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
-                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">قائمة المستأجرين</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{t('admin.tenantList')}</h3>
                     <button
                         onClick={onAddManager}
-                        className="w-full sm:w-auto px-3 sm:px-4 py-2 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg sm:rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm"
+                        className="w-full sm:w-auto px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm font-medium"
+                        style={{
+                            background: 'rgba(30, 41, 59, 0.8)',
+                            border: '1px solid rgba(32, 178, 170, 0.3)',
+                            color: 'rgba(255, 255, 255, 0.9)',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(30, 41, 59, 1)';
+                            e.currentTarget.style.borderColor = 'rgba(32, 178, 170, 0.5)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(32, 178, 170, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)';
+                            e.currentTarget.style.borderColor = 'rgba(32, 178, 170, 0.3)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
+                        }}
                     >
                         <Plus className="w-4 h-4 flex-shrink-0" />
-                        <span>إضافة مدير جديد</span>
+                        <span>{t('admin.addNewManager')}</span>
                     </button>
                 </div>
 
@@ -2310,16 +2628,16 @@ const TenantsTab: React.FC<{
                     {/* Filter Buttons */}
                     <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide">
                         {[
-                            { id: 'all' as FilterType, label: 'الكل', icon: Activity },
-                            { id: 'active' as FilterType, label: 'النشط', icon: CheckCircle },
-                            { id: 'suspended' as FilterType, label: 'الموقوف مؤقتاً', icon: Pause },
-                            { id: 'expired' as FilterType, label: 'المنتهي', icon: AlertTriangle },
-                            { id: 'expiring' as FilterType, label: 'الأقرب للانتهاء', icon: Clock },
-                            { id: 'deleted' as FilterType, label: 'المحذوف', icon: Trash2 }
+                            { id: 'all' as FilterType, label: t('common.all'), icon: Activity },
+                            { id: 'active' as FilterType, label: t('admin.active'), icon: CheckCircle },
+                            { id: 'suspended' as FilterType, label: t('admin.suspended'), icon: Pause },
+                            { id: 'expired' as FilterType, label: t('admin.expired'), icon: AlertTriangle },
+                            { id: 'expiring' as FilterType, label: t('admin.nearingExpiry'), icon: Clock },
+                            { id: 'deleted' as FilterType, label: t('admin.deleted'), icon: Trash2 }
                         ].map(filter => {
                             const Icon = filter.icon;
                             const isActive = activeFilter === filter.id;
-                            // ✅ FIX: قائمة IDs المحذوفين لاستثنائهم من الإحصاء
+                            // ✅ FIX: {t('admin.deletedIdsList')}
                             const deletedTenantIds = new Set(deletedManagers.map((m: any) => m.tenantId || m.id));
                             const count = filter.id === 'all'
                                 ? tenants.length
@@ -2367,18 +2685,47 @@ const TenantsTab: React.FC<{
                                 <button
                                     key={filter.id}
                                     onClick={() => setActiveFilter(filter.id)}
-                                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm flex-shrink-0 ${isActive
-                                            ? 'bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/40 shadow-lg shadow-teal-500/10'
-                                            : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-300 dark:border-white/10'
-                                        }`}
+                                    className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm flex-shrink-0"
+                                    style={isActive
+                                        ? {
+                                            background: 'rgba(20, 184, 166, 0.2)',
+                                            color: 'rgba(20, 184, 166, 1)',
+                                            border: '1px solid rgba(20, 184, 166, 0.4)',
+                                            boxShadow: '0 4px 12px rgba(20, 184, 166, 0.15)',
+                                        }
+                                        : {
+                                            background: 'rgba(30, 41, 59, 0.6)',
+                                            color: 'rgba(255, 255, 255, 0.7)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        }}
+                                    onMouseEnter={(e) => {
+                                        if (!isActive) {
+                                            e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)';
+                                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isActive) {
+                                            e.currentTarget.style.background = 'rgba(30, 41, 59, 0.6)';
+                                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                        }
+                                    }}
                                 >
                                     <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                                     <span>{filter.label}</span>
                                     {count > 0 && (
-                                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive
-                                                ? 'bg-teal-500/30 text-teal-700 dark:text-teal-300'
-                                                : 'bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-white/70'
-                                            }`}>
+                                        <span 
+                                            className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                                            style={isActive
+                                                ? {
+                                                    background: 'rgba(20, 184, 166, 0.3)',
+                                                    color: 'rgba(20, 184, 166, 1)',
+                                                }
+                                                : {
+                                                    background: 'rgba(255, 255, 255, 0.1)',
+                                                    color: 'rgba(255, 255, 255, 0.8)',
+                                                }}
+                                        >
                                             {count}
                                         </span>
                                     )}
@@ -2389,13 +2736,30 @@ const TenantsTab: React.FC<{
 
                     {/* Search by Name/Code - Mobile First */}
                     <div className="relative">
-                        <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400 dark:text-white/40" />
+                        <Search 
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5" 
+                            style={{ color: 'rgba(255, 255, 255, 0.5)' }}
+                        />
                         <input
                             type="text"
-                            placeholder="ابحث بالاسم أو كود المدير..."
+                            placeholder={t('admin.searchByNameOrCode')}
                             value={searchCode}
                             onChange={(e) => setSearchCode(e.target.value)}
-                            className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-lg sm:rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/40 focus:outline-none focus:border-teal-500 dark:focus:border-blue-400 transition-colors text-sm sm:text-base shadow-sm"
+                            className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base shadow-sm transition-all"
+                            style={{
+                                background: 'rgba(30, 41, 59, 0.8)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                color: 'rgba(255, 255, 255, 0.95)',
+                                placeholder: 'rgba(255, 255, 255, 0.4)',
+                            }}
+                            onFocus={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(32, 178, 170, 0.5)';
+                                e.currentTarget.style.background = 'rgba(30, 41, 59, 1)';
+                            }}
+                            onBlur={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)';
+                            }}
                         />
                     </div>
                 </div>
@@ -2404,8 +2768,8 @@ const TenantsTab: React.FC<{
                     {filteredTenants.length === 0 ? (
                         <p className="text-center text-slate-500 dark:text-white/40 py-8">
                             {searchCode || activeFilter !== 'all'
-                                ? 'لا توجد نتائج للبحث أو الفلتر المحدد'
-                                : 'لا يوجد مستأجرون'}
+                                ? t('admin.noResults')
+                                : t('admin.noTenants')}
                         </p>
                     ) : (
                         filteredTenants.map((tenant: TenantAnalytics & { isDeleted?: boolean }) => {
@@ -2416,12 +2780,12 @@ const TenantsTab: React.FC<{
 
                             const statusLabel =
                                 isDeletedManager
-                                    ? 'محذوف'
+                                    ? t('admin.deletedLicense')
                                     : tenant.status === 'active'
-                                        ? 'نشط'
+                                        ? t('admin.activeStatus')
                                         : tenant.status === 'suspended'
-                                            ? 'موقوف مؤقتاً'
-                                            : 'منتهي / غير فعّال';
+                                            ? t('admin.suspendedStatus')
+                                            : t('admin.expiredStatus');
 
                             const statusClasses =
                                 isDeletedManager
@@ -2531,7 +2895,7 @@ const TenantsTab: React.FC<{
                                                             (m.tenantId || m.id) === tenant.tenantId
                                                         );
                                                         if (!deletedManager) {
-                                                            error('لم يتم العثور على المدير المحذوف');
+                                                            error(t('admin.managerNotFound'));
                                                             return;
                                                         }
                                                         const confirmed = await customConfirm({
@@ -2547,12 +2911,12 @@ const TenantsTab: React.FC<{
                                                         setProcessing(tenant.tenantId);
                                                         try {
                                                             await restoreManager(deletedManager.id);
-                                                            success('تم استعادة المدير بنجاح');
+                                                            success(t('admin.managerRestored'));
                                                             await onRefresh();
                                                             const updatedDeleted = await getDeletedManagers();
                                                             setDeletedManagers(updatedDeleted);
                                                         } catch (err: any) {
-                                                            error(err.message || 'حدث خطأ في الاستعادة');
+                                                            error(err.message || t('admin.errorRestoring'));
                                                         } finally {
                                                             setProcessing(null);
                                                         }
@@ -2593,7 +2957,7 @@ const TenantsTab: React.FC<{
                                                                             (m.tenantId || m.id) === tenant.tenantId
                                                                         );
                                                                         if (!deletedManager) {
-                                                                            error('لم يتم العثور على المدير المحذوف');
+                                                                            error(t('admin.managerNotFound'));
                                                                             return;
                                                                         }
                                                                         const confirmed = await customConfirm({
@@ -2609,12 +2973,12 @@ const TenantsTab: React.FC<{
                                                                         setProcessing(tenant.tenantId);
                                                                         try {
                                                                             await restoreManager(deletedManager.id);
-                                                                            success('تم استعادة المدير بنجاح');
+                                                                            success(t('admin.managerRestored'));
                                                                             await onRefresh();
                                                                             const updatedDeleted = await getDeletedManagers();
                                                                             setDeletedManagers(updatedDeleted);
                                                                         } catch (err: any) {
-                                                                            error(err.message || 'حدث خطأ في الاستعادة');
+                                                                            error(err.message || t('admin.errorRestoring'));
                                                                         } finally {
                                                                             setProcessing(null);
                                                                         }
@@ -2641,17 +3005,17 @@ const TenantsTab: React.FC<{
                                                                         const managers = await getAllManagers();
                                                                         const manager = managers.find(m => m.tenantId === tenant.tenantId);
                                                                         if (!manager) {
-                                                                            error('لم يتم العثور على المدير');
+                                                                            error(t('admin.managerNotFound'));
                                                                             return;
                                                                         }
                                                                         setProcessing(tenant.tenantId);
                                                                         try {
                                                                             await toggleLicenseStatus(manager.id, tenant.tenantId, tenant.status === 'active');
-                                                                            success(tenant.status === 'active' ? 'تم إيقاف المدير مؤقتاً' : 'تم تفعيل المدير');
+                                                                            success(tenant.status === 'active' ? t('admin.managerSuspended') : t('admin.managerActivated'));
                                                                             // Refresh data to update statistics and cards
                                                                             await onRefresh();
                                                                         } catch (err: any) {
-                                                                            error(err.message || 'حدث خطأ');
+                                                                            error(err.message || t('admin.addError'));
                                                                         } finally {
                                                                             setProcessing(null);
                                                                         }
@@ -2674,7 +3038,7 @@ const TenantsTab: React.FC<{
                                                                         const managers = await getAllManagers();
                                                                         const manager = managers.find(m => m.tenantId === tenant.tenantId);
                                                                         if (!manager) {
-                                                                            error('لم يتم العثور على المدير');
+                                                                            error(t('admin.managerNotFound'));
                                                                             return;
                                                                         }
                                                                         setProcessing(tenant.tenantId);
@@ -2738,11 +3102,11 @@ const TenantsTab: React.FC<{
                                                                                 });
                                                                             }
 
-                                                                            success('تم تجديد الاشتراك بنجاح');
+                                                                            success(t('admin.subscriptionRenewed'));
                                                                             // Refresh data to update statistics, billing cards, and revenue
                                                                             await onRefresh();
                                                                         } catch (err: any) {
-                                                                            error(err.message || 'حدث خطأ في التجديد');
+                                                                            error(err.message || t('admin.errorRenewing'));
                                                                         } finally {
                                                                             setProcessing(null);
                                                                         }
@@ -2762,10 +3126,10 @@ const TenantsTab: React.FC<{
                                                                     onClick={async () => {
                                                                         const confirmed = await customConfirm({
                                                                             type: 'danger',
-                                                                            title: 'تأكيد الحذف',
-                                                                            message: `هل أنت متأكد من حذف المدير "${tenant.managerName || tenant.tenantName}" نهائياً؟\n\nسيتم نقل بياناته لقائمة المحذوفين ويمكن استعادته لاحقاً.`,
-                                                                            confirmText: 'حذف',
-                                                                            cancelText: 'إلغاء'
+                                                                            title: t('admin.confirmDelete'),
+                                                                            message: t('admin.deleteManagerConfirm', { name: tenant.managerName || tenant.tenantName }),
+                                                                            confirmText: t('admin.delete'),
+                                                                            cancelText: t('common.cancel')
                                                                         });
                                                                         if (!confirmed) {
                                                                             return;
@@ -2773,29 +3137,29 @@ const TenantsTab: React.FC<{
                                                                         const managers = await getAllManagers();
                                                                         const manager = managers.find(m => m.tenantId === tenant.tenantId);
                                                                         if (!manager) {
-                                                                            error('لم يتم العثور على المدير');
+                                                                            error(t('admin.managerNotFound'));
                                                                             return;
                                                                         }
                                                                         setProcessing(tenant.tenantId);
                                                                         try {
                                                                             await softDeleteManager(manager.id, tenant.tenantId);
-                                                                            success('تم حذف المدير ونقله لقائمة المحذوفين');
+                                                                            success(t('admin.managerDeletedSuccess'));
                                                                             // Refresh data to update statistics
                                                                             await onRefresh();
                                                                             const deleted = await getDeletedManagers();
                                                                             setDeletedManagers(deleted);
                                                                         } catch (err: any) {
-                                                                            error(err.message || 'حدث خطأ في الحذف');
+                                                                            error(err.message || t('admin.deleteError'));
                                                                         } finally {
                                                                             setProcessing(null);
                                                                         }
                                                                     }}
                                                                     disabled={processing === tenant.tenantId}
                                                                     className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                                                                    title="حذف نهائي"
+                                                                    title={t('admin.deletePermanent')}
                                                                 >
                                                                     <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">حذف</span>
+                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">{t('admin.delete')}</span>
                                                                 </button>
                                                             </>
                                                         );
@@ -2837,6 +3201,26 @@ const SettingsTab: React.FC<{
 }> = ({ systemSettings, onSave, saving, features, onToggleFeature }) => {
     const [isFeaturesCollapsed, setIsFeaturesCollapsed] = useState(true);
     const [isCompanyInfoCollapsed, setIsCompanyInfoCollapsed] = useState(true);
+    const [isTabsConfigCollapsed, setIsTabsConfigCollapsed] = useState(true);
+    
+    // ✅ Visible Tabs Configuration
+    const visibleTabs = systemSettings.visibleTabs || {
+        overview: true,
+        tenants: false,
+        billing: false,
+        settings: false,
+        broadcasts: false,
+        demo: true,
+        'core-config': false
+    };
+    
+    const handleToggleTab = (tabKey: keyof typeof visibleTabs) => {
+        const updated = {
+            ...visibleTabs,
+            [tabKey]: !visibleTabs[tabKey]
+        };
+        onSave({ visibleTabs: updated });
+    };
 
     // ✅ FIXED: Initialize from localStorage first, then systemSettings
     const [localPrice, setLocalPrice] = useState<number>(() => {
@@ -2913,11 +3297,11 @@ const SettingsTab: React.FC<{
     };
 
     const featureDescriptions: Record<string, string> = {
-        qrCodeGuestPortal: 'يسمح للنزلاء بالوصول إلى لوحة التحكم الخاصة بهم عبر مسح رمز QR. يمكنهم طلب الخدمات، تقديم التقييمات، والتفاعل مع الفندق.',
-        pointsSystem: 'نظام تجميع النقاط للموظفين عند إتمام المهام. يمكن للموظفين استبدال النقاط بمكافآت حقيقية.',
-        gamification: 'نظام الشارات والرتب والمستويات للموظفين. يشمل الإنجازات، التحديات، ولوحة المتصدرين لتحفيز الموظفين.',
-        shiftNotes: 'يسمح للموظفين بتبادل الملاحظات بين الشيفتات. يساعد في التواصل الفعال ونقل المعلومات المهمة.',
-        scheduledTasks: 'نظام المهام المجدولة مسبقاً. يسمح بتخطيط المهام وتوزيعها على الموظفين بشكل منظم.',
+        qrCodeGuestPortal: t('admin.featureDescriptions.qrCodeGuestPortal'),
+        pointsSystem: t('admin.featureDescriptions.pointsSystem'),
+        gamification: t('admin.featureDescriptions.gamification'),
+        shiftNotes: t('admin.featureDescriptions.shiftNotes'),
+        scheduledTasks: t('admin.featureDescriptions.scheduledTasks'),
         aiAssistant: 'سوف يظهر زر المساعد الصوتي في المشروع للمشتركين. يمكن للموظفين التفاعل مع النظام عبر الأوامر الصوتية.',
         calendarSync: 'مزامنة التقويم مع أنظمة خارجية. يسمح بتنسيق الأحداث والمواعيد مع التقويمات الأخرى.',
         inventoryManagement: 'نظام إدارة المخزون الكامل. تتبع المنتجات، الكميات، والحركات المخزنية.',
@@ -2949,16 +3333,16 @@ const SettingsTab: React.FC<{
         <div className="space-y-4 sm:space-y-6">
             {/* General Settings Section - Mobile First */}
             <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6">الإعدادات العامة</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6">{t('admin.generalSettings')}</h3>
                 <div className="space-y-4 sm:space-y-6">
                     {/* Default Subscription Price */}
                     <div className="space-y-3 sm:space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-white/80 mb-2">
-                                سعر الاشتراك الافتراضي (ر.س)
+                                {t('admin.subscriptionPrice')}
                             </label>
                             <p className="text-xs text-white/50 mb-3 leading-relaxed">
-                                هذا السعر شامل الضريبة، ويتم تطبيقه تلقائياً على الاشتراكات الجديدة فقط. لا يؤثر على الاشتراكات القديمة.
+                                {t('admin.subscriptionPriceNote')}
                             </p>
                             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
                                 <div className="w-full sm:flex-1">
@@ -3069,7 +3453,7 @@ const SettingsTab: React.FC<{
                         <div className="min-w-0 flex-1">
                             <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">معلومات الشركة (للمطبوعات)</h3>
                             <p className="text-xs sm:text-sm text-white/50 leading-relaxed hidden sm:block">
-                                هذه المعلومات ستظهر في جميع المطبوعات (سندات القبض، الفواتير، سندات الصرف)
+                                {t('admin.infoAppearsInAllPrints')}
                             </p>
                         </div>
                     </div>
@@ -3113,7 +3497,7 @@ const SettingsTab: React.FC<{
                             {/* Commercial Registration */}
                             <div>
                                 <label className="block text-xs font-medium text-white/70 mb-1.5">
-                                    رقم السجل التجاري *
+                                    {t('admin.commercialRegisterNumber')} *
                                 </label>
                                 <input
                                     type="text"
@@ -3276,6 +3660,89 @@ const SettingsTab: React.FC<{
                 </div>
             </div>
 
+            {/* ✅ Visible Tabs Configuration Section */}
+            <div className="glass rounded-xl sm:rounded-2xl overflow-hidden border border-white/10">
+                <div
+                    onClick={() => setIsTabsConfigCollapsed(!isTabsConfigCollapsed)}
+                    className="flex items-center justify-between p-4 sm:p-6 cursor-pointer hover:bg-white/5 transition-colors"
+                >
+                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-500/20 flex items-center justify-center shadow-lg shadow-purple-500/10 flex-shrink-0">
+                            <LayoutDashboard className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">{t('admin.horizontalTabsSettings')}</h3>
+                            <p className="text-xs sm:text-sm text-white/50 leading-relaxed hidden sm:block">
+                                {t('admin.selectTabsToShow')}
+                            </p>
+                        </div>
+                    </div>
+                    <div className={`p-2 rounded-lg bg-white/5 transition-transform duration-300 flex-shrink-0 ${isTabsConfigCollapsed ? '' : 'rotate-180'}`}>
+                        <ChevronDown className="w-4 h-4 text-white/60" />
+                    </div>
+                </div>
+
+                {/* Collapsible Content */}
+                <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isTabsConfigCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
+                    <div className="p-4 sm:p-6">
+                        <div className="space-y-3 sm:space-y-4">
+                            {[
+                                { key: 'overview' as const, label: t('admin.overview') || 'Overview', description: t('admin.mainDashboardAlwaysVisible') || 'Main Dashboard (always visible)', alwaysVisible: true },
+                                { key: 'tenants' as const, label: t('admin.createManager') || 'Create Manager', description: t('admin.tabDescriptions.tenants') || 'Create and manage managers (subscribers)', alwaysVisible: false },
+                                { key: 'billing' as const, label: t('admin.billing') || 'Billing', description: t('admin.tabDescriptions.billing') || 'Manage invoices and subscriptions', alwaysVisible: false },
+                                { key: 'settings' as const, label: t('admin.systemSettings') || 'System Settings', description: t('admin.tabDescriptions.settings') || 'Complete project settings', alwaysVisible: false },
+                                { key: 'demo' as const, label: t('admin.demoLinks') || 'Demo Links', description: t('admin.tabDescriptions.demo') || 'Create and manage demo links', alwaysVisible: false },
+                                { key: 'core-config' as const, label: t('admin.coreSetup') || '🔐 Core Setup', description: t('admin.tabDescriptions.coreConfig') || 'Advanced core settings (hidden by default)', alwaysVisible: false },
+                            ].map(tab => {
+                                const isEnabled = visibleTabs[tab.key] !== false;
+                                const isDisabled = tab.alwaysVisible;
+                                
+                                return (
+                                    <div
+                                        key={tab.key}
+                                        className="flex items-start justify-between p-3 sm:p-4 bg-white/5 rounded-lg sm:rounded-xl hover:bg-white/10 transition-all gap-3 sm:gap-4"
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-1">
+                                                <h4 className="font-medium text-white text-sm sm:text-base">
+                                                    {tab.label}
+                                                </h4>
+                                                {isDisabled && (
+                                                    <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                                        دائماً مرئي
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs sm:text-sm text-white/50 leading-relaxed">
+                                                {tab.description}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <button
+                                                onClick={() => !isDisabled && handleToggleTab(tab.key)}
+                                                disabled={isDisabled || saving}
+                                                className={`relative w-12 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${
+                                                    isEnabled
+                                                        ? 'bg-teal-500'
+                                                        : 'bg-white/20'
+                                                } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                title={isDisabled ? 'هذا التبويب دائماً مرئي' : isEnabled ? 'إخفاء التبويب' : 'إظهار التبويب'}
+                                            >
+                                                <span
+                                                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${
+                                                        isEnabled ? 'translate-x-6' : 'translate-x-0'
+                                                    }`}
+                                                />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* ✅ Dynamic Platform Branding Section - Logo & Theme */}
             <DynamicBrandingSection />
 
@@ -3347,7 +3814,7 @@ const DynamicBrandingSection: React.FC = () => {
             <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
                 <div className="p-4 sm:p-6 space-y-4">
                     <p className="text-xs text-white/60 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/10">
-                        🎨 هذه الإعدادات تغير شكل المنصة بالكامل. اللوجو والألوان ستظهر في صفحة الدخول وجميع الواجهات.
+                        {t('admin.theseSettingsChangePlatform')}
                     </p>
 
                     {/* Logo URL */}
@@ -3482,7 +3949,7 @@ const DynamicBrandingSection: React.FC = () => {
                         ) : saved ? (
                             <>
                                 <CheckCircle className="w-4 h-4" />
-                                تم الحفظ ✓
+                                {t('admin.saveSuccess')}
                             </>
                         ) : (
                             <>
@@ -3547,9 +4014,9 @@ const DeveloperBrandingSection: React.FC = () => {
                         <Code2 className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">إعدادات المطور</h3>
+                        <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">{t('admin.developerSettings')}</h3>
                         <p className="text-xs sm:text-sm text-white/50 leading-relaxed hidden sm:block">
-                            بيانات الدعم الفني وحقوق الملكية - تظهر في "نسيت الكود" وأسفل الصفحات
+                            {t('admin.technicalSupportAndCopyright')}
                         </p>
                     </div>
                 </div>
@@ -3654,12 +4121,12 @@ const DeveloperBrandingSection: React.FC = () => {
                         ) : saved ? (
                             <>
                                 <CheckCircle className="w-4 h-4" />
-                                تم الحفظ ✓
+                                {t('admin.saveSuccess')}
                             </>
                         ) : (
                             <>
                                 <Save className="w-4 h-4" />
-                                حفظ إعدادات المطور
+                                {t('admin.saveDeveloperSettings')}
                             </>
                         )}
                     </button>
@@ -3681,7 +4148,7 @@ const UpdatesTab: React.FC<{
         if (updates.length === 0) {
             await customConfirm({
                 title: 'تنبيه',
-                message: 'لا توجد تحديثات لبثها. أضف تحديث أولاً.',
+                message: t('admin.noUpdatesToBroadcast'),
                 confirmText: 'حسناً',
                 showCancel: false,
                 type: 'warning'
@@ -3691,9 +4158,9 @@ const UpdatesTab: React.FC<{
 
         const latestUpdate = updates[0];
         const confirmBroadcast = await customConfirm({
-            title: 'بث التحديث',
-            message: `هل تريد إرسال إشعار لجميع المستخدمين بخصوص الإصدار ${latestUpdate.version}؟`,
-            confirmText: 'بث الآن',
+            title: t('admin.broadcastUpdate'),
+            message: t('admin.sendNotificationToAllUsers', { version: latestUpdate.version }),
+            confirmText: t('admin.broadcastNow'),
             cancelText: 'إلغاء',
             type: 'info'
         });
@@ -3710,7 +4177,7 @@ const UpdatesTab: React.FC<{
                     changelog: latestUpdate.changelog,
                     critical: latestUpdate.critical,
                     broadcastAt: serverTimestamp(),
-                    message: `🚀 تحديث جديد: الإصدار ${latestUpdate.version} متاح الآن! ${latestUpdate.changelog}`
+                    message: t('admin.newUpdateAvailable', { version: latestUpdate.version, changelog: latestUpdate.changelog })
                 });
             }
 
@@ -3719,8 +4186,8 @@ const UpdatesTab: React.FC<{
         } catch (error) {
             console.error('Error broadcasting update:', error);
             await customConfirm({
-                title: 'خطأ',
-                message: 'حدث خطأ أثناء بث التحديث',
+                title: t('admin.error'),
+                message: t('admin.errorBroadcastingUpdate'),
                 confirmText: 'حسناً',
                 showCancel: false,
                 type: 'danger'
@@ -3734,9 +4201,9 @@ const UpdatesTab: React.FC<{
         <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4">
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-lg sm:text-xl font-bold text-white mb-1">التحديثات</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-white mb-1">{t('admin.updates')}</h3>
                     <p className="text-xs sm:text-sm text-white/50 leading-relaxed hidden sm:block">
-                        إدارة تحديثات النظام وإصداراته. يمكنك إضافة سجلات التغييرات (Changelog) لكل إصدار جديد مع تحديد التحديثات الحرجة.
+                        {t('admin.manageSystemUpdates')}
                     </p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
@@ -3745,7 +4212,7 @@ const UpdatesTab: React.FC<{
                         className="flex-1 sm:flex-none px-3 sm:px-4 py-2 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg sm:rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm"
                     >
                         <Plus className="w-4 h-4 flex-shrink-0" />
-                        <span className="hidden sm:inline">إضافة</span>
+                        <span className="hidden sm:inline">{t('admin.addUpdate')}</span>
                     </button>
                     {/* ✅ Global Broadcast Button */}
                     <button
@@ -3761,12 +4228,12 @@ const UpdatesTab: React.FC<{
                         ) : broadcastSent ? (
                             <>
                                 <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                                <span className="hidden sm:inline">تم البث</span>
+                                <span className="hidden sm:inline">{t('admin.broadcastSent')}</span>
                             </>
                         ) : (
                             <>
                                 <Bell className="w-4 h-4 flex-shrink-0" />
-                                <span className="hidden sm:inline">بث التحديث</span>
+                                <span className="hidden sm:inline">{t('admin.broadcastUpdateButton')}</span>
                             </>
                         )}
                     </button>
@@ -3778,7 +4245,7 @@ const UpdatesTab: React.FC<{
                 <p className="text-purple-300 text-xs flex items-center gap-2">
                     <Bell className="w-4 h-4 flex-shrink-0" />
                     <span>
-                        زر "بث التحديث" يرسل إشعار فوري لجميع المشتركين والموظفين في كل الفروع بخصوص آخر تحديث.
+                        {t('admin.broadcastUpdateButtonDesc')}
                     </span>
                 </p>
             </div>
@@ -3786,10 +4253,10 @@ const UpdatesTab: React.FC<{
                 {updates.length === 0 ? (
                     <div className="text-center py-8 sm:py-12 px-4">
                         <Activity className="w-12 h-12 sm:w-16 sm:h-16 text-white/10 mx-auto mb-4" />
-                        <p className="text-white/60 font-medium mb-2 text-sm sm:text-base">لا توجد تحديثات مسجلة حالياً</p>
+                        <p className="text-white/60 font-medium mb-2 text-sm sm:text-base">{t('admin.noUpdatesRecorded')}</p>
                         <p className="text-xs sm:text-sm text-white/40 max-w-md mx-auto leading-relaxed">
-                            يمكنك إضافة سجلات التحديثات لإعلام المستخدمين بالإصدارات الجديدة والميزات المضافة.
-                            التحديثات الحرجة ستظهر بشكل بارز للمستخدمين.
+                            {t('admin.addUpdateLogs')}
+                            {t('admin.criticalUpdatesProminent')}
                         </p>
                     </div>
                 ) : (
@@ -3823,13 +4290,14 @@ const BroadcastsTab: React.FC<{
     broadcasts: SystemSettings['broadcastMessages'];
     onAddBroadcast: () => void;
 }> = ({ broadcasts, onAddBroadcast }) => {
+    const { t } = useTranslation();
     return (
         <div className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4">
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-lg sm:text-xl font-bold text-white mb-1">الرسائل العامة</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-white mb-1">{t('admin.generalMessages')}</h3>
                     <p className="text-xs sm:text-sm text-white/50 leading-relaxed hidden sm:block">
-                        إرسال رسائل عامة لجميع المستخدمين أو مستأجرين محددين. يمكن استخدامها للإعلانات، التنبيهات، أو التحديثات المهمة.
+                        {t('admin.sendGeneralMessages')}
                     </p>
                 </div>
                 <button
@@ -3837,17 +4305,17 @@ const BroadcastsTab: React.FC<{
                     className="w-full sm:w-auto px-3 sm:px-4 py-2 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg sm:rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm"
                 >
                     <Plus className="w-4 h-4 flex-shrink-0" />
-                    <span className="sm:hidden">إضافة رسالة</span>
+                    <span className="sm:hidden">{t('admin.addMessage')}</span>
                 </button>
             </div>
             <div className="space-y-3">
                 {broadcasts.length === 0 ? (
                     <div className="text-center py-8 sm:py-12 px-4">
                         <MessageSquare className="w-12 h-12 sm:w-16 sm:h-16 text-white/10 mx-auto mb-4" />
-                        <p className="text-white/60 font-medium mb-2 text-sm sm:text-base">لا توجد رسائل عامة حالياً</p>
+                        <p className="text-white/60 font-medium mb-2 text-sm sm:text-base">{t('admin.noGeneralMessages')}</p>
                         <p className="text-xs sm:text-sm text-white/40 max-w-md mx-auto leading-relaxed">
-                            يمكنك إضافة رسائل عامة لإعلام جميع المستخدمين أو مستأجرين محددين بأخبار مهمة، تحديثات النظام، أو تنبيهات خاصة.
-                            الرسائل ستظهر في لوحة التحكم للمستخدمين المستهدفين.
+                            {t('admin.addGeneralMessages')}
+                            {t('admin.messagesWillAppear')}
                         </p>
                     </div>
                 ) : (
@@ -3928,7 +4396,7 @@ const UpdateModal: React.FC<{
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" style={{ backdropFilter: 'none' }}>
             <div className="glass rounded-2xl p-6 max-w-md w-full">
-                <h3 className="text-xl font-bold text-white mb-6">إضافة تحديث جديد</h3>
+                <h3 className="text-xl font-bold text-white mb-6">{t('admin.addNewUpdate')}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
                         type="text"
@@ -3953,7 +4421,7 @@ const UpdateModal: React.FC<{
                             onChange={(e) => setCritical(e.target.checked)}
                             className="w-4 h-4 rounded"
                         />
-                        <span>تحديث حرج</span>
+                        <span>{t('admin.criticalUpdate')}</span>
                     </label>
                     <label className="flex items-center gap-3 text-white/60">
                         <input
@@ -3962,7 +4430,7 @@ const UpdateModal: React.FC<{
                             onChange={(e) => setRequired(e.target.checked)}
                             className="w-4 h-4 rounded"
                         />
-                        <span>إجبار التحديث</span>
+                        <span>{t('admin.forceUpdate')}</span>
                     </label>
                     <div className="flex gap-3 pt-4">
                         <button
@@ -3976,7 +4444,7 @@ const UpdateModal: React.FC<{
                             type="submit"
                             className="flex-1 px-4 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl text-white hover:from-yellow-600 hover:to-yellow-700 transition-all font-medium"
                         >
-                            إضافة
+                            {t('admin.addUpdate')}
                         </button>
                     </div>
                 </form>
@@ -4018,10 +4486,10 @@ const TenantMultiSelect: React.FC<{
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white/80 hover:bg-white/10 focus:outline-none focus:border-yellow-400 transition-all flex items-center justify-between"
                 >
                     <span className="text-sm">
-                        {loading ? 'جاري التحميل...' :
-                            selectedTenants.length === 0 ? 'اختر المستأجرين' :
+                        {loading ? t('admin.loading') :
+                            selectedTenants.length === 0 ? t('common.select') :
                                 selectedTenants.length === 1 ? selectedNames[0] :
-                                    `تم اختيار ${selectedTenants.length} مستأجر`}
+                                    t('admin.selectedTenantsPlural', { count: selectedTenants.length })}
                     </span>
                     <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -4029,7 +4497,7 @@ const TenantMultiSelect: React.FC<{
                 {isOpen && (
                     <div className="absolute z-50 w-full mt-2 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-2xl max-h-[250px] overflow-y-auto">
                         {loading ? (
-                            <div className="text-center py-4 text-white/60">جاري التحميل...</div>
+                            <div className="text-center py-4 text-white/60">{t('admin.loading')}</div>
                         ) : tenants.length === 0 ? (
                             <div className="text-center py-4 text-white/60">لا يوجد مستأجرون</div>
                         ) : (
@@ -4059,7 +4527,7 @@ const TenantMultiSelect: React.FC<{
 
             {selectedTenants.length > 0 && (
                 <div className="text-xs text-white/60 bg-blue-500/10 p-2 rounded-lg">
-                    تم اختيار {selectedTenants.length} مستأجر: {selectedNames.join('، ')}
+                    {t('admin.selectedTenantsPlural', { count: selectedTenants.length })}: {selectedNames.join('، ')}
                 </div>
             )}
         </div>
@@ -4166,7 +4634,7 @@ const BroadcastModal: React.FC<{
     return (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-                <h3 className="text-xl font-bold text-white mb-6">إضافة رسالة عامة</h3>
+                <h3 className="text-xl font-bold text-white mb-6">{t('admin.addGeneralMessage')}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
                         type="text"
@@ -4311,7 +4779,7 @@ const BroadcastModal: React.FC<{
                             type="submit"
                             className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl text-white hover:from-blue-600 hover:to-blue-700 transition-all font-medium"
                         >
-                            إضافة
+                            {t('admin.addUpdate')}
                         </button>
                     </div>
                 </form>
@@ -4326,6 +4794,7 @@ const AddManagerModal: React.FC<{
     onClose: () => void;
     onSuccess: () => void;
 }> = ({ systemSettings, onClose, onSuccess }) => {
+    const { t } = useTranslation();
     // ✅ Wizard Step State
     const [currentStep, setCurrentStep] = useState(1);
     const TOTAL_STEPS = 4;
@@ -4397,7 +4866,7 @@ const AddManagerModal: React.FC<{
 
     // Step Titles
     const stepTitles = {
-        1: 'البيانات الأساسية',
+        1: t('admin.basicData'),
         2: 'الفروع',
         3: 'الاشتراك والدفع',
         4: 'المراجعة والحفظ'
@@ -4506,11 +4975,11 @@ const AddManagerModal: React.FC<{
             return;
         }
         if (code.length !== 4 || !/^\d+$/.test(code)) {
-            setError('كود المدير يجب أن يكون 4 أرقام');
+            setError(t('admin.managerCodeMustBe4Digits'));
             return;
         }
         if (branchCodes.length === 0) {
-            setError('يجب إضافة كود فرع واحد على الأقل');
+            setError(t('admin.mustAddOneBranch'));
             return;
         }
         if (conflictingCodes.has(code)) {
@@ -4604,13 +5073,13 @@ const AddManagerModal: React.FC<{
                         paymentMethod, // ✅ طريقة الدفع من النافذة
                         currency: 'SAR',
                         createdBy: user?.id,
-                        notes: `سند قبض تلقائي - اشتراك ${subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'}`
+                        notes: t('admin.receiptVoucherAuto', { duration: subscriptionDuration === 1 ? t('admin.oneYear') : t('admin.twoYears') })
                     });
                     createdVoucherIds.push(voucherId);
                 }
             }
 
-            showSuccess('تم إضافة المدير وإنشاء سندات القبض بنجاح');
+            showSuccess(t('admin.addManagerSuccess'));
 
             // ✅ Print vouchers automatically
             if (createdVoucherIds.length > 0) {
@@ -4991,8 +5460,8 @@ const AddManagerModal: React.FC<{
                                                 <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${formattedDate}</div>
                                             </div>
                                             <div style="text-align: left;">
-                                                <div style="font-size: 9pt; color: #6b7280; margin-bottom: 3px;">حالة الدفع</div>
-                                                <div style="font-size: 10pt; color: #22c55e; font-weight: 600;">✅ مدفوعة</div>
+                                                <div style="font-size: 9pt; color: #6b7280; margin-bottom: 3px;">${t('admin.paymentStatus')}</div>
+                                                <div style="font-size: 10pt; color: #22c55e; font-weight: 600;">${t('admin.paid')}</div>
                                             </div>
                                         </div>
                                         
@@ -5062,7 +5531,7 @@ const AddManagerModal: React.FC<{
                                 <html dir="rtl" lang="ar">
                                 <head>
                                     <meta charset="UTF-8">
-                                    <title>طباعة الفواتير</title>
+                                    <title>${t('common.print')} ${t('admin.invoice')}</title>
                                     <style>
                                         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800&display=swap');
                                         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -5120,8 +5589,8 @@ const AddManagerModal: React.FC<{
 
             onSuccess();
         } catch (err: any) {
-            setError(err.message || 'حدث خطأ');
-            showError(err.message || 'حدث خطأ في إضافة المدير');
+            setError(err.message || t('admin.addError'));
+            showError(err.message || t('admin.addManagerError'));
         } finally {
             setLoading(false);
         }
@@ -5139,7 +5608,7 @@ const AddManagerModal: React.FC<{
                             <Plus className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>إضافة مدير جديد</h3>
+                            <h3 className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>{t('admin.addNewManager')}</h3>
                             <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>{stepTitles[currentStep as keyof typeof stepTitles]}</p>
                         </div>
                     </div>
@@ -5273,7 +5742,7 @@ const AddManagerModal: React.FC<{
                             <div className="glass rounded-xl p-4">
                                 <label className="flex items-center gap-2 text-sm mb-3" style={{ color: 'var(--theme-text-secondary)' }}>
                                     <Plus className="w-4 h-4 text-teal-500" />
-                                    إضافة فرع جديد
+                                    {t('admin.addUpdate')} فرع جديد
                                 </label>
                                 <div className="flex gap-2">
                                     <input
@@ -5423,18 +5892,18 @@ const AddManagerModal: React.FC<{
                             {/* Success Banner */}
                             <div className="p-3 rounded-xl flex items-center gap-3 bg-green-500/10 border border-green-500/30">
                                 <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                                <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>راجع البيانات قبل <strong>الحفظ النهائي</strong></p>
+                                <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }} dangerouslySetInnerHTML={{ __html: t('admin.reviewDataBeforeFinalSave') }} />
                             </div>
 
                             {/* Summary Cards */}
                             <div className="space-y-2">
                                 {/* Basic Info */}
                                 <div className="glass rounded-xl p-3">
-                                    <h4 className="text-xs font-bold mb-2 flex items-center gap-2 text-teal-500"><Users className="w-3.5 h-3.5" />البيانات الأساسية</h4>
+                                    <h4 className="text-xs font-bold mb-2 flex items-center gap-2 text-teal-500"><Users className="w-3.5 h-3.5" />{t('admin.basicData')}</h4>
                                     <div className="grid grid-cols-2 gap-2 text-sm">
-                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>الاسم</span><span style={{ color: 'var(--theme-text-primary)' }}>{name || 'مدير جديد'}</span></div>
-                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>الهاتف</span><span style={{ color: 'var(--theme-text-primary)' }} dir="ltr">{phone}</span></div>
-                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>الكود</span><span className="font-mono font-bold text-teal-500">{code}</span></div>
+                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>{t('admin.name')}</span><span style={{ color: 'var(--theme-text-primary)' }}>{name || t('admin.newManager')}</span></div>
+                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>{t('admin.phone')}</span><span style={{ color: 'var(--theme-text-primary)' }} dir="ltr">{phone}</span></div>
+                                        <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>{t('admin.code')}</span><span className="font-mono font-bold text-teal-500">{code}</span></div>
                                         <div><span className="text-xs block" style={{ color: 'var(--theme-text-disabled)' }}>البراند</span><span style={{ color: 'var(--theme-text-primary)' }}>{hotelName || '-'}</span></div>
                                     </div>
                                 </div>
@@ -5505,6 +5974,7 @@ const ManagerDetailsModal: React.FC<{
     loading: boolean;
     onClose: () => void;
 }> = ({ tenant, managerDetails, loading, onClose }) => {
+    const { t } = useTranslation();
     const [activeBranchTab, setActiveBranchTab] = useState<string | null>(
         managerDetails.branches.length > 0 ? managerDetails.branches[0].id : null
     );
@@ -5589,14 +6059,14 @@ const ManagerDetailsModal: React.FC<{
                             <div class="stat-value">${Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))} يوم</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-label">الخطة</div>
+                            <div class="stat-label">${t('admin.plan')}</div>
                             <div class="stat-value">${tenant.plan}</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-label">حالة الترخيص</div>
+                            <div class="stat-label">${t('admin.licenseStatus')}</div>
                             <div class="stat-value">
                                 <span class="badge ${tenant.daysUntilExpiry > 30 ? 'badge-green' : tenant.daysUntilExpiry > 7 ? 'badge-yellow' : 'badge-red'}">
-                                    ${tenant.daysUntilExpiry > 0 ? tenant.daysUntilExpiry + ' يوم متبقي' : 'منتهي'}
+                                    ${tenant.daysUntilExpiry > 0 ? t('admin.daysRemaining', { days: tenant.daysUntilExpiry }) : t('admin.expired')}
                                 </span>
                             </div>
                         </div>
@@ -5709,13 +6179,13 @@ const ManagerDetailsModal: React.FC<{
                                         </p>
                                     </div>
                                     <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
-                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">الخطة</p>
+                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.plan')}</p>
                                         <p className="text-slate-800 dark:text-white font-medium capitalize">{tenant.plan}</p>
                                     </div>
                                     <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
-                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">حالة الترخيص</p>
+                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.licenseStatus')}</p>
                                         <p className={`font-medium ${tenant.daysUntilExpiry > 30 ? 'text-green-600 dark:text-green-400' : tenant.daysUntilExpiry > 7 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
-                                            {tenant.daysUntilExpiry > 0 ? `${tenant.daysUntilExpiry} يوم متبقي` : 'منتهي'}
+                                            {tenant.daysUntilExpiry > 0 ? t('admin.daysRemaining', { days: tenant.daysUntilExpiry }) : t('admin.expired')}
                                         </p>
                                     </div>
                                 </div>
@@ -5867,6 +6337,237 @@ const ManagerDetailsModal: React.FC<{
                         </div>
                     )}
                 </div>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================
+// SUBSCRIPTION REQUESTS TAB COMPONENT
+// ============================================================
+
+const SubscriptionRequestsTab: React.FC = () => {
+    const { success, error } = useUX();
+    const { t } = useTranslation();
+    const [requests, setRequests] = useState<TrialRequest[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+
+    // Fetch requests
+    useEffect(() => {
+        const fetchRequests = async () => {
+            setLoading(true);
+            try {
+                const result = await getAllTrialRequests();
+                if (result.success && result.data) {
+                    setRequests(result.data);
+                } else {
+                    // ✅ Better error message for permission errors
+                    const errorMsg = result.error || t('common.error');
+                    const isPermissionError = errorMsg.toLowerCase().includes('permission') || 
+                                             errorMsg.toLowerCase().includes('missing or insufficient') ||
+                                             errorMsg.toLowerCase().includes('unauthorized');
+                    
+                    if (isPermissionError) {
+                        error(t('admin.permissionError'));
+                    } else {
+                        error(errorMsg);
+                    }
+                }
+            } catch (err: any) {
+                const errorMsg = err.message || 'حدث خطأ أثناء جلب الطلبات';
+                const isPermissionError = errorMsg.toLowerCase().includes('permission') || 
+                                         errorMsg.toLowerCase().includes('missing or insufficient') ||
+                                         errorMsg.toLowerCase().includes('unauthorized');
+                
+                if (isPermissionError) {
+                        error(t('admin.permissionErrorGeneral'));
+                } else {
+                    error(errorMsg);
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchRequests();
+    }, []); // ✅ Remove 'error' from dependencies to prevent infinite loops
+
+    // Filter requests
+    const filteredRequests = useMemo(() => {
+        if (filter === 'all') return requests;
+        return requests.filter(req => req.status === filter);
+    }, [requests, filter]);
+
+    // Format date
+    const formatDate = (dateValue: any): string => {
+        if (!dateValue) return t('admin.undefined');
+        try {
+            let date: Date;
+            if (dateValue instanceof Timestamp) {
+                date = dateValue.toDate();
+            } else if (typeof dateValue?.toDate === 'function') {
+                date = dateValue.toDate();
+            } else if (dateValue instanceof Date) {
+                date = dateValue;
+            } else {
+                date = new Date(dateValue);
+            }
+            return new Intl.DateTimeFormat('ar-SA', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        } catch {
+            return t('admin.undefined');
+        }
+    };
+
+    // Get status badge
+    const getStatusBadge = (status: string) => {
+        const styles = {
+            pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+            approved: 'bg-green-500/20 text-green-400 border-green-500/30',
+            rejected: 'bg-red-500/20 text-red-400 border-red-500/30'
+        };
+        const labels = {
+            pending: t('admin.statusPending'),
+            approved: t('admin.statusApproved'),
+            rejected: t('admin.statusRejected')
+        };
+        return (
+            <span className={`px-3 py-1 rounded-lg text-xs font-semibold border ${styles[status as keyof typeof styles] || styles.pending}`}>
+                {labels[status as keyof typeof labels] || status}
+            </span>
+        );
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <AdoraLoaderInline />
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-white mb-2">{t('admin.subscriptionRequests')}</h2>
+                    <p className="text-white/60">{t('admin.allTrialAndSubscriptionRequests')}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            setLoading(true);
+                            getAllTrialRequests().then(result => {
+                                if (result.success && result.data) {
+                                    setRequests(result.data);
+                                    success(t('admin.updateRequests'));
+                                }
+                                setLoading(false);
+                            });
+                        }}
+                        className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-all flex items-center gap-2"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        {t('admin.refresh')}
+                    </button>
+                </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                    <div className="text-white/60 text-sm mb-1">{t('common.total')}</div>
+                    <div className="text-2xl font-bold text-white">{requests.length}</div>
+                </div>
+                <div className="bg-yellow-500/10 rounded-xl p-4 border border-yellow-500/20">
+                    <div className="text-yellow-400/80 text-sm mb-1">{t('admin.statusPending')}</div>
+                    <div className="text-2xl font-bold text-yellow-400">
+                        {requests.filter(r => r.status === 'pending').length}
+                    </div>
+                </div>
+                <div className="bg-green-500/10 rounded-xl p-4 border border-green-500/20">
+                    <div className="text-green-400/80 text-sm mb-1">{t('admin.statusApproved')}</div>
+                    <div className="text-2xl font-bold text-green-400">
+                        {requests.filter(r => r.status === 'approved').length}
+                    </div>
+                </div>
+                <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/20">
+                    <div className="text-red-400/80 text-sm mb-1">{t('admin.statusRejected')}</div>
+                    <div className="text-2xl font-bold text-red-400">
+                        {requests.filter(r => r.status === 'rejected').length}
+                    </div>
+                </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex gap-2 flex-wrap">
+                {(['all', 'pending', 'approved', 'rejected'] as const).map((filterOption) => (
+                    <button
+                        key={filterOption}
+                        onClick={() => setFilter(filterOption)}
+                        className={`px-4 py-2 rounded-lg transition-all ${
+                            filter === filterOption
+                                ? 'bg-teal-500 text-white'
+                                : 'bg-white/5 text-white/60 hover:bg-white/10'
+                        }`}
+                    >
+                        {filterOption === 'all' && t('admin.filterAll')}
+                        {filterOption === 'pending' && t('admin.statusPending')}
+                        {filterOption === 'approved' && t('admin.statusApproved')}
+                        {filterOption === 'rejected' && t('admin.statusRejected')}
+                    </button>
+                ))}
+            </div>
+
+            {/* Requests List */}
+            <div className="space-y-4">
+                {filteredRequests.length === 0 ? (
+                    <div className="text-center py-12 bg-white/5 rounded-xl border border-white/10">
+                        <MessageSquare className="w-16 h-16 text-white/20 mx-auto mb-4" />
+                        <p className="text-white/60">{t('admin.noRequestsWithStatus', { status: filter !== 'all' ? filter : '' })}</p>
+                    </div>
+                ) : (
+                    filteredRequests.map((request) => (
+                        <div
+                            key={request.id}
+                            className="bg-white/5 rounded-xl p-6 border border-white/10 hover:border-teal-500/30 transition-all"
+                        >
+                            <div className="flex items-start justify-between flex-wrap gap-4">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-12 h-12 rounded-full bg-teal-500/20 flex items-center justify-center">
+                                            <Users className="w-6 h-6 text-teal-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-white">{request.name}</h3>
+                                            <p className="text-white/60 text-sm">{request.phone}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4 flex-wrap text-sm">
+                                        <div className="flex items-center gap-2 text-white/60">
+                                            <Calendar className="w-4 h-4" />
+                                            {formatDate(request.createdAt)}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-white/60">
+                                            <Globe className="w-4 h-4" />
+                                            {request.source === 'about_us_page' ? 'صفحة About Us' : request.source}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {getStatusBadge(request.status)}
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
     );

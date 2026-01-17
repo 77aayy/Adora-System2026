@@ -16,11 +16,13 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
-import { db } from '../../services/firebase';
-import { collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore';
+import { subscribeToLivePulse } from '../../services/dashboardStatsService';
 import { useLiveTimer, getElapsedMinutes, getElapsedWithColor } from '../../services/liveTimerService';
 import { haptic, playSound } from '../../utils/uxEffects';
-import { doc, getDoc } from 'firebase/firestore';
+import { getSystemSettings } from '../../services/systemSettingsService';
+import { logger } from '../../services/loggerService';
+// ✅ Architecture: Use services instead of direct Firebase calls
+// Note: subscribeToLivePulse is already in dashboardStatsService
 
 // ============================================================
 // TYPES
@@ -272,6 +274,12 @@ export const LivePulseDashboard: React.FC = () => {
         const loadPointsConfig = async () => {
             if (!tenantId || !branchId) return;
             
+            // ✅ Null Safety: Check db before operations
+            if (!db) {
+                logger.error('Cannot load points config', new Error('Database not initialized'), 'LivePulseDashboard');
+                return;
+            }
+
             try {
                 // Try branch-specific settings first
                 const branchPointsRef = doc(db, `tenants/${tenantId}/branches/${branchId}/settings`, 'points');
@@ -297,10 +305,10 @@ export const LivePulseDashboard: React.FC = () => {
                     };
                     
                     setDelayThresholds(customThresholds);
-                    console.log('✅ Loaded custom delay thresholds from manager settings:', customThresholds);
+                    logger.info('Loaded custom delay thresholds from manager settings', customThresholds, 'LivePulseDashboard');
                 }
-            } catch (error) {
-                console.warn('⚠️ Could not load points config, using defaults:', error);
+            } catch (error: any) {
+                logger.warn('Could not load points config, using defaults', error, 'LivePulseDashboard');
             }
         };
         
@@ -312,6 +320,12 @@ export const LivePulseDashboard: React.FC = () => {
         if (!tenantId || !branchId) return;
 
         const items: PulseItem[] = [];
+        // ✅ Null Safety: Check db before operations
+        if (!db) {
+            logger.error('Cannot subscribe to live pulse', new Error('Database not initialized'), 'LivePulseDashboard');
+            return;
+        }
+
         const unsubscribes: (() => void)[] = [];
 
         // Subscribe to cleaning requests (Housekeeping)

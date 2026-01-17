@@ -286,6 +286,13 @@ service cloud.firestore {
       );
     }
     
+    // 📝 Trial Requests - Anyone can create, only owner can read
+    match /trial_requests/{requestId} {
+      allow create: if true; // Anyone can submit a trial request
+      allow read: if request.auth != null && isOwner(); // Only owner can read all requests
+      allow update, delete: if request.auth != null && isOwner(); // Only owner can update/delete
+    }
+    
     // ⛔ DEFAULT DENY - Anything not explicitly allowed is DENIED!
   }
 }

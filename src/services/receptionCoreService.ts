@@ -36,7 +36,7 @@ export const getCapacityMetrics = async (
     try {
         // ✅ SECURITY: Use tenant/branch-isolated room service
         if (!tenantId) {
-            console.warn('getCapacityMetrics: tenantId is required for SaaS isolation. Returning empty metrics.');
+            logger.warn('getCapacityMetrics: tenantId is required for SaaS isolation', null, 'receptionCoreService');
             return { totalRooms: 0, occupiedRooms: 0, availableRooms: 0, occupancyRate: 0, pendingCheckIns: 0, pendingCheckOuts: 0 };
         }
 
@@ -53,7 +53,7 @@ export const getCapacityMetrics = async (
             pendingCheckOuts: 0
         };
     } catch (error) {
-        console.error('Capacity error:', error);
+        logger.error('Capacity error', error, 'receptionCoreService');
         return { totalRooms: 0, occupiedRooms: 0, availableRooms: 0, occupancyRate: 0, pendingCheckIns: 0, pendingCheckOuts: 0 };
     }
 };

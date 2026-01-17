@@ -55,8 +55,10 @@ import { useAllBranchesForOwner } from '../../hooks/useTenantData'; // ✅ SaaS 
 import { StatCard } from '../../components/common/StatCard'; // ✅ Use project StatCard
 import { AdoraLoader } from '../../components/common/AdoraLoader'; // ✅ Custom loader
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { confirm as customConfirm } from '../../services/customConfirmService';
+import { AdminSidebar } from '../../components/admin/AdminSidebar';
 
 interface BillingDashboardProps {
     embedded?: boolean; // ✅ When true, hides header and transitions (for tab embedding)
@@ -67,6 +69,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
     // ✅ SaaS Integration: Get all branches dynamically
     const { branches: allBranches, loading: branchesLoading } = useAllBranchesForOwner();
     const { success, error } = useUX();
+    const { user } = useAuth();
+    const { t } = useTranslation();
+    const isOwner = user?.role === 'owner';
     
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -392,57 +397,80 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
         return mainContent;
     }
 
-    // ✅ Standalone mode: full page with header
+    // ✅ Standalone mode: full page with header + sidebar
     return (
         <PageTransition>
-            <div className="min-h-screen theme-page">
-                <FlexibleHeader
-                    title="إدارة الفواتير والاشتراكات"
-                    titleIcon={<DollarSign className="w-6 h-6" />}
-                    subtitle={`${allBranches.length} فرع نشط • إدارة كاملة للفواتير والمدفوعات`}
-                    actions={[
-                        {
-                            id: 'back',
-                            icon: <ArrowLeft className="w-5 h-5" />,
-                            label: 'العودة',
-                            onClick: () => navigate('/owner-dashboard'),
-                            variant: 'default' as const,
-                            showOnMobile: true
-                        },
-                        {
-                            id: 'export-pdf',
-                            icon: <FileText className="w-4 h-4" />,
-                            label: 'PDF',
-                            onClick: () => {
-                                try {
-                                    exportToPDF({ subscriptions, invoices, payments }, 'billing-report.pdf');
-                                    success('تم تصدير التقرير PDF بنجاح');
-                                } catch (err) {
-                                    console.error('PDF export failed:', err);
-                                    error('فشل تصدير PDF');
-                                }
-                            },
-                            variant: 'default' as const
-                        },
-                        {
-                            id: 'export-excel',
-                            icon: <Download className="w-4 h-4" />,
-                            label: 'Excel',
-                            onClick: () => {
-                                try {
-                                    exportToExcel({ subscriptions, invoices, payments }, 'billing-report.xlsx');
-                                    success('تم تصدير التقرير Excel بنجاح');
-                                } catch (err) {
-                                    console.error('Excel export failed:', err);
-                                    error('فشل تصدير Excel');
-                                }
-                            },
-                            variant: 'default' as const
-                        }
-                    ]}
-                />
+            <div className="flex min-h-screen transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+                {/* ✅ ALWAYS VISIBLE SIDEBAR - Premium Professional Design */}
+                <div className="desktop-sidebar-container flex-shrink-0 fixed top-0 right-0 h-screen z-30">
+                    <aside id="admin-sidebar" className="h-full">
+                        <AdminSidebar
+                            isOwner={isOwner}
+                        />
+                    </aside>
+                </div>
 
-                {mainContent}
+                {/* Main Content Area - Adjusted for fixed sidebar */}
+                <main className="flex-1 p-4 pb-24 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col" style={{ marginRight: '280px' }}>
+                    <div className="flex-1">
+                        {/* Header */}
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center">
+                                        <DollarSign className="w-6 h-6 text-teal-400" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-2xl font-bold text-white">إدارة الفواتير والاشتراكات</h1>
+                                        <p className="text-sm text-white/60">{allBranches.length} فرع نشط • إدارة كاملة للفواتير والمدفوعات</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => {
+                                            try {
+                                                exportToPDF({ subscriptions, invoices, payments }, 'billing-report.pdf');
+                                                success('تم تصدير التقرير PDF بنجاح');
+                                            } catch (err) {
+                                                console.error('PDF export failed:', err);
+                                                error('فشل تصدير PDF');
+                                            }
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 border border-teal-500/30 hover:border-teal-500/50 transition-all"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        <span className="text-sm font-medium">PDF</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            try {
+                                                exportToExcel({ subscriptions, invoices, payments }, 'billing-report.xlsx');
+                                                success('تم تصدير التقرير Excel بنجاح');
+                                            } catch (err) {
+                                                console.error('Excel export failed:', err);
+                                                error('فشل تصدير Excel');
+                                            }
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 border border-teal-500/30 hover:border-teal-500/50 transition-all"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        <span className="text-sm font-medium">Excel</span>
+                                    </button>
+                                    <button
+                                        onClick={() => navigate('/owner-dashboard')}
+                                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 border border-teal-500/30 hover:border-teal-500/50 transition-all"
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                        <span className="text-sm font-medium">العودة</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Main Content */}
+                        {mainContent}
+                    </div>
+                </main>
             </div>
         </PageTransition>
     );
@@ -499,73 +527,57 @@ const ComprehensiveFinancialStats: React.FC<{
             {/* ✅ Essential Financial KPIs - Single Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {/* 1. إجمالي الإيرادات */}
-                <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-green-200 dark:border-green-500/30 shadow-md dark:shadow-lg">
-                    <StatCard
-                        icon={TrendingUp}
-                        iconColor="green"
-                        label="💰 إجمالي الإيرادات"
-                        value={`${totalRevenue.toLocaleString()} ر.س`}
-                    />
-                </div>
+                <StatCard
+                    icon={TrendingUp}
+                    iconColor="green"
+                    label={t('admin.totalRevenue')}
+                    value={`${totalRevenue.toLocaleString()} ${t('common.rs')}`}
+                />
                 
                 {/* 2. إجمالي المصروفات */}
-                <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-red-200 dark:border-red-500/30 shadow-md dark:shadow-lg">
-                    <StatCard
-                        icon={TrendingDown}
-                        iconColor="red"
-                        label="💸 المصروفات"
-                        value={`${totalExpenses.toLocaleString()} ر.س`}
-                    />
-                </div>
+                <StatCard
+                    icon={TrendingDown}
+                    iconColor="red"
+                    label={t('admin.totalExpenses')}
+                    value={`${totalExpenses.toLocaleString()} ${t('common.rs')}`}
+                />
                 
                 {/* 3. صافي الربح */}
-                <div className={`bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border shadow-md dark:shadow-lg ${
-                    netProfit >= 0 
-                        ? 'border-teal-200 dark:border-teal-500/30' 
-                        : 'border-orange-200 dark:border-orange-500/30'
-                }`}>
-                    <StatCard
-                        icon={netProfit >= 0 ? TrendingUp : TrendingDown}
-                        iconColor={netProfit >= 0 ? "teal" : "orange"}
-                        label="📊 صافي الربح"
-                        value={`${netProfit.toLocaleString()} ر.س`}
-                        lastUpdate={`${profitMargin.toFixed(0)}%`}
-                    />
-            </div>
+                <StatCard
+                    icon={netProfit >= 0 ? TrendingUp : TrendingDown}
+                    iconColor={netProfit >= 0 ? "teal" : "orange"}
+                    label={t('admin.netProfit')}
+                    value={`${netProfit.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={`${profitMargin.toFixed(0)}%`}
+                />
 
                 {/* 4. سندات القبض */}
-                <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-blue-200 dark:border-blue-500/30 shadow-md dark:shadow-lg">
-                    <StatCard
-                        icon={CreditCard}
-                        iconColor="blue"
-                        label="📝 سندات القبض"
-                        count={totalReceiptVouchers}
-                        lastUpdate={`${totalReceiptAmount.toLocaleString()} ر.س`}
-                    />
-                </div>
+                <StatCard
+                    icon={CreditCard}
+                    iconColor="blue"
+                    label={t('admin.receiptVouchers')}
+                    count={totalReceiptVouchers}
+                    lastUpdate={`${totalReceiptAmount.toLocaleString()} ${t('common.rs')}`}
+                />
                 
                 {/* 5. سندات الصرف */}
-                <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-purple-200 dark:border-purple-500/30 shadow-md dark:shadow-lg">
-                    <StatCard
-                        icon={DollarSign}
-                        iconColor="purple"
-                        label="📤 سندات الصرف"
-                        count={totalExpenseVouchers}
-                        lastUpdate={`${totalExpenseAmount.toLocaleString()} ر.س`}
-                    />
-                </div>
+                <StatCard
+                    icon={DollarSign}
+                    iconColor="purple"
+                    label={t('admin.expenseVouchers')}
+                    count={totalExpenseVouchers}
+                    lastUpdate={`${totalExpenseAmount.toLocaleString()} ${t('common.rs')}`}
+                />
                 
                 {/* 6. مستحقات متأخرة - Only show if there are overdue */}
                 {overdue.length > 0 && (
-                    <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl p-4 border border-orange-300 dark:border-orange-500/30 shadow-md dark:shadow-lg animate-pulse">
                     <StatCard
                         icon={AlertTriangle}
                         iconColor="orange"
-                            label="⚠️ متأخرات"
-                        value={`${totalOverdueAmount.toLocaleString()} ر.س`}
-                        lastUpdate={`${overdue.length} فاتورة`}
+                        label={t('admin.overdue')}
+                        value={`${totalOverdueAmount.toLocaleString()} ${t('common.rs')}`}
+                        lastUpdate={`${overdue.length} ${t('admin.invoice')}`}
                     />
-                </div>
                 )}
             </div>
         </div>

@@ -13,14 +13,14 @@ import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
 import { useAuth } from '../../context/AuthContext';
 import {
-    getEmergencyAlerts,
     createEmergencyAlert,
     updateEmergencyAlert,
     deactivateEmergencyAlert,
     type EmergencyAlert
 } from '../../services/emergencyAlertService';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+import { getAllEmergencyAlertsForBranch } from '../../services/emergencyAlertsAdminService';
+import { logger } from '../../services/loggerService';
+import { subscribeToRooms } from '../../services/roomService';
 
 interface EmergencyAlertsManagerProps {
     branchId: string;
@@ -62,42 +62,23 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
     }, [tenantId, branchId]);
 
     const loadAlerts = async () => {
-        if (!tenantId || !branchId) return;
+        // ✅ Null Safety: Check required params
+        if (!tenantId || !branchId) {
+            logger.warn('EmergencyAlertsManager: Missing tenantId or branchId', null, 'EmergencyAlertsManager');
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
-            if (!db) {
-                console.warn('Firebase db not initialized');
-                setLoading(false);
-                return;
-            }
-            
-            // Load all alerts (active and inactive) for management
-            const q = query(
-                collection(db, 'emergency_alerts'),
-                where('branchId', '==', branchId),
-                where('tenantId', '==', tenantId)
-            );
-            const snapshot = await getDocs(q);
-            const loaded: EmergencyAlert[] = [];
-            snapshot.forEach(doc => {
-                loaded.push({
-                    id: doc.id,
-                    ...doc.data()
-                } as EmergencyAlert);
-            });
-            setAlerts(loaded.sort((a, b) => {
-                const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-                const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-                return bTime.getTime() - aTime.getTime();
-            }));
-            console.log(`✅ Loaded ${loaded.length} emergency alerts for branch ${branchId}`);
+            // ✅ Architecture: Use service instead of direct Firebase call
+            const loaded = await getAllEmergencyAlertsForBranch(branchId, tenantId);
+            setAlerts(loaded);
         } catch (err: any) {
-            console.error('Error loading emergency alerts:', err);
+            logger.error('Error loading emergency alerts', err, 'EmergencyAlertsManager');
             // ✅ Only show error if it's a real error, not just empty collection
             if (err.code !== 'permission-denied') {
                 error('فشل تحميل التنبيهات الطارئة');
-            } else {
-                console.warn('⚠️ Permission denied - check Firestore rules for emergency_alerts');
             }
         } finally {
             setLoading(false);
@@ -105,18 +86,30 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
     };
 
     const loadAvailableRooms = async () => {
-        if (!tenantId || !branchId) return;
+        // ✅ Null Safety: Check required params
+        if (!tenantId || !branchId) {
+            logger.warn('Cannot load rooms: Missing tenantId or branchId', null, 'EmergencyAlertsManager');
+            return;
+        }
+
         try {
-            const roomsRef = collection(db, `tenants/${tenantId}/branches/${branchId}/rooms`);
-            const snapshot = await getDocs(roomsRef);
-            const rooms: string[] = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                if (data.number) rooms.push(data.number);
-            });
-            setAvailableRooms(rooms.sort());
-        } catch (err) {
-            console.error('Error loading rooms:', err);
+            // ✅ Architecture: Use service instead of direct Firebase call
+            // Use subscribeToRooms to get rooms, then extract room numbers
+            const unsubscribe = subscribeToRooms(branchId, (rooms) => {
+                const roomNumbers = rooms
+                    .map(room => room.number)
+                    .filter(Boolean)
+                    .sort();
+                setAvailableRooms(roomNumbers);
+                unsubscribe(); // Unsubscribe after first load
+            }, tenantId, 1000);
+
+            // Cleanup after 5 seconds if still subscribed
+            setTimeout(() => {
+                if (unsubscribe) unsubscribe();
+            }, 5000);
+        } catch (err: any) {
+            logger.error('Error loading rooms', err, 'EmergencyAlertsManager');
         }
     };
 

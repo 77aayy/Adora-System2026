@@ -497,6 +497,86 @@ input[type=number] {
   }
 
   /* ============================================================
+     ✅ TOAST NOTIFICATIONS FIX - Remove Black Frame
+     ============================================================ */
+  
+  /* ✅ AGGRESSIVE: Remove ANY black backdrop/frame from toast containers */
+  [class*="ToastContainer"],
+  [id*="toastContainer"],
+  div[class*="fixed"][class*="top"][class*="z-[9999]"],
+  div[class*="fixed"][class*="top-4"][class*="z-[9999]"],
+  div[class*="fixed"][class*="left-1/2"][class*="z-[9999]"],
+  div[class*="fixed"][class*="top-4"][class*="left-1/2"][class*="z-[9999]"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    /* ✅ CRITICAL: Remove any black frame/backdrop */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* ✅ AGGRESSIVE: Ensure toast items have NO black frames */
+  div[class*="pointer-events-auto"][class*="rounded-xl"],
+  div[class*="pointer-events-auto"][class*="rounded-xl"][class*="px-4"],
+  div[class*="pointer-events-auto"][class*="rounded-xl"][class*="px-4"][class*="py-3"],
+  div[class*="pointer-events-auto"][class*="rounded-xl"][class*="min-w"] {
+    background: var(--theme-bg-secondary, rgba(15, 23, 42, 0.95)) !important;
+    border: 1px solid var(--theme-border-primary, rgba(255, 255, 255, 0.1)) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2) !important;
+    outline: none !important;
+    border-image: none !important;
+    /* ✅ CRITICAL: No black frame around toasts */
+    margin: 0 !important;
+    padding: 0.875rem 1rem !important;
+    /* ✅ Remove any black background or backdrop */
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+  }
+  
+  /* ✅ Remove black frames from any parent containers or wrappers */
+  body > div[class*="fixed"][class*="z-[9999]"],
+  #root > div[class*="fixed"][class*="z-[9999]"],
+  div[class*="fixed"][class*="inset-0"][class*="z-[9999]"]:has([class*="ToastContainer"]),
+  div[class*="fixed"][class*="inset-0"]:has([class*="ToastContainer"]) {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  
+  /* ✅ Remove any black border/outline from toast wrapper */
+  div:has(> [class*="pointer-events-auto"][class*="rounded-xl"][class*="px-4"]) {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* ✅ ULTRA AGGRESSIVE: Remove black frames from ANY parent containers */
+  body > div[class*="fixed"][class*="z-[9999]"],
+  #root > div[class*="fixed"][class*="z-[9999]"],
+  /* ✅ Target any wrapper that might have black background */
+  div[class*="fixed"]:has(div[class*="pointer-events-auto"][class*="rounded-xl"]),
+  div[class*="fixed"][class*="top-4"]:has(div[class*="pointer-events-auto"]),
+  /* ✅ Remove black from any backdrop-like element */
+  div[class*="backdrop"]:has(div[class*="pointer-events-auto"][class*="rounded-xl"]),
+  div[class*="bg-black"]:has(div[class*="pointer-events-auto"][class*="rounded-xl"]) {
+    background: transparent !important;
+    border: none !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* ============================================================
      🔲 SOLID MODAL CLASS - Explicit solid styling
      ============================================================ */
   .solid-modal {
@@ -1868,13 +1948,23 @@ a:hover {
   color: white;
 }
 
-/* Disable text selection on buttons and icons */
+/* Disable text selection on buttons and icons only */
 button,
-.no-select {
+button *,
+.no-select,
+.no-select * {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+}
+
+/* ✅ Allow text selection on all other elements (p, div, span, etc.) */
+p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, label, input[type="text"], textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
 
 /* Loading State */

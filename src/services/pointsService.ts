@@ -89,6 +89,12 @@ let cachedConfigs: Record<string, any> = {};
  * Get points configuration from Tenant settings
  */
 export async function getPointsConfig(tenantId: string, branchId?: string): Promise<FullPointsConfig> {
+    // ✅ CRITICAL: Check db before use
+    if (!db) {
+        console.error('Firebase Firestore not initialized - returning default config');
+        return DEFAULT_POINTS_CONFIG as unknown as FullPointsConfig;
+    }
+
     if (cachedConfigs[tenantId]) return cachedConfigs[tenantId];
 
     try {

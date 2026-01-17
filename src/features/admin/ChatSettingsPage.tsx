@@ -36,6 +36,7 @@ import {
     saveQuickOption
 } from '../../services/smartChatService';
 import { haptic, playSound } from '../../utils/uxEffects';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -283,7 +284,7 @@ export const ChatSettingsPage: React.FC<ChatSettingsPageProps> = ({ tenantId }) 
             setWelcomeMessageEn(data.welcomeMessageEn || '');
             setSlaMinutes(data.slaMinutes || 5);
         } catch (error) {
-            console.error('Error loading chat settings:', error);
+            logger.error('Error loading chat settings', error, 'ChatSettingsPage');
         } finally {
             setLoading(false);
         }
@@ -305,7 +306,7 @@ export const ChatSettingsPage: React.FC<ChatSettingsPageProps> = ({ tenantId }) 
             });
             playSound('success');
         } catch (error) {
-            console.error('Error saving settings:', error);
+            logger.error('Error saving settings', error, 'ChatSettingsPage');
         } finally {
             setSaving(false);
         }
@@ -330,7 +331,7 @@ export const ChatSettingsPage: React.FC<ChatSettingsPageProps> = ({ tenantId }) 
             playSound('success');
             haptic('success');
         } catch (error) {
-            console.error('Error saving option:', error);
+            logger.error('Error saving option', error, 'ChatSettingsPage');
         }
     };
 
@@ -343,7 +344,7 @@ export const ChatSettingsPage: React.FC<ChatSettingsPageProps> = ({ tenantId }) 
             setSettings(s => s ? { ...s, quickOptions: updatedOptions } : null);
             playSound('pop');
         } catch (error) {
-            console.error('Error deleting option:', error);
+            logger.error('Error deleting option', error, 'ChatSettingsPage');
         }
     };
 

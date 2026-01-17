@@ -689,10 +689,20 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             placeholder="اسم البند"
                                             value={newItemName}
                                             onChange={e => setNewItemName(e.target.value)}
-                                            className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40 border border-slate-300 dark:border-white/10"
+                                            style={{
+                                                background: 'var(--theme-bg-secondary)',
+                                                color: 'var(--theme-text-primary)',
+                                                borderColor: 'var(--theme-border-primary)',
+                                            }}
+                                            className="px-3 py-2 rounded-xl placeholder:text-slate-400 dark:placeholder:text-white/40"
                                         />
                                         <input
-                                            className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40 border border-slate-300 dark:border-white/10"
+                                            style={{
+                                                background: 'var(--theme-bg-secondary)',
+                                                color: 'var(--theme-text-primary)',
+                                                borderColor: 'var(--theme-border-primary)',
+                                            }}
+                                            className="px-3 py-2 rounded-xl placeholder:text-slate-400 dark:placeholder:text-white/40"
                                         />
                                         <input
                                             type="number"
@@ -700,7 +710,12 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             placeholder="السعر"
                                             value={newItemPrice}
                                             onChange={e => setNewItemPrice(e.target.value)}
-                                            className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40 border border-slate-300 dark:border-white/10"
+                                            style={{
+                                                background: 'var(--theme-bg-secondary)',
+                                                color: 'var(--theme-text-primary)',
+                                                borderColor: 'var(--theme-border-primary)',
+                                            }}
+                                            className="px-3 py-2 rounded-xl placeholder:text-slate-400 dark:placeholder:text-white/40"
                                         />
                                         <div className="flex gap-2">
                                             <input
@@ -709,7 +724,12 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                                 title="الرصيد في المستودع"
                                                 value={newItemStock} // Reusing this state for Warehouse temporarily or split? Best to be clear.
                                                 onChange={e => setNewItemStock(e.target.value)}
-                                                className="w-1/2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/40 border border-slate-300 dark:border-white/10 border-blue-500/30"
+                                                style={{
+                                                    background: 'var(--theme-bg-secondary)',
+                                                    color: 'var(--theme-text-primary)',
+                                                    borderColor: 'var(--theme-border-primary)',
+                                                }}
+                                                className="w-1/2 px-3 py-2 rounded-xl placeholder:text-slate-400 dark:placeholder:text-white/40 border-blue-500/30"
                                             />
                                             {/* We rely on defaults for Rooms/Laundry on create, or I need more states. checking... 
                                                 Let's stick to Warehouse for quick add, edit for details. */}
@@ -836,7 +856,12 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                         <select
                                             value={reportPeriod}
                                             onChange={e => setReportPeriod(e.target.value as ReportPeriod)}
-                                            className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white border border-slate-300 dark:border-white/10"
+                                            style={{
+                                                background: 'var(--theme-bg-secondary)',
+                                                color: 'var(--theme-text-primary)',
+                                                borderColor: 'var(--theme-border-primary)',
+                                            }}
+                                            className="w-full px-3 py-2 rounded-xl"
                                         >
                                             <option value="day">يومي</option>
                                             <option value="week">أسبوعي</option>
@@ -851,7 +876,12 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                         <select
                                             value={reportMonth}
                                             onChange={e => setReportMonth(parseInt(e.target.value))}
-                                            className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/10 text-slate-800 dark:text-white border border-slate-300 dark:border-white/10"
+                                            style={{
+                                                background: 'var(--theme-bg-secondary)',
+                                                color: 'var(--theme-text-primary)',
+                                                borderColor: 'var(--theme-border-primary)',
+                                            }}
+                                            className="w-full px-3 py-2 rounded-xl"
                                         >
                                             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
                                                 <option key={m} value={m}>

@@ -22,6 +22,7 @@ import {
     type RatingTemplate,
     type RatingQuestion
 } from '../../services/ratingService';
+import { logger } from '../../services/loggerService';
 
 interface RatingTemplatesManagerProps {
     branchId: string;
@@ -71,7 +72,7 @@ export const RatingTemplatesManager: React.FC<RatingTemplatesManagerProps> = ({ 
             const loaded = await getRatingTemplates(branchId, tenantId);
             setTemplates(loaded);
         } catch (err) {
-            console.error('Error loading rating templates:', err);
+            logger.error('Error loading rating templates', err, 'RatingTemplatesManager');
             error('فشل تحميل القوالب');
         } finally {
             setLoading(false);

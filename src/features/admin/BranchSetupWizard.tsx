@@ -29,13 +29,15 @@ import {
     Play,
     Edit2
 } from 'lucide-react';
-import { addDoc, collection, Timestamp, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase';
 import { useTenant } from '../../context/TenantContext';
 import { useAuth } from '../../context/AuthContext';
 import { addRoomType, getRoomTypes, RoomTypeConfig } from '../../services/pricingRulesService';
 import { addRoom, createRoomBatch } from '../../services/roomService';
 import { haptic, playSound } from '../../utils/uxEffects';
+import { logger } from '../../services/loggerService';
+// ✅ Architecture: Use services instead of direct Firebase calls
+import { createBranch, updateBranch } from '../../services/branchService';
+import { Timestamp } from 'firebase/firestore';
 
 // ============================================================
 // TYPES
@@ -92,7 +94,7 @@ const saveWizardState = (state: WizardState) => {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
-        console.error('Error saving wizard state:', e);
+        logger.error('Error saving wizard state', e, 'BranchSetupWizard');
     }
 };
 
@@ -101,7 +103,7 @@ const loadWizardState = (): WizardState | null => {
         const saved = localStorage.getItem(STORAGE_KEY);
         return saved ? JSON.parse(saved) : null;
     } catch (e) {
-        console.error('Error loading wizard state:', e);
+        logger.error('Error loading wizard state', e, 'BranchSetupWizard');
         return null;
     }
 };
@@ -110,7 +112,7 @@ const clearWizardState = () => {
     try {
         localStorage.removeItem(STORAGE_KEY);
     } catch (e) {
-        console.error('Error clearing wizard state:', e);
+        logger.error('Error clearing wizard state', e, 'BranchSetupWizard');
     }
 };
 
@@ -214,18 +216,29 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                 // Create branch in Firestore
                 if (!tenantId) throw new Error('لم يتم تحديد المؤسسة');
                 
-                const branchRef = await addDoc(collection(db, `tenants/${tenantId}/branches`), {
+                // ✅ Architecture: Use service instead of direct Firebase call
+                // ✅ Null Safety: Check required params
+                if (!tenantId) {
+                    throw new Error('لم يتم تحديد المؤسسة');
+                }
+
+                const result = await createBranch(tenantId, {
                     name: state.branchData.name,
                     code: state.branchData.code,
                     location: state.branchData.location,
-                    status: 'setup_incomplete', // Mark as incomplete
-                    createdAt: Timestamp.now(),
-                    createdBy: user?.id,
+                    status: 'setup_incomplete',
+                    createdBy: user?.id || 'system',
                     settings: {
                         allowNegativeInventory: false,
                         requireManagerApproval: true
                     }
-                });
+                } as any);
+
+                if (!result.success || !result.branchId) {
+                    throw new Error(result.error || 'Failed to create branch');
+                }
+
+                const branchRef = { id: result.branchId };
 
                 setState(prev => ({
                     ...prev,
@@ -288,7 +301,7 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                 }));
             }
         } catch (err: any) {
-            console.error('Wizard step error:', err);
+            logger.error('Wizard step error', err, 'BranchSetupWizard');
             setError(err.message || 'حدث خطأ غير متوقع');
             haptic('error');
         } finally {
@@ -312,11 +325,20 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
         try {
             if (!tenantId || !state.branchId) throw new Error('لم يتم تحديد الفرع');
 
-            // Update branch status to active
-            await updateDoc(doc(db, `tenants/${tenantId}/branches`, state.branchId), {
+            // ✅ Architecture: Use service instead of direct Firebase call
+            // ✅ Null Safety: Check required params
+            if (!tenantId || !state.branchId) {
+                throw new Error('لم يتم تحديد الفرع');
+            }
+
+            const result = await updateBranch(tenantId, state.branchId, {
                 status: 'active',
-                setupCompletedAt: Timestamp.now()
-            });
+                setupCompletedAt: Timestamp.now() as any
+            } as any);
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to activate branch');
+            }
 
             setState(prev => ({
                 ...prev,
@@ -334,7 +356,7 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                 onClose();
             }, 2000);
         } catch (err: any) {
-            console.error('Activation error:', err);
+            logger.error('Activation error', err, 'BranchSetupWizard');
             setError(err.message || 'فشل في تفعيل الفرع');
             haptic('error');
         } finally {

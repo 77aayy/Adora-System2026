@@ -146,12 +146,51 @@ export const getTicket = async (ticketId: string): Promise<SupportTicket | null>
 };
 
 /**
- * Subscribe to tickets for a tenant (Owner view)
+ * Subscribe to ALL tickets (Owner view - sees tickets from all managers/employees)
+ */
+export const subscribeToAllTickets = (
+    callback: (tickets: SupportTicket[]) => void
+): (() => void) => {
+    if (!db) {
+        console.warn('Firebase db not initialized, skipping all tickets subscription');
+        callback([]);
+        return () => {};
+    }
+    
+    const q = query(
+        getTicketsCollectionRef(),
+        orderBy('createdAt', 'desc')
+    );
+    
+    return onSnapshot(
+        q,
+        (snapshot) => {
+            const tickets = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as SupportTicket));
+            callback(tickets);
+        },
+        (error) => {
+            console.error('Error subscribing to all tickets:', error);
+            callback([]);
+        }
+    );
+};
+
+/**
+ * Subscribe to tickets for a tenant (Manager view - sees only their tenant's tickets)
  */
 export const subscribeToTenantTickets = (
     tenantId: string,
     callback: (tickets: SupportTicket[]) => void
 ): (() => void) => {
+    if (!db) {
+        console.warn('Firebase db not initialized, skipping tenant tickets subscription');
+        callback([]);
+        return () => {};
+    }
+    
     const q = query(
         getTicketsCollectionRef(),
         where('tenantId', '==', tenantId),
@@ -238,6 +277,7 @@ export const subscribeToBranchTickets = (
 
 /**
  * Acknowledge ticket (Owner clicks "تم العلم")
+ * ✅ Sends notification to ticket sender
  */
 export const acknowledgeTicket = async (
     ticketId: string,
@@ -245,12 +285,45 @@ export const acknowledgeTicket = async (
     ownerName: string
 ): Promise<void> => {
     try {
+        // Get ticket to find sender info
+        const ticket = await getTicket(ticketId);
+        if (!ticket) {
+            throw new Error('التذكرة غير موجودة');
+        }
+
+        // Update ticket status
         await updateDoc(getTicketDocRef(ticketId), {
             status: 'acknowledged',
             acknowledgedBy: { id: ownerId, name: ownerName },
             acknowledgedAt: Timestamp.now(),
             updatedAt: Timestamp.now()
         });
+
+        // ✅ Send push notification to ticket sender
+        try {
+            const { sendPushNotification } = await import('./pushNotificationService');
+            if (ticket.senderId && db) {
+                const senderRef = doc(db, 'users', ticket.senderId);
+                const senderDoc = await getDoc(senderRef);
+                if (senderDoc.exists()) {
+                    const senderData = senderDoc.data();
+                    const fcmToken = senderData.fcmToken;
+                    if (fcmToken) {
+                        await sendPushNotification(fcmToken, {
+                            title: 'تم العلم بتذكرتك',
+                            body: `تم العلم بتذكرة الدعم الفني #${ticket.ticketNumber} من قبل المالك`,
+                            data: {
+                                type: 'support_ticket_acknowledged',
+                                ticketId: ticketId,
+                                ticketNumber: ticket.ticketNumber
+                            }
+                        });
+                    }
+                }
+            }
+        } catch (notifError) {
+            console.warn('Failed to send notification (non-critical):', notifError);
+        }
     } catch (error) {
         console.error('Error acknowledging ticket:', error);
         throw error;
@@ -279,6 +352,7 @@ export const markTicketInProgress = async (
 
 /**
  * Resolve ticket (Owner clicks "تم الإصلاح/الانتهاء")
+ * ✅ Sends notification to ticket sender
  */
 export const resolveTicket = async (
     ticketId: string,
@@ -287,6 +361,13 @@ export const resolveTicket = async (
     resolutionNote: string
 ): Promise<void> => {
     try {
+        // Get ticket to find sender info
+        const ticket = await getTicket(ticketId);
+        if (!ticket) {
+            throw new Error('التذكرة غير موجودة');
+        }
+
+        // Update ticket status
         await updateDoc(getTicketDocRef(ticketId), {
             status: 'resolved',
             resolvedBy: { id: ownerId, name: ownerName },
@@ -294,6 +375,32 @@ export const resolveTicket = async (
             resolutionNote,
             updatedAt: Timestamp.now()
         });
+
+        // ✅ Send push notification to ticket sender
+        try {
+            const { sendPushNotification } = await import('./pushNotificationService');
+            if (ticket.senderId && db) {
+                const senderRef = doc(db, 'users', ticket.senderId);
+                const senderDoc = await getDoc(senderRef);
+                if (senderDoc.exists()) {
+                    const senderData = senderDoc.data();
+                    const fcmToken = senderData.fcmToken;
+                    if (fcmToken) {
+                        await sendPushNotification(fcmToken, {
+                            title: 'تم حل تذكرتك',
+                            body: `تم حل تذكرة الدعم الفني #${ticket.ticketNumber}. ${resolutionNote.substring(0, 80)}${resolutionNote.length > 80 ? '...' : ''}`,
+                            data: {
+                                type: 'support_ticket_resolved',
+                                ticketId: ticketId,
+                                ticketNumber: ticket.ticketNumber
+                            }
+                        });
+                    }
+                }
+            }
+        } catch (notifError) {
+            console.warn('Failed to send notification (non-critical):', notifError);
+        }
     } catch (error) {
         console.error('Error resolving ticket:', error);
         throw error;
@@ -302,6 +409,7 @@ export const resolveTicket = async (
 
 /**
  * Close ticket
+ * ✅ Sends notification to ticket sender
  */
 export const closeTicket = async (
     ticketId: string,
@@ -310,13 +418,48 @@ export const closeTicket = async (
     resolutionNote?: string
 ): Promise<void> => {
     try {
+        // Get ticket to find sender info
+        const ticket = await getTicket(ticketId);
+        if (!ticket) {
+            throw new Error('التذكرة غير موجودة');
+        }
+
+        const note = resolutionNote || 'تم الإغلاق';
+
+        // Update ticket status
         await updateDoc(getTicketDocRef(ticketId), {
             status: 'closed',
             closedBy: { id: ownerId, name: ownerName },
             closedAt: Timestamp.now(),
-            resolutionNote: resolutionNote || 'تم الإغلاق',
+            resolutionNote: note,
             updatedAt: Timestamp.now()
         });
+
+        // ✅ Send push notification to ticket sender
+        try {
+            const { sendPushNotification } = await import('./pushNotificationService');
+            if (ticket.senderId && db) {
+                const senderRef = doc(db, 'users', ticket.senderId);
+                const senderDoc = await getDoc(senderRef);
+                if (senderDoc.exists()) {
+                    const senderData = senderDoc.data();
+                    const fcmToken = senderData.fcmToken;
+                    if (fcmToken) {
+                        await sendPushNotification(fcmToken, {
+                            title: 'تم إغلاق تذكرتك',
+                            body: `تم إغلاق تذكرة الدعم الفني #${ticket.ticketNumber}. ${note.substring(0, 80)}${note.length > 80 ? '...' : ''}`,
+                            data: {
+                                type: 'support_ticket_closed',
+                                ticketId: ticketId,
+                                ticketNumber: ticket.ticketNumber
+                            }
+                        });
+                    }
+                }
+            }
+        } catch (notifError) {
+            console.warn('Failed to send notification (non-critical):', notifError);
+        }
     } catch (error) {
         console.error('Error closing ticket:', error);
         throw error;
@@ -325,6 +468,7 @@ export const closeTicket = async (
 
 /**
  * Add owner response to ticket
+ * ✅ Sends notification to ticket sender when owner responds
  */
 export const addOwnerResponse = async (
     ticketId: string,
@@ -333,11 +477,47 @@ export const addOwnerResponse = async (
     ownerName: string
 ): Promise<void> => {
     try {
+        // Get ticket to find sender info
+        const ticket = await getTicket(ticketId);
+        if (!ticket) {
+            throw new Error('التذكرة غير موجودة');
+        }
+
+        // Update ticket with owner response
         await updateDoc(getTicketDocRef(ticketId), {
             ownerResponse: response,
             ownerResponseAt: Timestamp.now(),
-            updatedAt: Timestamp.now()
+            updatedAt: Timestamp.now(),
+            status: ticket.status === 'pending' ? 'acknowledged' : ticket.status // Auto-acknowledge if pending
         });
+
+        // ✅ Send push notification to ticket sender
+        try {
+            const { sendPushNotification } = await import('./pushNotificationService');
+            // Get sender's FCM token from users collection
+            if (ticket.senderId && db) {
+                const senderRef = doc(db, 'users', ticket.senderId);
+                const senderDoc = await getDoc(senderRef);
+                if (senderDoc.exists()) {
+                    const senderData = senderDoc.data();
+                    const fcmToken = senderData.fcmToken;
+                    if (fcmToken) {
+                        await sendPushNotification(fcmToken, {
+                            title: 'رد على تذكرة الدعم الفني',
+                            body: `رد المالك على تذكرتك #${ticket.ticketNumber}: ${response.substring(0, 100)}${response.length > 100 ? '...' : ''}`,
+                            data: {
+                                type: 'support_ticket_response',
+                                ticketId: ticketId,
+                                ticketNumber: ticket.ticketNumber
+                            }
+                        });
+                    }
+                }
+            }
+        } catch (notifError) {
+            console.warn('Failed to send notification (non-critical):', notifError);
+            // Don't throw - notification failure shouldn't block response
+        }
     } catch (error) {
         console.error('Error adding owner response:', error);
         throw error;

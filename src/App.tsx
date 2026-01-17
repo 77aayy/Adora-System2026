@@ -46,6 +46,7 @@ import { MaintenanceMode } from './components/system/MaintenanceMode';
 import { BroadcastMessages } from './components/system/BroadcastMessages';
 import { UpdateNotifications } from './components/system/UpdateNotifications';
 import { PremiumHeader } from './components/layout/PremiumHeader';
+import { useTranslation } from 'react-i18next';
 import './index.css';
 
 // ============================================================
@@ -124,6 +125,7 @@ const NavigationBar: React.FC<{
 }> = React.memo(({ isVoiceEnabled, onToggleVoice }) => {
     const location = useLocation();
     const { user, isAuthenticated, logout, branchId, setBranch } = useAuth();
+    const { t } = useTranslation();
     
     // ⚡ Performance: Preload routes on hover
     const { getPreloadProps } = useRoutePreload();
@@ -216,12 +218,12 @@ const NavigationBar: React.FC<{
     // ✅ OWNER TABS - Show in navbar when owner is on dashboard
     // ✅ تم حذف "الإحصائيات" لأنها كانت تعرض بيانات وهمية - تم نقل البيانات الحقيقية إلى "نظرة عامة"
     const ownerTabs = [
-        { id: 'overview', label: 'نظرة عامة', icon: <Activity className="w-4 h-4" />, shortLabel: 'نظرة' },
-        { id: 'tenants', label: 'المستأجرون', icon: <Building2 className="w-4 h-4" />, shortLabel: 'مستأجرون' },
-        { id: 'settings', label: 'الإعدادات', icon: <Settings className="w-4 h-4" />, shortLabel: 'إعدادات' },
-        { id: 'updates', label: 'التحديثات', icon: <Bell className="w-4 h-4" />, shortLabel: 'تحديثات' },
-        { id: 'broadcasts', label: 'الرسائل', icon: <MessageSquare className="w-4 h-4" />, shortLabel: 'رسائل' },
-        { id: 'billing', label: 'الإدارة المالية', icon: <DollarSign className="w-4 h-4" />, shortLabel: 'المالية', special: true }
+        { id: 'overview', label: t('admin.overview') || 'Overview', icon: <Activity className="w-4 h-4" />, shortLabel: t('admin.overview') || 'Overview' },
+        { id: 'tenants', label: t('admin.tenantList') || 'Tenants', icon: <Building2 className="w-4 h-4" />, shortLabel: t('admin.tenantList') || 'Tenants' },
+        { id: 'settings', label: t('admin.systemSettings') || 'Settings', icon: <Settings className="w-4 h-4" />, shortLabel: t('admin.systemSettings') || 'Settings' },
+        { id: 'updates', label: t('admin.updates') || 'Updates', icon: <Bell className="w-4 h-4" />, shortLabel: t('admin.updates') || 'Updates' },
+        { id: 'broadcasts', label: t('admin.communicationsAndAnnouncements') || 'Messages', icon: <MessageSquare className="w-4 h-4" />, shortLabel: t('admin.communicationsAndAnnouncements') || 'Messages' },
+        { id: 'billing', label: t('admin.billing') || 'Billing', icon: <DollarSign className="w-4 h-4" />, shortLabel: t('admin.billing') || 'Billing', special: true }
     ];
 
     const handleTabChange = (tabId: string) => {
@@ -232,11 +234,11 @@ const NavigationBar: React.FC<{
 
     // ✅ OWNER: Only Owner Dashboard (unified experience)
     if (isOwner && !isOnOwnerDashboard) {
-        navItems.push({ to: '/owner-dashboard', icon: <Building2 className="w-5 h-5" />, label: 'لوحة المالك' });
+        navItems.push({ to: '/owner-dashboard', icon: <Building2 className="w-5 h-5" />, label: t('admin.ownerDashboard') || 'Owner Dashboard' });
     } 
     // ✅ MANAGER: Admin + Operational Departments (filtered by feature gates)
     else if (isManager) {
-        navItems.push({ to: '/admin', icon: <Building2 className="w-5 h-5" />, label: 'لوحة التحكم' });
+        navItems.push({ to: '/admin', icon: <Building2 className="w-5 h-5" />, label: t('sidebar.dashboard') || 'Dashboard' });
         navItems.push(
             { to: '/reception', icon: <Phone className="w-5 h-5" />, label: 'الاستقبال' },
             { to: '/bellman', icon: <BellRing className="w-5 h-5" />, label: 'البيلمان' },
@@ -486,7 +488,7 @@ const NavigationBar: React.FC<{
                             border: '1px solid var(--theme-border-primary)',
                             color: 'var(--theme-text-secondary)'
                         }}
-                        title="تسجيل خروج"
+                        title={t('auth.logout') || 'Logout'}
                     >
                         <LogOut className="w-4 h-4 flip-rtl" />
                     </button>
@@ -527,16 +529,92 @@ const DeveloperFooter: React.FC = () => {
 
     // Listen for theme changes - MUST be before any conditional return!
     useEffect(() => {
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.attributeName === 'data-theme') {
-                    setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
-                }
-            });
-        });
+        // ✅ COMPREHENSIVE NULL SAFETY: Multiple checks before observing
+        if (typeof window === 'undefined' || typeof document === 'undefined') {
+            return;
+        }
 
-        observer.observe(document.documentElement, { attributes: true });
-        return () => observer.disconnect();
+        // ✅ Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            const handleDOMReady = () => {
+                setupThemeObserver();
+            };
+            document.addEventListener('DOMContentLoaded', handleDOMReady);
+            return () => {
+                document.removeEventListener('DOMContentLoaded', handleDOMReady);
+            };
+        }
+
+        setupThemeObserver();
+
+        function setupThemeObserver() {
+            if (!document || !document.documentElement) {
+                return;
+            }
+
+            // ✅ ENHANCED NULL SAFETY: Check if targetElement is a valid Node
+            const targetElement = document.documentElement;
+            if (!targetElement) {
+                return;
+            }
+
+            // ✅ Type check: Ensure it's a valid Node
+            if (!(targetElement instanceof Node)) {
+                return;
+            }
+
+            // ✅ Additional check: Ensure MutationObserver is available
+            if (typeof MutationObserver === 'undefined') {
+                return;
+            }
+
+            let observer: MutationObserver | null = null;
+
+            try {
+                observer = new MutationObserver((mutations) => {
+                    try {
+                        mutations.forEach((mutation) => {
+                            if (mutation.attributeName === 'data-theme') {
+                                const theme = document.documentElement?.getAttribute('data-theme');
+                                if (theme !== null) {
+                                    setIsDark(theme === 'dark');
+                                }
+                            }
+                        });
+                    } catch (err) {
+                        console.error('Error in MutationObserver callback:', err);
+                    }
+                });
+
+                // ✅ Final check before observing - ensure element is still valid
+                if (targetElement && targetElement instanceof Node && observer && document.documentElement === targetElement) {
+                    observer.observe(targetElement, { 
+                        attributes: true, 
+                        attributeFilter: ['data-theme'] 
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to create or observe MutationObserver:', error);
+                return;
+            }
+            
+            // ✅ Return cleanup function
+            return () => {
+                try {
+                    if (observer) {
+                        observer.disconnect();
+                        observer = null;
+                    }
+                } catch (error) {
+                    console.error('Failed to disconnect observer:', error);
+                }
+            };
+        }
+
+        // ✅ Return cleanup for DOMContentLoaded listener if needed
+        return () => {
+            // Cleanup is handled inside setupThemeObserver
+        };
     }, []);
     
     // ✅ FIX: Listen for settings updates from owner dashboard - MUST be before conditional return
@@ -734,7 +812,9 @@ const AppContent: React.FC = () => {
     const showUnifiedHeader = isManager && isOnManagerPage && !isOnLoginOrGuest;
     
     // Show regular nav for non-managers or when unified header is not shown
-    const showRegularNav = !isOnLoginOrGuest && !showUnifiedHeader && !isOwner;
+    // ✅ Hide navigation on About Us page
+    const isOnAboutPage = location.pathname === '/about';
+    const showRegularNav = !isOnLoginOrGuest && !showUnifiedHeader && !isOwner && !isOnAboutPage;
 
     return (
         <div 

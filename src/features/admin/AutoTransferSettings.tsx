@@ -20,6 +20,7 @@ import {
     AutoTransferRule,
     AutoTransferConfig,
 } from '../../services/autoTransferService';
+import { logger } from '../../services/loggerService';
 
 const DEPARTMENTS = [
     { value: 'reception', label: 'الاستقبال' },
@@ -75,7 +76,7 @@ export const AutoTransferSettings: React.FC = () => {
                     });
                 }
             } catch (err: any) {
-                console.error('Error loading auto-transfer config:', err);
+                logger.error('Error loading auto-transfer config', err, 'AutoTransferSettings');
                 error('فشل تحميل الإعدادات');
             } finally {
                 setLoading(false);
@@ -94,7 +95,7 @@ export const AutoTransferSettings: React.FC = () => {
             await saveAutoTransferConfig(config);
             success('تم حفظ الإعدادات بنجاح');
         } catch (err: any) {
-            console.error('Error saving auto-transfer config:', err);
+            logger.error('Error saving auto-transfer config', err, 'AutoTransferSettings');
             error('فشل حفظ الإعدادات: ' + (err.message || 'خطأ غير معروف'));
         } finally {
             setSaving(false);

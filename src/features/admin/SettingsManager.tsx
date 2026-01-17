@@ -46,6 +46,7 @@ import { useUX } from '../../context/UXContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantBranches, useAllBranchesForOwner } from '../../hooks/useTenantData';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
+import { logger } from '../../services/loggerService';
 import {
     getCalendarSources,
     saveCalendarSources,
@@ -116,7 +117,7 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 const roomsList = await getRooms(branchId, tenantId);
                 setRooms(roomsList.map(r => ({ number: r.number, floor: r.floor, type: r.type })));
             } catch (error) {
-                console.error('Error loading rooms:', error);
+                logger.error('Error loading rooms', error, 'SettingsManager');
             } finally {
                 setLoadingRooms(false);
             }
@@ -148,7 +149,7 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 });
                 setExistingTokens(tokens);
             } catch (error) {
-                console.error('Error loading existing tokens:', error);
+                logger.error('Error loading existing tokens', error, 'SettingsManager');
             } finally {
                 setLoadingExisting(false);
             }
@@ -241,7 +242,7 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 type: 'success'
             });
         } catch (error) {
-            console.error('Error generating token:', error);
+            logger.error('Error generating token', error, 'SettingsManager');
             await customConfirm({
                 title: 'خطأ',
                 message: `حدث خطأ أثناء توليد الرابط: ${(error as any).message || 'خطأ غير معروف'}`,
@@ -504,7 +505,7 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
                 setMaxDevices(qrData.maxDevices ?? 2);
             }
         } catch (err) {
-            console.error('Error loading location settings:', err);
+            logger.error('Error loading location settings', err, 'SettingsManager');
             error('فشل تحميل الإعدادات');
         } finally {
             setLoading(false);
@@ -581,7 +582,7 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
 
             success('تم حفظ الإعدادات بنجاح');
         } catch (err: any) {
-            console.error('Error saving location settings:', err);
+            logger.error('Error saving location settings', err, 'SettingsManager');
             error(err.message || 'فشل الحفظ');
         } finally {
             setSaving(false);
@@ -887,7 +888,7 @@ const GuestPortalSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantId
                 }
             }
         } catch (err) {
-            console.error('Error loading guest settings:', err);
+            logger.error('Error loading guest settings', err, 'SettingsManager');
         } finally {
             setLoading(false);
         }
@@ -908,7 +909,7 @@ const GuestPortalSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantId
             }, { merge: true });
             success('تم تحديث إعدادات بوابة النزلاء');
         } catch (err) {
-            console.error('Error saving guest settings:', err);
+            logger.error('Error saving guest settings', err, 'SettingsManager');
             error('فشل الحفظ');
         } finally {
             setSaving(false);
@@ -1024,7 +1025,7 @@ const ReceptionVerificationSettings: React.FC<BranchSettingsProps> = ({ branchId
                 setSettings(prev => ({ ...prev, ...data }));
             }
         } catch (err) {
-            console.error('Error loading reception settings:', err);
+            logger.error('Error loading reception settings', err, 'SettingsManager');
         } finally {
             setLoading(false);
         }
@@ -1041,7 +1042,7 @@ const ReceptionVerificationSettings: React.FC<BranchSettingsProps> = ({ branchId
             }, { merge: true });
             success('تم تحديث إعدادات التحقق من النزلاء');
         } catch (err) {
-            console.error('Error saving reception settings:', err);
+            logger.error('Error saving reception settings', err, 'SettingsManager');
             error('فشل الحفظ');
         } finally {
             setSaving(false);
@@ -1227,7 +1228,7 @@ const LaundryPriceManager: React.FC<BranchSettingsProps> = ({ branchId, tenantId
                 if (data.taxRate !== undefined) setTaxRate(data.taxRate);
             }
         } catch (error) {
-            console.error('Error loading laundry prices:', error);
+            logger.error('Error loading laundry prices', error, 'SettingsManager');
         } finally {
             setLoading(false);
         }
@@ -1350,7 +1351,7 @@ const LaundryPriceManager: React.FC<BranchSettingsProps> = ({ branchId, tenantId
             });
             success('تم حفظ إعدادات المغسلة بنجاح');
         } catch (err) {
-            console.error('Error saving:', err);
+            logger.error('Error saving', err, 'SettingsManager');
             error('فشل الحفظ');
         } finally {
             setSaving(false);
@@ -1569,7 +1570,7 @@ const SystemToggles: React.FC<BranchSettingsProps> = ({ branchId, tenantId: prop
                     setSettings(prev => ({ ...prev, ...snap.data() }));
                 }
             } catch (error) {
-                console.error('Error loading system settings:', error);
+                logger.error('Error loading system settings', error, 'SettingsManager');
             } finally {
                 setLoading(false);
             }
@@ -1588,7 +1589,7 @@ const SystemToggles: React.FC<BranchSettingsProps> = ({ branchId, tenantId: prop
             const docRef = doc(db, `tenants/${tenantId}/branches/${branchId}/settings`, 'system');
             await setDoc(docRef, { [key]: newValue }, { merge: true });
         } catch (error) {
-            console.error('Error saving system setting:', error);
+            logger.error('Error saving system setting', error, 'SettingsManager');
             // Revert on error
             setSettings(prev => ({ ...prev, [key]: !newValue }));
         }
@@ -1769,7 +1770,7 @@ const WorkingHoursSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantI
                 });
             }
         } catch (error) {
-            console.error('Error loading working hours:', error);
+            logger.error('Error loading working hours', error, 'SettingsManager');
         } finally {
             setLoading(false);
         }
@@ -1801,7 +1802,7 @@ const WorkingHoursSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantI
                 type: 'success'
             });
         } catch (error) {
-            console.error('Error saving working hours:', error);
+            logger.error('Error saving working hours', error, 'SettingsManager');
             await customConfirm({
                 title: 'خطأ',
                 message: 'فشل الحفظ',
@@ -1951,7 +1952,7 @@ const BranchContactSettings: React.FC<BranchContactSettingsProps> = ({ branchId,
                 });
             }
         } catch (err) {
-            console.error('Error loading contact settings:', err);
+            logger.error('Error loading contact settings', err, 'SettingsManager');
         } finally {
             setLoading(false);
         }
@@ -1968,7 +1969,7 @@ const BranchContactSettings: React.FC<BranchContactSettingsProps> = ({ branchId,
             }, { merge: true });
             success('تم حفظ إعدادات التواصل');
         } catch (err) {
-            console.error('Error saving contact settings:', err);
+            logger.error('Error saving contact settings', err, 'SettingsManager');
             showError('فشل حفظ الإعدادات');
         } finally {
             setSaving(false);
@@ -2064,7 +2065,7 @@ const CalendarSourcesManager: React.FC = () => {
             setSources(settings.sources);
             setLastSync(settings.lastSyncAt?.toDate() || null);
         } catch (error) {
-            console.error(error);
+            logger.error('Error', error, 'SettingsManager');
         } finally {
             setLoading(false);
         }
@@ -2349,7 +2350,7 @@ const ProductsManager: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 ]);
             }
         } catch (error) {
-            console.error(error);
+            logger.error('Error', error, 'SettingsManager');
         } finally {
             setLoading(false);
         }
@@ -2373,7 +2374,7 @@ const ProductsManager: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                 type: 'success'
             });
         } catch (error) {
-            console.error(error);
+            logger.error('Error', error, 'SettingsManager');
             await customConfirm({
                 title: 'خطأ',
                 message: 'فشل الحفظ',
@@ -2509,7 +2510,7 @@ const BranchSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pro
                         logoUrl: data.logoUrl || '',
                     });
                 }
-            } catch (err) { console.error(err); } finally { setLoading(false); }
+            } catch (err: any) { logger.error('Error', err, 'SettingsManager'); } finally { setLoading(false); }
         };
         loadSettings();
     }, [tenantId, branchId]);
@@ -2688,7 +2689,7 @@ const GeneralSettings: React.FC = () => {
                     setName(snap.data().info?.name || '');
                 }
             } catch (e) {
-                console.error(e);
+                logger.error('Error', e, 'SettingsManager');
             } finally {
                 setLoading(false);
             }

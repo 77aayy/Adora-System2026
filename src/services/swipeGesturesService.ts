@@ -272,6 +272,11 @@ class SwipeGestureManager {
      */
     observe(selector: string = '.swipeable, .room-card, .request-card', options: SwipeOptions = {}): void {
         if (typeof MutationObserver === 'undefined') return;
+        
+        // ✅ NULL SAFETY: Ensure document.body exists before observing
+        if (!document.body) {
+            return;
+        }
 
         this.observer = new MutationObserver((mutations) => {
             mutations.forEach(mutation => {

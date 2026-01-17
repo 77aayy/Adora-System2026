@@ -13,6 +13,7 @@
 import React, { memo } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { ADORA_THEME } from '../../design/adoraTheme';
+import { useTheme } from '../../context/ThemeContext';
 
 // Icon color variants
 type IconColorVariant = 'teal' | 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'yellow' | 'pink';
@@ -110,6 +111,7 @@ export const StatCard: React.FC<StatCardProps> = ({
     pulse = false,
     urgency
 }) => {
+    const { isDark } = useTheme(); // ✅ Get dark mode state
     const displayValue = count !== undefined ? count : (value !== undefined ? value : 0);
     const isStringValue = typeof displayValue === 'string';
     
@@ -177,40 +179,50 @@ export const StatCard: React.FC<StatCardProps> = ({
     
     const iconBgColor = iconColorMap[iconColor] || ADORA_THEME.colors.primary;
 
+    // ✅ Enhanced shadows for better visual separation (Light & Dark mode aware)
+    const defaultShadow = '0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.08)';
+    const hoverShadow = '0 12px 28px rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.12)';
+
     return (
         <div 
-            className="group relative overflow-hidden transition-all duration-300 ease-out"
+            className="group relative overflow-hidden transition-all duration-300 ease-out flex items-center justify-between"
             style={{
-                background: '#ffffff',
-                border: '1px solid #f1f5f9',
+                background: isDark ? 'rgba(30, 41, 59, 0.8)' : '#ffffff', // ✅ Dark bg in dark mode, white in light mode
+                border: isDark ? '1px solid rgba(32, 178, 170, 0.2)' : '1px solid #e2e8f0', // ✅ Turquoise border in dark mode
                 borderRadius: '20px',
-                padding: '16px 20px',
-                height: '100px', // ✅ Fixed height as per spec
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
-                gap: '16px', // ✅ Gap: 16px as per spec
-            }}
+                padding: '12px 16px', // ✅ Responsive padding: smaller on mobile
+                minHeight: '90px', // ✅ Min height instead of fixed (responsive)
+                height: 'auto', // ✅ Auto height for mobile flexibility
+                // ✅ Enhanced Shadow for Better Visual Separation - More Visible
+                boxShadow: isDark 
+                    ? '0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)' 
+                    : defaultShadow,
+                gap: '12px', // ✅ Responsive gap: smaller on mobile
+            } as React.CSSProperties}
             onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = ADORA_THEME.colors.primary; // ✅ Turquoise DNA
-                e.currentTarget.style.transform = 'translateY(-3px)'; // ✅ Enhanced hover lift
-                e.currentTarget.style.boxShadow = '0 10px 20px rgba(32, 178, 170, 0.08)'; // ✅ Turquoise shadow
+                e.currentTarget.style.transform = 'translateY(-4px)'; // ✅ Enhanced hover lift
+                // ✅ Stronger shadow on hover for better depth perception
+                e.currentTarget.style.boxShadow = isDark 
+                    ? '0 12px 28px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.3)' 
+                    : hoverShadow;
             }}
             onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#f1f5f9';
+                e.currentTarget.style.borderColor = isDark ? 'rgba(32, 178, 170, 0.2)' : '#e2e8f0';
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.02)';
+                // ✅ Restore enhanced shadow
+                e.currentTarget.style.boxShadow = isDark 
+                    ? '0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)' 
+                    : defaultShadow;
             }}
         >
             {/* Content Section - Left (RTL) */}
             <div className="flex flex-col gap-1 flex-1 min-w-0">
-                {/* Value - Premium Typography */}
+                {/* Value - Premium Typography - Responsive */}
                 <h2 
-                    className="m-0 font-extrabold leading-none truncate"
+                    className="m-0 font-extrabold leading-none truncate text-xl sm:text-2xl"
                     style={{
-                        fontSize: '26px', // ✅ Updated to 26px as per spec
-                        color: '#1e293b',
+                        color: isDark ? 'rgba(255, 255, 255, 0.95)' : '#1e293b', // ✅ Dark text on light bg, light text on dark bg
                         fontWeight: 800,
                         lineHeight: '1.2',
                         margin: '4px 0 0 0', // ✅ Margin as per spec
@@ -222,32 +234,25 @@ export const StatCard: React.FC<StatCardProps> = ({
                     }
                 </h2>
                 
-                {/* Label - Clean & Readable - ✅ Text Truncation for Long Labels */}
+                {/* Label - Clean & Readable - ✅ Text Truncation for Long Labels - Responsive */}
                 <p 
-                    className="m-0 font-semibold leading-tight"
+                    className="m-0 font-semibold leading-tight text-xs sm:text-sm truncate"
                     style={{
-                        fontSize: '14px', // ✅ Updated to 14px as per spec
-                        color: '#64748b',
+                        color: isDark ? 'rgba(255, 255, 255, 0.7)' : '#64748b', // ✅ Dark text on light bg, light text on dark bg
                         fontWeight: 600,
                         lineHeight: '1.4',
-                        whiteSpace: 'nowrap', // ✅ Prevent text wrapping
-                        overflow: 'hidden', // ✅ Hide overflow
-                        textOverflow: 'ellipsis', // ✅ Show ellipsis for long text
-                        maxWidth: '150px', // ✅ Max width to prevent overlap with icon
+                        maxWidth: '100%', // ✅ Full width on mobile, truncate on desktop
                     }}
                 >
                     {label}
                 </p>
             </div>
             
-            {/* Icon Section - Right (RTL) - Premium Design */}
+            {/* Icon Section - Right (RTL) - Premium Design - Responsive */}
             {iconElement && (
                 <div 
-                    className="flex-shrink-0 flex items-center justify-center relative"
+                    className="flex-shrink-0 flex items-center justify-center relative w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl"
                     style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '14px',
                         background: `${iconBgColor}1A`, // 10% opacity
                         color: iconBgColor,
                         transition: 'all 0.3s ease',
@@ -263,8 +268,8 @@ export const StatCard: React.FC<StatCardProps> = ({
                 >
                     {React.isValidElement(iconElement) 
                         ? React.cloneElement(iconElement as React.ReactElement<any>, {
-                            className: 'w-6 h-6',
-                            size: 24, // ✅ Explicit size for Lucide icons
+                            className: 'w-5 h-5 sm:w-6 sm:h-6',
+                            size: undefined, // ✅ Let className handle size (responsive)
                             strokeWidth: 2.5, // ✅ Duo-tone stroke width
                             style: { 
                                 color: iconBgColor,
@@ -273,8 +278,8 @@ export const StatCard: React.FC<StatCardProps> = ({
                         })
                         : typeof iconElement === 'function'
                         ? React.createElement(iconElement as React.ComponentType<any>, {
-                            className: 'w-6 h-6',
-                            size: 24, // ✅ Explicit size for Lucide icons
+                            className: 'w-5 h-5 sm:w-6 sm:h-6',
+                            size: undefined, // ✅ Let className handle size (responsive)
                             strokeWidth: 2.5, // ✅ Duo-tone stroke width
                             style: { 
                                 color: iconBgColor,

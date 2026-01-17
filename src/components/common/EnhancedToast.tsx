@@ -174,6 +174,7 @@ function notifySubscribers() {
 /**
  * Toast Container Component
  * Place at root of your app
+ * ✅ FIXED: Removed any backdrop/black frame - toasts appear directly without wrapper
  */
 export const ToastContainer: React.FC = () => {
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -185,8 +186,29 @@ export const ToastContainer: React.FC = () => {
         };
     }, []);
     
+    if (toasts.length === 0) return null;
+    
     return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none">
+        <div 
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none"
+            style={{ 
+                maxWidth: 'calc(100vw - 2rem)',
+                padding: 0,
+                margin: 0,
+                background: 'transparent',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderWidth: 0,
+                boxShadow: 'none',
+                outline: 'none',
+                backdropFilter: 'none',
+                WebkitBackdropFilter: 'none',
+                // ✅ CRITICAL: Remove any black frame/backdrop completely
+                backgroundImage: 'none',
+                position: 'fixed',
+                isolation: 'isolate'
+            }}
+        >
             {toasts.map((t) => (
                 <ToastItem key={t.id} toast={t} />
             ))}
@@ -221,18 +243,43 @@ const ToastItem: React.FC<{ toast: Toast }> = ({ toast: t }) => {
         loading: 'bg-teal-500/20 border-teal-500/30',
     };
     
+    // Get border color based on type
+    const borderColorMap = {
+        success: 'rgba(16, 185, 129, 0.3)',
+        error: 'rgba(239, 68, 68, 0.3)',
+        info: 'rgba(59, 130, 246, 0.3)',
+        warning: 'rgba(245, 158, 11, 0.3)',
+        loading: 'rgba(99, 102, 241, 0.3)',
+    };
+
     return (
         <div
             className={`
                 pointer-events-auto
-                glass rounded-xl border ${colors[t.type]}
+                rounded-xl
                 px-4 py-3 min-w-[300px] max-w-md
                 flex items-center gap-3
-                shadow-lg
                 transition-all duration-200
                 ${isExiting ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}
                 animate-in slide-in-from-top-2 fade-in
             `}
+            style={{
+                background: 'var(--theme-bg-secondary, rgba(15, 23, 42, 0.95))',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: `1px solid ${borderColorMap[t.type]}`,
+                margin: 0,
+                padding: '0.875rem 1rem',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
+                // ✅ CRITICAL: Remove any black frame/backdrop
+                outline: 'none',
+                borderImage: 'none',
+                // ✅ CRITICAL: Ensure no black background or wrapper
+                backgroundColor: 'var(--theme-bg-secondary, rgba(15, 23, 42, 0.95))',
+                // ✅ Remove any parent wrapper styles
+                position: 'relative',
+                isolation: 'isolate'
+            }}
         >
             {/* Icon */}
             <div className="flex-shrink-0">

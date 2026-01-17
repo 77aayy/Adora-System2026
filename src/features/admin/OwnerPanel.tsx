@@ -7,12 +7,13 @@ import { useNavigate } from 'react-router-dom';
 import {
     Crown, UserPlus, Users, Building2, Trash2, Edit,
     Save, X, RefreshCw, LogOut, Eye, EyeOff, Check,
-    Calendar, Clock, Pause, Play, AlertTriangle, Key
+    Calendar, Clock, Pause, Play, AlertTriangle, Key, Shield, ArrowRight, LayoutDashboard, CheckCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { StatCard } from '../../components/common/StatCard';
+import { responsiveClasses } from '../../utils/mobileOptimization';
 import {
     User,
 } from '../../types';
@@ -27,12 +28,16 @@ import {
     checkLicenseExpiryNotifications,
     softDeleteManager,
     restoreManager,
-    getDeletedManagers,
-    purgeAllSystemData
+    getDeletedManagers
 } from '../../services/ownerService';
+import { executeDeepAudit } from '../../services/deepAuditService';
 import { collection, getDocs, query, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { haptic, playSound } from '../../utils/uxEffects';
+import { logger } from '../../services/loggerService';
+import { auth } from '../../services/firebase';
+import { AdminSidebar } from '../../components/admin/AdminSidebar';
+import { UnifiedModal, ModalActions } from '../../components/common/UnifiedModal';
 
 // ============================================================
 // TYPES
@@ -60,26 +65,62 @@ export const OwnerPanel: React.FC = () => {
     const [dataLoading, setDataLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDeletedManagers, setShowDeletedManagers] = useState(false);
+    const [auditLoading, setAuditLoading] = useState(false);
+    const [auditStatus, setAuditStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const [auditProgress, setAuditProgress] = useState<string>('');
+    const [showAuditChoiceModal, setShowAuditChoiceModal] = useState(false);
+    const [showPurgeConfirmModal, setShowPurgeConfirmModal] = useState(false);
+    const [resetCode, setResetCode] = useState('');
 
     // Manual init not needed - relying on useAuth
     // User role check handles redirection
 
-    // Check if user is owner
+    // Check if user is owner - CRITICAL: Must wait for authReady
     useEffect(() => {
-        if (authReady && user?.role !== 'owner') {
-            navigate('/');
+        if (!authReady) {
+            return; // Still loading
         }
+
+        if (!user) {
+            // No user - redirect to login
+            navigate('/login', { replace: true });
+            return;
+        }
+
+        if (user.role !== 'owner') {
+            // Not owner - redirect to home
+            navigate('/', { replace: true });
+            return;
+        }
+
+        // User is owner - safe to proceed
     }, [user, authReady, navigate]);
 
-    // Load managers and branches
+    // Load managers and branches - CRITICAL: Must wait for authReady AND user confirmation
     useEffect(() => {
-        // ✅ Gate: Wait for Auth Ready
+        // ✅ Gate: Wait for Auth Ready AND confirm user is owner
         if (authReady && user?.role === 'owner') {
             loadData();
         }
     }, [authReady, user]);
 
+    // ✅ CRITICAL: Show loading while auth is not ready OR user is not confirmed owner
+    if (!authReady) {
+        return (
+            <div className="min-h-screen flex items-center justify-center transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+                <AdoraLoader size="lg" message="جاري تحميل بيانات المستخدم..." />
+            </div>
+        );
+    }
 
+    // ✅ CRITICAL: Show loading if user is not owner (redirecting)
+    if (!user || user.role !== 'owner') {
+        return (
+            <div className="min-h-screen flex items-center justify-center transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+                <AdoraLoader size="lg" message="جاري التحقق من الصلاحيات..." />
+            </div>
+        );
+    }
 
     const loadData = async () => {
         setDataLoading(true);
@@ -98,14 +139,14 @@ export const OwnerPanel: React.FC = () => {
                 const notification = checkLicenseExpiryNotifications((manager as any).licenseExpiry);
                 if (notification) {
                     // Logic to show notification if needed (e.g., console warn for now)
-                    console.warn(`License Alert [${manager.name}]:`, notification.message);
+                    logger.warn(`License Alert [${manager.name}]`, notification.message, 'OwnerPanel');
                 }
             });
 
             // Mock branches for now or load from structure if needed
             // setBranches([...]); 
-        } catch (error) {
-            console.error('Error loading owner data:', error);
+        } catch (error: any) {
+            logger.error('Error loading owner data', error, 'OwnerPanel');
         } finally {
             setDataLoading(false);
         }
@@ -120,7 +161,7 @@ export const OwnerPanel: React.FC = () => {
             playSound('success');
             success('تم إنشاء المدير بنجاح');
         } catch (error: any) {
-            console.error('Error creating manager:', error);
+            logger.error('Error creating manager', error, 'OwnerPanel');
             haptic('error');
             error('حدث خطأ أثناء إنشاء المدير');
         }
@@ -148,7 +189,7 @@ export const OwnerPanel: React.FC = () => {
                 playSound('success');
                 success('تم حذف المدير بنجاح ونقله للأرشيف');
             } catch (err: any) {
-                console.error('Error deleting manager:', err);
+                logger.error('Error deleting manager', err, 'OwnerPanel');
                 haptic('error');
                 error('فشل الحذف: ' + (err.message || 'خطأ في الاتصال'));
             } finally {
@@ -165,7 +206,7 @@ export const OwnerPanel: React.FC = () => {
                 haptic('success');
                 playSound('success');
             } catch (err) {
-                console.error('Error restoring manager:', err);
+                logger.error('Error restoring manager', err, 'OwnerPanel');
                 haptic('error');
             }
         }
@@ -185,7 +226,7 @@ export const OwnerPanel: React.FC = () => {
                 loadData();
                 haptic('success');
             } catch (error) {
-                console.error('Error toggling license:', error);
+                logger.error('Error toggling license', error, 'OwnerPanel');
                 haptic('error');
             }
         }
@@ -203,7 +244,7 @@ export const OwnerPanel: React.FC = () => {
                 haptic('success');
                 playSound('success');
             } catch (error) {
-                console.error('Error renewing license:', error);
+                logger.error('Error renewing license', error, 'OwnerPanel');
                 haptic('error');
             }
         }
@@ -222,7 +263,7 @@ export const OwnerPanel: React.FC = () => {
             const { saveUserBinding } = await import('../../services/userService');
 
             if (auth.currentUser) {
-                console.log("Syncing permissions for UID:", auth.currentUser.uid);
+                logger.info('Syncing permissions', { uid: auth.currentUser.uid }, 'OwnerPanel');
                 await saveUserBinding(auth.currentUser.uid, user.tenantId, user.role);
                 haptic('success');
                 success('تم تحديث الصلاحيات بنجاح');
@@ -230,7 +271,7 @@ export const OwnerPanel: React.FC = () => {
                 error('لم يتم العثور على جلسة نشطة');
             }
         } catch (err) {
-            console.error('Sync failed:', err);
+            logger.error('Sync failed', err, 'OwnerPanel');
             error('فشل التحديث');
         } finally {
             setDataLoading(false);
@@ -238,73 +279,373 @@ export const OwnerPanel: React.FC = () => {
     };
 
     const handlePurgeSystem = async () => {
+        logger.info('Purge System (Nuclear Mode) button clicked', null, 'OwnerPanel');
+        
+        // ✅ CRITICAL: Validate user before proceeding
+        if (!authReady) {
+            error('⏳ يرجى الانتظار حتى يتم تحميل بيانات المستخدم...');
+            return;
+        }
+
+        if (!user) {
+            logger.error('No user found', null, 'OwnerPanel');
+            error('⚠️ خطأ تقني: لم يتم التعرف على المستخدم. يرجى تسجيل الخروج والدخول مرة أخرى.');
+            return;
+        }
+
+        if (user.role !== 'owner') {
+            logger.error('User is not owner', null, 'OwnerPanel');
+            error('⚠️ خطأ: هذه العملية متاحة للمالك فقط.');
+            return;
+        }
+
+        if (!user.id) {
+            logger.error('No user ID found', null, 'OwnerPanel');
+            error("⚠️ خطأ تقني: لم يتم التعرف على هوية المالك. يرجى تسجيل الخروج والدخول مرة أخرى.");
+            return;
+        }
+
         // 🧪 DEBUG LOGS
         const { auth } = await import('../../services/firebase');
-        console.log("Purge Request - User Obj:", user);
-        console.log("Purge Request - Firebase UID:", auth.currentUser?.uid);
+        logger.info('Purge Request', { userId: user.id, firebaseUid: auth.currentUser?.uid }, 'OwnerPanel');
 
-        if (!user?.id) {
-            alert("⚠️ خطأ تقني: لم يتم التعرف على هوية المالك. يرجى تسجيل الخروج والدخول مرة أخرى.");
+        // Show custom confirmation modal (wait for user confirmation)
+        setShowPurgeConfirmModal(true);
+        setResetCode('');
+    };
+
+    const handleConfirmPurge = async () => {
+        // Validate RESET code
+        if (resetCode.trim() !== 'RESET') {
+            error('⚠️ لم تكتب الكلمة الصحيحة. يرجى كتابة (RESET) باللغة الإنجليزية.');
             return;
         }
 
-        const confirm1 = window.confirm('⚠️ تحذير شديد: أنت على وشك مسح كافة بيانات النظام (المشتركين، الغرف، الطلبات، المستأجرين) للبدء من جديد. هل أنت متأكد؟');
-        if (!confirm1) return;
+        // Close modal
+        setShowPurgeConfirmModal(false);
+        setResetCode('');
 
-        const confirm2 = window.prompt('لتأكيد المسح الشامل، يرجى كتابة كلمة (RESET) باللغة الإنجليزية:');
-        if (confirm2 !== 'RESET') {
-            alert('تم إلغاء العملية. لم تكتب الكلمة الصحيحة.');
-            return;
-        }
-
+        logger.info('User confirmed Purge System - starting', null, 'OwnerPanel');
+        
         setDataLoading(true);
+        setAuditLoading(true);
+        setAuditStatus('loading');
+        setAuditProgress('☢️ جاري المسح الكامل...');
+
         try {
-            console.log("🔥 Initializing Nuclear Purge...");
-            const result = await purgeAllSystemData(user.id);
+            logger.info('Initializing Nuclear Purge via Deep Audit', null, 'OwnerPanel');
+            setAuditProgress('🔥 جاري حذف جميع البيانات...');
+            // ✅ MERGED: Use executeDeepAudit with nuclearMode=true
+            const report = await executeDeepAudit({ nuclearMode: true, ownerId: user!.id });
+            
+            setAuditProgress('✅ اكتمل المسح بنجاح!');
+            setAuditStatus('success');
+            
             haptic('success');
             playSound('success');
 
             // Re-fetch all data to clear the UI
             await loadData();
 
-            success(`✅ تم مسح النظام بنجاح. تم حذف ${result.deletedCount} سجل.`);
+            success(`✅ تم المسح الكامل بنجاح!\n\n🗑️ تم حذف: ${report.summary.totalDeleted} سجل\n✨ النظام الآن نظيف وجاهز للبدء من جديد`);
 
             // Forced reload to clear any cached states in services
             setTimeout(() => {
                 window.location.reload();
-            }, 1000);
+            }, 2000);
 
         } catch (err: any) {
-            console.error('Purge error:', err);
-            error('فشل مسح النظام: ' + (err.message || 'خطأ غير معروف'));
-            alert('فشل المسح: ' + (err.message || 'خطأ في الاتصال بقاعدة البيانات. ربما بسبب ضعف الصلاحيات. جرب زر "تحديث الصلاحيات".'));
+            logger.error('Purge System error', err, 'OwnerPanel');
+            logger.error('Error details', {
+                message: err.message,
+                code: err.code,
+                stack: err.stack
+            });
+            const errorMsg = err.message || 'خطأ غير معروف';
+            setAuditStatus('error');
+            setAuditProgress('❌ فشل المسح');
+            error(`❌ فشل المسح الكامل\n\n${errorMsg}\n\n💡 جرب زر "مزامنة الأمان" ثم أعد المحاولة`);
+            haptic('error');
+            playSound('error');
+            
+            // Reset status after 5 seconds
+            setTimeout(() => {
+                setAuditStatus('idle');
+                setAuditProgress('');
+            }, 5000);
         } finally {
             setDataLoading(false);
+            setAuditLoading(false);
+        }
+    };
+
+    const handleDeepAudit = async () => {
+        logger.info('Deep Audit button clicked', null, 'OwnerPanel');
+        
+        // ✅ CRITICAL: Validate user before proceeding
+        if (!authReady) {
+            error('⏳ يرجى الانتظار حتى يتم تحميل بيانات المستخدم...');
+            return;
+        }
+
+        if (!user) {
+            logger.error('No user found', null, 'OwnerPanel');
+            error('⚠️ خطأ تقني: لم يتم التعرف على المستخدم. يرجى تسجيل الخروج والدخول مرة أخرى.');
+            return;
+        }
+
+        if (user.role !== 'owner') {
+            logger.error('User is not owner', null, 'OwnerPanel');
+            error('⚠️ خطأ: هذه العملية متاحة للمالك فقط.');
+            return;
+        }
+
+        if (!user.id) {
+            logger.error('No user ID found', null, 'OwnerPanel');
+            error('⚠️ خطأ تقني: لم يتم التعرف على هوية المالك.');
+            return;
+        }
+
+        logger.info('User ID found', { userId: user.id }, 'OwnerPanel');
+
+        const confirm1 = window.confirm(
+            '🔍 Deep Audit Protocol\n\n' +
+            'سيتم فحص النظام بالكامل (Firestore, Auth, Storage) وحذف أي بيانات تجريبية.\n\n' +
+            'هل أنت متأكد؟'
+        );
+        if (!confirm1) {
+            logger.info('User cancelled Deep Audit', null, 'OwnerPanel');
+            return;
+        }
+
+        logger.info('User confirmed Deep Audit - starting', null, 'OwnerPanel');
+        setAuditLoading(true);
+        setAuditStatus('loading');
+        setAuditProgress('🔍 جاري فحص Firestore...');
+
+        try {
+            logger.info('Starting Deep Audit Protocol', null, 'OwnerPanel');
+            
+            setAuditProgress('📊 جاري فحص Firestore...');
+            const report = await executeDeepAudit();
+            setAuditProgress('✅ اكتمل الفحص بنجاح!');
+
+            // Log audit report
+            logger.info('DEEP AUDIT REPORT - TOTAL PURGE', {
+                firestore: {
+                    tenantsScanned: report.firestore.tenantsScanned,
+                    documentsDeleted: report.firestore.documentsDeleted,
+                    managersDeleted: report.firestore.managersDeleted,
+                    branchesDeleted: report.firestore.branchesDeleted,
+                    orphanedDocuments: report.firestore.orphanedDocuments.length,
+                    errors: report.firestore.errors.length,
+                },
+                auth: {
+                    usersScanned: report.auth.usersScanned,
+                    orphanedUids: report.auth.orphanedUids.length,
+                    usersDeleted: report.auth.usersDeleted,
+                    errors: report.auth.errors.length,
+                },
+                storage: {
+                    pathsScanned: report.storage.pathsScanned.length,
+                    filesFound: report.storage.filesFound.length,
+                    filesDeleted: report.storage.filesDeleted,
+                    errors: report.storage.errors.length,
+                },
+                summary: {
+                    totalDeleted: report.summary.totalDeleted,
+                    managersDeleted: report.firestore.managersDeleted,
+                    branchesDeleted: report.firestore.branchesDeleted,
+                    isSterile: report.summary.isSterile,
+                    status: report.summary.status
+                }
+            }, 'OwnerPanel');
+
+            // Display status with enhanced notifications
+            if (report.summary.status === 'STERILE') {
+                logger.info('System Status: 100% Sterile', null, 'OwnerPanel');
+                setAuditStatus('success');
+                success(
+                    `✅ تم الفحص بنجاح!\n\n` +
+                    `📊 الحالة: النظام نظيف 100%\n` +
+                    `🗑️ تم حذف: ${report.summary.totalDeleted} عنصر\n` +
+                    `👥 المدراء المحذوفين: ${report.firestore.managersDeleted}\n` +
+                    `🏢 الفروع المحذوفة: ${report.firestore.branchesDeleted}\n\n` +
+                    `✨ النظام جاهز للإعداد من جديد`
+                );
+            } else if (report.summary.status === 'CONTAMINATED') {
+                logger.warn('System Status: CONTAMINATED', null, 'OwnerPanel');
+                setAuditStatus('error');
+                error(`⚠️ اكتمل الفحص مع تحذيرات\n\nتم حذف ${report.summary.totalDeleted} عنصر، لكن لا يزال هناك بيانات في النظام`);
+            } else {
+                logger.error('System Status: ERROR', null, 'OwnerPanel');
+                const totalErrors = report.firestore.errors.length + report.auth.errors.length + report.storage.errors.length;
+                setAuditStatus('error');
+                error(`❌ فشل الفحص\n\nعدد الأخطاء: ${totalErrors}\n\nراجع Console للتفاصيل`);
+                if (totalErrors > 0) {
+                    const errorDetails = [
+                        ...report.firestore.errors.slice(0, 3),
+                        ...report.auth.errors.slice(0, 2),
+                        ...report.storage.errors.slice(0, 2)
+                    ].join('\n');
+                    alert(`❌ Deep Audit فشل:\n\nعدد الأخطاء: ${totalErrors}\n\nالأخطاء:\n${errorDetails}\n\nتفاصيل إضافية في Console.`);
+                }
+            }
+
+            haptic('success');
+            playSound('success');
+            
+            // Reset status after 3 seconds
+            setTimeout(() => {
+                setAuditStatus('idle');
+                setAuditProgress('');
+            }, 3000);
+
+        } catch (err: any) {
+            logger.error('Deep Audit error', err, 'OwnerPanel');
+            logger.error('Error details', {
+                message: err.message,
+                code: err.code,
+                name: err.name,
+                stack: err.stack
+            });
+            
+            const errorMsg = err.message || 'خطأ غير معروف';
+            const errorCode = err.code || '';
+            
+            setAuditStatus('error');
+            setAuditProgress('❌ فشل العملية');
+            
+            // Check for permission errors
+            if (errorCode === 'permission-denied' || errorMsg.includes('permission') || errorMsg.includes('Access denied')) {
+                error(`❌ فشل الفحص - صلاحيات غير كافية\n\n${errorMsg}\n\n💡 الحل:\n1. تأكد إنك Owner\n2. جرب زر "مزامنة الأمان"\n3. تحقق من Firebase Security Rules`);
+                alert(`❌ Deep Audit فشل - صلاحيات غير كافية:\n\n${errorMsg}\n\nالحل:\n1. تأكد إنك Owner\n2. جرب زر "مزامنة الأمان"\n3. تحقق من Firebase Security Rules\n\nتفاصيل في Console.`);
+            } else {
+                error(`❌ فشل الفحص\n\n${errorMsg}\n\nراجع Console للتفاصيل`);
+                alert(`❌ Deep Audit فشل:\n\n${errorMsg}\n\nتفاصيل إضافية في Console.`);
+            }
+            
+            haptic('error');
+            playSound('error');
+            
+            // Reset status after 5 seconds
+            setTimeout(() => {
+                setAuditStatus('idle');
+                setAuditProgress('');
+            }, 5000);
+        } finally {
+            setAuditLoading(false);
+            logger.info('Deep Audit handler finished', null, 'OwnerPanel');
         }
     };
 
     return (
-        <div className="bg-[#0F172A] min-h-screen text-white p-4 lg:p-6">
-            {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-xl shadow-teal-500/20 border border-white/10">
-                        <Crown className="w-9 h-9 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">
-                            لوحة المالك
-                        </h1>
-                        <p className="text-white/40 text-sm font-medium">التحكم الكامل في المنظومة والتراخيص</p>
-                    </div>
-                </div>
+        <div className="flex min-h-screen transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+            {/* ✅ ALWAYS VISIBLE SIDEBAR - Premium Professional Design */}
+            <div className="desktop-sidebar-container flex-shrink-0 fixed top-0 right-0 h-screen z-30">
+                <aside id="admin-sidebar" className="h-full">
+                    <AdminSidebar
+                        isOwner={user?.role === 'owner'}
+                    />
+                </aside>
+            </div>
 
-                <div className="flex flex-wrap gap-3 items-center">
+            {/* Main Content Area - Adjusted for fixed sidebar */}
+            <main className="flex-1 p-4 pb-24 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col" style={{ marginRight: '280px' }}>
+                <div className="flex-1">
+                    {/* ✅ Standard Header - Same as other pages */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center">
+                                <Crown className="w-6 h-6 text-teal-400" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold text-white">لوحة المالك</h1>
+                                <p className="text-sm text-white/60">التحكم الكامل في المنظومة والتراخيص</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => navigate('/owner-dashboard')}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 border border-teal-500/30 hover:border-teal-500/50 transition-all"
+                        >
+                            <LayoutDashboard className="w-4 h-4" />
+                            <span className="text-sm font-medium">الرئيسية</span>
+                        </button>
+                    </div>
+
+                    <div className="max-w-7xl mx-auto p-6 space-y-6">
+
+                {/* Actions Bar - Mobile-First: Scrollable Horizontal */}
+                {/* ✅ ORGANIZED: Main Actions First, Settings Second */}
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide mb-6">
+                    {/* ============================================ */}
+                    {/* 📋 MAIN ACTIONS (Primary Functions) */}
+                    {/* ============================================ */}
+                    <button
+                        onClick={() => setShowAddModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold shadow-lg hover:shadow-xl transition-all"
+                    >
+                        <UserPlus className="w-4 h-4" />
+                        <span>إضافة مدير</span>
+                    </button>
+
+                    <button
+                        onClick={handleSyncPermissions}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30 transition-all"
+                        title="تحديث صلاحيات Cloud Firestore"
+                    >
+                        {dataLoading ? <AdoraLoaderInline size={14} /> : <RefreshCw className="w-4 h-4" />}
+                        <span>مزامنة الأمان</span>
+                    </button>
+
+                    <button
+                        onClick={() => setShowAuditChoiceModal(true)}
+                        disabled={auditLoading || dataLoading}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all relative overflow-hidden ${
+                            auditStatus === 'loading' 
+                                ? 'bg-blue-500/30 text-blue-300 border-blue-400/50 animate-pulse shadow-lg shadow-blue-500/30' 
+                                : auditStatus === 'success'
+                                ? 'bg-green-500/30 text-green-300 border-green-400/50 shadow-lg shadow-green-500/30'
+                                : auditStatus === 'error'
+                                ? 'bg-red-500/30 text-red-300 border-red-400/50 shadow-lg shadow-red-500/30'
+                                : 'bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/30'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        title={auditProgress || "فحص شامل أو مسح كامل للنظام"}
+                    >
+                        {/* Pulsing ring animation when loading */}
+                        {auditStatus === 'loading' && (
+                            <span className="absolute inset-0 rounded-xl animate-ping bg-blue-500/20"></span>
+                        )}
+                        <div className="relative flex items-center gap-2">
+                            {(auditLoading || dataLoading) ? (
+                                <div className="flex items-center gap-2">
+                                    <AdoraLoaderInline size={16} />
+                                    <span className="text-xs font-medium animate-pulse">{auditProgress || 'جاري المعالجة...'}</span>
+                                </div>
+                            ) : auditStatus === 'success' ? (
+                                <>
+                                    <CheckCircle className="w-4 h-4 animate-bounce" />
+                                    <span className="text-xs font-medium">✅ اكتمل</span>
+                                </>
+                            ) : auditStatus === 'error' ? (
+                                <>
+                                    <AlertTriangle className="w-4 h-4 animate-shake" />
+                                    <span className="text-xs font-medium">❌ فشل</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Shield className="w-4 h-4" />
+                                    <span>🔍 فحص/مسح النظام</span>
+                                </>
+                            )}
+                        </div>
+                    </button>
+
                     <button
                         onClick={() => setShowDeletedManagers(!showDeletedManagers)}
-                        className={`flex-1 lg:flex-none px-5 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all font-bold text-sm ${showDeletedManagers
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-lg shadow-red-500/10'
-                            : 'bg-white/5 text-white/60 hover:bg-white/10 border border-white/5'
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${showDeletedManagers
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            : 'bg-white/5 text-white/60 hover:bg-white/10 border border-white/10'
                             }`}
                     >
                         {showDeletedManagers ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -312,49 +653,16 @@ export const OwnerPanel: React.FC = () => {
                     </button>
 
                     <button
-                        onClick={handleSyncPermissions}
-                        className="flex-1 lg:flex-none px-5 py-3 rounded-2xl bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20 transition-all flex items-center justify-center gap-2 text-sm font-bold shadow-lg shadow-teal-500/5"
-                        title="تحديث صلاحيات Cloud Firestore"
-                    >
-                        {dataLoading ? <AdoraLoaderInline size={16} /> : <RefreshCw className="w-4 h-4" />}
-                        <span>مزامنة الأمان</span>
-                    </button>
-
-                    <button
-                        onClick={() => setShowAddModal(true)}
-                        className="w-full lg:w-auto px-8 py-3 rounded-2xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-bold shadow-xl shadow-primary-500/20 hover:shadow-primary-500/40 active:scale-95 transition-all flex items-center justify-center gap-2 border border-primary-400/20"
-                    >
-                        <UserPlus className="w-5 h-5" />
-                        إضافة مدير
-                    </button>
-
-                    <button
-                        onClick={handlePurgeSystem}
-                        className="px-4 py-3 rounded-2xl bg-red-600/10 text-red-400 border border-red-500/10 hover:bg-red-600/20 transition-all flex items-center justify-center gap-2 text-xs font-black shadow-lg shadow-red-500/5 group"
-                        title="مسح كافة البيانات للبدء من الصفر"
-                    >
-                        <Trash2 className="w-4 h-4 group-hover:animate-bounce" />
-                        <span className="hidden sm:inline">تهيئة النظام خارق</span>
-                    </button>
-
-                    <button
                         onClick={logout}
-                        className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/40 hover:bg-red-500/10 hover:text-red-400 transition-all border border-white/5"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-white/40 hover:bg-red-500/10 hover:text-red-400 transition-all border border-white/10"
+                        title="تسجيل الخروج"
                     >
-                        <LogOut className="w-5 h-5 flip-rtl" />
+                        <LogOut className="w-4 h-4 flip-rtl" />
                     </button>
                 </div>
-            </div>
 
-            {/* Stats Overview - Unified Style like Owner Dashboard */}
-            <div 
-                className="grid mb-10"
-                style={{
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                    gap: '24px',
-                    padding: '24px',
-                }}
-            >
+            {/* Stats Overview - Mobile-First Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="stat-card-pro-compact">
                     <StatCard
                         icon={Users}
@@ -384,8 +692,8 @@ export const OwnerPanel: React.FC = () => {
                 </div>
             </div>
 
-            {/* Managers List */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Managers List - Mobile-First: Single column on mobile */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {dataLoading ? (
                     <div className="col-span-full flex justify-center py-20">
                         <AdoraLoader size="md" message="جاري تحميل البيانات..." />
@@ -403,32 +711,32 @@ export const OwnerPanel: React.FC = () => {
                             const licenseStatus = (manager as any).licenseStatus || 'active';
 
                             return (
-                                <div key={manager.id} className="glass-card p-5 rounded-2xl group border border-white/5 hover:border-white/10 transition-all">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex gap-4">
-                                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-2xl font-bold text-white/20">
+                                <div key={manager.id} className="p-6 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all group">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                                        <div className="flex gap-4 flex-1 min-w-0">
+                                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xl font-bold text-white/20 flex-shrink-0">
                                                 {manager.name.charAt(0)}
                                             </div>
-                                            <div>
-                                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                                    {manager.name}
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="text-lg font-bold text-white flex items-center gap-2 flex-wrap">
+                                                    <span className="truncate">{manager.name}</span>
                                                     {licenseStatus === 'suspended' && (
-                                                        <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">معلق</span>
+                                                        <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs whitespace-nowrap">معلق</span>
                                                     )}
                                                 </h3>
-                                                <p className="text-white/40 text-sm mb-1">{manager.hotelName || 'فندق جديد'}</p>
-                                                <div className="flex items-center gap-2 text-xs">
-                                                    <span className="px-2 py-1 rounded-lg bg-white/5 text-white/60">
+                                                <p className="text-sm text-white/40 mb-1 truncate">{manager.hotelName || 'فندق جديد'}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs px-2 py-1 rounded-lg bg-white/5 text-white/60">
                                                         كود: <span className="text-white font-mono">{manager.code}</span>
                                                     </span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {/* License Controls */}
+                                        {/* Action Buttons - Always visible */}
+                                        <div className="flex gap-2 flex-shrink-0">
                                             <button
                                                 onClick={() => handleToggleLicense(manager.id, manager.tenantId, licenseStatus)}
-                                                className={`p-2 rounded-xl transition-colors ${licenseStatus === 'active'
+                                                className={`p-2 rounded-lg transition-colors ${licenseStatus === 'active'
                                                     ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
                                                     : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
                                                     }`}
@@ -439,7 +747,7 @@ export const OwnerPanel: React.FC = () => {
 
                                             <button
                                                 onClick={() => handleRenewLicense(manager.id, manager.tenantId)}
-                                                className="p-2 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                                                className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
                                                 title="تجديد الترخيص (سنة)"
                                             >
                                                 <Calendar className="w-4 h-4" />
@@ -447,7 +755,7 @@ export const OwnerPanel: React.FC = () => {
 
                                             <button
                                                 onClick={() => handleDeleteManager(manager.id, manager.tenantId)}
-                                                className="p-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                                                className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
                                                 title="حذف (نقل للأرشيف)"
                                             >
                                                 <Trash2 className="w-4 h-4" />
@@ -456,12 +764,12 @@ export const OwnerPanel: React.FC = () => {
                                     </div>
 
                                     {/* License Info */}
-                                    <div className="bg-black/20 rounded-xl p-3 flex justify-between items-center text-sm mb-3">
-                                        <div className="flex items-center gap-2 text-white/60">
+                                    <div className="p-3 rounded-lg bg-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
+                                        <div className="flex items-center gap-2 text-sm text-white/60">
                                             <Clock className="w-4 h-4" />
                                             <span>ينتهي الترخيص في:</span>
                                         </div>
-                                        <div className={`flex items-center gap-2 font-bold ${(remainingDays ?? 0) < 30 ? 'text-red-400' : 'text-green-400'}`}>
+                                        <div className={`flex items-center gap-2 font-bold text-sm ${(remainingDays ?? 0) < 30 ? 'text-red-400' : 'text-green-400'}`}>
                                             {remainingDays ?? 0} يوم
                                             {(remainingDays ?? 0) < 30 && <AlertTriangle className="w-4 h-4" />}
                                         </div>
@@ -471,7 +779,7 @@ export const OwnerPanel: React.FC = () => {
                                     {(manager.branches?.length || 0) > 0 && (
                                         <div className="flex flex-wrap gap-2">
                                             {manager.branches?.map(code => (
-                                                <span key={code} className="text-xs px-2 py-1 rounded bg-white/5 text-white/40">
+                                                <span key={code} className="text-xs px-2 py-1 rounded-lg bg-white/5 text-white/40">
                                                     فرع {code}
                                                 </span>
                                             ))}
@@ -483,12 +791,12 @@ export const OwnerPanel: React.FC = () => {
 
                         {/* Deleted Managers Section */}
                         {showDeletedManagers && deletedManagers.map((manager) => (
-                            <div key={manager.id} className="glass-card p-5 rounded-2xl border border-red-500/10 bg-red-500/5 relative overflow-hidden">
-                                <div className="absolute top-2 left-2 px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg flex items-center gap-1">
+                            <div key={manager.id} className="p-6 rounded-xl border border-red-500/20 bg-red-500/5 relative overflow-hidden">
+                                <div className="absolute top-3 right-3 px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg flex items-center gap-1">
                                     <Trash2 className="w-3 h-3" />
                                     <span>محذوف</span>
                                 </div>
-                                <div className="flex items-center justify-between mt-4">
+                                <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-white/40">
                                             <Users className="w-6 h-6" />
@@ -500,7 +808,7 @@ export const OwnerPanel: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={() => handleRestoreManager(manager.id)}
-                                        className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors flex items-center gap-2 text-xs font-bold"
+                                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors text-sm font-bold"
                                     >
                                         <RefreshCw className="w-4 h-4" />
                                         استعادة
@@ -511,20 +819,253 @@ export const OwnerPanel: React.FC = () => {
                     </>
                 )}
             </div>
+                    </div>
 
-            {/* Add Manager Modal */}
-            {
-                showAddModal && (
-                    <AddManagerModal
-                        onClose={() => setShowAddModal(false)}
-                        onSuccess={() => {
-                            setShowAddModal(false);
-                            loadData();
-                        }}
-                    />
-                )
-            }
-        </div >
+                    {/* Add Manager Modal */}
+                    {
+                        showAddModal && (
+                            <AddManagerModal
+                                onClose={() => setShowAddModal(false)}
+                                onSuccess={() => {
+                                    setShowAddModal(false);
+                                    loadData();
+                                }}
+                            />
+                        )
+                    }
+
+                    {/* ✅ Audit Choice Modal - Premium Design */}
+                    {showAuditChoiceModal && (
+                        <div
+                            className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+                            onClick={() => setShowAuditChoiceModal(false)}
+                            style={{ background: 'rgba(0, 0, 0, 0.92)' }}
+                        >
+                            <div
+                                className="relative w-full max-w-lg rounded-3xl p-6 sm:p-8 animate-scale-in shadow-2xl"
+                                style={{
+                                    background: 'var(--theme-bg-secondary)',
+                                    border: '1px solid var(--theme-border-primary)'
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Header */}
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                                        <Shield className="w-6 h-6 text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white">اختر نوع العملية</h3>
+                                        <p className="text-sm text-white/60">اختر العملية المناسبة لنظامك</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowAuditChoiceModal(false)}
+                                        className="ml-auto p-2 rounded-lg hover:bg-white/10 transition-colors"
+                                    >
+                                        <X className="w-5 h-5 text-white/60" />
+                                    </button>
+                                </div>
+
+                                {/* Options */}
+                                <div className="space-y-3 mb-6">
+                                    {/* Deep Audit Option */}
+                                    <button
+                                        onClick={async () => {
+                                            setShowAuditChoiceModal(false);
+                                            await handleDeepAudit();
+                                        }}
+                                        disabled={auditLoading}
+                                        className="w-full p-4 rounded-xl border-2 border-blue-500/30 bg-blue-500/10 hover:border-blue-500/50 hover:bg-blue-500/20 transition-all text-right disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                                                <Shield className="w-5 h-5 text-blue-400" />
+                                            </div>
+                                            <div className="flex-1 text-right">
+                                                <h4 className="text-lg font-bold text-white mb-1">🔍 فحص شامل (Deep Audit)</h4>
+                                                <p className="text-sm text-white/70 leading-relaxed">
+                                                    فحص النظام بالكامل وحذف البيانات التجريبية فقط
+                                                    <br />
+                                                    <span className="text-green-400 font-semibold">✅ آمن - لا يحذف البيانات المهمة</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    {/* Nuclear Purge Option */}
+                                    <button
+                                        onClick={async () => {
+                                            setShowAuditChoiceModal(false);
+                                            await handlePurgeSystem();
+                                        }}
+                                        disabled={dataLoading}
+                                        className="w-full p-4 rounded-xl border-2 border-red-500/30 bg-red-500/10 hover:border-red-500/50 hover:bg-red-500/20 transition-all text-right disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                                                <Trash2 className="w-5 h-5 text-red-400" />
+                                            </div>
+                                            <div className="flex-1 text-right">
+                                                <h4 className="text-lg font-bold text-white mb-1">☢️ مسح كامل (Nuclear Purge)</h4>
+                                                <p className="text-sm text-white/70 leading-relaxed">
+                                                    مسح كافة البيانات للبدء من الصفر
+                                                    <br />
+                                                    <span className="text-red-400 font-semibold">⚠️ خطير - يحذف كل شيء ما عدا المالك</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </button>
+                                </div>
+
+                                {/* Footer Info */}
+                                <div className="pt-4 border-t border-white/10">
+                                    <p className="text-xs text-white/50 text-center">
+                                        💡 نصيحة: استخدم "فحص شامل" للتنظيف الآمن، و"مسح كامل" فقط عند الحاجة للبدء من الصفر
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ✅ Purge Confirmation Modal - Custom Themed */}
+                    {showPurgeConfirmModal && (
+                        <div
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+                            onClick={() => setShowPurgeConfirmModal(false)}
+                        >
+                            {/* Backdrop */}
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+                            {/* Modal Content */}
+                            <div
+                                className="relative w-full max-w-lg rounded-3xl p-6 sm:p-8 animate-modal-in shadow-2xl"
+                                style={{
+                                    background: 'var(--theme-bg-secondary)',
+                                    border: '1px solid var(--theme-border-primary)'
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Header */}
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+                                        <AlertTriangle className="w-6 h-6 text-red-400" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-xl font-bold text-white">⚠️ تحذير شديد: مسح كامل للنظام</h3>
+                                        <p className="text-sm text-white/60">عملية لا يمكن التراجع عنها</p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setShowPurgeConfirmModal(false);
+                                            setResetCode('');
+                                        }}
+                                        className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                                    >
+                                        <X className="w-5 h-5 text-white/60" />
+                                    </button>
+                                </div>
+
+                                {/* Warning Content */}
+                                <div className="mb-6 space-y-4">
+                                    <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+                                        <p className="text-white/90 leading-relaxed mb-3">
+                                            أنت على وشك <span className="font-bold text-red-400">مسح كافة بيانات النظام</span> للبدء من جديد.
+                                        </p>
+                                        <div className="space-y-2 text-sm text-white/70">
+                                            <p className="flex items-start gap-2">
+                                                <span className="text-red-400 mt-1">•</span>
+                                                <span>سيتم حذف جميع <strong>المشتركين</strong> (Managers) وبياناتهم</span>
+                                            </p>
+                                            <p className="flex items-start gap-2">
+                                                <span className="text-red-400 mt-1">•</span>
+                                                <span>سيتم حذف جميع <strong>الفروع</strong> (Branches) و<strong>الغرف</strong> (Rooms)</span>
+                                            </p>
+                                            <p className="flex items-start gap-2">
+                                                <span className="text-red-400 mt-1">•</span>
+                                                <span>سيتم حذف جميع <strong>الطلبات</strong> (Requests) و<strong>السجلات</strong></span>
+                                            </p>
+                                            <p className="flex items-start gap-2">
+                                                <span className="text-red-400 mt-1">•</span>
+                                                <span>سيتم حذف جميع <strong>المستخدمين</strong> (Users) ما عدا حساب المالك</span>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* RESET Code Input */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-white/80 mb-2">
+                                            لتأكيد المسح الشامل، اكتب كلمة <span className="font-bold text-red-400">RESET</span> باللغة الإنجليزية:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={resetCode}
+                                            onChange={(e) => setResetCode(e.target.value)}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter' && resetCode.trim() === 'RESET') {
+                                                    handleConfirmPurge();
+                                                }
+                                            }}
+                                            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-red-500/50 focus:bg-white/10 transition-all text-center font-mono text-lg tracking-wider"
+                                            placeholder="اكتب RESET هنا"
+                                            autoFocus
+                                        />
+                                        {resetCode && resetCode.trim() !== 'RESET' && (
+                                            <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
+                                                <AlertTriangle className="w-3 h-3" />
+                                                الكلمة غير صحيحة. يجب أن تكون بالضبط: <strong>RESET</strong>
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Footer - Action Buttons with Clear Explanations */}
+                                <div className="pt-4 border-t border-white/10">
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        {/* Cancel Button */}
+                                        <button
+                                            onClick={() => {
+                                                setShowPurgeConfirmModal(false);
+                                                setResetCode('');
+                                            }}
+                                            className="flex-1 px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/20 text-white font-medium transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <X className="w-4 h-4" />
+                                            <span>إلغاء</span>
+                                            <span className="text-xs text-white/50">(لا شيء سيحدث)</span>
+                                        </button>
+
+                                        {/* Confirm Button */}
+                                        <button
+                                            onClick={handleConfirmPurge}
+                                            disabled={resetCode.trim() !== 'RESET' || auditLoading}
+                                            className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold shadow-lg shadow-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                                        >
+                                            {auditLoading ? (
+                                                <>
+                                                    <AdoraLoaderInline size={16} />
+                                                    <span>جاري المسح...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Trash2 className="w-4 h-4" />
+                                                    <span>تأكيد المسح الكامل</span>
+                                                    <span className="text-xs opacity-80">(لا يمكن التراجع)</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-white/40 text-center mt-3">
+                                        💡 <strong>زر الإلغاء:</strong> يغلق النافذة دون تنفيذ أي عملية
+                                        <br />
+                                        ⚠️ <strong>زر التأكيد:</strong> يبدأ المسح الكامل فوراً - لا يمكن التراجع بعد الضغط
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </main>
+        </div>
     );
 };
 
@@ -532,10 +1073,12 @@ export const OwnerPanel: React.FC = () => {
 // ADD MANAGER MODAL
 // ============================================================
 
-const AddManagerModal: React.FC<{
+interface AddManagerModalProps {
     onClose: () => void;
     onSuccess: () => void;
-}> = ({ onClose, onSuccess }) => {
+}
+
+const AddManagerModal: React.FC<AddManagerModalProps> = ({ onClose, onSuccess }) => {
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
     const [hotelName, setHotelName] = useState('');
@@ -572,7 +1115,7 @@ const AddManagerModal: React.FC<{
                     });
                 }
             } catch (err) {
-                console.warn('Silent PIN check failed:', err);
+                logger.warn('Silent PIN check failed', err, 'OwnerPanel');
             } finally {
                 setCheckingCodes(false);
             }
@@ -631,7 +1174,7 @@ const AddManagerModal: React.FC<{
                 return next;
             });
         } catch (err) {
-            console.error('Branch PIN check error:', err);
+            logger.error('Branch PIN check error', err, 'OwnerPanel');
         } finally {
             setLoading(false);
         }
@@ -719,26 +1262,26 @@ const AddManagerModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-            <div className="glass-card w-full max-w-md rounded-3xl overflow-hidden max-h-[90vh] flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-white/10 flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-                            <UserPlus className="w-5 h-5 text-yellow-400" />
+        <div className={`fixed inset-0 bg-black/90 flex items-center justify-center z-50 ${responsiveClasses.container} overflow-y-auto`}>
+            <div className={`${responsiveClasses.modalMedium} ${responsiveClasses.cardRounded} bg-white/10 backdrop-blur-xl border border-white/20 overflow-hidden max-h-[95vh] sm:max-h-[90vh] flex flex-col my-auto shadow-2xl`}>
+                {/* Header - Mobile-First */}
+                <div className={`flex items-center justify-between ${responsiveClasses.cardPadding} border-b border-white/10 flex-shrink-0`}>
+                    <div className={`flex items-center ${responsiveClasses.gridGapSmall} min-w-0 flex-1`}>
+                        <div className={`${responsiveClasses.iconButton} ${responsiveClasses.cardRounded} bg-yellow-500/20 flex items-center justify-center flex-shrink-0`}>
+                            <UserPlus className={`${responsiveClasses.iconMedium} text-yellow-400`} />
                         </div>
-                        <h3 className="text-lg font-bold text-white">إضافة مدير جديد</h3>
+                        <h3 className={`${responsiveClasses.headerTitle} text-white truncate`}>إضافة مدير جديد</h3>
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:text-white"
+                        className={`${responsiveClasses.iconButton} ${responsiveClasses.cardRounded} bg-white/10 flex items-center justify-center text-white/60 hover:text-white ${responsiveClasses.touch} flex-shrink-0`}
                     >
-                        <X className="w-5 h-5" />
+                        <X className={responsiveClasses.iconMedium} />
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="p-4 space-y-4 overflow-y-auto">
+                {/* Content - Mobile-First Scrollable */}
+                <div className={`${responsiveClasses.cardPadding} ${responsiveClasses.gridGap} overflow-y-auto flex-1`}>
                     {/* Name (Optional) */}
                     <div>
                         <label className="block text-sm text-white/60 mb-2">اسم المدير (اختياري)</label>
@@ -865,18 +1408,18 @@ const AddManagerModal: React.FC<{
                     )}
                 </div>
 
-                {/* Footer */}
-                <div className="p-4 border-t border-white/10 flex-shrink-0">
+                {/* Footer - Mobile-First */}
+                <div className={`${responsiveClasses.cardPadding} border-t border-white/10 flex-shrink-0`}>
                     <button
                         onClick={handleSubmit}
                         disabled={loading || branchCodes.length === 0 || code.length !== 4}
-                        className="w-full py-3 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-yellow-500/20 transition-all"
+                        className={`${responsiveClasses.touch} w-full py-3 sm:py-4 ${responsiveClasses.cardRounded} bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-yellow-500/20 transition-all ${responsiveClasses.buttonText}`}
                     >
                         {loading ? (
                             <AdoraLoaderInline size={20} />
                         ) : (
                             <>
-                                <Save className="w-5 h-5" />
+                                <Save className={responsiveClasses.iconMedium} />
                                 حفظ وإنشاء الحساب
                             </>
                         )}

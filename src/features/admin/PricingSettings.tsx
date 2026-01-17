@@ -45,6 +45,7 @@ import { syncSeasonsFromSources, ParsedSeason } from '../../services/calendarSyn
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { Timestamp } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // COMPONENTS
@@ -112,7 +113,7 @@ const PricingSettings: React.FC = () => {
             setSeasons(s);
             setPrices(p);
         } catch (error) {
-            console.error(error);
+            logger.error('Error', error, 'PricingSettings');
         } finally {
             setLoading(false);
         }
@@ -182,7 +183,7 @@ const PricingSettings: React.FC = () => {
             loadAll();
         } catch (err) {
             showError('حدث خطأ أثناء المزامنة');
-            console.error(err);
+            logger.error('Error', err, 'PricingSettings');
         } finally {
             setSyncing(false);
         }

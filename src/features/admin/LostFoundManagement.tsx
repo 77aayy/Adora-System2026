@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
+import { logger } from '../../services/loggerService';
 import {
     LostFoundItem,
     ItemStatus,
@@ -664,7 +665,7 @@ export const LostFoundManagement: React.FC = () => {
     useEffect(() => {
         // ✅ FIX: Pass tenantId for tenant-scoped collection
         if (!tenantId) {
-            console.warn('⚠️ LostFoundManagement: tenantId is required');
+            logger.warn('LostFoundManagement: tenantId is required', null, 'LostFoundManagement');
             return;
         }
         const unsubscribe = subscribeToLostFound(branchId, (data) => {

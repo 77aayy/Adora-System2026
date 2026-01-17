@@ -17,6 +17,7 @@ import { collection, query, where, getCountFromServer, getDocs } from 'firebase/
 import { db } from '../../services/firebase';
 import { getAllManagers } from '../../services/ownerService';
 import { calculateTenantRevenue, calculateMonthlyRecurringRevenue } from '../../services/billingService';
+import { logger } from '../../services/loggerService';
 
 export const MultiBranchDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -98,7 +99,7 @@ export const MultiBranchDashboard: React.FC = () => {
                         const tenantRev = await calculateTenantRevenue(tenantId);
                         totalRevenue += tenantRev;
                     } catch (err) {
-                        console.error(`Error aggregating data for tenant ${tenantId}:`, err);
+                        logger.error(`Error aggregating data for tenant ${tenantId}`, err, 'MultiBranchDashboard');
                         // Continue with other tenants even if one fails
                     }
                 }
@@ -110,7 +111,7 @@ export const MultiBranchDashboard: React.FC = () => {
                     revenue: totalRevenue
                 });
             } catch (error) {
-                console.error('Error loading owner multi-branch data:', error);
+                logger.error('Error loading owner multi-branch data', error, 'MultiBranchDashboard');
                 // Set to 0 on error
                 setComparisonData({
                     totalRequests: 0,
@@ -178,7 +179,7 @@ export const MultiBranchDashboard: React.FC = () => {
                 revenue: tenantRevenue
             });
         } catch (error) {
-            console.error('Error loading multi-branch data:', error);
+            logger.error('Error loading multi-branch data', error, 'MultiBranchDashboard');
             // Set to 0 on error
             setComparisonData({
                 totalRequests: 0,

@@ -19,11 +19,6 @@ import {
     Smartphone, MapPin, Shield, Clock, Users, Building2,
     Sparkles, Copy, ExternalLink, Play, Pause, ShieldAlert
 } from 'lucide-react';
-import { db } from '../../services/firebase';
-import {
-    collection, query, where, getDocs, doc, updateDoc,
-    onSnapshot, Timestamp, serverTimestamp
-} from 'firebase/firestore';
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
 import { generateQRUrl } from '../../services/qrCodeService';
@@ -32,6 +27,10 @@ import {
     generateSecureAccessToken, 
     deactivateToken 
 } from '../../services/secureAccessService';
+import { logger } from '../../services/loggerService';
+// ✅ Architecture: Use services instead of direct Firebase calls
+import { subscribeToRooms, updateRoom } from '../../services/roomService';
+import { serverTimestamp } from 'firebase/firestore';
 
 // ============================================================
 // TYPES
@@ -88,29 +87,40 @@ export const QRRoomManager: React.FC<{ branchId: string; branchName: string; ten
     // DATA FETCHING
     // ============================================================
 
+    // ✅ Null Safety: Check required params before subscribing
     useEffect(() => {
-        if (!tenantId || !branchId) return;
+        if (!tenantId || !branchId) {
+            logger.warn('QRRoomManager: Missing tenantId or branchId', null, 'QRRoomManager');
+            setLoading(false);
+            return;
+        }
 
-        const roomsRef = collection(db, `tenants/${tenantId}/branches/${branchId}/rooms`);
-        const unsubscribe = onSnapshot(roomsRef, (snapshot) => {
-            const roomsData = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                qrGeneratedAt: doc.data().qrGeneratedAt?.toDate?.() || null
+        // ✅ Architecture: Use service instead of direct Firebase call
+        // subscribeToRooms signature: (branchId, callback, tenantId, maxResults)
+        const unsubscribe = subscribeToRooms(branchId, (roomsData) => {
+            // ✅ Map to Room interface with QR fields
+            const roomsWithQR = roomsData.map(room => ({
+                ...room,
+                qrGeneratedAt: (room as any).qrGeneratedAt?.toDate?.() || null,
+                qrToken: (room as any).qrToken || undefined,
+                qrGeneratedBy: (room as any).qrGeneratedBy || undefined,
+                isActive: (room as any).isActive || false
             })) as Room[];
             
             // Sort by room number
-            roomsData.sort((a, b) => {
+            roomsWithQR.sort((a, b) => {
                 const numA = parseInt(a.number) || 0;
                 const numB = parseInt(b.number) || 0;
                 return numA - numB;
             });
             
-            setRooms(roomsData);
+            setRooms(roomsWithQR);
             setLoading(false);
-        });
+        }, tenantId, 1000); // ✅ Pass tenantId and maxResults
 
-        return () => unsubscribe();
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
     }, [tenantId, branchId]);
 
     // ============================================================
@@ -156,7 +166,7 @@ export const QRRoomManager: React.FC<{ branchId: string; branchName: string; ten
             try {
                 await deactivateToken(room.qrToken, 'regenerated');
             } catch (e) {
-                console.warn('Could not deactivate old token:', e);
+                logger.warn('Could not deactivate old token', e, 'QRRoomManager');
             }
         }
 
@@ -177,20 +187,22 @@ export const QRRoomManager: React.FC<{ branchId: string; branchName: string; ten
                 }
             );
             
-            // Update room document with secure token
-            const roomRef = doc(db, `tenants/${tenantId}/branches/${branchId}/rooms`, room.id);
-            await updateDoc(roomRef, {
+            // ✅ Architecture: Use service instead of direct Firebase call
+            // ✅ Null Safety: Check required params
+            if (!tenantId || !branchId) {
+                throw new Error('Missing tenantId or branchId');
+            }
+
+            await updateRoom(tenantId, branchId, room.number, {
                 qrToken: token,
-                qrGeneratedAt: serverTimestamp(),
-                qrGeneratedBy: 'manager',
-                branchId: branchId,
-                tenantId: tenantId
-            });
+                qrGeneratedAt: serverTimestamp() as any,
+                qrGeneratedBy: 'manager'
+            } as any);
 
             success?.(`✅ تم توليد QR آمن للغرفة ${room.number}`);
             haptic?.('success');
         } catch (err) {
-            console.error('Error generating QR:', err);
+            logger.error('Error generating QR', err, 'QRRoomManager');
             showError?.('حدث خطأ أثناء توليد الرمز');
             haptic?.('error');
         } finally {
@@ -228,17 +240,20 @@ export const QRRoomManager: React.FC<{ branchId: string; branchName: string; ten
                     }
                 );
                 
-                const roomRef = doc(db, `tenants/${tenantId}/branches/${branchId}/rooms`, room.id);
-                await updateDoc(roomRef, {
+                // ✅ Architecture: Use service instead of direct Firebase call
+                // ✅ Null Safety: Check required params
+                if (!tenantId || !branchId) {
+                    throw new Error('Missing tenantId or branchId');
+                }
+
+                await updateRoom(tenantId, branchId, room.number, {
                     qrToken: token,
-                    qrGeneratedAt: serverTimestamp(),
-                    qrGeneratedBy: 'manager',
-                    branchId: branchId,
-                    tenantId: tenantId
-                });
+                    qrGeneratedAt: serverTimestamp() as any,
+                    qrGeneratedBy: 'manager'
+                } as any);
                 successCount++;
             } catch (err) {
-                console.error(`Error generating QR for room ${room.number}:`, err);
+                logger.error(`Error generating QR for room ${room.number}`, err, 'QRRoomManager');
             }
         }
 

@@ -26,6 +26,16 @@ const DEFAULT_MILESTONES: ChallengeMilestone[] = [
  * Fetch tenant-specific challenge configuration
  */
 export async function getChallengeConfig(tenantId: string): Promise<ChallengeConfig> {
+    // ✅ CRITICAL: Check db before use
+    if (!db) {
+        console.error('Firebase Firestore not initialized - returning default config');
+        return {
+            isEnabled: true,
+            gracePeriodDays: 2,
+            milestones: DEFAULT_MILESTONES
+        };
+    }
+
     const configRef = doc(db, `tenants/${tenantId}/settings/challengeConfig`);
     const configDoc = await getDoc(configRef);
 
@@ -51,6 +61,11 @@ export async function getChallengeConfig(tenantId: string): Promise<ChallengeCon
  * Save tenant-specific challenge configuration
  */
 export async function saveChallengeConfig(tenantId: string, config: ChallengeConfig): Promise<void> {
+    // ✅ CRITICAL: Check db before use
+    if (!db) {
+        throw new Error('Firebase Firestore not initialized');
+    }
+
     const configRef = doc(db, `tenants/${tenantId}/settings/challengeConfig`);
     // ✅ FIX: Use setDoc instead of transaction for simpler write
     await setDoc(configRef, {
@@ -67,6 +82,12 @@ export async function checkDailyAttendance(tenantId: string, userId: string): Pr
     unlocked?: ChallengeMilestone;
     alreadyCheckedToday?: boolean;
 }> {
+    // ✅ CRITICAL: Check db before use
+    if (!db) {
+        console.error('Firebase Firestore not initialized');
+        return { success: false };
+    }
+
     const userRef = doc(db, `tenants/${tenantId}/employees`, userId);
     const today = new Date().toISOString().split('T')[0];
 

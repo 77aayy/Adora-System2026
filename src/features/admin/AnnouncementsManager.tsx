@@ -20,6 +20,7 @@ import {
     deleteAnnouncement,
     type Announcement
 } from '../../services/announcementService';
+import { logger } from '../../services/loggerService';
 
 interface AnnouncementsManagerProps {
     branchId: string;
@@ -62,7 +63,7 @@ export const AnnouncementsManager: React.FC<AnnouncementsManagerProps> = ({ bran
             const loaded = await getAnnouncements(branchId, tenantId);
             setAnnouncements(loaded);
         } catch (err) {
-            console.error('Error loading announcements:', err);
+            logger.error('Error loading announcements', err, 'AnnouncementsManager');
             error('فشل تحميل التنبيهات');
         } finally {
             setLoading(false);

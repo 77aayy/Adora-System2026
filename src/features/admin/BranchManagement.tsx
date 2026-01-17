@@ -11,17 +11,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { MapPin, Plus, Edit2, Trash2, Wand2, AlertCircle, X, Building2, DoorOpen, Layers, Save, RefreshCw } from 'lucide-react';
-import {
-    addDoc,
-    updateDoc,
-    doc,
-    collection,
-    onSnapshot,
-    Timestamp,
-    setDoc, // ✅ Added setDoc for specific ID creation
-    deleteDoc
-} from 'firebase/firestore';
-import { db } from '../../services/firebase';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { useTenant } from '../../context/TenantContext';
 import { useAuth } from '../../context/AuthContext';
@@ -31,10 +20,16 @@ import { cancelAllActiveRequestsByBranch } from '../../services/requestService';
 import { BranchSetupWizard } from './BranchSetupWizard';
 import { subscribeToRooms, updateRoom, deleteRoom, addRoom } from '../../services/roomService';
 import { Room } from '../../types';
+import { logger } from '../../services/loggerService';
+// ✅ Architecture: Use services instead of direct Firebase calls
+import { subscribeToBranches, createBranch, updateBranch, deleteBranch, restoreBranch } from '../../services/branchService';
+import { useTranslation } from 'react-i18next';
+import { serverTimestamp } from 'firebase/firestore';
 
 
 export const BranchManagement: React.FC = () => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     // In this SaaS model, the person accessing this Admin page IS the Tenant Manager/Owner
     // So we don't restrict actions based on 'isOwner' flag from role, 
     // but rather assume authorization is handled by the Route Guard.
@@ -97,85 +92,103 @@ export const BranchManagement: React.FC = () => {
 
     // ✅ SaaS Provisioning: Setup a specific assigned branch slot
     const handleSetupBranch = async (data: { name: string; location: string }, targetCode: string) => {
+        // ✅ Null Safety: Check required params
+        if (!tenantId) {
+            logger.warn('Cannot setup branch: Missing tenantId', null, 'BranchManagement');
+            return;
+        }
+
+        // 🛡️ Security: Verify this code is in their license
+        const allowedCodes = (tenantContext?.tenantInfo as any)?.branchCodes || [];
+        if (user?.role !== 'owner' && !allowedCodes.includes(targetCode)) {
+            const { t } = useTranslation();
+            alert(t('admin.branches.codeNotInLicense') || 'عفواً، هذا الكود غير مدرج في ترخيصك الحالي.');
+            return;
+        }
+
         try {
-            if (!tenantId) return;
-
-            // 🛡️ Security: Verify this code is in their license
-            const allowedCodes = (tenantContext?.tenantInfo as any)?.branchCodes || [];
-            if (user?.role !== 'owner' && !allowedCodes.includes(targetCode)) {
-                alert('عفواً، هذا الكود غير مدرج في ترخيصك الحالي.');
-                return;
-            }
-
-            // ✅ ID is deterministic based on code (standardization)
-            const branchId = `branch-${targetCode}`;
-            const branchesCollection = collection(db, `tenants/${tenantId}/branches`);
-            const branchRef = doc(branchesCollection, branchId);
-
-            await setDoc(branchRef, {
+            // ✅ Architecture: Use service instead of direct Firebase call
+            const result = await createBranch(tenantId, {
                 name: data.name,
-                code: targetCode, // Locked
+                code: targetCode,
                 location: data.location,
-                status: 'active',
-                createdAt: Timestamp.now(),
-                createdBy: user?.id,
+                createdBy: user?.id || 'system',
                 settings: { workingHours: '24/7' }
-            });
+            } as Omit<Branch, 'id' | 'createdAt'>);
 
-            haptic('success');
-            playSound('success');
-            setEditingBranch(null); // Close modal
-        } catch (error) {
-            console.error('Error setting up branch:', error);
+            if (result.success) {
+                haptic('success');
+                playSound('success');
+                setEditingBranch(null); // Close modal
+            } else {
+                throw new Error(result.error || 'Failed to setup branch');
+            }
+        } catch (error: any) {
+            logger.error('Error setting up branch', error, 'BranchManagement');
             haptic('error');
-            alert('حدث خطأ في إعداد الفرع');
+            const { t } = useTranslation();
+            alert(t('admin.branches.setupError') || 'حدث خطأ في إعداد الفرع');
         }
     };
 
     const handleUpdateBranch = async (branchId: string, data: { name: string; code: string; location: string }) => {
+        // ✅ Null Safety: Check required params
+        if (!tenantId) {
+            logger.warn('Cannot update branch: Missing tenantId', null, 'BranchManagement');
+            return;
+        }
+
+        // 🛡️ Validity Check
+        if (!/^\d{4}$/.test(data.code)) {
+            const { t } = useTranslation();
+            alert(t('admin.branches.invalidCode') || 'عفواً، كود الفرع يجب أن يتكون من 4 أرقام فقط.');
+            return;
+        }
+
         try {
-            if (!tenantId) return;
-
-            // 🛡️ Validity Check
-            if (!/^\d{4}$/.test(data.code)) {
-                alert('عفواً، كود الفرع يجب أن يتكون من 4 أرقام فقط.');
-                return;
-            }
-
-            const branchRef = doc(db, `tenants/${tenantId}/branches`, branchId);
-
-            await updateDoc(branchRef, {
+            // ✅ Architecture: Use service instead of direct Firebase call
+            const result = await updateBranch(tenantId, branchId, {
                 name: data.name,
                 code: data.code,
                 location: data.location
             });
 
-            haptic('success');
-            playSound('success');
-            setEditingBranch(null);
-        } catch (error) {
-            console.error('Error updating branch:', error);
+            if (result.success) {
+                haptic('success');
+                playSound('success');
+                setEditingBranch(null);
+            } else {
+                throw new Error(result.error || 'Failed to update branch');
+            }
+        } catch (error: any) {
+            logger.error('Error updating branch', error, 'BranchManagement');
             haptic('error');
         }
     };
 
     const handleRestoreBranch = async (branch: any) => {
-        if (!tenantId) return;
-        if (!confirm('هل تريد استعادة هذا الفرع؟')) return;
+        // ✅ Null Safety: Check required params
+        if (!tenantId) {
+            logger.warn('Cannot restore branch: Missing tenantId', null, 'BranchManagement');
+            return;
+        }
+
+        const { t } = useTranslation();
+        if (!confirm(t('admin.branches.restoreConfirm') || 'هل تريد استعادة هذا الفرع؟')) return;
 
         try {
-            const branchRef = doc(db, `tenants/${tenantId}/branches`, branch.id);
-
-            await updateDoc(branchRef, {
-                status: 'active',
-                deletedAt: null
-            });
-            haptic('success');
-            playSound('success');
-        } catch (error) {
-            console.error('Error restoring branch:', error);
+            // ✅ Architecture: Use service instead of direct Firebase call
+            const result = await restoreBranch(tenantId, branch.id);
+            if (result.success) {
+                haptic('success');
+                playSound('success');
+            } else {
+                throw new Error(result.error || 'Failed to restore branch');
+            }
+        } catch (error: any) {
+            logger.error('Error restoring branch', error, 'BranchManagement');
             haptic('error');
-            alert('حدث خطأ في استعادة الفرع');
+            alert(t('admin.branches.restoreError') || 'حدث خطأ في استعادة الفرع');
         }
     };
 
@@ -196,34 +209,37 @@ export const BranchManagement: React.FC = () => {
         // if (!confirm(...)) return; 
 
         try {
-            const branchRef = doc(db, `tenants/${tenantId}/branches`, branchId);
-
-            await updateDoc(branchRef, {
+            // ✅ Architecture: Use service instead of direct Firebase call
+            // Soft delete (scheduled_for_deletion)
+            const result = await updateBranch(tenantId, branchId, {
                 status: 'scheduled_for_deletion',
-                deletedAt: Timestamp.now()
-            });
+                deletedAt: serverTimestamp() as any
+            } as any);
 
-            // ✅ CASCADING CLEANUP: Cancel all pending requests for this branch
-            // This ensures "Project remains clean" after deletion
-            if (tenantId && user) {
-                await cancelAllActiveRequestsByBranch(
-                    tenantId,
-                    branchId,
-                    user.id,
-                    user.name || 'Admin',
-                    `تم إلغاء الطلبات آلياً بسبب حذف الفرع [${branchName}]`
-                );
+            if (result.success) {
+                // ✅ CASCADING CLEANUP: Cancel all pending requests for this branch
+                // This ensures "Project remains clean" after deletion
+                if (tenantId && user) {
+                    await cancelAllActiveRequestsByBranch(
+                        tenantId,
+                        branchId,
+                        user.id,
+                        user.name || 'Admin',
+                        `تم إلغاء الطلبات آلياً بسبب حذف الفرع [${branchName}]`
+                    );
+                }
+
+                // Timer to "finalize" (visual only, as data is already soft deleted)
+                const timer = setTimeout(() => {
+                    setShowUndoToast(false);
+                    setDeletedBranchId(null);
+                }, 5000);
+                setUndoTimer(timer);
+            } else {
+                throw new Error(result.error || 'Failed to delete branch');
             }
-
-            // Timer to "finalize" (visual only, as data is already soft deleted)
-            const timer = setTimeout(() => {
-                setShowUndoToast(false);
-                setDeletedBranchId(null);
-            }, 5000);
-            setUndoTimer(timer);
-
-        } catch (error) {
-            console.error('Error deleting branch:', error);
+        } catch (error: any) {
+            logger.error('Error deleting branch', error, 'BranchManagement');
             haptic('error');
         }
     };
@@ -234,17 +250,17 @@ export const BranchManagement: React.FC = () => {
         try {
             if (undoTimer) clearTimeout(undoTimer);
 
-            const branchRef = doc(db, `tenants/${tenantId}/branches`, deletedBranchId);
-            await updateDoc(branchRef, {
-                status: 'active',
-                deletedAt: null
-            });
+            // ✅ Architecture: Use service instead of direct Firebase call
+            const result = await restoreBranch(tenantId, deletedBranchId);
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to restore branch');
+            }
 
             playSound('success');
             setShowUndoToast(false);
             setDeletedBranchId(null);
         } catch (error) {
-            console.error('Error restoring branch:', error);
+            logger.error('Error restoring branch', error, 'BranchManagement');
         }
     };
 
@@ -259,20 +275,23 @@ export const BranchManagement: React.FC = () => {
         }
 
         try {
-            await addDoc(collection(db, `tenants/${tenantId}/branches`), {
+            // ✅ Architecture: Use service instead of direct Firebase call
+            const result = await createBranch(tenantId, {
                 ...data,
-                status: 'active',
-                createdAt: Timestamp.now(),
                 settings: {
                     allowNegativeInventory: false,
                     requireManagerApproval: true
                 }
-            });
-            haptic('success');
-            playSound('success');
-            setShowCreateModal(false);
-        } catch (error) {
-            console.error('Error creating branch:', error);
+            } as Omit<Branch, 'id' | 'createdAt'>);
+            if (result.success) {
+                haptic('success');
+                playSound('success');
+                setShowCreateModal(false);
+            } else {
+                throw new Error(result.error || 'Failed to create branch');
+            }
+        } catch (error: any) {
+            logger.error('Error creating branch', error, 'BranchManagement');
             haptic('error');
         }
     };
@@ -526,7 +545,7 @@ export const BranchManagement: React.FC = () => {
                 isOpen={showSetupWizard}
                 onClose={() => setShowSetupWizard(false)}
                 onComplete={(branchId) => {
-                    console.log('Branch setup complete:', branchId);
+                    logger.info('Branch setup complete', { branchId }, 'BranchManagement');
                     haptic('success');
                     playSound('success');
                 }}
@@ -581,7 +600,7 @@ const EnhancedBranchEditModal: React.FC<EnhancedBranchEditModalProps> = ({ branc
             haptic('success');
             playSound('success');
         } catch (error) {
-            console.error('Error saving branch info:', error);
+            logger.error('Error saving branch info', error, 'BranchManagement');
             haptic('error');
         } finally {
             setSaving(false);
@@ -610,7 +629,7 @@ const EnhancedBranchEditModal: React.FC<EnhancedBranchEditModalProps> = ({ branc
             haptic('success');
             setEditingRoom(null);
         } catch (error) {
-            console.error('Error updating room:', error);
+            logger.error('Error updating room', error, 'BranchManagement');
             haptic('error');
         }
     };
@@ -623,7 +642,7 @@ const EnhancedBranchEditModal: React.FC<EnhancedBranchEditModalProps> = ({ branc
             await deleteRoom(tenantId, branch.id, room.number);
             haptic('success');
         } catch (error) {
-            console.error('Error deleting room:', error);
+            logger.error('Error deleting room', error, 'BranchManagement');
             haptic('error');
         }
     };
@@ -644,7 +663,7 @@ const EnhancedBranchEditModal: React.FC<EnhancedBranchEditModalProps> = ({ branc
             setNewRoomNumber('');
             setShowAddRoom(false);
         } catch (error) {
-            console.error('Error adding room:', error);
+            logger.error('Error adding room', error, 'BranchManagement');
             haptic('error');
         }
     };

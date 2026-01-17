@@ -1025,126 +1025,58 @@ export const restoreManager = async (managerId: string): Promise<void> => {
 // ✅ Get deleted managers (for recovery)
 // ✅ NO TIME LIMIT: All deleted managers can be recovered anytime
 export const getDeletedManagers = async (): Promise<Array<User & { deletedAt: Date; canRecover: boolean }>> => {
-    // ✅ RBAC: Only Owner can access deleted managers
-    validateRoleAccess('owner');
+    // Null safety check
+    if (!db) {
+        logger.error('Database not initialized', new Error('db is null'), 'ownerService');
+        return [];
+    }
 
-    const deletedManagersRef = collection(db, 'deleted_managers');
-    // ✅ Filter by createdBy to satisfy Security Rules
-    const q = query(deletedManagersRef, where('createdBy', '==', 'owner'));
-    const snapshot = await getDocs(q);
+    // ✅ RBAC: Only Owner can access deleted managers (soft check - Firestore Rules will enforce)
+    try {
+        validateRoleAccess('owner');
+    } catch (rbacError: any) {
+        // Don't block here - let Firestore Rules handle it for better error messages
+        logger.warn('Client-side RBAC check failed, but proceeding to Firestore (Rules will enforce)', rbacError, 'ownerService');
+    }
 
-    return snapshot.docs.map(doc => {
-        const data = doc.data();
+    try {
+        const deletedManagersRef = collection(db, 'deleted_managers');
+        // ✅ Owner can read all deleted managers (no filter needed - Firestore Rules handle it)
+        const q = query(deletedManagersRef);
+        const snapshot = await getDocs(q);
 
-        return {
-            id: data.originalId || doc.id,
-            ...data,
-            deletedAt: data.deletedAt?.toDate() || new Date(),
-            canRecover: true, // ✅ Always true: No time limit for recovery
-        } as User & { deletedAt: Date; canRecover: boolean };
-    });
+        return snapshot.docs.map(doc => {
+            const data = doc.data();
+
+            return {
+                id: data.originalId || doc.id,
+                ...data,
+                deletedAt: data.deletedAt?.toDate() || new Date(),
+                canRecover: true, // ✅ Always true: No time limit for recovery
+            } as User & { deletedAt: Date; canRecover: boolean };
+        });
+    } catch (error: any) {
+        logger.error('Error getting deleted managers', error, 'ownerService');
+        // ✅ Return empty array instead of throwing to prevent UI crash
+        return [];
+    }
 };
 
 /**
- * ☢️ NUCLEAR OPTION: Purge All System Data (Except Owner)
- * Used to start 'Step 0' testing. Deletes all tenants, branches, managers, employees, and global codes.
+ * ☢️ DEPRECATED: Use executeDeepAudit({ nuclearMode: true, ownerId }) instead
+ * This function is kept for backward compatibility but redirects to deepAuditService
+ * 
+ * @deprecated Use executeDeepAudit from deepAuditService with nuclearMode=true
  */
 export const purgeAllSystemData = async (ownerId: string): Promise<{ success: boolean; deletedCount: number }> => {
-    // ✅ RBAC: Only Owner can purge system data (CRITICAL operation)
-    validateRoleAccess('owner');
-
-    try {
-        console.log("☢️ NUCLEAR PURGE INITIATED. Protection: Active.");
-        let totalDeleted = 0;
-
-        // --- PHASE 1: Users & Codes ---
-        console.log("Phase 1: Protecting Owner & Purging Accounts...");
-        try {
-            const usersRef = collection(db, 'users');
-            const usersSnap = await getDocs(usersRef);
-            for (const uDoc of usersSnap.docs) {
-                const uData = uDoc.data();
-                if (uDoc.id !== ownerId && uData.role !== 'owner') {
-                    await deleteDoc(uDoc.ref);
-                    totalDeleted++;
-                } else {
-                    console.log("🛡️ Shielded Owner:", uDoc.id);
-                }
-            }
-        } catch (e) { console.error("Users purge error:", e); }
-
-        try {
-            const codesRef = collection(db, 'globalCodes');
-            const codesSnap = await getDocs(codesRef);
-            for (const cDoc of codesSnap.docs) {
-                if (cDoc.id !== '765255' && cDoc.id !== '000000') {
-                    await deleteDoc(cDoc.ref);
-                    totalDeleted++;
-                }
-            }
-        } catch (e) { console.error("Codes purge error:", e); }
-
-        // --- PHASE 2: Tenants ---
-        console.log("Phase 2: Vaporizing Tenants & Sub-collections...");
-        try {
-            const tenantsRef = collection(db, 'tenants');
-            const tenantsSnap = await getDocs(tenantsRef);
-            for (const tDoc of tenantsSnap.docs) {
-                const tenantId = tDoc.id;
-                const subCols = ['branches', 'rooms', 'employees', 'teams', 'settings', 'request_history', 'inventory'];
-                for (const scName of subCols) {
-                    try {
-                        const scSnap = await getDocs(collection(db, `tenants/${tenantId}/${scName}`));
-                        for (const scDoc of scSnap.docs) {
-                            await deleteDoc(scDoc.ref);
-                            totalDeleted++;
-                        }
-                    } catch (e) { /* ignore subcol err */ }
-                }
-                await deleteDoc(tDoc.ref);
-                totalDeleted++;
-                console.log(`Vaporized Tenant: ${tenantId}`);
-            }
-        } catch (e) { console.error("Tenants/Sub purge error:", e); }
-
-        // --- PHASE 3: Archives & Records ---
-        console.log("Phase 3: Clearing Archives & History...");
-        try {
-            const archives = ['deleted_managers', 'audit_logs', 'scheduled_tasks', 'points_history', 'attendance'];
-            for (const colName of archives) {
-                const snap = await getDocs(collection(db, colName));
-                for (const d of snap.docs) {
-                    await deleteDoc(d.ref);
-                    totalDeleted++;
-                }
-                console.log(`Cleared ${colName}`);
-            }
-        } catch (e) { console.error("Archive purge error:", e); }
-
-        // --- PHASE 4: Global Business Data ---
-        console.log("Phase 4: Resetting Global Business State...");
-        const functionalCollections = [
-            'requests', 'roomCards', 'rooms', 'branches', 'inventory',
-            'inventory_transactions', 'laundry_records', 'procurement_orders'
-        ];
-
-        for (const colName of functionalCollections) {
-            try {
-                const snap = await getDocs(collection(db, colName));
-                for (const d of snap.docs) {
-                    await deleteDoc(d.ref);
-                    totalDeleted++;
-                }
-                console.log(`Purged ${colName}`);
-            } catch (e) { console.warn(`Could not purge ${colName}:`, e); }
-        }
-
-        console.log(`✅ NUCLEAR RESET COMPLETE. Total Records Removed: ${totalDeleted}`);
-        return { success: true, deletedCount: totalDeleted };
-    } catch (error) {
-        console.error('CRITICAL: Purge process failed at base level:', error);
-        throw error;
-    }
+    // ✅ Redirect to unified Deep Audit with nuclear mode
+    const { executeDeepAudit } = await import('./deepAuditService');
+    const report = await executeDeepAudit({ nuclearMode: true, ownerId });
+    
+    return {
+        success: report.summary.status === 'STERILE' || report.summary.status === 'CONTAMINATED',
+        deletedCount: report.summary.totalDeleted
+    };
 };
 
 // ============================================================

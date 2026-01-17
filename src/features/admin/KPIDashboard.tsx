@@ -45,11 +45,13 @@ import {
     HandCoins,
     Gem
 } from 'lucide-react';
-import { db } from '../../services/firebase';
-import { collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { useAdminStats } from '../../hooks/useAdminStats';
+import { getPayoutStats } from '../../services/statsService';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import * as PointsService from '../../services/pointsService';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -510,8 +512,8 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
                     lifetimePoints: e.lifetimePoints || 0
                 }));
                 setTopEmployees(realTop);
-            } catch (err) {
-                console.warn('Error loading real leaderboard:', err);
+            } catch (err: any) {
+                logger.warn('Error loading real leaderboard', err, 'KPIDashboard');
                 // Fallback to mock if index not ready
                 setTopEmployees([
                     { id: '1', name: 'أحمد محمد', department: 'housekeeping', completedRequests: 45, avgResponseTime: 12, rating: 4.8, points: 450 },
@@ -526,8 +528,8 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
                 let totalPaid = 0;
                 payoutSnap.forEach(doc => totalPaid += doc.data().monetaryValue || 0);
                 // We'll store this in a state or use it in the UI
-            } catch (err) {
-                console.warn('Error loading payout stats:', err);
+            } catch (err: any) {
+                logger.warn('Error loading payout stats', err, 'KPIDashboard');
             }
 
 
@@ -536,12 +538,12 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
                 const { getLowStockAlerts } = await import('../../services/inventoryService');
                 const alerts = await getLowStockAlerts(branchId);
                 setLowStockCount(alerts.length);
-            } catch (err) {
-                console.warn('Could not load inventory alerts:', err);
+            } catch (err: any) {
+                logger.warn('Could not load inventory alerts', err, 'KPIDashboard');
             }
 
-        } catch (error) {
-            console.error('Error loading KPI data:', error);
+        } catch (error: any) {
+            logger.error('Error loading KPI data', error, 'KPIDashboard');
         } finally {
             setLoading(false);
             setRefreshing(false);

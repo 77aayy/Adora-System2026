@@ -20,35 +20,19 @@ import {
     LayoutGrid, // ✅ Added for Room Selector
     Edit // ✅ Added for Edit button
 } from 'lucide-react';
-import { collection, query, where, onSnapshot, doc, deleteDoc, addDoc, updateDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../services/firebase';
+// ✅ Architecture: Firebase imports removed - using services instead
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { useTenantRooms } from '../../hooks/useTenantData'; // ✅ Added for room data
 import { FloorRoomSelector } from '../../components/shared/FloorRoomSelector'; // ✅ Added Room Selector
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
 // ============================================================
 
-export type TaskFrequency = 'once' | 'daily' | 'weekly' | 'monthly';
-export type TaskDepartment = 'housekeeping' | 'maintenance' | 'reception' | 'bellman' | 'procurement';
-
-export interface ScheduledTask {
-    id: string;
-    title: string;
-    description?: string;
-    department: TaskDepartment;
-    frequency: TaskFrequency;
-    scheduledFor: any; // Timestamp
-    nextRun: any; // Timestamp (for recurring)
-    branchId: string;
-    createdBy: string;
-    createdAt: any;
-    status: 'active' | 'completed' | 'cancelled';
-    targetId?: string; // Room number or specific target
-}
+// ✅ Types: Use shared types from scheduledTasksService
 
 // ============================================================
 // HELPERS
@@ -86,10 +70,10 @@ export const ScheduledTasksManager: React.FC = () => {
     // ✅ Feature Gate: Check if scheduled tasks feature is enabled
     const { isEnabled: isScheduledTasksEnabled } = useFeatureGate('scheduledTasks');
     
-    const [tasks, setTasks] = useState<ScheduledTask[]>([]);
+    const [tasks, setTasks] = useState<ScheduledTaskType[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
-    const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null); // ✅ Edit mode
+    const [editingTask, setEditingTask] = useState<ScheduledTaskType | null>(null); // ✅ Edit mode
 
     // Filters
     const [deptFilter, setDeptFilter] = useState<TaskDepartment | 'all'>('all');
@@ -105,8 +89,12 @@ export const ScheduledTasksManager: React.FC = () => {
             return;
         }
 
-        const tenantId = (user as any)?.tenantId;
-        if (!branchId || !tenantId) return;
+        // ✅ Null Safety: Check required params
+        if (!branchId || !tenantId) {
+            logger.warn('ScheduledTasksManager: Missing branchId or tenantId', null, 'ScheduledTasksManager');
+            setLoading(false);
+            return;
+        }
 
         const q = query(
             collection(db, 'scheduled_tasks'),
@@ -119,7 +107,7 @@ export const ScheduledTasksManager: React.FC = () => {
             const data = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
-            })) as ScheduledTask[];
+            })) as ScheduledTaskType[];
 
             // Sort client-side to avoid index issues initially
             data.sort((a, b) => {
@@ -137,14 +125,26 @@ export const ScheduledTasksManager: React.FC = () => {
 
     // Delete Task
     const handleDelete = async (id: string) => {
-        if (!window.confirm('هل أنت متأكد من حذف هذه المهمة المجدولة؟')) return;
+        // ✅ Null Safety: Check required params
+        if (!tenantId) {
+            logger.warn('Cannot delete task: Missing tenantId', null, 'ScheduledTasksManager');
+            return;
+        }
+
+        if (!window.confirm(t('admin.scheduledTasks.deleteConfirm') || 'هل أنت متأكد من حذف هذه المهمة المجدولة؟')) return;
+        
         try {
-            await deleteDoc(doc(db, 'scheduled_tasks', id));
-            haptic('success');
-            success('تم حذف المهمة');
-        } catch (err) {
-            console.error(err);
-            error('فشل الحذف');
+            // ✅ Architecture: Use service instead of direct Firebase call
+            const result = await deleteScheduledTask(id);
+            if (result.success) {
+                haptic('success');
+                success(t('admin.scheduledTasks.deleteSuccess') || 'تم حذف المهمة');
+            } else {
+                throw new Error(result.error || 'Failed to delete task');
+            }
+        } catch (err: any) {
+            logger.error('Error deleting scheduled task', err, 'ScheduledTasksManager');
+            error(t('admin.scheduledTasks.deleteError') || 'فشل الحذف');
         }
     };
 
@@ -313,9 +313,11 @@ const AddTaskModal: React.FC<{
     onClose: () => void;
     branchId: string;
     userId: string;
-    editingTask?: ScheduledTask; // ✅ Optional editing task
+    editingTask?: ScheduledTaskType; // ✅ Optional editing task
 }> = ({ onClose, branchId, userId, editingTask }) => {
     const { user } = useAuth();
+    const { tenantId } = useTenant();
+    const { t } = useTranslation();
     const { success, error, haptic } = useUX();
     const [loading, setLoading] = useState(false);
 
@@ -352,8 +354,16 @@ const AddTaskModal: React.FC<{
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // ✅ Null Safety: Check required params
+        if (!tenantId || !branchId) {
+            logger.warn('Cannot save task: Missing tenantId or branchId', null, 'ScheduledTasksManager');
+            error(t('admin.scheduledTasks.missingParams') || 'يرجى التأكد من تسجيل الدخول');
+            return;
+        }
+
         if (!title || !scheduledDate || !scheduledTime) {
-            error('يرجى تعبئة الحقول المطلوبة');
+            error(t('admin.scheduledTasks.requiredFields') || 'يرجى تعبئة الحقول المطلوبة');
             return;
         }
 
@@ -363,41 +373,50 @@ const AddTaskModal: React.FC<{
             const nextRun = new Date(`${scheduledDate}T${scheduledTime}`);
 
             if (editingTask) {
-                // ✅ Update existing task
-                await updateDoc(doc(db, 'scheduled_tasks', editingTask.id), {
+                // ✅ Architecture: Use service instead of direct Firebase call
+                const result = await updateScheduledTask(editingTask.id, {
                     title,
                     description,
                     department,
                     frequency,
                     nextRun: Timestamp.fromDate(nextRun),
-                    scheduledFor: Timestamp.fromDate(nextRun), // Update schedule
+                    scheduledFor: Timestamp.fromDate(nextRun),
                     targetId
-                });
-                haptic('success');
-                success('تم تحديث المهمة المجدولة بنجاح');
+                } as Partial<ScheduledTaskType>);
+
+                if (result.success) {
+                    haptic('success');
+                    success(t('admin.scheduledTasks.updateSuccess') || 'تم تحديث المهمة المجدولة بنجاح');
+                    onClose();
+                } else {
+                    throw new Error(result.error || 'Failed to update task');
+                }
             } else {
-                // ✅ Create new task
-                await addDoc(collection(db, 'scheduled_tasks'), {
+                // ✅ Architecture: Use service instead of direct Firebase call
+                const result = await createScheduledTask({
                     title,
                     description,
                     department,
                     frequency,
                     nextRun: Timestamp.fromDate(nextRun),
-                    scheduledFor: Timestamp.fromDate(nextRun), // Initial schedule
+                    scheduledFor: Timestamp.fromDate(nextRun),
                     targetId,
                     branchId,
-                    tenantId: (user as any)?.tenantId, // ✅ SaaS: Add Tenant ID
-                    createdBy: userId,
-                    createdAt: serverTimestamp(),
-                    status: 'active'
-                });
-                haptic('success');
-                success('تمت جدولة المهمة بنجاح');
+                    tenantId,
+                    createdBy: userId
+                } as Omit<ScheduledTaskType, 'id' | 'createdAt' | 'status'>);
+
+                if (result.success) {
+                    haptic('success');
+                    success(t('admin.scheduledTasks.createSuccess') || 'تمت جدولة المهمة بنجاح');
+                    onClose();
+                } else {
+                    throw new Error(result.error || 'Failed to create task');
+                }
             }
-            onClose();
-        } catch (err) {
-            console.error(err);
-            error('حدث خطأ');
+        } catch (err: any) {
+            logger.error('Error saving scheduled task', err, 'ScheduledTasksManager');
+            error(t('admin.scheduledTasks.saveError') || 'حدث خطأ');
         } finally {
             setLoading(false);
         }

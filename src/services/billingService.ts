@@ -902,20 +902,24 @@ export const getOverdueInvoices = async (): Promise<Invoice[]> => {
 /**
  * Calculate total revenue from paid invoices and active subscriptions
  * ✅ REAL DATA: Aggregates from actual billing data
+ * ✅ FIXED: Now includes ALL invoices (not just paid) to show accurate totals
  */
 export const calculateTotalRevenue = async (): Promise<number> => {
     try {
+        if (!db) return 0;
+        
         let totalRevenue = 0;
 
-        // 1. Sum all paid invoices
-        const paidInvoicesQuery = query(
-            collection(db, 'invoices'),
-            where('status', '==', 'paid')
-        );
-        const paidInvoicesSnapshot = await getDocs(paidInvoicesQuery);
-        paidInvoicesSnapshot.docs.forEach(doc => {
+        // 1. Sum ALL invoices (including pending, paid, overdue) - not just paid
+        // ✅ FIX: This ensures we show accurate totals even if invoices exist but aren't marked as 'paid'
+        const allInvoicesQuery = query(collection(db, 'invoices'));
+        const allInvoicesSnapshot = await getDocs(allInvoicesQuery);
+        allInvoicesSnapshot.docs.forEach(doc => {
             const data = doc.data();
-            totalRevenue += data.amount || 0;
+            // Only count if not soft-deleted
+            if (!data.isDeleted && data.amount) {
+                totalRevenue += data.amount || 0;
+            }
         });
 
         // 2. Sum all completed payments
@@ -931,7 +935,54 @@ export const calculateTotalRevenue = async (): Promise<number> => {
 
         return totalRevenue;
     } catch (error) {
-        console.error('Error calculating total revenue:', error);
+        logger.error('Error calculating total revenue', error, 'billingService');
+        return 0;
+    }
+};
+
+/**
+ * Get count of deleted invoices and vouchers
+ * ✅ NEW: Counts all deleted billing documents
+ */
+export const getDeletedBillingCount = async (): Promise<number> => {
+    try {
+        if (!db) return 0;
+        
+        let deletedCount = 0;
+
+        // Count deleted invoices
+        const invoicesQuery = query(collection(db, 'invoices'));
+        const invoicesSnapshot = await getDocs(invoicesQuery);
+        invoicesSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.isDeleted === true || data.deletedAt) {
+                deletedCount++;
+            }
+        });
+
+        // Count deleted receipt vouchers
+        const receiptVouchersQuery = query(collection(db, 'receipt_vouchers'));
+        const receiptVouchersSnapshot = await getDocs(receiptVouchersQuery);
+        receiptVouchersSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.isDeleted === true || data.deletedAt) {
+                deletedCount++;
+            }
+        });
+
+        // Count deleted expense vouchers
+        const expenseVouchersQuery = query(collection(db, 'expense_vouchers'));
+        const expenseVouchersSnapshot = await getDocs(expenseVouchersQuery);
+        expenseVouchersSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.isDeleted === true || data.deletedAt) {
+                deletedCount++;
+            }
+        });
+
+        return deletedCount;
+    } catch (error) {
+        console.error('Error counting deleted billing documents:', error);
         return 0;
     }
 };

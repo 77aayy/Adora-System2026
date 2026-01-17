@@ -102,12 +102,21 @@ export class ErrorBoundary extends Component<Props, State> {
         const { error, errorInfo } = this.state;
         if (!error) return;
 
-        const errorDetails = `
-Error: ${error.toString()}
-Stack: ${errorInfo?.componentStack || 'No stack available'}
-URL: ${window.location.href}
-Time: ${new Date().toISOString()}
-        `.trim();
+        // ✅ Extract only the essential error information (file path, line number, error message)
+        const errorMessage = error.toString();
+        
+        // Extract file path and line number from error message (e.g., "C:\path\to\file.tsx:1080:16")
+        const filePathMatch = errorMessage.match(/([A-Z]:[^:]+):(\d+):(\d+)/i) || 
+                             errorMessage.match(/([^:]+\.(tsx?|jsx?)):(\d+):(\d+)/i);
+        
+        // Extract the main error message (usually after the file path or in parentheses)
+        const mainErrorMatch = errorMessage.match(/Expected corresponding JSX closing tag|Unexpected token|Cannot read|is not defined|Cannot find/i);
+        const mainError = mainErrorMatch ? mainErrorMatch[0] : errorMessage.split('\n')[0].trim();
+        
+        // Build concise error details (only what Cursor needs to understand quickly)
+        const errorDetails = filePathMatch
+            ? `${filePathMatch[1]}:${filePathMatch[2]}:${filePathMatch[3] || filePathMatch[4]}\n${mainError}`
+            : `${mainError}\n${errorMessage.split('\n')[0]}`;
 
         try {
             await navigator.clipboard.writeText(errorDetails);
@@ -125,63 +134,165 @@ Time: ${new Date().toISOString()}
                 return this.props.fallback;
             }
 
-            // Default fallback UI
+            // Default fallback UI - Adora Theme (Proper Colors)
             return (
-                <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
-                    <div className="max-w-md w-full glass p-8 rounded-2xl text-center">
-                        <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <AlertTriangle className="w-8 h-8 text-red-400" />
+                <div 
+                    className="min-h-screen flex items-center justify-center p-4"
+                    style={{ background: 'var(--theme-gradient-page)' }}
+                >
+                    <div 
+                        className="max-w-2xl w-full rounded-3xl p-6 sm:p-8 text-center shadow-2xl"
+                        style={{
+                            background: 'var(--theme-bg-secondary)',
+                            border: '1px solid var(--theme-border-primary)',
+                            boxShadow: 'var(--theme-shadow-card)'
+                        }}
+                    >
+                        <div 
+                            className="w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4"
+                            style={{
+                                background: 'var(--theme-accent-red-light)',
+                            }}
+                        >
+                            <AlertTriangle 
+                                className="w-8 h-8" 
+                                style={{ color: 'var(--theme-accent-red)' }}
+                            />
                         </div>
 
-                        <h1 className="text-2xl font-bold text-white mb-2">
+                        <h1 
+                            className="text-2xl font-bold mb-2"
+                            style={{ color: 'var(--theme-text-primary)' }}
+                        >
                             حدث خطأ غير متوقع
                         </h1>
 
-                        <p className="text-white/60 mb-6">
+                        <p 
+                            className="mb-6"
+                            style={{ color: 'var(--theme-text-secondary)' }}
+                        >
                             نعتذر عن هذا الإزعاج. حدث خطأ أثناء تحميل هذه الصفحة.
                         </p>
 
                         {process.env.NODE_ENV === 'development' && this.state.error && (
-                            <div className="bg-slate-800/50 rounded-lg p-4 mb-6 text-left">
+                            <div 
+                                className="rounded-xl p-5 mb-6 text-left"
+                                style={{
+                                    background: 'var(--theme-bg-tertiary)',
+                                    border: '1px solid var(--theme-border-primary)'
+                                }}
+                            >
                                 {/* Smart Friendly Message */}
-                                <div className="mb-3 pb-3 border-b border-white/5">
-                                    <p className="text-orange-400 text-sm font-bold flex items-center gap-2 mb-1">
+                                <div 
+                                    className="mb-4 pb-4"
+                                    style={{ borderBottom: '1px solid var(--theme-border-primary)' }}
+                                >
+                                    <p 
+                                        className="text-sm font-bold flex items-center gap-2 mb-2"
+                                        style={{ color: 'var(--theme-primary-600)' }}
+                                    >
                                         <Sparkles className="w-4 h-4" />
                                         المساعد الذكي:
                                     </p>
-                                    <p className="text-white/80 text-sm">
+                                    <p 
+                                        className="text-sm leading-relaxed"
+                                        style={{ color: 'var(--theme-text-secondary)' }}
+                                    >
                                         {getFriendlyErrorMessage(this.state.error.toString())}
                                     </p>
                                 </div>
 
-                                <p className="text-red-400 text-sm font-mono mb-2 dir-ltr">
-                                    {this.state.error.toString()}
-                                </p>
+                                {/* Main Error - Highlighted */}
+                                <div className="mb-4">
+                                    <p 
+                                        className="text-xs mb-2 font-medium"
+                                        style={{ color: 'var(--theme-text-tertiary)' }}
+                                    >
+                                        الخطأ الأساسي:
+                                    </p>
+                                    <div 
+                                        className="rounded-lg p-3 font-mono text-sm dir-ltr text-left"
+                                        style={{
+                                            background: 'var(--theme-accent-red-light)',
+                                            border: '1px solid var(--theme-accent-red)',
+                                            color: 'var(--theme-accent-red-dark)'
+                                        }}
+                                    >
+                                        {(() => {
+                                            const errorMsg = this.state.error.toString();
+                                            // Extract file path and line number
+                                            const fileMatch = errorMsg.match(/([A-Z]:[^:]+):(\d+):(\d+)/i) || 
+                                                             errorMsg.match(/([^:]+\.(tsx?|jsx?)):(\d+):(\d+)/i);
+                                            // Extract main error type
+                                            const mainError = errorMsg.match(/Expected corresponding JSX closing tag|Unexpected token|Cannot read|is not defined|Cannot find/i)?.[0] || 
+                                                            errorMsg.split('\n')[0].trim();
+                                            
+                                            if (fileMatch) {
+                                                return `${fileMatch[1]}:${fileMatch[2]}:${fileMatch[3] || fileMatch[4]}\n${mainError}`;
+                                            }
+                                            return mainError;
+                                        })()}
+                                    </div>
+                                </div>
+
+                                {/* Stack Trace - Collapsible (Hidden by default) */}
                                 {this.state.errorInfo && (
-                                    <pre className="text-white/40 text-xs overflow-auto max-h-32 dir-ltr">
-                                        {this.state.errorInfo.componentStack}
-                                    </pre>
+                                    <details className="mb-4">
+                                        <summary 
+                                            className="text-xs cursor-pointer mb-2"
+                                            style={{ color: 'var(--theme-text-tertiary)' }}
+                                        >
+                                            عرض تفاصيل إضافية (Stack Trace)
+                                        </summary>
+                                        <pre 
+                                            className="text-xs overflow-auto max-h-40 dir-ltr text-left rounded-lg p-3 mt-2"
+                                            style={{
+                                                background: 'var(--theme-bg-primary)',
+                                                border: '1px solid var(--theme-border-primary)',
+                                                color: 'var(--theme-text-tertiary)'
+                                            }}
+                                        >
+                                            {this.state.errorInfo.componentStack}
+                                        </pre>
+                                    </details>
                                 )}
 
-                                {/* ✅ Copy Button */}
+                                {/* ✅ Copy Button - Adora Theme */}
                                 <button
                                     onClick={this.handleCopyError}
-                                    className={`mt-4 w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all
-                                        ${this.state.copied
-                                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                            : 'bg-white/5 text-white/60 hover:bg-white/10 border border-white/5 hover:border-white/20'
+                                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
+                                    style={{
+                                        background: this.state.copied 
+                                            ? 'var(--theme-accent-green)' 
+                                            : 'var(--theme-primary-600)',
+                                        color: 'white',
+                                        border: 'none',
+                                        boxShadow: this.state.copied 
+                                            ? 'var(--theme-shadow-md)' 
+                                            : 'var(--theme-shadow-sm)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!this.state.copied) {
+                                            e.currentTarget.style.background = 'var(--theme-primary-700)';
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
                                         }
-                                    `}
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!this.state.copied) {
+                                            e.currentTarget.style.background = 'var(--theme-primary-600)';
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                        }
+                                    }}
                                 >
                                     {this.state.copied ? (
                                         <>
-                                            <Check className="w-3.5 h-3.5" />
+                                            <Check className="w-4 h-4" />
                                             تم النسخ بنجاح
                                         </>
                                     ) : (
                                         <>
-                                            <Copy className="w-3.5 h-3.5" />
-                                            نسخ تفاصيل الخطأ لإرسالها للمطور
+                                            <Copy className="w-4 h-4" />
+                                            نسخ تفاصيل الخطأ
                                         </>
                                     )}
                                 </button>
@@ -191,7 +302,21 @@ Time: ${new Date().toISOString()}
                         <div className="flex gap-3 justify-center flex-wrap">
                             <button
                                 onClick={this.handleReset}
-                                className="btn-primary flex items-center gap-2"
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all"
+                                style={{
+                                    background: 'var(--theme-primary-600)',
+                                    color: 'white',
+                                    border: 'none',
+                                    boxShadow: 'var(--theme-shadow-sm)'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--theme-primary-700)';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'var(--theme-primary-600)';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                }}
                             >
                                 <RefreshCw className="w-4 h-4" />
                                 إعادة المحاولة
@@ -199,7 +324,20 @@ Time: ${new Date().toISOString()}
 
                             <button
                                 onClick={this.handleReload}
-                                className="btn-secondary flex items-center gap-2"
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all"
+                                style={{
+                                    background: 'var(--theme-bg-tertiary)',
+                                    color: 'var(--theme-text-primary)',
+                                    border: '1px solid var(--theme-border-primary)'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--theme-bg-secondary)';
+                                    e.currentTarget.style.borderColor = 'var(--theme-border-hover)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
+                                    e.currentTarget.style.borderColor = 'var(--theme-border-primary)';
+                                }}
                             >
                                 <RefreshCw className="w-4 h-4" />
                                 تحديث الصفحة
@@ -207,7 +345,20 @@ Time: ${new Date().toISOString()}
 
                             <button
                                 onClick={this.handleGoHome}
-                                className="btn-secondary flex items-center gap-2"
+                                className="flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all"
+                                style={{
+                                    background: 'var(--theme-bg-tertiary)',
+                                    color: 'var(--theme-text-primary)',
+                                    border: '1px solid var(--theme-border-primary)'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'var(--theme-bg-secondary)';
+                                    e.currentTarget.style.borderColor = 'var(--theme-border-hover)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
+                                    e.currentTarget.style.borderColor = 'var(--theme-border-primary)';
+                                }}
                             >
                                 <Home className="w-4 h-4" />
                                 الصفحة الرئيسية

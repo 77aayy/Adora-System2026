@@ -7,13 +7,18 @@
 import React, { useState, useEffect } from 'react';
 import {
     Mail, X, CheckCircle, Clock, AlertCircle, Phone, User, Building2,
-    MessageSquare, FileText, ArrowRight, Check, XCircle, Save, Eye
+    MessageSquare, FileText, ArrowRight, Check, XCircle, Save, Eye, Plus
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
+import { useTenantBranches } from '../../hooks/useTenantData';
+import { SupportTicketModal } from '../../components/shared/SupportTicketModal';
 import {
+    subscribeToAllTickets,
     subscribeToTenantTickets,
+    subscribeToBranchTickets,
+    subscribeToUserTickets,
     acknowledgeTicket,
     markTicketInProgress,
     resolveTicket,
@@ -26,36 +31,68 @@ import {
 } from '../../services/supportTicketService';
 
 export const SupportTicketsManager: React.FC = () => {
-    const { user } = useAuth();
+    const { user, branchId } = useAuth();
     const { tenantId } = useTenant();
     const { success, error } = useUX();
+
+    const isOwner = user?.role === 'owner';
+    const isManager = user?.role === 'manager';
 
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
     const [ticketStatus, setTicketStatus] = useState<SupportTicketStatus | null>(null);
     const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
     const [selectedTab, setSelectedTab] = useState<'pending' | 'acknowledged' | 'in_progress' | 'resolved' | 'closed' | 'all'>('pending');
     const [showTicketModal, setShowTicketModal] = useState(false);
+    const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
     const [resolutionNote, setResolutionNote] = useState('');
     const [ownerResponse, setOwnerResponse] = useState('');
+    const { branches: rawBranches } = useTenantBranches();
+    // ✅ ARCHITECT FIX: Ensure branches is always an array (SaaS Safety)
+    const branches = Array.isArray(rawBranches) ? rawBranches : [];
+    const currentBranch = branchId ? branches.find(b => b.id === branchId) || branches[0] : branches[0];
 
     useEffect(() => {
-        if (!tenantId) return;
+        // ✅ CRITICAL FIX: Owner doesn't need tenantId - they see all tickets
+        // For Owner, we'll use a special subscription that gets all tickets
+        // For Manager/Other users, we need tenantId
+        if (!isOwner && !tenantId) return;
 
-        // Subscribe to ticket status (for badge)
-        const unsubStatus = subscribeToTicketStatus(tenantId, (status) => {
-            setTicketStatus(status);
-        });
+        // Subscribe to ticket status (for badge) - Owner only
+        let unsubStatus: (() => void) | null = null;
+        if (isOwner) {
+            // ✅ Owner: Subscribe to all tickets (no tenantId needed)
+            // We'll use a special service method or pass null/undefined for tenantId
+            // For now, if tenantId is 'system-owner', we'll handle it differently
+            const ownerTenantId = tenantId || 'system-owner';
+            unsubStatus = subscribeToTicketStatus(ownerTenantId, (status) => {
+                setTicketStatus(status);
+            });
+        }
 
-        // Subscribe to tickets
-        const unsubTickets = subscribeToTenantTickets(tenantId, (ticketsList) => {
-            setTickets(ticketsList);
-        });
+        // Subscribe to tickets based on role
+        let unsubTickets: (() => void) | null = null;
+        if (isOwner) {
+            // ✅ Owner: See ALL tickets from ALL managers and employees (no tenantId filter)
+            unsubTickets = subscribeToAllTickets((ticketsList) => {
+                setTickets(ticketsList);
+            });
+        } else if (isManager && branchId && tenantId) {
+            // Manager: See only tickets from their branch
+            unsubTickets = subscribeToBranchTickets(branchId, tenantId, (ticketsList) => {
+                setTickets(ticketsList);
+            });
+        } else if (user?.id && tenantId) {
+            // Other users: See only their own tickets
+            unsubTickets = subscribeToUserTickets(user.id, tenantId, (ticketsList) => {
+                setTickets(ticketsList);
+            });
+        }
 
         return () => {
-            unsubStatus();
-            unsubTickets();
+            if (unsubStatus) unsubStatus();
+            if (unsubTickets) unsubTickets();
         };
-    }, [tenantId]);
+    }, [tenantId, branchId, user?.id, isOwner, isManager]);
 
     const filteredTickets = tickets.filter(ticket => {
         if (selectedTab === 'all') return true;
@@ -170,16 +207,31 @@ export const SupportTicketsManager: React.FC = () => {
                             <Mail className="w-6 h-6 text-yellow-400" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-white">دعم فني - التذاكر</h1>
+                            <h1 className="text-2xl font-bold text-white">
+                                {isOwner ? 'دعم فني - التذاكر' : 'تذاكر الدعم الفني'}
+                            </h1>
                             <p className="text-sm text-white/60">
-                                {ticketStatus && ticketStatus.unreadCount > 0 && (
+                                {isOwner && ticketStatus && ticketStatus.unreadCount > 0 && (
                                     <span className="text-yellow-400">
                                         {ticketStatus.unreadCount} تذكرة جديدة
                                     </span>
                                 )}
+                                {!isOwner && (
+                                    <span>إرسال ومتابعة طلبات الدعم الفني</span>
+                                )}
                             </p>
                         </div>
                     </div>
+                    {/* ✅ Manager: Add "Create Ticket" button */}
+                    {!isOwner && currentBranch && (
+                        <button
+                            onClick={() => setShowCreateTicketModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-xl font-medium hover:shadow-lg shadow-yellow-500/25 transition-all active:scale-95"
+                        >
+                            <Plus className="w-4 h-4" />
+                            إرسال تذكرة جديدة
+                        </button>
+                    )}
                 </div>
 
                 {/* Tabs */}
@@ -272,15 +324,26 @@ export const SupportTicketsManager: React.FC = () => {
                         setResolutionNote('');
                         setOwnerResponse('');
                     }}
-                    onAcknowledge={handleAcknowledge}
-                    onMarkInProgress={handleMarkInProgress}
-                    onResolve={handleResolve}
-                    onCloseTicket={handleClose}
-                    onAddResponse={handleAddResponse}
+                    onAcknowledge={isOwner ? handleAcknowledge : undefined}
+                    onMarkInProgress={isOwner ? handleMarkInProgress : undefined}
+                    onResolve={isOwner ? handleResolve : undefined}
+                    onCloseTicket={isOwner ? handleClose : undefined}
+                    onAddResponse={isOwner ? handleAddResponse : undefined}
                     resolutionNote={resolutionNote}
                     setResolutionNote={setResolutionNote}
                     ownerResponse={ownerResponse}
                     setOwnerResponse={setOwnerResponse}
+                    isOwner={isOwner}
+                />
+            )}
+
+            {/* ✅ Create Ticket Modal for Manager */}
+            {!isOwner && currentBranch && (
+                <SupportTicketModal
+                    isOpen={showCreateTicketModal}
+                    onClose={() => setShowCreateTicketModal(false)}
+                    branchId={currentBranch.id}
+                    branchName={currentBranch.name || 'الفرع'}
                 />
             )}
         </div>
@@ -291,15 +354,16 @@ export const SupportTicketsManager: React.FC = () => {
 const TicketDetailsModal: React.FC<{
     ticket: SupportTicket;
     onClose: () => void;
-    onAcknowledge: (ticketId: string) => void;
-    onMarkInProgress: (ticketId: string) => void;
-    onResolve: (ticketId: string) => void;
-    onCloseTicket: (ticketId: string) => void;
-    onAddResponse: (ticketId: string) => void;
+    onAcknowledge?: (ticketId: string) => void;
+    onMarkInProgress?: (ticketId: string) => void;
+    onResolve?: (ticketId: string) => void;
+    onCloseTicket?: (ticketId: string) => void;
+    onAddResponse?: (ticketId: string) => void;
     resolutionNote: string;
     setResolutionNote: (note: string) => void;
     ownerResponse: string;
     setOwnerResponse: (response: string) => void;
+    isOwner?: boolean;
 }> = ({
     ticket,
     onClose,
@@ -311,7 +375,8 @@ const TicketDetailsModal: React.FC<{
     resolutionNote,
     setResolutionNote,
     ownerResponse,
-    setOwnerResponse
+    setOwnerResponse,
+    isOwner = false
 }) => {
     const getStatusBadge = (status: SupportTicket['status']) => {
         const badges = {
@@ -426,27 +491,29 @@ const TicketDetailsModal: React.FC<{
                         )}
                     </div>
 
-                    {/* Owner Response Input */}
-                    <div className="mb-4">
-                        <label className="block text-sm text-white/60 mb-2">إضافة رد:</label>
-                        <textarea
-                            value={ownerResponse}
-                            onChange={e => setOwnerResponse(e.target.value)}
-                            placeholder="اكتب ردك هنا..."
-                            rows={3}
-                            className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white resize-none focus:border-yellow-500/50 focus:outline-none transition-all"
-                        />
-                        <button
-                            onClick={() => onAddResponse(ticket.id)}
-                            disabled={!ownerResponse.trim()}
-                            className="mt-2 px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all disabled:opacity-50"
-                        >
-                            إرسال الرد
-                        </button>
-                    </div>
+                    {/* Owner Response Input - Owner Only */}
+                    {isOwner && onAddResponse && (
+                        <div className="mb-4">
+                            <label className="block text-sm text-white/60 mb-2">إضافة رد:</label>
+                            <textarea
+                                value={ownerResponse}
+                                onChange={e => setOwnerResponse(e.target.value)}
+                                placeholder="اكتب ردك هنا..."
+                                rows={3}
+                                className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white resize-none focus:border-yellow-500/50 focus:outline-none transition-all"
+                            />
+                            <button
+                                onClick={() => onAddResponse(ticket.id)}
+                                disabled={!ownerResponse.trim()}
+                                className="mt-2 px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all disabled:opacity-50"
+                            >
+                                إرسال الرد
+                            </button>
+                        </div>
+                    )}
 
-                    {/* Resolution Note Input */}
-                    {ticket.status !== 'closed' && (
+                    {/* Resolution Note Input - Owner Only */}
+                    {isOwner && ticket.status !== 'closed' && (
                         <div className="mb-4">
                             <label className="block text-sm text-white/60 mb-2">ملاحظة الحل (عند الإغلاق):</label>
                             <textarea
@@ -459,54 +526,69 @@ const TicketDetailsModal: React.FC<{
                         </div>
                     )}
 
-                    {/* Actions */}
-                    <div className="flex gap-3 pt-4 border-t border-white/10">
-                        {ticket.status === 'pending' && (
-                            <button
-                                onClick={() => onAcknowledge(ticket.id)}
-                                className="flex-1 py-3 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all flex items-center justify-center gap-2"
-                            >
-                                <CheckCircle className="w-5 h-5" />
-                                تم العلم
-                            </button>
-                        )}
-                        {ticket.status === 'acknowledged' && (
-                            <button
-                                onClick={() => onMarkInProgress(ticket.id)}
-                                className="flex-1 py-3 rounded-xl bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Clock className="w-5 h-5" />
-                                جاري العمل
-                            </button>
-                        )}
-                        {ticket.status === 'in_progress' && (
-                            <>
+                    {/* Actions - Owner Only */}
+                    {isOwner && (
+                        <div className="flex gap-3 pt-4 border-t border-white/10">
+                            {ticket.status === 'pending' && onAcknowledge && (
                                 <button
-                                    onClick={() => onResolve(ticket.id)}
-                                    disabled={!resolutionNote.trim()}
-                                    className="flex-1 py-3 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                    onClick={() => onAcknowledge(ticket.id)}
+                                    className="flex-1 py-3 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all flex items-center justify-center gap-2"
                                 >
                                     <CheckCircle className="w-5 h-5" />
-                                    تم الإصلاح
+                                    تم العلم
                                 </button>
+                            )}
+                            {ticket.status === 'acknowledged' && onMarkInProgress && (
                                 <button
-                                    onClick={() => onCloseTicket(ticket.id)}
-                                    className="flex-1 py-3 rounded-xl bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 transition-all flex items-center justify-center gap-2"
+                                    onClick={() => onMarkInProgress(ticket.id)}
+                                    className="flex-1 py-3 rounded-xl bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all flex items-center justify-center gap-2"
                                 >
-                                    <XCircle className="w-5 h-5" />
-                                    إغلاق
+                                    <Clock className="w-5 h-5" />
+                                    جاري العمل
                                 </button>
-                            </>
-                        )}
-                        {ticket.status !== 'closed' && (
+                            )}
+                            {ticket.status === 'in_progress' && (
+                                <>
+                                    {onResolve && (
+                                        <button
+                                            onClick={() => onResolve(ticket.id)}
+                                            disabled={!resolutionNote.trim()}
+                                            className="flex-1 py-3 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            <CheckCircle className="w-5 h-5" />
+                                            تم الإصلاح
+                                        </button>
+                                    )}
+                                    {onCloseTicket && (
+                                        <button
+                                            onClick={() => onCloseTicket(ticket.id)}
+                                            className="flex-1 py-3 rounded-xl bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <XCircle className="w-5 h-5" />
+                                            إغلاق
+                                        </button>
+                                    )}
+                                </>
+                            )}
                             <button
                                 onClick={onClose}
                                 className="px-4 py-3 rounded-xl bg-white/10 text-white/60 hover:bg-white/20 transition-all"
                             >
+                                إغلاق النافذة
+                            </button>
+                        </div>
+                    )}
+                    {/* Manager: Only close button */}
+                    {!isOwner && (
+                        <div className="flex gap-3 pt-4 border-t border-white/10">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 py-3 rounded-xl bg-white/10 text-white/60 hover:bg-white/20 transition-all"
+                            >
                                 إغلاق
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

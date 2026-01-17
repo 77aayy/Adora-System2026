@@ -15,6 +15,7 @@ import { useTenant } from '../../context/TenantContext';
 import { getPendingPayouts, approvePayout, rejectPayout } from '../../services/payoutService';
 import { PayoutRequest } from '../../types';
 import * as XLSX from 'xlsx';
+import { logger } from '../../services/loggerService';
 
 export const PayoutsManager: React.FC = () => {
     const { user } = useAuth();
@@ -39,7 +40,7 @@ export const PayoutsManager: React.FC = () => {
             const data = await getPendingPayouts(tenantId);
             setRequests(data);
         } catch (error) {
-            console.error(error);
+            logger.error('Error loading payout requests', error, 'PayoutsManager');
         } finally {
             setLoading(false);
         }
@@ -56,7 +57,7 @@ export const PayoutsManager: React.FC = () => {
                 alert(res.error);
             }
         } catch (e) {
-            console.error(e);
+            logger.error('Error approving payout', e, 'PayoutsManager');
         } finally {
             setProcessingId(null);
         }
@@ -76,7 +77,7 @@ export const PayoutsManager: React.FC = () => {
                 alert(res.error);
             }
         } catch (e) {
-            console.error(e);
+            logger.error('Error approving payout', e, 'PayoutsManager');
         } finally {
             setProcessingId(null);
         }

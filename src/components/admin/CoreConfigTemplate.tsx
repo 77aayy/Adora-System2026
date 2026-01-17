@@ -17,6 +17,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../context/AuthContext';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -258,8 +259,8 @@ export const CoreConfigTemplate: React.FC<CoreConfigTemplateProps> = ({ onSave }
                     updatedBy: data.updatedBy
                 });
             }
-        } catch (error) {
-            console.error('Error loading core config template:', error);
+        } catch (error: any) {
+            logger.error('Error loading core config template', error, 'CoreConfigTemplate');
         } finally {
             setLoading(false);
         }
@@ -276,8 +277,8 @@ export const CoreConfigTemplate: React.FC<CoreConfigTemplateProps> = ({ onSave }
                 updatedBy: user?.id || 'unknown'
             });
             onSave?.();
-        } catch (error) {
-            console.error('Error saving core config template:', error);
+        } catch (error: any) {
+            logger.error('Error saving core config template', error, 'CoreConfigTemplate');
         } finally {
             setSaving(false);
         }

@@ -5,7 +5,7 @@
  */
 
 import { getMessaging, getToken, onMessage, MessagePayload } from 'firebase/messaging';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { getVapidKey } from './systemConfigsService';
 
@@ -283,6 +283,46 @@ export const usePushNotifications = () => {
     };
 };
 
+// ============================================================
+// SEND PUSH NOTIFICATION
+// ============================================================
+
+/**
+ * Send push notification to a specific FCM token
+ * Used for sending notifications to users (e.g., support ticket responses)
+ */
+export const sendPushNotification = async (
+    fcmToken: string,
+    data: NotificationData
+): Promise<void> => {
+    try {
+        if (!db) {
+            console.warn('Firebase not initialized, cannot send push notification');
+            return;
+        }
+
+        // Store notification in Firestore for delivery via Cloud Functions
+        // Cloud Function will handle actual FCM sending
+        await addDoc(collection(db, 'notification_queue'), {
+            token: fcmToken,
+            title: data.title,
+            body: data.body,
+            icon: data.icon || '/icon-192x192.png',
+            click_action: data.click_action,
+            data: data.data || {},
+            createdAt: serverTimestamp(),
+            status: 'pending'
+        });
+
+        // Also show local notification immediately (for same-device notifications)
+        showLocalNotification(data);
+    } catch (error) {
+        console.error('Error sending push notification:', error);
+        // Fallback: show local notification even if Firestore fails
+        showLocalNotification(data);
+    }
+};
+
 export default {
     initPushNotifications,
     getFCMToken,
@@ -293,4 +333,5 @@ export default {
     getNotificationPermission,
     requestNotificationPermission,
     usePushNotifications,
+    sendPushNotification,
 };

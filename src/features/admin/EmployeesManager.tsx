@@ -36,6 +36,7 @@ import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoa
 import { MapPin, Check } from 'lucide-react';
 import { useUX } from '../../hooks/useUX'; // ✅ Added useUX
 import { EmployeesManagerHelp } from '../../components/common/ContextualHelp'; // ✅ Contextual Help
+import { logger } from '../../services/loggerService';
 
 // Department config
 const DEPARTMENTS: Array<{ value: string; label: string; icon: React.ReactNode; color: string }> = [
@@ -147,7 +148,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
                     setSuggestedCode(null);
                 }
             } catch (err) {
-                console.error('Error checking code:', err);
+                logger.error('Error checking code', err, 'EmployeesManager');
                 // Don't block on error, just log
             } finally {
                 setIsCheckingCode(false);
@@ -246,7 +247,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
             setSelectedDepartments(['reception']); // ✅ Reset departments
             onClose();
         } catch (err) {
-            console.error('Error adding employee:', err);
+            logger.error('Error adding employee', err, 'EmployeesManager');
             showError('حدث خطأ في إضافة الموظف');
         } finally {
             setIsSubmitting(false);
@@ -724,7 +725,7 @@ export const EmployeesManager: React.FC = () => {
             setSelectedEmployeeIds([]);
             showSuccess('تم حذف الموظفين المحددين');
         } catch (e) {
-            console.error(e);
+            logger.error('Error', e, 'EmployeesManager');
             showError('حدث خطأ أثناء الحذف');
         } finally {
             setLoading(false);
@@ -1122,7 +1123,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
                 allowedWeeklyOffDays: allowedOffDays
             };
 
-            console.log('🔧 Updating employee with:', {
+            logger.info('Updating employee', {
                 employeeId: employee.id,
                 updates,
                 allowedOffDays,
@@ -1135,7 +1136,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
             showSuccess('تم تحديث بيانات الموظف بنجاح');
             onClose();
         } catch (err) {
-            console.error('Error updating employee:', err);
+            logger.error('Error updating employee', err, 'EmployeesManager');
             showError('حدث خطأ في تحديث البيانات: ' + (err as any)?.message);
         } finally {
             setIsSubmitting(false);

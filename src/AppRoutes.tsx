@@ -161,6 +161,16 @@ export const AppRoutes: React.FC = () => {
                 />
 
                 {/* ================= Owner ================= */}
+                {/* ✅ Owner Panel - Manager Management */}
+                <Route
+                    path="/owner-panel"
+                    element={
+                        <ProtectedRoute allowedDepartments={['admin']} allowedRoles={['owner']}>
+                            <OwnerPanel />
+                        </ProtectedRoute>
+                    }
+                />
+                
                 {/* ✅ FIX: Redirect /owner to /owner-dashboard for the complete experience */}
                 <Route
                     path="/owner"

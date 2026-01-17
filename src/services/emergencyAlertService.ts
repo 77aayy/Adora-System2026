@@ -7,6 +7,7 @@
 
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -112,7 +113,7 @@ export const getEmergencyAlerts = async (
             return bTime.getTime() - aTime.getTime(); // Newest first
         });
     } catch (error) {
-        console.error('Error getting emergency alerts:', error);
+        logger.error('Error getting emergency alerts', error, 'emergencyAlertService');
         return [];
     }
 };
@@ -177,7 +178,7 @@ export const subscribeToEmergencyAlerts = (
             callback(sorted);
         },
         (error) => {
-            console.error('Error subscribing to emergency alerts:', error);
+            logger.error('Error subscribing to emergency alerts', error, 'emergencyAlertService');
             callback([]);
         }
     );
@@ -203,7 +204,7 @@ export const createEmergencyAlert = async (
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating emergency alert:', error);
+        logger.error('Error creating emergency alert', error, 'emergencyAlertService');
         throw error;
     }
 };
@@ -225,7 +226,7 @@ export const updateEmergencyAlert = async (
             updatedBy: { id: userId, name: userName }
         });
     } catch (error) {
-        console.error('Error updating emergency alert:', error);
+        logger.error('Error updating emergency alert', error, 'emergencyAlertService');
         throw error;
     }
 };
@@ -240,7 +241,7 @@ export const deactivateEmergencyAlert = async (alertId: string): Promise<void> =
             deactivatedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error deactivating emergency alert:', error);
+        logger.error('Error deactivating emergency alert', error, 'emergencyAlertService');
         throw error;
     }
 };
@@ -285,7 +286,7 @@ export const markAlertAsRead = async (
             await addDoc(collection(db, 'emergency_alert_reads'), readData);
         }
     } catch (error) {
-        console.error('Error marking alert as read:', error);
+        logger.error('Error marking alert as read', error, 'emergencyAlertService');
     }
 };
 
@@ -326,7 +327,7 @@ export const dismissAlert = async (
             await addDoc(collection(db, 'emergency_alert_reads'), readData);
         }
     } catch (error) {
-        console.error('Error dismissing alert:', error);
+        logger.error('Error dismissing alert', error, 'emergencyAlertService');
     }
 };
 
@@ -359,7 +360,7 @@ export const getAlertReadStatus = async (
 
         return reads;
     } catch (error) {
-        console.error('Error getting alert read status:', error);
+        logger.error('Error getting alert read status', error, 'emergencyAlertService');
         return {};
     }
 };
@@ -373,7 +374,7 @@ export const getAlertReadStatus = async (
  */
 export const requestNotificationPermission = async (): Promise<boolean> => {
     if (!('Notification' in window)) {
-        console.warn('This browser does not support notifications');
+        logger.warn('This browser does not support notifications', null, 'emergencyAlertService');
         return false;
     }
 
@@ -480,6 +481,6 @@ export const playAlertSound = (soundType: 'alert' | 'siren' | 'bell' | 'chime' =
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + duration);
     } catch (error) {
-        console.error('Error playing alert sound:', error);
+        logger.error('Error playing alert sound', error, 'emergencyAlertService');
     }
 };

@@ -46,6 +46,44 @@
         rel="stylesheet" />
 
     <title>Adora | نظام إدارة الفنادق</title>
+    
+    <!-- ✅ CRITICAL: Remove Black Frame from Toast Notifications -->
+    <style>
+        /* ✅ ULTRA AGGRESSIVE: Remove ANY black backdrop/frame from toast containers */
+        [class*="ToastContainer"],
+        [id*="toastContainer"],
+        div[class*="fixed"][class*="top"][class*="z-[9999]"],
+        div[class*="fixed"][class*="top-4"][class*="z-[9999]"],
+        div[class*="fixed"][class*="left-1/2"][class*="z-[9999]"] {
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            background-color: transparent !important;
+            background-image: none !important;
+        }
+        
+        /* ✅ Remove black frames from toast items */
+        div[class*="pointer-events-auto"][class*="rounded-xl"] {
+            margin: 0 !important;
+            outline: none !important;
+            border-image: none !important;
+        }
+        
+        /* ✅ Remove any wrapper with black background */
+        div:has(> div[class*="pointer-events-auto"][class*="rounded-xl"]) {
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
+    </style>
 </head>
 
 <body class="font-cairo antialiased">
@@ -112,7 +150,8 @@
 
     <!-- 📋 زر نسخ الأخطاء - Adora Theme -->
     <script>
-        (function () {
+        // ✅ Wait for DOM to be fully ready before executing
+        function initErrorButton() {
             // إنشاء الأنماط
             var style = document.createElement('style');
             style.textContent = `
@@ -146,25 +185,56 @@
                 background: linear-gradient(135deg, #10B981 0%, #059669 100%);
             }
         `;
-            document.head.appendChild(style);
+            // ✅ NULL SAFETY: Ensure document.head exists before appending
+            if (document.head) {
+                document.head.appendChild(style);
+            }
 
             // إنشاء الزر
             var btn = document.createElement('button');
             btn.id = 'copy-error-btn';
             btn.innerHTML = '📋 نسخ تفاصيل الخطأ';
 
+            // ✅ NULL SAFETY: Ensure document.body exists before appending
+            if (document.body) {
+                document.body.appendChild(btn);
+            } else {
+                // Wait for body to be ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        if (document.body) {
+                            document.body.appendChild(btn);
+                        }
+                    });
+                }
+            }
+
             btn.onclick = function () {
                 var errorText = '';
                 var overlay = document.querySelector('vite-error-overlay');
                 if (overlay && overlay.shadowRoot) {
-                    var msg = overlay.shadowRoot.querySelector('.message-body');
+                    // ✅ Extract only essential error info (file path, line number, error type)
                     var file = overlay.shadowRoot.querySelector('.file');
-                    var stack = overlay.shadowRoot.querySelector('.stack');
-                    var frame = overlay.shadowRoot.querySelector('.frame');
-                    // نسخ النص الأصلي كما هو بالضبط
-                    errorText = (msg ? msg.textContent : '') + '\n\n';
-                    errorText += (file ? file.textContent : '') + '\n\n';
-                    errorText += (stack ? stack.textContent : (frame ? frame.textContent : ''));
+                    var msg = overlay.shadowRoot.querySelector('.message-body');
+                    
+                    // Extract file path and line number from file element
+                    var fileText = file ? file.textContent : '';
+                    var fileMatch = fileText.match(/([A-Z]:[^:]+):(\d+):(\d+)/i) || 
+                                   fileText.match(/([^:]+\.(tsx?|jsx?)):(\d+):(\d+)/i);
+                    
+                    // Extract main error type from message
+                    var msgText = msg ? msg.textContent : '';
+                    var mainError = msgText.match(/Expected corresponding JSX closing tag|Unexpected token|Cannot read|is not defined|Cannot find/i)?.[0] || 
+                                  msgText.split('\n')[0].trim();
+                    
+                    // Build concise error (only what Cursor needs)
+                    if (fileMatch) {
+                        errorText = fileMatch[1] + ':' + fileMatch[2] + ':' + (fileMatch[3] || fileMatch[4]) + '\n' + mainError;
+                    } else if (fileText) {
+                        errorText = fileText + '\n' + mainError;
+                    } else {
+                        errorText = mainError || msgText.split('\n')[0].trim();
+                    }
                 }
                 if (!errorText) {
                     errorText = document.body.innerText;
@@ -180,16 +250,173 @@
                 });
             };
 
-            document.body.appendChild(btn);
-
             function checkError() {
                 var hasError = document.querySelector('vite-error-overlay');
-                btn.style.display = hasError ? 'block' : 'none';
+                if (btn) {
+                    btn.style.display = hasError ? 'block' : 'none';
+                }
             }
 
             setInterval(checkError, 300);
-            new MutationObserver(checkError).observe(document.documentElement, { childList: true, subtree: true });
-        })();
+            
+            // ✅ NULL SAFETY: Wait for DOM to be fully ready before observing
+            function setupErrorObserver() {
+                if (typeof MutationObserver === 'undefined') return;
+                if (!document || !document.documentElement) return;
+                
+                var targetElement = document.documentElement;
+                if (!targetElement || !(targetElement instanceof Node)) return;
+                
+                try {
+                    var errorObserver = new MutationObserver(checkError);
+                    errorObserver.observe(targetElement, { childList: true, subtree: true });
+                } catch (e) {
+                    console.warn('Failed to observe document for errors:', e);
+                }
+            }
+            
+            // Wait for DOM to be ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', setupErrorObserver);
+            } else {
+                // DOM already ready, but wait a bit to ensure documentElement is valid
+                setTimeout(setupErrorObserver, 100);
+            }
+        }
+        
+        // ✅ Execute when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initErrorButton);
+        } else {
+            // DOM already ready
+            setTimeout(initErrorButton, 0);
+        }
+    </script>
+
+    <!-- ✅ Vite Overlay Customization - Premium Adora Theme -->
+    <script>
+        // ✅ Wait for DOM to be fully ready before executing
+        function initViteOverlay() {
+            var styled = false;
+            
+            function injectOverlayStyles() {
+                var overlay = document.querySelector('vite-error-overlay');
+                if (!overlay) return;
+                
+                var shadowRoot = overlay.shadowRoot;
+                if (!shadowRoot) {
+                    // Try to wait a bit for shadowRoot to be available
+                    setTimeout(injectOverlayStyles, 100);
+                    return;
+                }
+                
+                if (shadowRoot.querySelector('style[data-adora-theme]')) {
+                    styled = true;
+                    return;
+                }
+                
+                // Get theme colors from CSS variables
+                var root = document.documentElement;
+                var getColor = function(v, fallback) {
+                    var val = getComputedStyle(root).getPropertyValue(v).trim();
+                    return val || fallback;
+                };
+                
+                var bgSecondary = getColor('--theme-bg-secondary', '#ffffff');
+                var bgTertiary = getColor('--theme-bg-tertiary', '#e2e8f0');
+                var borderPrimary = getColor('--theme-border-primary', '#cbd5e1');
+                var textPrimary = getColor('--theme-text-primary', '#1e293b');
+                var textSecondary = getColor('--theme-text-secondary', '#475569');
+                var textTertiary = getColor('--theme-text-tertiary', '#64748b');
+                var primary600 = getColor('--theme-primary-600', '#0d9488');
+                var primary700 = getColor('--theme-primary-700', '#0f766e');
+                var accentRedDark = getColor('--theme-accent-red-dark', '#dc2626');
+                var shadowCard = getColor('--theme-shadow-card', '0 4px 16px rgba(0, 0, 0, 0.15)');
+                
+                // Premium styling like Purge Modal
+                var style = document.createElement('style');
+                style.setAttribute('data-adora-theme', 'true');
+                style.textContent = \`
+                    * {
+                        font-family: 'Cairo', 'Tajawal', sans-serif !important;
+                    }
+                    :host {
+                        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+                    }
+                    .overlay, .container, .wrapper, [class*="overlay"], div:not([class*="stack"]):not([class*="frame"]) {
+                        background: \${bgSecondary} !important;
+                        border: 1px solid \${borderPrimary} !important;
+                        border-radius: 24px !important;
+                        box-shadow: \${shadowCard} !important;
+                        color: \${textPrimary} !important;
+                        padding: 24px !important;
+                    }
+                    .message, .title, h1, h2, h3, [class*="title"] {
+                        color: \${accentRedDark} !important;
+                        font-weight: 600 !important;
+                    }
+                    .file, code, pre:not([class*="stack"]) {
+                        color: \${primary600} !important;
+                        font-weight: 500 !important;
+                    }
+                    .stack, .frame, pre[class*="stack"], [class*="stack"] {
+                        color: \${textTertiary} !important;
+                        background: \${bgTertiary} !important;
+                        border: 1px solid \${borderPrimary} !important;
+                        border-radius: 12px !important;
+                        padding: 12px !important;
+                        font-size: 11px !important;
+                    }
+                    button, .dismiss, .btn, [role="button"] {
+                        background: \${primary600} !important;
+                        border: none !important;
+                        border-radius: 12px !important;
+                        color: white !important;
+                        font-weight: 700 !important;
+                        padding: 10px 20px !important;
+                        transition: all 0.3s ease !important;
+                    }
+                    button:hover, .dismiss:hover, .btn:hover {
+                        background: \${primary700} !important;
+                        transform: translateY(-2px) !important;
+                    }
+                    p, span, .description {
+                        color: \${textSecondary} !important;
+                    }
+                \`;
+                
+                shadowRoot.insertBefore(style, shadowRoot.firstChild);
+                styled = true;
+                console.log('✅ Adora theme applied to Vite overlay');
+            }
+            
+            // Ultra-aggressive injection
+            setInterval(injectOverlayStyles, 30);
+            
+            // ✅ NULL SAFETY: Ensure document.body exists and is a valid Node before observing
+            if (document.body && document.body instanceof Node && typeof MutationObserver !== 'undefined') {
+                try {
+                    new MutationObserver(injectOverlayStyles).observe(document.body, { 
+                        childList: true, subtree: true 
+                    });
+                } catch (e) {
+                    console.warn('Failed to observe document.body for overlay styles:', e);
+                }
+            }
+            function raf() {
+                injectOverlayStyles();
+                requestAnimationFrame(raf);
+            }
+            raf();
+        }
+        
+        // ✅ Execute when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initViteOverlay);
+        } else {
+            // DOM already ready
+            setTimeout(initViteOverlay, 0);
+        }
     </script>
 
     <script type="module" src="/src/main.tsx"></script>
