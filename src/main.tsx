@@ -6,6 +6,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { I18nextProvider } from 'react-i18next';
 import App from './App';
 import './index.css';
 import './styles/animations.css';
@@ -13,7 +14,7 @@ import './styles/design-system.css';
 import './styles/guest-unified.css';
 
 // Initialize i18n (Arabic/English)
-import './i18n';
+import i18n from './i18n';
 
 // ✅ CRITICAL: Pre-import Chart.js to ensure it's in the dependency graph
 // This ensures vendor-chartjs is added to modulepreload automatically
@@ -44,6 +45,10 @@ if (import.meta.env.DEV) {
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-    <App />
+    <React.StrictMode>
+        <I18nextProvider i18n={i18n}>
+            <App />
+        </I18nextProvider>
+    </React.StrictMode>
 );
 
