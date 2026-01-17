@@ -141,11 +141,11 @@ export const auditCleaningQuality = async (tenantId: string, branchId: string): 
     // Implementation: Query requests of type 'room_service' where status is 'completed' 
     // and compare createdAt vs completedAt
 
-    const requestsRef = collection(db, 'requests');
+    // ✅ FIX: Use tenant-scoped collection path
+    const requestsRef = collection(db, `tenants/${tenantId}/requests`);
     const q = query(
         requestsRef,
-        where('tenantId', '==', tenantId),
-        where('branchId', '==', branchId),
+        where('branch', '==', branchId),
         where('type', '==', 'room_service'),
         where('status', '==', 'completed')
     );
@@ -349,13 +349,16 @@ export const generateWeeklyReport = async (
             .sort((a, b) => b.count - a.count)
             .slice(0, 5);
 
-        // Calculate average maintenance time (from requests)
+        // Calculate average maintenance time (from requests) for current week
         let avgMaintenanceTimeMinutes = 0;
+        let avgMaintenanceTimePrevWeek = 0;
+        
         try {
-            const requestsRef = collection(db, 'requests');
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+            
+            // ✅ Calculate current week average
             const maintenanceQuery = query(
                 requestsRef,
-                where('tenantId', '==', tenantId),
                 where('type', '==', 'maintenance'),
                 where('status', '==', 'completed'),
                 where('completedAt', '>=', Timestamp.fromDate(weekStart))
@@ -381,12 +384,55 @@ export const generateWeeklyReport = async (
                     durations.reduce((a, b) => a + b, 0) / durations.length
                 );
             }
+
+            // ✅ Calculate previous week average (for trend comparison)
+            const prevWeekStart = new Date(weekStart);
+            prevWeekStart.setDate(prevWeekStart.getDate() - 7); // 7 days before current week start
+            const prevWeekEnd = new Date(weekStart); // End of previous week = start of current week
+
+            const prevMaintenanceQuery = query(
+                requestsRef,
+                where('type', '==', 'maintenance'),
+                where('status', '==', 'completed'),
+                where('completedAt', '>=', Timestamp.fromDate(prevWeekStart)),
+                where('completedAt', '<', Timestamp.fromDate(prevWeekEnd))
+            );
+
+            const prevMaintenanceSnapshot = await getDocs(prevMaintenanceQuery);
+            const prevDurations: number[] = [];
+
+            prevMaintenanceSnapshot.docs.forEach(d => {
+                const data = d.data();
+                if (data.createdAt && data.completedAt) {
+                    const start = data.createdAt.toDate();
+                    const end = data.completedAt.toDate();
+                    const mins = (end.getTime() - start.getTime()) / 60000;
+                    if (mins > 0 && mins < 1440) { // Less than 24 hours
+                        prevDurations.push(mins);
+                    }
+                }
+            });
+
+            if (prevDurations.length > 0) {
+                avgMaintenanceTimePrevWeek = Math.round(
+                    prevDurations.reduce((a, b) => a + b, 0) / prevDurations.length
+                );
+            }
         } catch (err) {
             console.warn('Could not calculate maintenance time:', err);
         }
 
-        // TODO: Calculate trend from previous week (would need historical data)
-        const maintenanceTimeTrend = 0;
+        // ✅ FIX: Calculate trend from previous week (percentage change)
+        let maintenanceTimeTrend = 0;
+        if (avgMaintenanceTimePrevWeek > 0) {
+            // Calculate percentage change: ((current - previous) / previous) * 100
+            maintenanceTimeTrend = Math.round(
+                ((avgMaintenanceTimeMinutes - avgMaintenanceTimePrevWeek) / avgMaintenanceTimePrevWeek) * 100
+            );
+        } else if (avgMaintenanceTimeMinutes > 0 && avgMaintenanceTimePrevWeek === 0) {
+            // If no previous data but current data exists, mark as new data
+            maintenanceTimeTrend = 100; // Indicates new metric (no previous comparison)
+        }
 
         return {
             weekStart,

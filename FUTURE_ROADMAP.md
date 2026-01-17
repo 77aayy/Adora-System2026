@@ -89,19 +89,26 @@ return alerts;
 
 ---
 
-### 6. **dataDoctorService.ts:388** 📊 **TREND CALCULATION MISSING**
+### 6. **dataDoctorService.ts:388** 📊 **TREND CALCULATION MISSING** ✅ **FIXED**
 ```typescript
-// TODO: Calculate trend from previous week (would need historical data)
-const maintenanceTimeTrend = 0;
+// ✅ FIX: Calculate trend from previous week (percentage change)
+let maintenanceTimeTrend = 0;
+if (avgMaintenanceTimePrevWeek > 0) {
+    maintenanceTimeTrend = Math.round(
+        ((avgMaintenanceTimeMinutes - avgMaintenanceTimePrevWeek) / avgMaintenanceTimePrevWeek) * 100
+    );
+}
 ```
-**المشكلة:**
-- لا يتم حساب Trends من البيانات التاريخية
-- **الأولوية:** 🟡 **متوسطة** - يؤثر على دقة التقارير
+**الحالة:** ✅ **تم الإصلاح**
+- ✅ يتم حساب متوسط وقت الصيانة للأسبوع الحالي
+- ✅ يتم حساب متوسط وقت الصيانة للأسبوع السابق
+- ✅ يتم حساب النسبة المئوية للتغيير (Trend)
+- ✅ تم تحديث المسار إلى `tenants/${tenantId}/requests` (tenant-scoped)
 
-**الحل المطلوب:**
-- تخزين البيانات التاريخية في `tenants/${tenantId}/analytics_weekly`
-- حساب Trends من البيانات السابقة
-- تحديث `maintenanceTimeTrend` ليعكس القيمة الفعلية
+**التفاصيل:**
+- يتم حساب Trend من مقارنة الأسبوع الحالي بالأسبوع السابق مباشرة من `requests` collection
+- لا حاجة لتخزين بيانات تاريخية منفصلة (يتم حسابها عند الطلب)
+- النتيجة: نسبة مئوية موجبة (تحسن) أو سالبة (تراجع)
 
 ---
 
