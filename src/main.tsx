@@ -45,13 +45,15 @@ if (import.meta.env.DEV) {
     }
 }
 
+// ✅ CRITICAL: I18nProvider MUST be the absolute top parent
+// It must wrap EVERYTHING, including StrictMode, to ensure usei18n hook is available everywhere
 ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-        <I18nProvider>
+    <I18nProvider>
+        <React.StrictMode>
             <I18nextProvider i18n={i18n}>
                 <App />
             </I18nextProvider>
-        </I18nProvider>
-    </React.StrictMode>
+        </React.StrictMode>
+    </I18nProvider>
 );
 
