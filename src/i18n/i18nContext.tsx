@@ -102,11 +102,15 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 };
 
-// Hook
+// Hook (DEPRECATED - Not used anywhere, kept for backward compatibility)
+// If you see "usei18n must be used within i18nProvider" error, use useTranslation from react-i18next instead
 export const usei18n = (): i18nContextType => {
     const context = useContext(i18nContext);
     if (!context) {
-        throw new Error('usei18n must be used within i18nProvider');
+        // ✅ CRITICAL: This error means usei18n is being called outside I18nProvider
+        // Check that I18nProvider wraps your component tree in main.tsx
+        // Consider using useTranslation from react-i18next instead (recommended)
+        throw new Error('usei18n must be used within i18nProvider. Use useTranslation from react-i18next instead.');
     }
     return context;
 };
