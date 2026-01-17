@@ -102,22 +102,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 };
 
-// Hook (DEPRECATED - Not used anywhere, kept for backward compatibility)
-// If you see "usei18n must be used within i18nProvider" error, use useTranslation from react-i18next instead
-export const usei18n = (): i18nContextType => {
-    const context = useContext(i18nContext);
-    if (!context) {
-        // ✅ CRITICAL: Production-safe fallback to prevent white screen
-        // This should never happen if I18nProvider is properly set up in main.tsx
-        // Return fallback instead of throwing to prevent app crash
-        console.error('⚠️ usei18n called outside I18nProvider. Using fallback. Use useTranslation from react-i18next instead.');
-        return {
-            language: 'ar' as const,
-            t: (key: string) => key, // Fallback: return key if no translation
-            changeLanguage: () => {} // No-op fallback
-        };
-    }
-    return context;
-};
+// ✅ REMOVED: usei18n hook was deprecated and unused
+// All components now use useTranslation from react-i18next instead
 
 export default I18nProvider;
