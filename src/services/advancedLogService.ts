@@ -7,7 +7,7 @@
 
 import {
     collection, getDocs, query, where, orderBy, Timestamp, limit, 
-    addDoc, serverTimestamp, startAfter, DocumentSnapshot
+    addDoc, serverTimestamp, startAfter, DocumentSnapshot, onSnapshot, Unsubscribe
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { logger } from './loggerService';
@@ -498,6 +498,103 @@ export const getLogs = async (
     } catch (error) {
         logger.error('Error fetching logs:', error, 'advancedLogService');
         return { logs: [], hasMore: false };
+    }
+};
+
+/**
+ * ✅ Subscribe to logs with real-time updates (onSnapshot)
+ * Used by View Components for live updates without refresh
+ */
+export const subscribeToLogs = (
+    tenantId: string,
+    branchId: string,
+    filter: LogFilter,
+    callback: (logs: AdvancedLogEntry[]) => void
+): Unsubscribe => {
+    if (!db || !tenantId) {
+        console.warn('subscribeToLogs: db or tenantId missing');
+        callback([]);
+        return () => {}; // Return empty unsubscribe function
+    }
+
+    try {
+        // ✅ FIX: Use tenant-scoped collection
+        const logsCollection = getLogsCollection(tenantId);
+        const logsRef = collection(db, logsCollection);
+        let constraints: any[] = [];
+        
+        // Branch filter
+        if (branchId && branchId !== 'all') {
+            constraints.push(where('branchId', '==', branchId));
+        }
+        
+        // Date range
+        if (filter.startDate) {
+            constraints.push(where('timestamp', '>=', Timestamp.fromDate(filter.startDate)));
+        }
+        if (filter.endDate) {
+            constraints.push(where('timestamp', '<=', Timestamp.fromDate(filter.endDate)));
+        }
+        
+        // Category filter
+        if (filter.categories && filter.categories.length > 0 && !filter.categories.includes('all')) {
+            if (filter.categories.length === 1) {
+                constraints.push(where('category', '==', filter.categories[0]));
+            }
+        }
+        
+        // Severity filter
+        if (filter.severities && filter.severities.length > 0) {
+            if (filter.severities.length <= 10) {
+                constraints.push(where('severity', 'in', filter.severities));
+            }
+        }
+        
+        // Actor filter
+        if (filter.actorDepartment) {
+            constraints.push(where('actorDepartment', '==', filter.actorDepartment));
+        }
+        
+        // Room filter
+        if (filter.roomNumber) {
+            constraints.push(where('roomNumber', '==', filter.roomNumber));
+        }
+        
+        // Order and limit
+        constraints.push(orderBy('timestamp', 'desc'));
+        const limitCount = filter.limit || 100;
+        constraints.push(limit(limitCount));
+        
+        const q = query(logsRef, ...constraints);
+        
+        return onSnapshot(q, (snapshot) => {
+            let logs: AdvancedLogEntry[] = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                timestamp: doc.data().timestamp?.toDate() || new Date(),
+            })) as AdvancedLogEntry[];
+            
+            // Apply text search filter (client-side)
+            if (filter.searchText) {
+                const searchLower = filter.searchText.toLowerCase();
+                logs = logs.filter(log => 
+                    log.title.toLowerCase().includes(searchLower) ||
+                    log.description.toLowerCase().includes(searchLower) ||
+                    log.actorName.toLowerCase().includes(searchLower) ||
+                    (log.targetName && log.targetName.toLowerCase().includes(searchLower)) ||
+                    (log.roomNumber && log.roomNumber.includes(searchLower))
+                );
+            }
+            
+            callback(logs);
+        }, (error) => {
+            logger.error('Error in subscribeToLogs:', error, 'advancedLogService');
+            callback([]);
+        });
+    } catch (error) {
+        logger.error('Error setting up subscribeToLogs:', error, 'advancedLogService');
+        callback([]);
+        return () => {}; // Return empty unsubscribe function
     }
 };
 

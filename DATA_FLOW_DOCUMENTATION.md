@@ -63,7 +63,7 @@ sequenceDiagram
     participant Points
 
     Guest->>Reception: Create Request (QR/Phone)
-    Reception->>Firestore: createRequest() → tenants/{tenantId}/requests
+    Reception->>Firestore: createRequest() → `tenants/${tenantId}/requests`
     Firestore-->>Reception: Request ID
     Reception->>Firestore: confirmRequest() → Status: CONFIRMED
     Firestore->>Service: Real-time notification (onSnapshot)
@@ -137,9 +137,9 @@ sequenceDiagram
 
     Bellman->>RoomCardService: checkIn(guestData)
     RoomCardService->>Firestore: Validate room exists & available
-    RoomCardService->>Firestore: Create roomCard → tenants/{tenantId}/roomCards
+    RoomCardService->>Firestore: Create roomCard → `tenants/${tenantId}/roomCards`
     RoomCardService->>RoomService: updateRoomStatus(roomNumber, 'occupied')
-    RoomService->>Firestore: Update room.status = 'occupied'
+    RoomService->>Firestore: Update room.status = 'occupied' → `tenants/${tenantId}/rooms/{branchId}_{roomNumber}`
     Firestore->>Bellman: Real-time update (room now occupied)
     
     Bellman->>RoomCardService: checkOut(cardId)
@@ -190,18 +190,18 @@ sequenceDiagram
     participant Employee
 
     Request->>PointsService: Request Completed
-    PointsService->>PointsConfig: getPointsConfig(tenantId)
+    PointsService->>PointsConfig: getPointsConfig(tenantId) → `tenants/${tenantId}/settings/pointsConfig`
     PointsConfig-->>PointsService: Department Config
     PointsService->>PointsService: Calculate Points (base + speed bonus)
     PointsService->>PointsService: checkSuspiciousSpeed() (Quality Check)
     
     alt Normal Speed
-        PointsService->>Firestore: awardPoints() → runTransaction
-        Firestore->>Employee: Update currentPoints
-        Firestore->>Firestore: Log to wallet_transactions
+    PointsService->>Firestore: awardPoints() → runTransaction
+    Firestore->>Employee: Update `tenants/${tenantId}/employees/{employeeId}` (currentPoints)
+    Firestore->>Firestore: Log to `tenants/${tenantId}/employees/${employeeId}/wallet_transactions`
     else Suspicious Speed
-        PointsService->>Firestore: Hold Points → pending_points
-        Firestore->>Firestore: Log to suspicious_activities
+    PointsService->>Firestore: Hold Points → `tenants/${tenantId}/pending_points`
+    Firestore->>Firestore: Log to `tenants/${tenantId}/suspicious_activities`
     end
     
     PointsService->>Firestore: Update team points (if applicable)
@@ -354,7 +354,7 @@ sequenceDiagram
 
     Room->>Request: Create Laundry Request
     Request->>LaundryService: createLaundryRequest(items)
-    LaundryService->>Firestore: Create request → tenants/{tenantId}/requests
+    LaundryService->>Firestore: Create request → `tenants/${tenantId}/requests`
     LaundryService->>Inventory: updateInventory(items, 'dirty')
     Inventory->>Firestore: runTransaction (Update dirty counts)
     
@@ -424,7 +424,7 @@ sequenceDiagram
     Staff->>LostFoundService: createItem(itemData)
     LostFoundService->>RoomCardService: getLastCheckedOutGuest(roomNumber)
     RoomCardService-->>LostFoundService: Guest Name & Contact
-    LostFoundService->>Firestore: Create item → lost_found
+    LostFoundService->>Firestore: Create item → `tenants/${tenantId}/lost_found`
     
     Guest->>LostFoundService: claimItem(itemId, identityDoc)
     LostFoundService->>Firestore: Update item.status = 'claimed'
@@ -496,7 +496,7 @@ sequenceDiagram
     Guest->>Reception: Report Maintenance Issue
     Reception->>Firestore: Create request (type: maintenance)
     Firestore->>RoomService: Update room.status = 'maintenance'
-    RoomService->>Firestore: Update room → tenants/{tenantId}/rooms
+    RoomService->>Firestore: Update room → `tenants/${tenantId}/rooms/{branchId}_{roomNumber}`
     
     Reception->>Firestore: Confirm request → Status: CONFIRMED
     Firestore->>Maintenance: Real-time notification
@@ -511,7 +511,7 @@ sequenceDiagram
     
     Maintenance->>Firestore: Complete request → Status: COMPLETED
     Firestore->>RoomService: Update room.status = 'cleaning'
-    RoomService->>Firestore: Update room → tenants/{tenantId}/rooms
+    RoomService->>Firestore: Update room → `tenants/${tenantId}/rooms/{branchId}_{roomNumber}`
 ```
 
 ### 📝 Business Rules
@@ -664,9 +664,10 @@ sequenceDiagram
     Guest->>MinibarService: consumeItem(roomNumber, itemId, quantity)
     MinibarService->>Firestore: Validate room & item exists
     MinibarService->>InventoryService: Deduct from inventory (runTransaction)
-    InventoryService->>Firestore: Update stock (decrement quantity)
+    InventoryService->>Firestore: Update stock → `tenants/${tenantId}/settings/minibar` (decrement quantity)
     MinibarService->>BillingService: createCharge(roomNumber, item, quantity)
-    BillingService->>Firestore: Create charge → tenants/{tenantId}/charges
+    MinibarService->>Firestore: Create consumption record → `tenants/${tenantId}/minibar_consumption`
+    BillingService->>Firestore: Create charge → `tenants/${tenantId}/branches/${branchId}/financial_transactions`
     Firestore->>BillingService: Link to roomCard
     BillingService->>Firestore: Update roomCard.totalCharges
 ```
@@ -722,7 +723,7 @@ sequenceDiagram
     participant Firestore
 
     Guest->>CoffeeShopService: placeOrder(items, roomNumber)
-    CoffeeShopService->>Firestore: Create order (status: PENDING_RECEPTION)
+    CoffeeShopService->>Firestore: Create order (status: PENDING_RECEPTION) → `tenants/${tenantId}/branches/${branchId}/coffee_orders`
     Firestore->>Reception: Real-time notification
     
     Reception->>CoffeeShopService: approveOrder(orderId)
@@ -734,7 +735,7 @@ sequenceDiagram
     CoffeeShop->>CoffeeShopService: markReady(orderId)
     CoffeeShopService->>Firestore: Update status = READY
     CoffeeShopService->>Inventory: Deduct stock (runTransaction)
-    Inventory->>Firestore: Update coffee_products (decrement)
+    Inventory->>Firestore: Update coffee stock → `tenants/${tenantId}/settings/coffee_products` (decrement)
     
     CoffeeShop->>CoffeeShopService: deliverOrder(orderId)
     CoffeeShopService->>Firestore: Update status = COMPLETED
@@ -791,7 +792,7 @@ sequenceDiagram
     participant Firestore
 
     Department->>ProcurementService: createProcurementRequest(items, urgency)
-    ProcurementService->>Firestore: Create request (status: PENDING_APPROVAL)
+    ProcurementService->>Firestore: Create request (status: PENDING_APPROVAL) → `tenants/${tenantId}/procurementRequests`
     Firestore->>Manager: Real-time notification
     
     Manager->>ProcurementService: approveRequest(requestId)
@@ -846,7 +847,7 @@ sequenceDiagram
     RoomCard->>BillingService: Create charge (room, service, minibar)
     BillingService->>TaxService: calculateTax(amount, category)
     TaxService-->>BillingService: Tax amount
-    BillingService->>Firestore: Create charge → tenants/{tenantId}/charges
+    BillingService->>Firestore: Create charge → `tenants/${tenantId}/branches/${branchId}/financial_transactions`
     
     BillingService->>BillingService: Accumulate charges (roomCard.totalCharges)
     
@@ -1329,5 +1330,32 @@ tenants/{tenantId}/branches/{branchId} = {
 ---
 
 **تاريخ التوثيق:** 2026-01-16  
+**آخر تحديث:** 2026-01-16 (Tenant-scoped Paths Update)  
 **القائد التقني:** Senior Full-Stack Engineer  
-**الحالة:** ✅ **DATA FLOW DOCUMENTATION COMPLETE**
+**الحالة:** ✅ **DATA FLOW DOCUMENTATION COMPLETE - 100% CODE MIRROR**
+
+---
+
+## 📍 ملاحظة مهمة: المسارات الفعلية (Actual Firestore Paths)
+
+### ✅ جميع المسارات محدثة لتعكس الكود الفعلي بعد التعديلات
+
+**المسارات الأساسية (Tenant-Scoped):**
+- Requests: `tenants/${tenantId}/requests`
+- Rooms: `tenants/${tenantId}/rooms/{branchId}_{roomNumber}`
+- Room Cards: `tenants/${tenantId}/roomCards`
+- Employees: `tenants/${tenantId}/employees`
+- Procurement: `tenants/${tenantId}/procurementRequests`
+- Procurement Receipts: `tenants/${tenantId}/procurementReceipts`
+- Activity Logs: `tenants/${tenantId}/activityLogs`
+- Minibar Consumption: `tenants/${tenantId}/minibar_consumption`
+
+**المسارات المتداخلة (Nested Subcollections):**
+- Settings: `tenants/${tenantId}/settings/pointsConfig`, `tenants/${tenantId}/settings/minibar`
+- Branches: `tenants/${tenantId}/branches/{branchId}`
+- Financial Transactions: `tenants/${tenantId}/branches/${branchId}/financial_transactions`
+- Chat Rooms: `tenants/${tenantId}/branches/${branchId}/chat_rooms`
+- Wallet Transactions: `tenants/${tenantId}/employees/${employeeId}/wallet_transactions`
+- Points History: `tenants/${tenantId}/employees/${employeeId}/pointsHistory`
+
+**✅ هذا التوثيق يعكس الكود الفعلي 100% بعد جميع التعديلات (Tenant-scoped Migration)**

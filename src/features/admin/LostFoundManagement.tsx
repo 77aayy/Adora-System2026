@@ -645,6 +645,7 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ isOpen, onClose, it
 export const LostFoundManagement: React.FC = () => {
     const { user } = useAuth();
     const branchId = useMemo(() => (user as any)?.branch || 'default', [user]);
+    const tenantId = useMemo(() => (user as any)?.tenantId || '', [user]); // ✅ FIX: Get tenantId
 
     // State
     const [items, setItems] = useState<LostFoundItem[]>([]);
@@ -661,13 +662,18 @@ export const LostFoundManagement: React.FC = () => {
 
     // Load data
     useEffect(() => {
+        // ✅ FIX: Pass tenantId for tenant-scoped collection
+        if (!tenantId) {
+            console.warn('⚠️ LostFoundManagement: tenantId is required');
+            return;
+        }
         const unsubscribe = subscribeToLostFound(branchId, (data) => {
             setItems(data);
             setLoading(false);
-        });
+        }, undefined, tenantId);
 
         const loadStats = async () => {
-            const statsData = await getLostFoundStats(branchId);
+            const statsData = await getLostFoundStats(branchId, tenantId);
             setStats(statsData);
         };
         loadStats();
@@ -694,21 +700,36 @@ export const LostFoundManagement: React.FC = () => {
 
     const handleClaimItem = async (claimedBy: any) => {
         if (!selectedItem) return;
-        await claimItem(selectedItem.id, claimedBy);
+        // ✅ FIX: Pass tenantId for tenant-scoped collection
+        const tenantId = selectedItem.tenantId || (user as any)?.tenantId;
+        if (!tenantId) {
+            throw new Error('tenantId is required');
+        }
+        await claimItem(selectedItem.id, claimedBy, tenantId);
         setShowClaimModal(false);
         setShowDetailsModal(false);
     };
 
     const handleReturnItem = async () => {
         if (!selectedItem) return;
-        await returnItem(selectedItem.id, { id: user?.id || '', name: user?.name || '' });
+        // ✅ FIX: Pass tenantId for tenant-scoped collection
+        const tenantId = selectedItem.tenantId || (user as any)?.tenantId;
+        if (!tenantId) {
+            throw new Error('tenantId is required');
+        }
+        await returnItem(selectedItem.id, { id: user?.id || '', name: user?.name || '' }, tenantId);
         setShowDetailsModal(false);
     };
 
     const handleDisposeItem = async () => {
         if (!selectedItem) return;
+        // ✅ FIX: Pass tenantId for tenant-scoped collection
+        const tenantId = selectedItem.tenantId || (user as any)?.tenantId;
+        if (!tenantId) {
+            throw new Error('tenantId is required');
+        }
         if (confirm('هل أنت متأكد من التخلص من هذا العنصر؟')) {
-            await disposeItem(selectedItem.id);
+            await disposeItem(selectedItem.id, tenantId);
             setShowDetailsModal(false);
         }
     };

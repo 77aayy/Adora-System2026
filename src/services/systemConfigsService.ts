@@ -6,6 +6,7 @@
 
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { validateRoleAccess } from './tenantSecurityService';
 
 // ============================================================
 // TYPES
@@ -49,9 +50,13 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Get system configs from Firestore with caching
+ * 🔐 RBAC: Only Owner can access API keys (sensitive data)
  */
 export const getSystemConfigs = async (): Promise<SystemConfigs | null> => {
     try {
+        // ✅ RBAC: Check role before accessing sensitive API keys
+        validateRoleAccess('owner');
+
         // Return cached data if still valid
         if (cachedConfigs && Date.now() - cacheTimestamp < CACHE_TTL) {
             return cachedConfigs;
@@ -81,18 +86,22 @@ export const getSystemConfigs = async (): Promise<SystemConfigs | null> => {
         return null;
     } catch (error) {
         console.error('Error fetching system configs:', error);
-        return null;
+        throw error; // ✅ Re-throw to show error to caller (don't silently fail)
     }
 };
 
 /**
  * Save system configs to Firestore
+ * 🔐 RBAC: Only Owner can save API keys (sensitive data)
  */
 export const saveSystemConfigs = async (
     configs: Partial<SystemConfigs>,
     userId: string
 ): Promise<{ success: boolean; message: string }> => {
     try {
+        // ✅ RBAC: Check role before saving sensitive API keys
+        validateRoleAccess('owner');
+
         if (!db) {
             return { success: false, message: 'قاعدة البيانات غير متصلة' };
         }

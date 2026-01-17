@@ -805,13 +805,13 @@ export const getProcurementSummary = async (
     totalShortages: number;
 }> => {
     try {
-        const requestsRef = collection(db, 'procurementRequests');
+        // ✅ FIX: Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
         // Base constraints
         const baseConstraints = [
-            where('tenantId', '==', tenantId),
             where('branchId', '==', branchId),
         ];
         
@@ -832,10 +832,10 @@ export const getProcurementSummary = async (
         const receiptSnap = await getDocs(receiptQ);
         
         // Get receipts for shortage count
-        const receiptsRef = collection(db, 'procurementReceipts');
+        // ✅ FIX: Use tenant-scoped collection
+        const receiptsRef = collection(db, `tenants/${tenantId}/procurementReceipts`);
         const shortageQ = query(
             receiptsRef,
-            where('tenantId', '==', tenantId),
             where('branchId', '==', branchId),
             where('type', '==', 'shortage')
         );

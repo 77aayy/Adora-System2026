@@ -115,11 +115,12 @@ export const subscribeToLostFound = (
         return () => { };
     }
 
+    // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+    const lostFoundRef = collection(db, `tenants/${tenantId}/lost_found`);
     const constraints: any[] = [
-        where('branch', '==', branchId),
-        where('tenantId', '==', tenantId) // 🔐 CRITICAL: Tenant isolation
+        where('branch', '==', branchId) // tenantId already in path, only need branch
     ];
-
+    
     if (status) {
         constraints.push(where('status', '==', status));
     }
@@ -147,8 +148,13 @@ export const subscribeToLostFound = (
 /**
  * Get single item
  */
-export const getLostFoundItem = async (itemId: string): Promise<LostFoundItem | null> => {
-    const docRef = doc(db, 'lost_found', itemId);
+export const getLostFoundItem = async (itemId: string, tenantId: string): Promise<LostFoundItem | null> => {
+    // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+    if (!tenantId) {
+        console.warn('⚠️ [LostFound] getLostFoundItem called without tenantId');
+        return null;
+    }
+    const docRef = doc(db, `tenants/${tenantId}/lost_found`, itemId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
         return { id: docSnap.id, ...docSnap.data() } as LostFoundItem;
@@ -168,7 +174,12 @@ const getLastCheckedOutGuest = async (
     if (!db) return null;
     
     try {
-        const roomCardsRef = collection(db, 'roomCards');
+        // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+        if (!tenantId) {
+            console.warn('⚠️ [Lost & Found] getLastCheckedOutGuest called without tenantId');
+            return null;
+        }
+        const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
         const constraints: any[] = [
             where('roomNumber', '==', roomNumber),
             where('status', 'in', ['checkout_pending', 'checked_out', 'completed'])
@@ -243,7 +254,12 @@ export const addLostFoundItem = async (
         }
     }
 
-    const docRef = await addDoc(collection(db, 'lost_found'), {
+    // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+    if (!item.tenantId) {
+        throw new Error('tenantId is required for SaaS isolation');
+    }
+    const lostFoundRef = collection(db, `tenants/${item.tenantId}/lost_found`);
+    const docRef = await addDoc(lostFoundRef, {
         ...item,
         imageUrl: finalImageUrl,
         status: 'found',
@@ -293,9 +309,14 @@ export const addLostFoundItem = async (
  */
 export const updateLostFoundItem = async (
     itemId: string,
-    updates: Partial<LostFoundItem>
+    updates: Partial<LostFoundItem>,
+    tenantId: string
 ): Promise<void> => {
-    const docRef = doc(db, 'lost_found', itemId);
+    // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+    if (!tenantId) {
+        throw new Error('tenantId is required for SaaS isolation');
+    }
+    const docRef = doc(db, `tenants/${tenantId}/lost_found`, itemId);
     await updateDoc(docRef, {
         ...updates,
         updatedAt: Timestamp.now(),
@@ -316,12 +337,15 @@ export const claimItem = async (
         idNumber?: string;
         guestIdentityURL?: string; // 🔐 Proof of Identity
     },
+    tenantId: string, // 🔐 REQUIRED: Tenant isolation
     signatureData?: string, // 🔐 Digital signature (Base64 or ImgBB URL)
     signatureUrl?: string // 🔐 Signature image URL
 ): Promise<void> => {
     if (!db) throw new Error('Firebase not initialized');
+    if (!tenantId) throw new Error('tenantId is required for SaaS isolation');
     
-    const itemRef = doc(db, 'lost_found', itemId);
+    // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+    const itemRef = doc(db, `tenants/${tenantId}/lost_found`, itemId);
     
     try {
         await runTransaction(db, async (transaction) => {
@@ -371,18 +395,21 @@ export const claimItem = async (
 export const returnItem = async (
     itemId: string,
     returnedBy: { id: string; name: string },
+    tenantId: string, // 🔐 REQUIRED: Tenant isolation
     guestIdentityURL?: string, // 🔐 REQUIRED: Proof of Identity
     signatureData?: string, // 🔐 REQUIRED: Digital signature
     signatureUrl?: string // 🔐 Optional: Signature image URL
 ): Promise<void> => {
     if (!db) throw new Error('Firebase not initialized');
+    if (!tenantId) throw new Error('tenantId is required for SaaS isolation');
     
     // 🛡️ PROOF OF DELIVERY VALIDATION
     if (!guestIdentityURL || !signatureData) {
         throw new Error('يجب توفير إثبات الهوية والتوقيع الرقمي لإتمام عملية الإرجاع');
     }
     
-    const itemRef = doc(db, 'lost_found', itemId);
+    // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+    const itemRef = doc(db, `tenants/${tenantId}/lost_found`, itemId);
     
     try {
         await runTransaction(db, async (transaction) => {
@@ -429,11 +456,14 @@ export const returnItem = async (
 export const donateItem = async (
     itemId: string,
     donatedBy: { id: string; name: string },
+    tenantId: string, // 🔐 REQUIRED: Tenant isolation
     notes?: string
 ): Promise<void> => {
     if (!db) throw new Error('Firebase not initialized');
+    if (!tenantId) throw new Error('tenantId is required for SaaS isolation');
     
-    const itemRef = doc(db, 'lost_found', itemId);
+    // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+    const itemRef = doc(db, `tenants/${tenantId}/lost_found`, itemId);
     
     try {
         await runTransaction(db, async (transaction) => {
@@ -470,9 +500,12 @@ export const donateItem = async (
  */
 export const disposeItem = async (
     itemId: string,
+    tenantId: string, // 🔐 REQUIRED: Tenant isolation
     notes?: string
 ): Promise<void> => {
-    await updateDoc(doc(db, 'lost_found', itemId), {
+    if (!tenantId) throw new Error('tenantId is required for SaaS isolation');
+    // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+    await updateDoc(doc(db, `tenants/${tenantId}/lost_found`, itemId), {
         status: 'disposed',
         disposedAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
@@ -499,13 +532,14 @@ export const getLostFoundStats = async (branchId: string, tenantId?: string) => 
         };
     }
 
+    // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
+    const lostFoundRef = collection(db, `tenants/${tenantId}/lost_found`);
     const constraints: any[] = [
-        where('branch', '==', branchId),
-        where('tenantId', '==', tenantId) // 🔐 CRITICAL: Tenant isolation
+        where('branch', '==', branchId) // tenantId already in path, only need branch
     ];
     
     const q = query(
-        collection(db, 'lost_found'),
+        lostFoundRef,
         ...constraints
     );
 

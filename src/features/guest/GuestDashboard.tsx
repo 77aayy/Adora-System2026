@@ -335,6 +335,23 @@ export const GuestDashboard: React.FC = () => {
         });
     }, []);
 
+    // ✅ FIX: Real-time listeners with proper cleanup (prevents Zombie Listeners)
+    useEffect(() => {
+        if (!session) return;
+
+        // Subscribe to active requests
+        const unsubscribeActive = listenForActiveRequests(session);
+        
+        // Subscribe to completed requests (for auto-rating)
+        const unsubscribeCompleted = listenForCompletedRequests(session);
+
+        // ✅ Cleanup function - CRITICAL to prevent Zombie Listeners
+        return () => {
+            if (unsubscribeActive) unsubscribeActive();
+            if (unsubscribeCompleted) unsubscribeCompleted();
+        };
+    }, [session]); // Re-subscribe when session changes
+
     const initGuestPage = async () => {
         console.log('🚀 [GuestDashboard] initGuestPage started');
         console.log('🚀 [GuestDashboard] Current URL:', window.location.href);
@@ -614,8 +631,9 @@ export const GuestDashboard: React.FC = () => {
                 
                 setSession(existingSession);
                 await loadBranchSettings(existingSession.branch, existingSession.hotelId);
-                listenForActiveRequests(existingSession);
-                listenForCompletedRequests(existingSession); // Auto-rating listener
+                // ✅ FIX: Listeners are now handled in useEffect (see below) for proper cleanup
+                // listenForActiveRequests(existingSession);
+                // listenForCompletedRequests(existingSession); // Auto-rating listener
                 await loadRecentRequests(existingSession);
                 await loadCoffeeMenu(existingSession);
                 await loadMinibarMenu(existingSession);

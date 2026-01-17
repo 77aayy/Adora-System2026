@@ -23,6 +23,7 @@ import { User } from '../types';
 import { AuthContextState } from '../types/auth';
 import { hashPin } from './hashService';
 import { quickAudit } from '../utils/auditService';
+import { validateRoleAccess } from './tenantSecurityService';
 
 // ============================================================
 // CONSTANTS
@@ -135,6 +136,9 @@ export const createManager = async (data: {
         appId?: string;
     };
 }): Promise<{ managerId: string; tenantId: string }> => {
+    // ✅ RBAC: Only Owner can create managers
+    validateRoleAccess('owner');
+
     // Check if code is available
     const available = await isPinAvailable(data.code);
     if (!available) {
@@ -361,6 +365,9 @@ export const createManager = async (data: {
  * ⚡ PERFORMANCE: Uses request deduplication & memory cache
  */
 export const getAllManagers = async (forceRefresh: boolean = false): Promise<User[]> => {
+    // ✅ RBAC: Only Owner can access all managers (sensitive data)
+    validateRoleAccess('owner');
+
     const { cachedFetch } = await import('../utils/requestCache');
 
     return cachedFetch<User[]>(
@@ -407,6 +414,9 @@ export const getRemainingLicenseDays = (expiryDate: Date | Timestamp | null | un
 
 // ✅ Suspend/Resume manager license
 export const toggleLicenseStatus = async (managerId: string, tenantId: string, suspend: boolean): Promise<void> => {
+    // ✅ RBAC: Only Owner can toggle license status
+    validateRoleAccess('owner');
+
     const batch = writeBatch(db);
 
     // 1. Get manager data to find PIN code
@@ -477,6 +487,9 @@ export const renewLicense = async (
     currentPrice?: number,
     defaultPrice?: number
 ): Promise<{ warning?: string }> => {
+    // ✅ RBAC: Only Owner can renew licenses
+    validateRoleAccess('owner');
+
     const batch = writeBatch(db);
     const now = new Date();
     const expiryDate = new Date(now);
@@ -590,6 +603,9 @@ export const checkLicenseExpiryNotifications = (expiryDate: Date | Timestamp | n
 
 // ✅ Soft delete manager (move to deleted_managers collection with automatic backup)
 export const softDeleteManager = async (managerId: string, tenantId?: string): Promise<void> => {
+    // ✅ RBAC: Only Owner can delete managers
+    validateRoleAccess('owner');
+
     // ✅ 1. Try to create backup before deletion (non-blocking if permission denied)
     let backupId: string | null = null;
     if (tenantId) {
@@ -814,6 +830,9 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
 
 // ✅ Restore deleted manager (within 7-day recovery period)
 export const restoreManager = async (managerId: string): Promise<void> => {
+    // ✅ RBAC: Only Owner can restore managers
+    validateRoleAccess('owner');
+
     const batch = writeBatch(db);
 
     // 1. Get backup
@@ -1006,6 +1025,9 @@ export const restoreManager = async (managerId: string): Promise<void> => {
 // ✅ Get deleted managers (for recovery)
 // ✅ NO TIME LIMIT: All deleted managers can be recovered anytime
 export const getDeletedManagers = async (): Promise<Array<User & { deletedAt: Date; canRecover: boolean }>> => {
+    // ✅ RBAC: Only Owner can access deleted managers
+    validateRoleAccess('owner');
+
     const deletedManagersRef = collection(db, 'deleted_managers');
     // ✅ Filter by createdBy to satisfy Security Rules
     const q = query(deletedManagersRef, where('createdBy', '==', 'owner'));
@@ -1028,6 +1050,9 @@ export const getDeletedManagers = async (): Promise<Array<User & { deletedAt: Da
  * Used to start 'Step 0' testing. Deletes all tenants, branches, managers, employees, and global codes.
  */
 export const purgeAllSystemData = async (ownerId: string): Promise<{ success: boolean; deletedCount: number }> => {
+    // ✅ RBAC: Only Owner can purge system data (CRITICAL operation)
+    validateRoleAccess('owner');
+
     try {
         console.log("☢️ NUCLEAR PURGE INITIATED. Protection: Active.");
         let totalDeleted = 0;
@@ -1136,6 +1161,9 @@ export const getDemoStats = async (): Promise<{
     nearestExpiry: Date | null;
     farthestExpiry: Date | null;
 }> => {
+    // ✅ RBAC: Only Owner can access demo stats
+    validateRoleAccess('owner');
+
     try {
         if (!db) {
             return { total: 0, nearestExpiry: null, farthestExpiry: null };

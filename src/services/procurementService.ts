@@ -435,7 +435,9 @@ export const completePurchase = async (
             throw new Error('tenantId is required for SaaS isolation');
         }
         
-        const newRequestRef = await addDoc(collection(db, 'procurementRequests'), {
+        // ✅ FIX: Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
+        const newRequestRef = await addDoc(requestsRef, {
             items: remainingItems,
             department: requestData.department,
             requestedBy: requestData.requestedBy,
@@ -702,7 +704,9 @@ export const confirmReceipt = async (
             
             // 4. ATOMIC CREATE: Create backorder in the same transaction (if needed)
             if (receiptType === 'shortage' && remainingItems.length > 0) {
-                const backorderRef = doc(collection(db, 'procurementRequests'));
+                // ✅ FIX: Use tenant-scoped collection
+                const backorderRequestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
+                const backorderRef = doc(backorderRequestsRef);
                 backorderId = backorderRef.id; // Store ID for return value
                 
                 transaction.set(backorderRef, {
@@ -796,9 +800,9 @@ export const subscribeToPendingApprovals = (
         return () => {}; // Return empty unsubscribe function
     }
     
-    const requestsRef = collection(db, 'procurementRequests');
+    // ✅ FIX: Use tenant-scoped collection
+    const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
     const constraints: any[] = [
-        where('tenantId', '==', tenantId), // ✅ SaaS requirement - mandatory filter
         where('branch', '==', branchId),
         where('status', '==', 'PENDING_APPROVAL')
     ];
@@ -835,10 +839,10 @@ export const subscribeToApprovedRequests = (
         return () => {}; // Return empty unsubscribe function
     }
     
-    const requestsRef = collection(db, 'procurementRequests');
+    // ✅ FIX: Use tenant-scoped collection
+    const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
     const q = query(
         requestsRef,
-        where('tenantId', '==', tenantId), // ✅ SaaS requirement - mandatory filter
         where('branch', '==', branchId),
         where('status', 'in', ['APPROVED', 'PURCHASING', 'PURCHASED'])
     );
@@ -874,10 +878,10 @@ export const subscribeToDepartmentRequests = (
         return () => {}; // Return empty unsubscribe function
     }
     
-    const requestsRef = collection(db, 'procurementRequests');
+    // ✅ FIX: Use tenant-scoped collection
+    const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
     const q = query(
         requestsRef,
-        where('tenantId', '==', tenantId), // ✅ SaaS requirement - mandatory filter
         where('branch', '==', branchId),
         where('department', '==', department)
     );

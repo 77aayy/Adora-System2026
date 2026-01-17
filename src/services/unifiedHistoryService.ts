@@ -401,18 +401,19 @@ const fetchProcurementHistory = async (
     try {
         let q;
 
+        // ✅ FIX: Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
+        
         if (targetDepartment && targetDepartment !== 'all') {
             q = query(
-                collection(db, 'procurementRequests'),
+                requestsRef,
                 where('branch', '==', branchId),
-                where('tenantId', '==', tenantId),
                 where('department', '==', targetDepartment)
             );
         } else {
             q = query(
-                collection(db, 'procurementRequests'),
-                where('branch', '==', branchId),
-                where('tenantId', '==', tenantId)
+                requestsRef,
+                where('branch', '==', branchId)
             );
         }
 

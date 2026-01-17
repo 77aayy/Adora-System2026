@@ -64,7 +64,12 @@ export const LostFoundModal: React.FC<LostFoundModalProps> = ({
 
     const handleReturnItem = async (itemId: string) => {
         try {
-            await returnItem(itemId, { id: userId, name: userName });
+            // ✅ FIX: Pass tenantId for tenant-scoped collection
+            const item = items.find(i => i.id === itemId);
+            if (!item?.tenantId) {
+                throw new Error('tenantId is required');
+            }
+            await returnItem(itemId, { id: userId, name: userName }, tenantId);
             
             // ✅ Create Live Feed entry for return
             try {

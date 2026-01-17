@@ -330,16 +330,20 @@ export const ProcurementDashboard: React.FC = () => {
         // Regular employees only see their branch
         const shouldFilterByBranch = !isManager || (isManager && branchId);
 
-        const requestsRef = collection(db, 'procurementRequests');
+        // ✅ FIX: Use tenant-scoped collection (tenants/${tenantId}/procurementRequests)
+        if (!tenantId) {
+            console.warn('⚠️ [ProcurementDashboard] Cannot subscribe to requests: tenantId is missing');
+            setLoading(false);
+            return;
+        }
+        
+        const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
         let unsubscribe: (() => void) | null = null;
         let fallbackAttempted = false;
 
-        // ✅ SaaS: Add tenantId filter for proper isolation
-        // Try with orderBy first, fallback to simple query if index not ready
+        // ✅ SaaS: Try with orderBy first, fallback to simple query if index not ready
         const trySubscribe = (useOrderBy: boolean) => {
-            const constraints: any[] = [
-                where('tenantId', '==', tenantId) // ✅ SaaS requirement - mandatory filter
-            ];
+            const constraints: any[] = [];
             
             // ✅ Only filter by branch if not a manager viewing all, or if specific branch is selected
             if (shouldFilterByBranch && branchId) {

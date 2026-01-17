@@ -19,9 +19,10 @@ import { logger } from './loggerService';
  * This is the FIRST line of defense (Service Layer)
  * 
  * @param requestedTenantId - The tenantId being accessed
+ * @param requiredRole - Optional: Required role for sensitive operations (e.g., 'owner' for API keys)
  * @throws Error if access is denied
  */
-export function validateTenantAccess(requestedTenantId: string): void {
+export function validateTenantAccess(requestedTenantId: string, requiredRole?: string): void {
     if (!auth) {
         throw new Error('Firebase Auth not initialized');
     }
@@ -45,6 +46,30 @@ export function validateTenantAccess(requestedTenantId: string): void {
             userRole = user.role || null;
         } catch (e) {
             logger.warn('Failed to parse stored user', e, 'tenantSecurityService');
+        }
+    }
+
+    // ✅ RBAC: Check role first for sensitive operations
+    if (requiredRole) {
+        if (!userRole) {
+            logger.error(
+                'Role access denied: User role not found',
+                undefined,
+                'tenantSecurityService'
+            );
+            throw new Error('Access denied: User role not found');
+        }
+
+        // Owner can always access (super-admin)
+        if (userRole === 'owner' || userTenantId === 'system-owner') {
+            // Owner bypass - continue to tenant check
+        } else if (userRole !== requiredRole) {
+            logger.error(
+                `Role access denied: User role (${userRole}) != Required role (${requiredRole})`,
+                undefined,
+                'tenantSecurityService'
+            );
+            throw new Error(`Access denied: Operation requires '${requiredRole}' role. Your role: '${userRole}'`);
         }
     }
 
@@ -127,4 +152,39 @@ export function isCurrentUserOwner(): boolean {
     const role = getCurrentUserRole();
     const tenantId = getCurrentUserTenantId();
     return role === 'owner' || tenantId === 'system-owner';
+}
+
+/**
+ * 🔐 RBAC: Validates user has required role for operation
+ * Used by services to enforce role-based access to sensitive data
+ * 
+ * @param requiredRole - Required role (e.g., 'owner', 'manager')
+ * @throws Error if user doesn't have required role
+ */
+export function validateRoleAccess(requiredRole: string): void {
+    const userRole = getCurrentUserRole();
+    const tenantId = getCurrentUserTenantId();
+
+    // Owner always has access
+    if (userRole === 'owner' || tenantId === 'system-owner') {
+        return;
+    }
+
+    if (!userRole) {
+        logger.error(
+            'Role access denied: User role not found',
+            undefined,
+            'tenantSecurityService'
+        );
+        throw new Error('Access denied: User role not found');
+    }
+
+    if (userRole !== requiredRole) {
+        logger.error(
+            `Role access denied: User role (${userRole}) != Required role (${requiredRole})`,
+            undefined,
+            'tenantSecurityService'
+        );
+        throw new Error(`Access denied: Operation requires '${requiredRole}' role. Your role: '${userRole}'`);
+    }
 }

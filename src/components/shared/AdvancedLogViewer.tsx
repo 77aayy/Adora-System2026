@@ -17,7 +17,7 @@ import { AdoraLoader } from '../common/AdoraLoader';
 import { useUX } from '../../context/UXContext';
 import { useTenantData, useTenantBranches } from '../../hooks/useTenantData';
 import {
-    getLogs, getLogStats, downloadCSV, printLogs,
+    getLogs, getLogStats, subscribeToLogs, downloadCSV, printLogs,
     AdvancedLogEntry, LogFilter, LogStats, LogCategory, LogSeverity, LogAction,
     CATEGORY_CONFIG, SEVERITY_CONFIG, ACTION_CONFIG, formatTimeAgo
 } from '../../services/advancedLogService';
@@ -136,52 +136,54 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
     }, [customStartDate, customEndDate]);
     
     // ============================================================
-    // LOAD DATA
+    // REAL-TIME DATA LOADING (onSnapshot)
     // ============================================================
     
-    const loadData = useCallback(async () => {
-        if (!tenantId) return;
+    // ✅ FIX: Use onSnapshot for real-time updates (no refresh needed)
+    useEffect(() => {
+        if (!isOpen || !tenantId) return;
         
         setLoading(true);
-        try {
-            const { start, end } = getDateRange(period);
-            
-            const filter: LogFilter = {
-                startDate: start,
-                endDate: end,
-                categories: selectedCategories.length > 0 ? selectedCategories : undefined,
-                severities: selectedSeverities.length > 0 ? selectedSeverities : undefined,
-                actorDepartment: selectedDepartment || undefined,
-                roomNumber: selectedRoom || undefined,
-                searchText: searchText || undefined,
-                limit: PAGE_SIZE,
-            };
-            
-            const { logs: fetchedLogs, hasMore: more } = await getLogs(
-                tenantId,
-                selectedBranch || branchId,
-                filter
-            );
-            
-            setLogs(fetchedLogs);
-            setHasMore(more);
-            
-            // Load stats if on stats view
-            if (viewMode === 'stats') {
-                const statsData = await getLogStats(tenantId, selectedBranch || branchId, start, end);
-                setStats(statsData);
+        
+        const { start, end } = getDateRange(period);
+        
+        const filter: LogFilter = {
+            startDate: start,
+            endDate: end,
+            categories: selectedCategories.length > 0 ? selectedCategories : undefined,
+            severities: selectedSeverities.length > 0 ? selectedSeverities : undefined,
+            actorDepartment: selectedDepartment || undefined,
+            roomNumber: selectedRoom || undefined,
+            searchText: searchText || undefined,
+            limit: PAGE_SIZE,
+        };
+        
+        // ✅ Subscribe to real-time updates
+        const unsubscribe = subscribeToLogs(
+            tenantId,
+            selectedBranch || branchId,
+            filter,
+            (fetchedLogs) => {
+                setLogs(fetchedLogs);
+                setHasMore(fetchedLogs.length >= PAGE_SIZE);
+                setLoading(false);
+                
+                // Load stats if on stats view (async, doesn't block)
+                if (viewMode === 'stats') {
+                    getLogStats(tenantId, selectedBranch || branchId, start, end).then(statsData => {
+                        setStats(statsData);
+                    }).catch(err => {
+                        console.error('Error loading stats:', err);
+                    });
+                }
             }
-        } catch (err) {
-            console.error('Error loading logs:', err);
-        }
-        setLoading(false);
-    }, [tenantId, branchId, period, selectedCategories, selectedSeverities, selectedDepartment, selectedRoom, searchText, selectedBranch, getDateRange, viewMode]);
-    
-    useEffect(() => {
-        if (isOpen) {
-            loadData();
-        }
-    }, [isOpen, loadData]);
+        );
+        
+        // ✅ Cleanup function
+        return () => {
+            unsubscribe();
+        };
+    }, [isOpen, tenantId, branchId, period, selectedCategories, selectedSeverities, selectedDepartment, selectedRoom, searchText, selectedBranch, getDateRange, viewMode]);
     
     // ============================================================
     // HANDLERS
