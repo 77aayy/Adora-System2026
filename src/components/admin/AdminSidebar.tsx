@@ -30,14 +30,15 @@ import {
     Menu,
     X
 } from 'lucide-react';
-import { BookOpen, MessageCircle, Radio, Languages, Share2 } from 'lucide-react';
+import { BookOpen, MessageCircle, MessageSquare, Radio, Languages, Share2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { useTenant } from '../../context/TenantContext';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { useTheme } from '../../context/ThemeContext'; // ✅ Use theme context
 import { Branch } from '../../types';
-import { subscribeToTicketStatus, type SupportTicketStatus } from '../../services/supportTicketService';
+import { subscribeToTicketStatus, getUnrespondedTicketsCount, type SupportTicketStatus } from '../../services/supportTicketService';
+import { getAllTrialRequests } from '../../services/trialRequestService';
 
 interface AdminSidebarProps {
     isOwner: boolean;
@@ -56,6 +57,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     const { tenantId } = useTenant();
     const { isDark } = useTheme(); // ✅ Use theme context for live updates
     const [ticketStatus, setTicketStatus] = React.useState<SupportTicketStatus | null>(null);
+    const [pendingSubscriptionRequests, setPendingSubscriptionRequests] = React.useState<number>(0);
+    const [unrespondedTicketsCount, setUnrespondedTicketsCount] = React.useState<number>(0);
     
     // ✅ ADORA SMART SIDEBAR: Collapsed State Management
     const [isCollapsed, setIsCollapsed] = React.useState<boolean>(false);
@@ -124,6 +127,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 { to: '/owner-panel', icon: <ShieldCheck className="w-4 h-4" />, label: t('admin.ownerDashboard') || 'Owner Dashboard' },
                 { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: t('admin.createManager') || 'Create Manager' },
                 { to: '/owner-dashboard?tab=billing', icon: <DollarSign className="w-4 h-4" />, label: t('admin.billing') || 'Billing' },
+                { 
+                    to: '/owner-dashboard?tab=subscription-requests', 
+                    icon: <MessageSquare className="w-4 h-4" />, 
+                    label: t('admin.subscriptionRequests') || 'طلبات التجربة والاشتراك',
+                    badge: pendingSubscriptionRequests > 0 ? pendingSubscriptionRequests : undefined
+                },
                 { to: '/owner-dashboard?tab=demo', icon: <Share2 className="w-4 h-4" />, label: t('admin.demoLinks') || 'Demo Links' },
             ]
         },
@@ -145,7 +154,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     to: '/admin/support-tickets', 
                     icon: <Mail className="w-4 h-4" />, 
                     label: t('admin.supportTickets') || 'تذاكر الدعم',
-                    badge: ticketStatus && ticketStatus.unreadCount > 0 ? ticketStatus.unreadCount : undefined
+                    badge: isOwner 
+                        ? (unrespondedTicketsCount > 0 ? unrespondedTicketsCount : undefined)
+                        : (ticketStatus && ticketStatus.unreadCount > 0 ? ticketStatus.unreadCount : undefined)
                 }
             ]
         }
@@ -208,12 +219,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
         },
         {
             id: 'communications',
-            label: t('admin.communicationsAndAnnouncements') || 'الاتصالات والإعلانات',
+            label: t('admin.communicationsAndAnnouncements'),
             icon: <Bell className="w-4 h-4" style={{ color: 'var(--theme-accent-yellow)' }} />,
             items: [
-                { to: '/admin/manager-announcements', icon: <Bell className="w-4 h-4" />, label: t('admin.urgentMessages') || 'الرسائل العاجلة للأقسام' },
-                { to: '/admin/general-instructions', icon: <BookOpen className="w-4 h-4" />, label: t('admin.generalInstructions') || 'التعليمات العامة' },
-                ...(isWhatsAppEnabled ? [{ to: '/admin/whatsapp-templates', icon: <MessageCircle className="w-4 h-4" />, label: t('admin.whatsappTemplates') || 'نماذج WhatsApp' }] : []),
+                { to: '/admin/manager-announcements', icon: <Bell className="w-4 h-4" />, label: t('admin.urgentMessages') },
+                { to: '/admin/general-instructions', icon: <BookOpen className="w-4 h-4" />, label: t('admin.generalInstructions') },
+                ...(isWhatsAppEnabled ? [{ to: '/admin/whatsapp-templates', icon: <MessageCircle className="w-4 h-4" />, label: t('admin.whatsappTemplates') }] : []),
             ]
         },
         {
@@ -234,7 +245,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 { 
                     to: '/admin/support-tickets', 
                     icon: <Mail className="w-4 h-4" />, 
-                    label: t('admin.supportTickets') || 'تذاكر الدعم'
+                    label: t('admin.supportTickets') || 'تذاكر الدعم',
+                    badge: unrespondedTicketsCount > 0 ? unrespondedTicketsCount : undefined
                 }
             ]
         }
@@ -253,6 +265,47 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
 
         return () => unsub();
     }, [isOwner, tenantId]);
+
+    // ✅ Fetch pending subscription requests count (for owner only)
+    useEffect(() => {
+        if (!isOwner) return;
+
+        const fetchPendingRequests = async () => {
+            try {
+                const result = await getAllTrialRequests();
+                if (result.success && result.data) {
+                    const notContacted = result.data.filter(r => !r.contactedAt).length;
+                    setPendingSubscriptionRequests(notContacted);
+                }
+            } catch (err) {
+                // Silent fail - don't show error for badge count
+            }
+        };
+
+        fetchPendingRequests();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchPendingRequests, 30000);
+        return () => clearInterval(interval);
+    }, [isOwner]);
+
+    // ✅ Fetch unresponded support tickets count (for owner only - SaaS: from all tenants)
+    useEffect(() => {
+        if (!isOwner) return;
+
+        const fetchUnrespondedTickets = async () => {
+            try {
+                const count = await getUnrespondedTicketsCount();
+                setUnrespondedTicketsCount(count);
+            } catch (err) {
+                // Silent fail - don't show error for badge count
+            }
+        };
+
+        fetchUnrespondedTickets();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchUnrespondedTickets, 30000);
+        return () => clearInterval(interval);
+    }, [isOwner]);
 
     // ✅ Auto-expand section based on active route
     useEffect(() => {
@@ -276,10 +329,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     // ✅ ADORA SMART & FLUID SIDEBAR V5.2 - Premium Specifications
     return (
         <aside 
-            className={`flex flex-col h-screen overflow-hidden relative ${className}`} 
+            className={`flex flex-col min-h-screen relative ${className}`} 
             style={{ 
                 width: isCollapsed ? '80px' : '280px',
-                height: '100vh',
                 minHeight: '100vh',
                 background: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
                 backdropFilter: isDark ? 'blur(20px) saturate(180%)' : 'none',
@@ -438,9 +490,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 )}
             </div>
 
-            {/* 🔗 Navigation - ✅ Scrollable navigation items only */}
-            <div 
-                className="flex-1 min-h-0 overflow-hidden"
+            {/* 🔗 Navigation - ✅ Full height navigation (no scroll) */}
+            <div
+                className="flex-1"
                 style={{
                     padding: isCollapsed ? '12px 4px' : '16px 8px',
                     paddingBottom: '8px',
@@ -448,7 +500,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     flexDirection: 'column',
                 }}
             >
-                <nav className="space-y-1 flex-1 overflow-y-auto overflow-x-hidden" style={{ 
+                <nav className="space-y-1 flex-1 overflow-x-hidden" style={{ 
                     paddingRight: isCollapsed ? '0' : '4px',
                     marginRight: isCollapsed ? '0' : '-4px',
                 }}>
@@ -669,7 +721,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                             </div>
                                                         )}
                                                         {(item as any).badge && (item as any).badge > 0 && (
-                                                            <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[16px] sm:min-w-[18px] text-center flex-shrink-0">
+                                                            <span 
+                                                                className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[16px] sm:min-w-[18px] text-center flex-shrink-0 animate-pulse"
+                                                                style={{
+                                                                    animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                                                    boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)'
+                                                                }}
+                                                            >
                                                                 {(item as any).badge}
                                                             </span>
                                                         )}

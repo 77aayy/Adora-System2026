@@ -1,13 +1,7 @@
 /**
- * Branch Setup Wizard
- * Unified wizard for creating and configuring a new branch
+ * Branch Setup Wizard - Compact & Responsive
+ * Fixed-height modal with glassmorphism design
  * Adora Hotel Management System V3
- * 
- * Features:
- * - 4-step wizard flow
- * - Progress tracking with state persistence
- * - Resume incomplete setups
- * - Real-time validation
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -21,21 +15,19 @@ import {
     X,
     Plus,
     Trash2,
-    Save,
     AlertTriangle,
     Loader2,
     Sparkles,
     Settings,
     Play,
-    Edit2
 } from 'lucide-react';
 import { useTenant } from '../../context/TenantContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTenantBranches } from '../../hooks/useTenantData';
 import { addRoomType, getRoomTypes, RoomTypeConfig } from '../../services/pricingRulesService';
-import { addRoom, createRoomBatch } from '../../services/roomService';
+import { addRoom } from '../../services/roomService';
 import { haptic, playSound } from '../../utils/uxEffects';
 import { logger } from '../../services/loggerService';
-// ✅ Architecture: Use services instead of direct Firebase calls
 import { createBranch, updateBranch } from '../../services/branchService';
 import { Timestamp } from 'firebase/firestore';
 
@@ -74,46 +66,64 @@ interface BranchSetupWizardProps {
 // ============================================================
 
 const STEPS = [
-    { id: 1, title: 'بيانات الفرع', description: 'أدخل اسم وبيانات الفرع', icon: Building2 },
-    { id: 2, title: 'أنواع الغرف', description: 'حدد أنواع الغرف وأسعارها', icon: Layers },
-    { id: 3, title: 'إضافة الغرف', description: 'أضف الغرف للفرع', icon: DoorOpen },
-    { id: 4, title: 'التفعيل', description: 'راجع وفعّل الفرع', icon: CheckCircle },
+    { id: 1, title: 'بيانات الفرع', icon: Building2 },
+    { id: 2, title: 'أنواع الغرف', icon: Layers },
+    { id: 3, title: 'إضافة الغرف', icon: DoorOpen },
+    { id: 4, title: 'التفعيل', icon: CheckCircle },
 ];
 
-const STORAGE_KEY = 'adora_branch_setup_wizard';
+const ADORA_TURQUOISE = '#40E0D0';
 
 // ============================================================
 // HELPER FUNCTIONS
 // ============================================================
 
-const generateBranchCode = (): string => {
-    return Math.floor(1000 + Math.random() * 9000).toString();
-};
-
-const saveWizardState = (state: WizardState) => {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
-        logger.error('Error saving wizard state', e, 'BranchSetupWizard');
+/**
+ * Generate a unique branch code (1-4 digits) that is not already used
+ * Uses random generation to avoid predictable patterns
+ */
+const generateBranchCode = (usedCodes: string[]): string => {
+    const maxAttempts = 1000; // Limit attempts to avoid infinite loops
+    const usedSet = new Set(usedCodes); // Use Set for O(1) lookup
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        let code: string;
+        
+        // Randomly choose code length (weighted toward shorter codes)
+        const lengthChoice = Math.random();
+        
+        if (lengthChoice < 0.3) {
+            // 30% chance: 1 digit (1-9)
+            code = String(Math.floor(1 + Math.random() * 9));
+        } else if (lengthChoice < 0.6) {
+            // 30% chance: 2 digits (10-99)
+            code = String(Math.floor(10 + Math.random() * 90));
+        } else if (lengthChoice < 0.85) {
+            // 25% chance: 3 digits (100-999)
+            code = String(Math.floor(100 + Math.random() * 900));
+        } else {
+            // 15% chance: 4 digits (1000-9999)
+            code = String(Math.floor(1000 + Math.random() * 9000));
+        }
+        
+        // Check if code is not used
+        if (!usedSet.has(code)) {
+            return code;
+        }
     }
-};
-
-const loadWizardState = (): WizardState | null => {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-        logger.error('Error loading wizard state', e, 'BranchSetupWizard');
-        return null;
+    
+    // Fallback: Sequential search starting from random position
+    const startNum = Math.floor(1 + Math.random() * 9998);
+    for (let i = 0; i < 9999; i++) {
+        const num = ((startNum + i - 1) % 9999) + 1;
+        const code = String(num);
+        if (!usedSet.has(code)) {
+            return code;
+        }
     }
-};
-
-const clearWizardState = () => {
-    try {
-        localStorage.removeItem(STORAGE_KEY);
-    } catch (e) {
-        logger.error('Error clearing wizard state', e, 'BranchSetupWizard');
-    }
+    
+    // Last resort: random 4-digit (might conflict, but unlikely)
+    return String(Math.floor(1000 + Math.random() * 9000));
 };
 
 // ============================================================
@@ -126,16 +136,29 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
     onComplete,
     resumeState
 }) => {
-    const { tenantId } = useTenant();
+    const { tenantId, tenantInfo } = useTenant();
     const { user } = useAuth();
+    const { branches } = useTenantBranches();
 
-    // Initialize state
+    // Get license info
+    const maxBranches = (tenantInfo as any)?.maxBranches || (user?.role === 'owner' ? 999 : 1);
+    const activeBranches = useMemo(() => {
+        return branches.filter((b: any) => b.status !== 'scheduled_for_deletion');
+    }, [branches]);
+    const usedBranchesCount = activeBranches.length;
+    const remainingLicenses = maxBranches - usedBranchesCount;
+
+    // Get used branch codes
+    const usedCodes = useMemo(() => {
+        return branches.map(b => b.code).filter(Boolean) as string[];
+    }, [branches]);
+
     const initialState: WizardState = useMemo(() => ({
         currentStep: 1,
         branchId: null,
         branchData: {
             name: '',
-            code: generateBranchCode(),
+            code: generateBranchCode(usedCodes),
             location: ''
         },
         roomTypes: [],
@@ -143,67 +166,37 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
         isComplete: false,
         startedAt: new Date().toISOString(),
         lastUpdatedAt: new Date().toISOString()
-    }), []);
+    }), [usedCodes]);
 
     const [state, setState] = useState<WizardState>(resumeState || initialState);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [showResumePrompt, setShowResumePrompt] = useState(false);
-
-    // Check for saved state on mount
-    useEffect(() => {
-        if (isOpen && !resumeState) {
-            const saved = loadWizardState();
-            if (saved && !saved.isComplete) {
-                setShowResumePrompt(true);
-            }
-        }
-    }, [isOpen, resumeState]);
-
-    // Auto-save state on changes
-    useEffect(() => {
-        if (isOpen && state.branchData.name) {
-            saveWizardState({
-                ...state,
-                lastUpdatedAt: new Date().toISOString()
-            });
-        }
-    }, [state, isOpen]);
 
     // Calculate progress percentage
     const progressPercentage = useMemo(() => {
         let progress = 0;
-        
-        // Step 1: Branch data (25%)
         if (state.branchData.name) progress += 25;
-        
-        // Step 2: Room types (25%)
         if (state.roomTypes.length > 0) progress += 25;
-        
-        // Step 3: Rooms (25%)
         if (state.rooms.length > 0) progress += 25;
-        
-        // Step 4: Activation (25%)
         if (state.isComplete) progress += 25;
-        
         return progress;
     }, [state]);
 
     // Navigation handlers
     const canGoNext = useMemo(() => {
         switch (state.currentStep) {
-            case 1:
+            case 1: 
+                // Check license limit for managers
+                if (user?.role !== 'owner' && remainingLicenses <= 0) {
+                    return false;
+                }
                 return state.branchData.name.trim().length >= 2;
-            case 2:
-                return state.roomTypes.length > 0;
-            case 3:
-                return state.rooms.length > 0;
-            case 4:
-                return true;
-            default:
-                return false;
+            case 2: return state.roomTypes.length > 0;
+            case 3: return state.rooms.length > 0;
+            case 4: return true;
+            default: return false;
         }
-    }, [state]);
+    }, [state, remainingLicenses, user?.role]);
 
     const handleNext = async () => {
         if (!canGoNext) return;
@@ -211,15 +204,12 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
         setIsLoading(true);
 
         try {
-            // Step-specific logic
             if (state.currentStep === 1 && !state.branchId) {
-                // Create branch in Firestore
                 if (!tenantId) throw new Error('لم يتم تحديد المؤسسة');
                 
-                // ✅ Architecture: Use service instead of direct Firebase call
-                // ✅ Null Safety: Check required params
-                if (!tenantId) {
-                    throw new Error('لم يتم تحديد المؤسسة');
+                // Check license limit (only for managers, not owner)
+                if (user?.role !== 'owner' && remainingLicenses <= 0) {
+                    throw new Error(`عفواً، لقد وصلت للحد الأقصى للفروع (${maxBranches}). يرجى التواصل مع المالك لزيادة عدد التراخيص.`);
                 }
 
                 const result = await createBranch(tenantId, {
@@ -238,17 +228,14 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                     throw new Error(result.error || 'Failed to create branch');
                 }
 
-                const branchRef = { id: result.branchId };
-
                 setState(prev => ({
                     ...prev,
-                    branchId: branchRef.id,
+                    branchId: result.branchId,
                     currentStep: prev.currentStep + 1
                 }));
                 
                 haptic('success');
             } else if (state.currentStep === 2) {
-                // Save room types to Firestore
                 if (!tenantId || !state.branchId) throw new Error('لم يتم تحديد الفرع');
                 
                 for (const type of state.roomTypes) {
@@ -264,7 +251,6 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                     }
                 }
                 
-                // Reload types with IDs
                 const savedTypes = await getRoomTypes(tenantId, state.branchId);
                 setState(prev => ({
                     ...prev,
@@ -274,7 +260,6 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                 
                 haptic('success');
             } else if (state.currentStep === 3) {
-                // Save rooms to Firestore
                 if (!tenantId || !state.branchId) throw new Error('لم يتم تحديد الفرع');
                 
                 for (const room of state.rooms) {
@@ -325,12 +310,6 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
         try {
             if (!tenantId || !state.branchId) throw new Error('لم يتم تحديد الفرع');
 
-            // ✅ Architecture: Use service instead of direct Firebase call
-            // ✅ Null Safety: Check required params
-            if (!tenantId || !state.branchId) {
-                throw new Error('لم يتم تحديد الفرع');
-            }
-
             const result = await updateBranch(tenantId, state.branchId, {
                 status: 'active',
                 setupCompletedAt: Timestamp.now() as any
@@ -345,13 +324,10 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                 isComplete: true
             }));
 
-            clearWizardState();
             haptic('success');
             playSound('success');
-
             onComplete?.(state.branchId);
             
-            // Show success and close after delay
             setTimeout(() => {
                 onClose();
             }, 2000);
@@ -364,141 +340,129 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
         }
     };
 
-    const handleResume = () => {
-        const saved = loadWizardState();
-        if (saved) {
-            setState(saved);
-        }
-        setShowResumePrompt(false);
-    };
-
-    const handleStartFresh = () => {
-        clearWizardState();
-        setState(initialState);
-        setShowResumePrompt(false);
-    };
-
-    const handleClose = () => {
-        // Save state before closing if in progress
-        if (state.branchData.name && !state.isComplete) {
-            saveWizardState(state);
-        }
-        onClose();
-    };
-
     if (!isOpen) return null;
 
     return (
         <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0, 0, 0, 0.85)' }}
+            className="fixed inset-0 flex items-center justify-center p-2 sm:p-4"
+            style={{ 
+                background: 'var(--theme-bg-overlay)',
+                backdropFilter: 'blur(8px)',
+                zIndex: 9999,
+            }}
         >
+            {/* Fixed-height modal with glassmorphism */}
             <div 
-                className="w-full max-w-md sm:max-w-lg lg:max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl animate-in zoom-in-95 duration-300"
+                className="w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col"
                 style={{ 
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                    height: '90vh',
+                    maxHeight: '700px',
+                    background: 'var(--theme-bg-secondary)',
+                    backdropFilter: 'blur(20px) saturate(180%)',
+                    border: `1px solid ${ADORA_TURQUOISE}40`,
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    zIndex: 9999,
                 }}
             >
-                {/* Resume Prompt Modal */}
-                {showResumePrompt && (
-                    <ResumePromptModal
-                        onResume={handleResume}
-                        onStartFresh={handleStartFresh}
-                    />
-                )}
-
-                {/* Header with Progress */}
+                {/* Header */}
                 <div 
-                    className="relative px-6 py-4"
-                    style={{ 
-                        background: 'linear-gradient(135deg, var(--theme-accent-teal) 0%, var(--theme-accent-cyan) 100%)'
-                    }}
+                    className="flex-shrink-0 px-4 sm:px-6 py-4 border-b"
+                    style={{ borderColor: `${ADORA_TURQUOISE}40` }}
                 >
-                    {/* Close Button */}
-                    <button
-                        onClick={handleClose}
-                        className="absolute top-4 left-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
-                    >
-                        <X className="w-5 h-5 text-white" />
-                    </button>
-
-                    <div className="text-center text-white">
-                        <h2 className="text-xl font-bold mb-1">معالج إعداد الفرع</h2>
-                        <p className="text-white/80 text-sm">اتبع الخطوات لإنشاء وتجهيز فرعك الجديد</p>
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="font-bold" style={{ fontSize: 'clamp(1rem, 2vw, 1.25rem)', color: 'var(--theme-text-primary)' }}>
+                            معالج إعداد الفرع
+                        </h2>
+                        <button
+                            onClick={onClose}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                            style={{ 
+                                color: 'var(--theme-text-primary)',
+                                background: 'var(--theme-bg-tertiary)',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--theme-bg-elevated)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--theme-bg-tertiary)'}
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="mt-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-white/80 text-xs">التقدم</span>
-                            <span className="text-white font-bold text-sm">{progressPercentage}%</span>
-                        </div>
-                        <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div 
-                                className="h-full bg-white rounded-full transition-all duration-500 ease-out"
-                                style={{ width: `${progressPercentage}%` }}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Steps Navigation */}
-                <div 
-                    className="px-6 py-3 flex items-center justify-center gap-2 border-b"
-                    style={{ 
-                        background: 'var(--theme-bg-secondary)',
-                        borderColor: 'var(--theme-border-primary)'
-                    }}
-                >
-                    {STEPS.map((step, index) => {
-                        const StepIcon = step.icon;
-                        const isActive = state.currentStep === step.id;
-                        const isCompleted = state.currentStep > step.id;
-                        
-                        return (
-                            <React.Fragment key={step.id}>
-                                <div 
-                                    className={`
-                                        flex items-center gap-2 px-3 py-2 rounded-lg transition-all
-                                        ${isActive ? 'bg-teal-500/20 text-teal-600' : 
-                                          isCompleted ? 'text-teal-500' : 
-                                          'text-slate-400'}
-                                    `}
-                                >
-                                    <div className={`
-                                        w-8 h-8 rounded-full flex items-center justify-center
-                                        ${isActive ? 'bg-teal-500 text-white' : 
-                                          isCompleted ? 'bg-teal-500/20 text-teal-500' : 
-                                          'bg-slate-200 dark:bg-slate-700'}
-                                    `}>
-                                        {isCompleted ? (
-                                            <CheckCircle className="w-5 h-5" />
-                                        ) : (
-                                            <StepIcon className="w-4 h-4" />
-                                        )}
-                                    </div>
-                                    <div className="hidden sm:block">
-                                        <div className={`text-sm font-medium ${isActive ? 'text-teal-600 dark:text-teal-400' : ''}`}>
-                                            {step.title}
+                    {/* Compact Horizontal Stepper (Desktop) / Circular Progress (Mobile) */}
+                    <div className="hidden sm:flex items-center justify-between gap-2">
+                        {STEPS.map((step, index) => {
+                            const StepIcon = step.icon;
+                            const isActive = state.currentStep === step.id;
+                            const isCompleted = state.currentStep > step.id;
+                            
+                            return (
+                                <React.Fragment key={step.id}>
+                                    <div 
+                                        className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all"
+                                        style={{
+                                            background: isActive ? `${ADORA_TURQUOISE}20` : 'transparent',
+                                        }}
+                                    >
+                                        <div 
+                                            className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                                            style={{
+                                                background: isActive || isCompleted ? ADORA_TURQUOISE : 'var(--theme-bg-tertiary)',
+                                                color: isActive || isCompleted ? '#fff' : 'var(--theme-text-secondary)',
+                                            }}
+                                        >
+                                            {isCompleted ? (
+                                                <CheckCircle className="w-4 h-4" />
+                                            ) : (
+                                                <StepIcon className="w-3 h-3" />
+                                            )}
                                         </div>
+                                        <span 
+                                            className="text-xs font-medium truncate"
+                                            style={{
+                                                color: isActive || isCompleted ? ADORA_TURQUOISE : 'var(--theme-text-secondary)',
+                                            }}
+                                        >
+                                            {step.title}
+                                        </span>
                                     </div>
-                                </div>
-                                {index < STEPS.length - 1 && (
-                                    <div className={`w-8 h-0.5 ${isCompleted ? 'bg-teal-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
-                                )}
-                            </React.Fragment>
-                        );
-                    })}
+                                    {index < STEPS.length - 1 && (
+                                        <div 
+                                            className="w-4 h-0.5"
+                                            style={{
+                                                background: isCompleted ? ADORA_TURQUOISE : 'var(--theme-border-primary)',
+                                            }}
+                                        />
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
+                    </div>
+
+                    {/* Circular Progress Mini-Indicator (Mobile) */}
+                    <div className="sm:hidden flex items-center justify-center gap-2">
+                        <div 
+                            className="relative w-10 h-10 rounded-full flex items-center justify-center"
+                            style={{
+                                background: `conic-gradient(${ADORA_TURQUOISE} ${progressPercentage * 3.6}deg, var(--theme-border-primary) 0deg)`,
+                            }}
+                        >
+                            <div className="absolute inset-1 rounded-full" style={{ background: 'var(--theme-bg-secondary)' }} />
+                            <span className="relative text-xs font-bold z-10" style={{ color: 'var(--theme-text-primary)' }}>{state.currentStep}/{STEPS.length}</span>
+                        </div>
+                        <span className="text-sm" style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', color: 'var(--theme-text-primary)' }}>
+                            {STEPS.find(s => s.id === state.currentStep)?.title}
+                        </span>
+                    </div>
                 </div>
 
-                {/* Content Area */}
-                <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 280px)' }}>
+                {/* Scrollable Content Area */}
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4" style={{ minHeight: 0 }}>
                     {error && (
-                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-600 dark:text-red-400">
-                            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                            <span className="text-sm">{error}</span>
+                        <div className="mb-3 p-3 rounded-lg flex items-center gap-2" style={{ 
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                        }}>
+                            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                            <span className="text-sm text-red-400">{error}</span>
                         </div>
                     )}
 
@@ -507,6 +471,12 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                         <Step1BranchInfo 
                             data={state.branchData}
                             onChange={(data) => setState(prev => ({ ...prev, branchData: data }))}
+                            usedCodes={usedCodes}
+                            generateCode={() => generateBranchCode(usedCodes)}
+                            maxBranches={maxBranches}
+                            usedBranchesCount={usedBranchesCount}
+                            remainingLicenses={remainingLicenses}
+                            isOwner={user?.role === 'owner'}
                         />
                     )}
 
@@ -533,49 +503,49 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                     )}
                 </div>
 
-                {/* Footer with Navigation */}
+                {/* Sticky Footer with Navigation Buttons */}
                 <div 
-                    className="px-6 py-4 flex items-center justify-between border-t"
+                    className="flex-shrink-0 px-4 sm:px-6 py-3 flex items-center justify-between border-t gap-2"
                     style={{ 
+                        borderColor: `${ADORA_TURQUOISE}40`,
                         background: 'var(--theme-bg-secondary)',
-                        borderColor: 'var(--theme-border-primary)'
                     }}
                 >
                     <button
                         onClick={handleBack}
                         disabled={state.currentStep === 1 || isLoading}
-                        className={`
-                            flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                            ${state.currentStep === 1 
-                                ? 'opacity-50 cursor-not-allowed text-slate-400' 
-                                : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'}
-                        `}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                            background: state.currentStep === 1 ? 'transparent' : 'var(--theme-bg-tertiary)',
+                            color: state.currentStep === 1 ? 'var(--theme-text-disabled)' : 'var(--theme-text-primary)',
+                            border: state.currentStep === 1 ? 'none' : `1px solid var(--theme-border-primary)`,
+                        }}
                     >
-                        <ChevronRight className="w-5 h-5" />
-                        <span>السابق</span>
+                        <ChevronRight className="w-4 h-4" />
+                        <span className="hidden sm:inline" style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)' }}>السابق</span>
                     </button>
 
-                    <div className="text-sm text-slate-500">
-                        الخطوة {state.currentStep} من {STEPS.length}
-                    </div>
+                    <span className="text-xs" style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.75rem)', color: 'var(--theme-text-secondary)' }}>
+                        {state.currentStep} / {STEPS.length}
+                    </span>
 
                     {state.currentStep < 4 ? (
                         <button
                             onClick={handleNext}
                             disabled={!canGoNext || isLoading}
-                            className={`
-                                flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all
-                                ${!canGoNext || isLoading
-                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
-                                    : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20'}
-                            `}
+                            className="flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                                background: !canGoNext || isLoading ? 'var(--theme-bg-tertiary)' : ADORA_TURQUOISE,
+                                color: !canGoNext || isLoading ? 'var(--theme-text-disabled)' : '#fff',
+                                fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                            }}
                         >
                             {isLoading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                                 <>
                                     <span>التالي</span>
-                                    <ChevronLeft className="w-5 h-5" />
+                                    <ChevronLeft className="w-4 h-4" />
                                 </>
                             )}
                         </button>
@@ -583,25 +553,23 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
                         <button
                             onClick={handleActivate}
                             disabled={isLoading || state.isComplete}
-                            className={`
-                                flex items-center gap-2 px-6 py-2 rounded-lg font-medium transition-all
-                                ${state.isComplete
-                                    ? 'bg-green-500 text-white' 
-                                    : isLoading
-                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-green-500/20'}
-                            `}
+                            className="flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                                background: state.isComplete ? '#10b981' : isLoading ? 'var(--theme-bg-tertiary)' : '#10b981',
+                                color: state.isComplete || !isLoading ? '#fff' : 'var(--theme-text-disabled)',
+                                fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                            }}
                         >
                             {isLoading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <Loader2 className="w-4 h-4 animate-spin" />
                             ) : state.isComplete ? (
                                 <>
-                                    <CheckCircle className="w-5 h-5" />
+                                    <CheckCircle className="w-4 h-4" />
                                     <span>تم التفعيل!</span>
                                 </>
                             ) : (
                                 <>
-                                    <Play className="w-5 h-5" />
+                                    <Play className="w-4 h-4" />
                                     <span>تفعيل الفرع</span>
                                 </>
                             )}
@@ -614,138 +582,150 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
 };
 
 // ============================================================
-// RESUME PROMPT MODAL
-// ============================================================
-
-const ResumePromptModal: React.FC<{
-    onResume: () => void;
-    onStartFresh: () => void;
-}> = ({ onResume, onStartFresh }) => (
-    <div 
-        className="absolute inset-0 z-10 flex items-center justify-center"
-        style={{ background: 'rgba(0, 0, 0, 0.85)' }}
-    >
-        <div 
-            className="max-w-md p-6 rounded-2xl text-center"
-            style={{ 
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-            }}
-        >
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <AlertTriangle className="w-8 h-8 text-amber-500" />
-            </div>
-            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
-                يوجد إعداد غير مكتمل
-            </h3>
-            <p className="text-sm mb-6" style={{ color: 'var(--theme-text-secondary)' }}>
-                لديك إعداد فرع سابق لم يكتمل. هل تريد المتابعة من حيث توقفت؟
-            </p>
-            <div className="flex gap-3">
-                <button
-                    onClick={onStartFresh}
-                    className="flex-1 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                    البدء من جديد
-                </button>
-                <button
-                    onClick={onResume}
-                    className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 transition-colors"
-                >
-                    استئناف
-                </button>
-            </div>
-        </div>
-    </div>
-);
-
-// ============================================================
 // STEP 1: BRANCH INFO
 // ============================================================
 
 const Step1BranchInfo: React.FC<{
     data: WizardState['branchData'];
     onChange: (data: WizardState['branchData']) => void;
-}> = ({ data, onChange }) => (
-    <div className="space-y-6">
-        <div className="text-center mb-8">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center">
-                <Building2 className="w-10 h-10 text-teal-500" />
-            </div>
-            <h3 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
-                بيانات الفرع الأساسية
-            </h3>
-            <p className="text-sm mt-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                أدخل اسم الفرع وبياناته الأساسية
-            </p>
+    usedCodes: string[];
+    generateCode: () => string;
+    maxBranches: number;
+    usedBranchesCount: number;
+    remainingLicenses: number;
+    isOwner?: boolean;
+}> = ({ data, onChange, usedCodes, generateCode, maxBranches, usedBranchesCount, remainingLicenses, isOwner }) => (
+    <div className="space-y-4">
+        <div className="text-center mb-4">
+            <Building2 className="w-12 h-12 mx-auto mb-2" style={{ color: ADORA_TURQUOISE }} />
+                <h3 className="font-bold mb-1" style={{ fontSize: 'clamp(1rem, 2vw, 1.125rem)', color: 'var(--theme-text-primary)' }}>
+                    بيانات الفرع الأساسية
+                </h3>
         </div>
 
-        <div className="max-w-md mx-auto space-y-4">
+        {/* License Info Card */}
+        {!isOwner && (
+            <div 
+                className="p-3 rounded-lg border"
+                style={{ 
+                    background: remainingLicenses > 0 ? `${ADORA_TURQUOISE}10` : 'rgba(239, 68, 68, 0.1)',
+                    borderColor: remainingLicenses > 0 ? `${ADORA_TURQUOISE}30` : 'rgba(239, 68, 68, 0.3)',
+                }}
+            >
+                <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium" style={{ color: 'var(--theme-text-primary)' }}>
+                        التراخيص المتاحة:
+                    </span>
+                    <span 
+                        className="text-sm font-bold"
+                        style={{ 
+                            color: remainingLicenses > 0 ? ADORA_TURQUOISE : '#ef4444'
+                        }}
+                    >
+                        {usedBranchesCount} / {maxBranches}
+                    </span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div 
+                        className="flex-1 h-2 rounded-full overflow-hidden"
+                        style={{ background: 'var(--theme-bg-tertiary)' }}
+                    >
+                        <div 
+                            className="h-full rounded-full transition-all"
+                            style={{
+                                width: `${(usedBranchesCount / maxBranches) * 100}%`,
+                                background: remainingLicenses > 0 ? ADORA_TURQUOISE : '#ef4444',
+                            }}
+                        />
+                    </div>
+                    <span 
+                        className="text-xs font-medium whitespace-nowrap"
+                        style={{ 
+                            color: remainingLicenses > 0 ? 'var(--theme-text-secondary)' : '#ef4444'
+                        }}
+                    >
+                        {remainingLicenses > 0 ? `متبقي ${remainingLicenses}` : 'لا يوجد تراخيص'}
+                    </span>
+                </div>
+            </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Branch Name */}
-            <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text-primary)' }}>
-                    اسم الفرع <span className="text-red-500">*</span>
+            <div className="sm:col-span-2">
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--theme-text-primary)' }}>
+                    اسم الفرع <span className="text-red-400">*</span>
                 </label>
                 <input
                     type="text"
                     value={data.name}
                     onChange={(e) => onChange({ ...data, name: e.target.value })}
                     placeholder="مثال: فرع الكورنيش"
-                    className="w-full px-4 py-3 rounded-xl border-2 transition-all focus:ring-2 focus:ring-teal-500/20"
+                    className="w-full px-3 py-2.5 rounded-lg border transition-all focus:ring-2 focus:ring-teal-500/20"
                     style={{
                         background: 'var(--theme-bg-tertiary)',
-                        borderColor: 'var(--theme-border-primary)',
-                        color: 'var(--theme-text-primary)'
+                        borderColor: `${ADORA_TURQUOISE}40`,
+                        color: 'var(--theme-text-primary)',
+                        fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
                     }}
                 />
             </div>
 
-            {/* Branch Code (Auto-generated) */}
+            {/* Branch Code */}
             <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text-primary)' }}>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--theme-text-primary)' }}>
                     كود الفرع
-                    <span className="text-xs font-normal text-slate-400 mr-2">(يُستخدم لتسجيل الدخول)</span>
                 </label>
-                <div className="relative">
-                    <input
-                        type="text"
-                        value={data.code}
-                        onChange={(e) => onChange({ ...data, code: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                        placeholder="كود رقمي من 4 أرقام"
-                        className="w-full px-4 py-3 rounded-xl border-2 transition-all focus:ring-2 focus:ring-teal-500/20"
-                        style={{
-                            background: 'var(--theme-bg-tertiary)',
-                            borderColor: 'var(--theme-border-primary)',
-                            color: 'var(--theme-text-primary)'
-                        }}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => onChange({ ...data, code: generateBranchCode() })}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 px-3 py-1 text-xs bg-teal-500/10 text-teal-600 rounded-lg hover:bg-teal-500/20 transition-colors"
-                    >
-                        توليد تلقائي
-                    </button>
-                </div>
+                <input
+                    type="text"
+                    value={data.code}
+                    onChange={(e) => onChange({ ...data, code: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                    placeholder="من 1 إلى 4 أرقام"
+                    className="w-full px-3 py-2.5 rounded-lg border transition-all focus:ring-2 focus:ring-teal-500/20 font-mono"
+                    style={{
+                        background: 'var(--theme-bg-tertiary)',
+                        borderColor: `${ADORA_TURQUOISE}40`,
+                        color: 'var(--theme-text-primary)',
+                        fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                    }}
+                />
+                <button
+                    type="button"
+                    onClick={() => onChange({ ...data, code: generateCode() })}
+                    className="mt-1.5 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5"
+                    style={{
+                        background: `${ADORA_TURQUOISE}15`,
+                        color: ADORA_TURQUOISE,
+                        border: `1px solid ${ADORA_TURQUOISE}30`,
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = `${ADORA_TURQUOISE}25`;
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = `${ADORA_TURQUOISE}15`;
+                    }}
+                >
+                    <Sparkles className="w-3 h-3" />
+                    اقتراح كود غير مستخدم
+                </button>
             </div>
 
-            {/* Location (Optional) */}
+            {/* Location */}
             <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text-primary)' }}>
-                    الموقع
-                    <span className="text-xs font-normal text-slate-400 mr-2">(اختياري)</span>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--theme-text-primary)' }}>
+                    الموقع <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>(اختياري)</span>
                 </label>
                 <input
                     type="text"
                     value={data.location}
                     onChange={(e) => onChange({ ...data, location: e.target.value })}
-                    placeholder="مثال: شارع الملك فهد، جدة"
-                    className="w-full px-4 py-3 rounded-xl border-2 transition-all focus:ring-2 focus:ring-teal-500/20"
+                    placeholder="شارع الملك فهد، جدة"
+                    className="w-full px-3 py-2.5 rounded-lg border transition-all focus:ring-2 focus:ring-teal-500/20"
                     style={{
                         background: 'var(--theme-bg-tertiary)',
-                        borderColor: 'var(--theme-border-primary)',
-                        color: 'var(--theme-text-primary)'
+                        borderColor: `${ADORA_TURQUOISE}40`,
+                        color: 'var(--theme-text-primary)',
+                        fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
                     }}
                 />
             </div>
@@ -773,7 +753,7 @@ const Step2RoomTypes: React.FC<{
         onChange([
             ...types,
             {
-                id: '', // Will be assigned by Firestore
+                id: '',
                 name: newType.name,
                 basePrice: newType.basePrice,
                 maxOccupancy: newType.maxOccupancy,
@@ -784,43 +764,27 @@ const Step2RoomTypes: React.FC<{
         setNewType({ name: '', basePrice: 0, maxOccupancy: 2 });
     };
 
-    const handleRemove = (index: number) => {
-        onChange(types.filter((_, i) => i !== index));
-    };
-
     const presetTypes = [
         { name: 'غرفة عادية', basePrice: 200, maxOccupancy: 2 },
         { name: 'غرفة توأم', basePrice: 250, maxOccupancy: 2 },
         { name: 'غرفة كينج', basePrice: 300, maxOccupancy: 2 },
         { name: 'ستوديو', basePrice: 350, maxOccupancy: 3 },
-        { name: 'جناح (غرفة وصالة)', basePrice: 450, maxOccupancy: 4 },
-        { name: 'جناح كبير (غرفتين وصالة)', basePrice: 600, maxOccupancy: 6 },
+        { name: 'جناح', basePrice: 450, maxOccupancy: 4 },
         { name: 'VIP', basePrice: 800, maxOccupancy: 4 },
     ];
 
     return (
-        <div className="space-y-6">
-            <div className="text-center mb-6">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-                    <Layers className="w-10 h-10 text-purple-500" />
-                </div>
-                <h3 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+        <div className="space-y-4">
+            <div className="text-center mb-4">
+                <Layers className="w-12 h-12 mx-auto mb-2" style={{ color: ADORA_TURQUOISE }} />
+                <h3 className="font-bold mb-1" style={{ fontSize: 'clamp(1rem, 2vw, 1.125rem)', color: 'var(--theme-text-primary)' }}>
                     أنواع الغرف والأسعار
                 </h3>
-                <p className="text-sm mt-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                    حدد أنواع الغرف المتاحة وأسعارها الأساسية
-                </p>
             </div>
 
-            {/* Quick Add Presets */}
-            <div 
-                className="p-4 rounded-xl"
-                style={{ background: 'var(--theme-bg-secondary)' }}
-            >
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    إضافة سريعة (اختر من القائمة)
-                </h4>
+            {/* Quick Presets */}
+            <div className="p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(64, 224, 208, 0.2)' }}>
+                <p className="text-xs font-medium mb-2" style={{ color: 'var(--theme-text-primary)' }}>إضافة سريعة:</p>
                 <div className="flex flex-wrap gap-2">
                     {presetTypes.map((preset) => {
                         const alreadyAdded = types.some(t => t.name === preset.name);
@@ -829,14 +793,13 @@ const Step2RoomTypes: React.FC<{
                                 key={preset.name}
                                 onClick={() => !alreadyAdded && onChange([...types, { ...preset, id: '', active: true }])}
                                 disabled={alreadyAdded}
-                                className={`
-                                    px-3 py-1.5 rounded-lg text-sm transition-all
-                                    ${alreadyAdded 
-                                        ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-600 cursor-default' 
-                                        : 'bg-slate-100 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-teal-900/20 text-slate-600 dark:text-slate-300'}
-                                `}
+                                className="px-2.5 py-1.5 rounded-lg text-xs transition-all disabled:opacity-50"
+                                style={{
+                                    background: alreadyAdded ? `${ADORA_TURQUOISE}30` : 'rgba(255, 255, 255, 0.05)',
+                                    color: alreadyAdded ? ADORA_TURQUOISE : 'var(--theme-text-primary)',
+                                    border: `1px solid ${alreadyAdded ? ADORA_TURQUOISE : `${ADORA_TURQUOISE}40`}`,
+                                }}
                             >
-                                {alreadyAdded && <CheckCircle className="w-3 h-3 inline ml-1" />}
                                 {preset.name}
                             </button>
                         );
@@ -844,103 +807,90 @@ const Step2RoomTypes: React.FC<{
                 </div>
             </div>
 
-            {/* Added Types List */}
+            {/* Custom Type Form */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(64, 224, 208, 0.2)' }}>
+                <input
+                    type="text"
+                    value={newType.name}
+                    onChange={(e) => setNewType({ ...newType, name: e.target.value })}
+                    placeholder="اسم النوع"
+                    className="px-3 py-2 rounded-lg border"
+                    style={{
+                        background: 'var(--theme-bg-tertiary)',
+                        borderColor: `${ADORA_TURQUOISE}40`,
+                        color: 'var(--theme-text-inverse)',
+                        fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                    }}
+                />
+                <input
+                    type="number"
+                    value={newType.basePrice || ''}
+                    onChange={(e) => setNewType({ ...newType, basePrice: Number(e.target.value) })}
+                    placeholder="السعر"
+                    className="px-3 py-2 rounded-lg border"
+                    style={{
+                        background: 'var(--theme-bg-tertiary)',
+                        borderColor: `${ADORA_TURQUOISE}40`,
+                        color: 'var(--theme-text-inverse)',
+                        fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                    }}
+                />
+                <input
+                    type="number"
+                    value={newType.maxOccupancy || ''}
+                    onChange={(e) => setNewType({ ...newType, maxOccupancy: Number(e.target.value) })}
+                    placeholder="السعة"
+                    className="px-3 py-2 rounded-lg border"
+                    style={{
+                        background: 'var(--theme-bg-tertiary)',
+                        borderColor: `${ADORA_TURQUOISE}40`,
+                        color: 'var(--theme-text-inverse)',
+                        fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                    }}
+                />
+                <button
+                    onClick={handleAdd}
+                    disabled={!newType.name || newType.basePrice <= 0}
+                    className="px-3 py-2 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    style={{
+                        background: !newType.name || newType.basePrice <= 0 ? 'rgba(255, 255, 255, 0.05)' : ADORA_TURQUOISE,
+                        color: 'var(--theme-text-inverse)',
+                        fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                    }}
+                >
+                    <Plus className="w-4 h-4" />
+                    إضافة
+                </button>
+            </div>
+
+            {/* Types List */}
             {types.length > 0 && (
-                <div className="space-y-3">
-                    <h4 className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                        الأنواع المضافة ({types.length})
-                    </h4>
+                <div className="space-y-2">
                     {types.map((type, index) => (
                         <div 
                             key={index}
-                            className="p-4 rounded-xl flex items-center justify-between"
-                            style={{ 
-                                background: 'var(--theme-bg-secondary)',
-                                border: '1px solid var(--theme-border-primary)'
-                            }}
+                            className="p-3 rounded-lg flex items-center justify-between"
+                            style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(64, 224, 208, 0.2)' }}
                         >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center">
-                                    <DoorOpen className="w-5 h-5 text-teal-500" />
+                            <div>
+                                <div className="font-medium" style={{ fontSize: 'clamp(0.875rem, 1.5vw, 1rem)', color: 'var(--theme-text-primary)' }}>
+                                    {type.name}
                                 </div>
-                                <div>
-                                    <div className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                                        {type.name}
-                                    </div>
-                                    <div className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
-                                        السعر: {type.basePrice} ر.س | السعة: {type.maxOccupancy} أشخاص
-                                    </div>
+                                <div className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    {type.basePrice} ر.س | {type.maxOccupancy} أشخاص
                                 </div>
                             </div>
                             <button
-                                onClick={() => handleRemove(index)}
-                                className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-colors"
+                                onClick={() => onChange(types.filter((_, i) => i !== index))}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                                style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444' }}
                             >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5" />
                             </button>
                         </div>
                     ))}
                 </div>
             )}
-
-            {/* Custom Type Form */}
-            <div 
-                className="p-4 rounded-xl"
-                style={{ 
-                    background: 'var(--theme-bg-secondary)',
-                    border: '1px solid var(--theme-border-primary)'
-                }}
-            >
-                <h4 className="text-sm font-medium mb-4 flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
-                    <Plus className="w-4 h-4" />
-                    إضافة نوع مخصص
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    <div className="sm:col-span-2">
-                        <input
-                            type="text"
-                            value={newType.name}
-                            onChange={(e) => setNewType({ ...newType, name: e.target.value })}
-                            placeholder="اسم النوع"
-                            className="w-full px-4 py-2 rounded-lg border"
-                            style={{
-                                background: 'var(--theme-bg-tertiary)',
-                                borderColor: 'var(--theme-border-primary)',
-                                color: 'var(--theme-text-primary)'
-                            }}
-                        />
-                    </div>
-                    <div>
-                        <input
-                            type="number"
-                            value={newType.basePrice || ''}
-                            onChange={(e) => setNewType({ ...newType, basePrice: Number(e.target.value) })}
-                            placeholder="السعر"
-                            className="w-full px-4 py-2 rounded-lg border"
-                            style={{
-                                background: 'var(--theme-bg-tertiary)',
-                                borderColor: 'var(--theme-border-primary)',
-                                color: 'var(--theme-text-primary)'
-                            }}
-                        />
-                    </div>
-                    <div>
-                        <button
-                            onClick={handleAdd}
-                            disabled={!newType.name || newType.basePrice <= 0}
-                            className={`
-                                w-full px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2
-                                ${!newType.name || newType.basePrice <= 0
-                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                    : 'bg-teal-500 text-white hover:bg-teal-600'}
-                            `}
-                        >
-                            <Plus className="w-4 h-4" />
-                            إضافة
-                        </button>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 };
@@ -963,7 +913,6 @@ const Step3AddRooms: React.FC<{
         type: ''
     });
 
-    // Set default type if types available
     useEffect(() => {
         if (roomTypes.length > 0 && !singleRoom.type) {
             setSingleRoom(prev => ({ ...prev, type: roomTypes[0].name }));
@@ -973,7 +922,6 @@ const Step3AddRooms: React.FC<{
 
     const handleAddSingle = () => {
         if (!singleRoom.number || !singleRoom.type) return;
-        
         onChange([...rooms, { ...singleRoom }]);
         setSingleRoom({ number: '', floor: singleRoom.floor, type: singleRoom.type });
     };
@@ -999,475 +947,269 @@ const Step3AddRooms: React.FC<{
         }));
     };
 
-    const handleRemoveRoom = (index: number) => {
-        onChange(rooms.filter((_, i) => i !== index));
-    };
-
-    const handleClearAll = () => {
-        onChange([]);
-    };
-
-    // Group rooms by floor for display
-    const roomsByFloor = useMemo(() => {
-        const grouped: Record<number, typeof rooms> = {};
-        rooms.forEach(room => {
-            if (!grouped[room.floor]) grouped[room.floor] = [];
-            grouped[room.floor].push(room);
-        });
-        return grouped;
-    }, [rooms]);
-
     return (
-        <div className="space-y-6">
-            <div className="text-center mb-6">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
-                    <DoorOpen className="w-10 h-10 text-blue-500" />
-                </div>
-                <h3 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+        <div className="space-y-4">
+            <div className="text-center mb-4">
+                <DoorOpen className="w-12 h-12 mx-auto mb-2" style={{ color: ADORA_TURQUOISE }} />
+                <h3 className="font-bold mb-1" style={{ fontSize: 'clamp(1rem, 2vw, 1.125rem)', color: 'var(--theme-text-primary)' }}>
                     إضافة الغرف
                 </h3>
-                <p className="text-sm mt-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                    أضف الغرف بشكل فردي أو دفعة واحدة
-                </p>
             </div>
 
             {/* Mode Toggle */}
-            <div className="flex justify-center gap-2">
+            <div className="flex gap-2">
                 <button
                     onClick={() => setMode('single')}
-                    className={`
-                        px-4 py-2 rounded-lg font-medium transition-all
-                        ${mode === 'single' 
-                            ? 'bg-teal-500 text-white' 
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}
-                    `}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                    style={{
+                        background: mode === 'single' ? ADORA_TURQUOISE : 'rgba(255, 255, 255, 0.05)',
+                        color: 'var(--theme-text-inverse)',
+                    }}
                 >
-                    إضافة فردية
+                    فردية
                 </button>
                 <button
                     onClick={() => setMode('batch')}
-                    className={`
-                        px-4 py-2 rounded-lg font-medium transition-all
-                        ${mode === 'batch' 
-                            ? 'bg-teal-500 text-white' 
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}
-                    `}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                    style={{
+                        background: mode === 'batch' ? ADORA_TURQUOISE : 'rgba(255, 255, 255, 0.05)',
+                        color: 'var(--theme-text-inverse)',
+                    }}
                 >
-                    إضافة دفعة
+                    دفعة
                 </button>
             </div>
 
-            {/* Add Form */}
-            <div 
-                className="p-4 rounded-xl"
-                style={{ 
-                    background: 'var(--theme-bg-secondary)',
-                    border: '1px solid var(--theme-border-primary)'
-                }}
-            >
+            {/* Form */}
+            <div className="p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(64, 224, 208, 0.2)' }}>
                 {mode === 'single' ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <div>
-                            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                                رقم الغرفة
-                            </label>
-                            <input
-                                type="text"
-                                value={singleRoom.number}
-                                onChange={(e) => setSingleRoom({ ...singleRoom, number: e.target.value })}
-                                placeholder="101"
-                                className="w-full px-4 py-2 rounded-lg border"
-                                style={{
-                                    background: 'var(--theme-bg-tertiary)',
-                                    borderColor: 'var(--theme-border-primary)',
-                                    color: 'var(--theme-text-primary)'
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                                الدور
-                            </label>
-                            <input
-                                type="number"
-                                value={singleRoom.floor}
-                                onChange={(e) => setSingleRoom({ ...singleRoom, floor: Number(e.target.value) })}
-                                min={0}
-                                className="w-full px-4 py-2 rounded-lg border"
-                                style={{
-                                    background: 'var(--theme-bg-tertiary)',
-                                    borderColor: 'var(--theme-border-primary)',
-                                    color: 'var(--theme-text-primary)'
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                                النوع
-                            </label>
-                            <select
-                                value={singleRoom.type}
-                                onChange={(e) => setSingleRoom({ ...singleRoom, type: e.target.value })}
-                                className="w-full px-4 py-2 rounded-lg border"
-                                style={{
-                                    background: 'var(--theme-bg-tertiary)',
-                                    borderColor: 'var(--theme-border-primary)',
-                                    color: 'var(--theme-text-primary)'
-                                }}
-                            >
-                                <option value="">اختر النوع</option>
-                                {roomTypes.map((type, idx) => (
-                                    <option key={idx} value={type.name}>{type.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="flex items-end">
-                            <button
-                                onClick={handleAddSingle}
-                                disabled={!singleRoom.number || !singleRoom.type}
-                                className="w-full px-4 py-2 rounded-lg bg-teal-500 text-white hover:bg-teal-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Plus className="w-4 h-4" />
-                                إضافة
-                            </button>
-                        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                            type="text"
+                            value={singleRoom.number}
+                            onChange={(e) => setSingleRoom({ ...singleRoom, number: e.target.value })}
+                            placeholder="رقم الغرفة"
+                            className="px-3 py-2 rounded-lg border"
+                            style={{
+                                background: 'var(--theme-bg-tertiary)',
+                                borderColor: `${ADORA_TURQUOISE}40`,
+                                color: 'var(--theme-text-inverse)',
+                                fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                            }}
+                        />
+                        <input
+                            type="number"
+                            value={singleRoom.floor}
+                            onChange={(e) => setSingleRoom({ ...singleRoom, floor: Number(e.target.value) })}
+                            placeholder="الدور"
+                            className="px-3 py-2 rounded-lg border"
+                            style={{
+                                background: 'var(--theme-bg-tertiary)',
+                                borderColor: `${ADORA_TURQUOISE}40`,
+                                color: 'var(--theme-text-inverse)',
+                                fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                            }}
+                        />
+                        <select
+                            value={singleRoom.type}
+                            onChange={(e) => setSingleRoom({ ...singleRoom, type: e.target.value })}
+                            className="px-3 py-2 rounded-lg border sm:col-span-2"
+                            style={{
+                                background: 'var(--theme-bg-tertiary)',
+                                borderColor: `${ADORA_TURQUOISE}40`,
+                                color: 'var(--theme-text-inverse)',
+                                fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                            }}
+                        >
+                            <option value="">اختر النوع</option>
+                            {roomTypes.map((type, idx) => (
+                                <option key={idx} value={type.name}>{type.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={handleAddSingle}
+                            disabled={!singleRoom.number || !singleRoom.type}
+                            className="sm:col-span-2 px-3 py-2 rounded-lg font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            style={{
+                                background: !singleRoom.number || !singleRoom.type ? 'rgba(255, 255, 255, 0.05)' : ADORA_TURQUOISE,
+                                color: 'var(--theme-text-inverse)',
+                                fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                            }}
+                        >
+                            <Plus className="w-4 h-4" />
+                            إضافة
+                        </button>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                            <div>
-                                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                                    الدور
-                                </label>
-                                <input
-                                    type="number"
-                                    value={batchConfig.floor}
-                                    onChange={(e) => setBatchConfig({ ...batchConfig, floor: Number(e.target.value) })}
-                                    min={0}
-                                    className="w-full px-4 py-2 rounded-lg border"
-                                    style={{
-                                        background: 'var(--theme-bg-tertiary)',
-                                        borderColor: 'var(--theme-border-primary)',
-                                        color: 'var(--theme-text-primary)'
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                                    من رقم
-                                </label>
-                                <input
-                                    type="number"
-                                    value={batchConfig.startNumber}
-                                    onChange={(e) => setBatchConfig({ ...batchConfig, startNumber: Number(e.target.value) })}
-                                    className="w-full px-4 py-2 rounded-lg border"
-                                    style={{
-                                        background: 'var(--theme-bg-tertiary)',
-                                        borderColor: 'var(--theme-border-primary)',
-                                        color: 'var(--theme-text-primary)'
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                                    إلى رقم
-                                </label>
-                                <input
-                                    type="number"
-                                    value={batchConfig.endNumber}
-                                    onChange={(e) => setBatchConfig({ ...batchConfig, endNumber: Number(e.target.value) })}
-                                    className="w-full px-4 py-2 rounded-lg border"
-                                    style={{
-                                        background: 'var(--theme-bg-tertiary)',
-                                        borderColor: 'var(--theme-border-primary)',
-                                        color: 'var(--theme-text-primary)'
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                                    النوع
-                                </label>
-                                <select
-                                    value={batchConfig.type}
-                                    onChange={(e) => setBatchConfig({ ...batchConfig, type: e.target.value })}
-                                    className="w-full px-4 py-2 rounded-lg border"
-                                    style={{
-                                        background: 'var(--theme-bg-tertiary)',
-                                        borderColor: 'var(--theme-border-primary)',
-                                        color: 'var(--theme-text-primary)'
-                                    }}
-                                >
-                                    <option value="">اختر النوع</option>
-                                    {roomTypes.map((type, idx) => (
-                                        <option key={idx} value={type.name}>{type.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex items-end">
-                                <button
-                                    onClick={handleAddBatch}
-                                    disabled={!batchConfig.type || batchConfig.startNumber >= batchConfig.endNumber}
-                                    className="w-full px-4 py-2 rounded-lg bg-teal-500 text-white hover:bg-teal-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    إضافة {batchConfig.endNumber - batchConfig.startNumber + 1} غرفة
-                                </button>
-                            </div>
-                        </div>
-                        <p className="text-xs text-center" style={{ color: 'var(--theme-text-secondary)' }}>
-                            سيتم إضافة غرف من {batchConfig.startNumber} إلى {batchConfig.endNumber} في الدور {batchConfig.floor}
-                        </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <input
+                            type="number"
+                            value={batchConfig.floor}
+                            onChange={(e) => setBatchConfig({ ...batchConfig, floor: Number(e.target.value) })}
+                            placeholder="الدور"
+                            className="px-3 py-2 rounded-lg border"
+                            style={{
+                                background: 'var(--theme-bg-tertiary)',
+                                borderColor: `${ADORA_TURQUOISE}40`,
+                                color: 'var(--theme-text-inverse)',
+                                fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                            }}
+                        />
+                        <input
+                            type="number"
+                            value={batchConfig.startNumber}
+                            onChange={(e) => setBatchConfig({ ...batchConfig, startNumber: Number(e.target.value) })}
+                            placeholder="من"
+                            className="px-3 py-2 rounded-lg border"
+                            style={{
+                                background: 'var(--theme-bg-tertiary)',
+                                borderColor: `${ADORA_TURQUOISE}40`,
+                                color: 'var(--theme-text-inverse)',
+                                fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                            }}
+                        />
+                        <input
+                            type="number"
+                            value={batchConfig.endNumber}
+                            onChange={(e) => setBatchConfig({ ...batchConfig, endNumber: Number(e.target.value) })}
+                            placeholder="إلى"
+                            className="px-3 py-2 rounded-lg border"
+                            style={{
+                                background: 'var(--theme-bg-tertiary)',
+                                borderColor: `${ADORA_TURQUOISE}40`,
+                                color: 'var(--theme-text-inverse)',
+                                fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                            }}
+                        />
+                        <select
+                            value={batchConfig.type}
+                            onChange={(e) => setBatchConfig({ ...batchConfig, type: e.target.value })}
+                            className="px-3 py-2 rounded-lg border"
+                            style={{
+                                background: 'var(--theme-bg-tertiary)',
+                                borderColor: `${ADORA_TURQUOISE}40`,
+                                color: 'var(--theme-text-inverse)',
+                                fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+                            }}
+                        >
+                            <option value="">النوع</option>
+                            {roomTypes.map((type, idx) => (
+                                <option key={idx} value={type.name}>{type.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={handleAddBatch}
+                            disabled={!batchConfig.type || batchConfig.startNumber >= batchConfig.endNumber}
+                            className="px-3 py-2 rounded-lg font-medium transition-all disabled:opacity-50 text-xs"
+                            style={{
+                                background: !batchConfig.type || batchConfig.startNumber >= batchConfig.endNumber ? 'rgba(255, 255, 255, 0.05)' : ADORA_TURQUOISE,
+                                color: 'var(--theme-text-inverse)',
+                            }}
+                        >
+                            إضافة {batchConfig.endNumber - batchConfig.startNumber + 1}
+                        </button>
                     </div>
                 )}
             </div>
 
             {/* Rooms Preview */}
             {rooms.length > 0 && (
-                <div className="space-y-4">
+                <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                            الغرف المضافة ({rooms.length} غرفة)
-                        </h4>
+                        <span className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>{rooms.length} غرفة</span>
                         <button
-                            onClick={handleClearAll}
-                            className="text-xs text-red-500 hover:text-red-600 flex items-center gap-1"
+                            onClick={() => onChange([])}
+                            className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
                         >
                             <Trash2 className="w-3 h-3" />
                             مسح الكل
                         </button>
                     </div>
-                    
                     <div 
-                        className="max-h-64 overflow-y-auto rounded-xl p-4 space-y-4"
-                        style={{ 
-                            background: 'var(--theme-bg-secondary)',
-                            border: '1px solid var(--theme-border-primary)'
-                        }}
+                        className="max-h-48 overflow-y-auto p-3 rounded-lg space-y-2"
+                        style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(64, 224, 208, 0.2)' }}
                     >
-                        {Object.entries(roomsByFloor)
-                            .sort(([a], [b]) => Number(a) - Number(b))
-                            .map(([floor, floorRooms]) => (
-                                <div key={floor}>
-                                    <div className="text-xs font-medium mb-2 text-teal-600">
-                                        الدور {floor} ({floorRooms.length} غرفة)
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {floorRooms.map((room, idx) => (
-                                            <div 
-                                                key={idx}
-                                                className="group relative px-3 py-1.5 rounded-lg text-sm flex items-center gap-2"
-                                                style={{ 
-                                                    background: 'var(--theme-bg-tertiary)',
-                                                    color: 'var(--theme-text-primary)'
-                                                }}
-                                            >
-                                                <span className="font-medium">{room.number}</span>
-                                                <span className="text-xs opacity-60">{room.type}</span>
-                                                <button
-                                                    onClick={() => handleRemoveRoom(rooms.indexOf(room))}
-                                                    className="opacity-0 group-hover:opacity-100 absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-xs transition-opacity"
-                                                >
-                                                    ×
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-// ============================================================
-// STEP 4: ACTIVATION & REVIEW
-// ============================================================
-
-const Step4Activation: React.FC<{
-    state: WizardState;
-    isComplete: boolean;
-}> = ({ state, isComplete }) => {
-    // Group rooms by floor for summary
-    const roomsByFloor = useMemo(() => {
-        const grouped: Record<number, number> = {};
-        state.rooms.forEach(room => {
-            grouped[room.floor] = (grouped[room.floor] || 0) + 1;
-        });
-        return grouped;
-    }, [state.rooms]);
-
-    const floorCount = Object.keys(roomsByFloor).length;
-
-    return (
-        <div className="space-y-6">
-            <div className="text-center mb-8">
-                <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
-                    isComplete 
-                        ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20' 
-                        : 'bg-gradient-to-br from-amber-500/20 to-orange-500/20'
-                }`}>
-                    {isComplete ? (
-                        <CheckCircle className="w-10 h-10 text-green-500" />
-                    ) : (
-                        <Settings className="w-10 h-10 text-amber-500" />
-                    )}
-                </div>
-                <h3 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
-                    {isComplete ? 'تم تفعيل الفرع بنجاح!' : 'مراجعة وتفعيل'}
-                </h3>
-                <p className="text-sm mt-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                    {isComplete 
-                        ? 'الفرع جاهز للعمل الآن' 
-                        : 'راجع البيانات ثم اضغط "تفعيل الفرع" للبدء'}
-                </p>
-            </div>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Branch Info Card */}
-                <div 
-                    className="p-4 rounded-xl"
-                    style={{ 
-                        background: 'var(--theme-bg-secondary)',
-                        border: '1px solid var(--theme-border-primary)'
-                    }}
-                >
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-teal-500/10 flex items-center justify-center">
-                            <Building2 className="w-5 h-5 text-teal-500" />
-                        </div>
-                        <div className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                            بيانات الفرع
-                        </div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                            <span style={{ color: 'var(--theme-text-secondary)' }}>الاسم:</span>
-                            <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                                {state.branchData.name}
-                            </span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span style={{ color: 'var(--theme-text-secondary)' }}>الكود:</span>
-                            <span className="font-medium font-mono" style={{ color: 'var(--theme-text-primary)' }}>
-                                {state.branchData.code}
-                            </span>
-                        </div>
-                        {state.branchData.location && (
-                            <div className="flex justify-between">
-                                <span style={{ color: 'var(--theme-text-secondary)' }}>الموقع:</span>
-                                <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                                    {state.branchData.location}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Room Types Card */}
-                <div 
-                    className="p-4 rounded-xl"
-                    style={{ 
-                        background: 'var(--theme-bg-secondary)',
-                        border: '1px solid var(--theme-border-primary)'
-                    }}
-                >
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                            <Layers className="w-5 h-5 text-purple-500" />
-                        </div>
-                        <div className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                            أنواع الغرف
-                        </div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                        <div className="text-2xl font-bold text-purple-500">{state.roomTypes.length}</div>
-                        <div style={{ color: 'var(--theme-text-secondary)' }}>
-                            {state.roomTypes.slice(0, 3).map(t => t.name).join('، ')}
-                            {state.roomTypes.length > 3 && ` (+${state.roomTypes.length - 3})`}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Rooms Card */}
-                <div 
-                    className="p-4 rounded-xl"
-                    style={{ 
-                        background: 'var(--theme-bg-secondary)',
-                        border: '1px solid var(--theme-border-primary)'
-                    }}
-                >
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                            <DoorOpen className="w-5 h-5 text-blue-500" />
-                        </div>
-                        <div className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                            الغرف
-                        </div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                        <div className="text-2xl font-bold text-blue-500">{state.rooms.length}</div>
-                        <div style={{ color: 'var(--theme-text-secondary)' }}>
-                            {floorCount} أدوار
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Activation Features */}
-            {!isComplete && (
-                <div 
-                    className="p-4 rounded-xl"
-                    style={{ 
-                        background: 'var(--theme-bg-secondary)',
-                        border: '1px solid var(--theme-border-primary)'
-                    }}
-                >
-                    <h4 className="font-medium mb-4 flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
-                        <Sparkles className="w-4 h-4 text-amber-500" />
-                        سيتم تفعيل الميزات التالية تلقائياً:
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {[
-                            { icon: '🏨', text: 'ظهور الغرف في الصفحة الرئيسية' },
-                            { icon: '🔄', text: 'نظام الأدوار للفرز والتنظيم' },
-                            { icon: '🔔', text: 'الربط مع البيلمان والاستقبال' },
-                            { icon: '🔧', text: 'الربط مع قسم الصيانة' },
-                            { icon: '🧹', text: 'الربط مع الهاوس كيبنج' },
-                            { icon: '📊', text: 'التقارير والإحصائيات' },
-                        ].map((feature, idx) => (
+                        {rooms.map((room, idx) => (
                             <div 
                                 key={idx}
-                                className="flex items-center gap-3 p-3 rounded-lg"
-                                style={{ background: 'var(--theme-bg-tertiary)' }}
+                                className="flex items-center justify-between p-2 rounded"
+                                style={{ background: 'rgba(255, 255, 255, 0.03)' }}
                             >
-                                <span className="text-xl">{feature.icon}</span>
-                                <span className="text-sm" style={{ color: 'var(--theme-text-primary)' }}>
-                                    {feature.text}
+                                <span className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    {room.number} - {room.type} (د{room.floor})
                                 </span>
+                                <button
+                                    onClick={() => onChange(rooms.filter((_, i) => i !== idx))}
+                                    className="text-red-400 hover:text-red-300"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                             </div>
                         ))}
                     </div>
                 </div>
             )}
-
-            {/* Success Animation */}
-            {isComplete && (
-                <div className="text-center py-8">
-                    <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-green-50 dark:bg-green-900/20 text-green-600">
-                        <CheckCircle className="w-6 h-6" />
-                        <span className="font-medium">تم إعداد الفرع بنجاح!</span>
-                    </div>
-                    <p className="mt-4 text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
-                        جاري إغلاق المعالج... يمكنك الآن إدارة الفرع من لوحة التحكم
-                    </p>
-                </div>
-            )}
         </div>
     );
 };
+
+// ============================================================
+// STEP 4: ACTIVATION
+// ============================================================
+
+const Step4Activation: React.FC<{
+    state: WizardState;
+    isComplete: boolean;
+}> = ({ state, isComplete }) => (
+    <div className="space-y-4">
+        <div className="text-center mb-4">
+            {isComplete ? (
+                <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+            ) : (
+                <Settings className="w-12 h-12 mx-auto mb-2" style={{ color: ADORA_TURQUOISE }} />
+            )}
+            <h3 className="font-bold mb-1" style={{ fontSize: 'clamp(1rem, 2vw, 1.125rem)', color: 'var(--theme-text-primary)' }}>
+                {isComplete ? 'تم تفعيل الفرع!' : 'مراجعة وتفعيل'}
+            </h3>
+        </div>
+
+        {/* Summary Cards - Responsive Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(64, 224, 208, 0.2)' }}>
+                <div className="text-xs text-xs mb-1">الاسم</div>
+                <div className="font-medium text-primary" style={{ fontSize: 'clamp(0.875rem, 1.5vw, 1rem)' }}>
+                    {state.branchData.name}
+                </div>
+            </div>
+            <div className="p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(64, 224, 208, 0.2)' }}>
+                <div className="text-xs text-xs mb-1">الكود</div>
+                <div className="font-medium font-mono text-primary" style={{ fontSize: 'clamp(0.875rem, 1.5vw, 1rem)' }}>
+                    {state.branchData.code}
+                </div>
+            </div>
+            <div className="p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(64, 224, 208, 0.2)' }}>
+                <div className="text-xs text-xs mb-1">أنواع الغرف</div>
+                <div className="font-medium text-primary" style={{ fontSize: 'clamp(0.875rem, 1.5vw, 1rem)' }}>
+                    {state.roomTypes.length}
+                </div>
+            </div>
+            <div className="p-3 rounded-lg" style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(64, 224, 208, 0.2)' }}>
+                <div className="text-xs text-xs mb-1">عدد الغرف</div>
+                <div className="font-medium text-primary" style={{ fontSize: 'clamp(0.875rem, 1.5vw, 1rem)' }}>
+                    {state.rooms.length}
+                </div>
+            </div>
+        </div>
+
+        {isComplete && (
+            <div className="text-center py-4">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>
+                    <CheckCircle className="w-5 h-5" />
+                    <span className="font-medium" style={{ fontSize: 'clamp(0.875rem, 1.5vw, 1rem)' }}>تم الإعداد بنجاح!</span>
+                </div>
+            </div>
+        )}
+    </div>
+);
 
 export default BranchSetupWizard;

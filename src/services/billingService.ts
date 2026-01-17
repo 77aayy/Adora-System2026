@@ -981,7 +981,16 @@ export const getDeletedBillingCount = async (): Promise<number> => {
         });
 
         return deletedCount;
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Graceful handling: Permission denied is expected for non-owners
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            return 0;
+        }
+        
         console.error('Error counting deleted billing documents:', error);
         return 0;
     }
@@ -1025,7 +1034,17 @@ export const calculateMonthlyRecurringRevenue = async (forceRefresh: boolean = f
                 });
 
                 return mrr;
-            } catch (error) {
+            } catch (error: any) {
+                // ✅ Graceful handling: Permission denied is expected for non-owners
+                const isPermissionError = error?.code === 'permission-denied' || 
+                                          error?.message?.includes('permission') ||
+                                          error?.message?.includes('Missing or insufficient');
+                
+                if (isPermissionError) {
+                    // Silently return 0 - not critical for UI
+                    return 0;
+                }
+                
                 console.error('Error calculating MRR:', error);
                 return 0;
             }
@@ -1067,7 +1086,16 @@ export const calculateTenantRevenue = async (tenantId: string): Promise<number> 
         });
 
         return revenue;
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Graceful handling: Permission denied is expected
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            return 0;
+        }
+        
         console.error('Error calculating tenant revenue:', error);
         return 0;
     }
@@ -1077,6 +1105,10 @@ export const calculateTenantRevenue = async (tenantId: string): Promise<number> 
  * Get all subscriptions (for owner dashboard)
  */
 export const getAllSubscriptions = async (): Promise<Subscription[]> => {
+    if (!db) {
+        return [];
+    }
+
     try {
         const q = query(
             collection(db, 'subscriptions'),
@@ -1093,7 +1125,17 @@ export const getAllSubscriptions = async (): Promise<Subscription[]> => {
                 renewalDate: data.renewalDate?.toDate()
             } as Subscription;
         });
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Graceful handling: Permission denied is expected for non-owners
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            // Silently return empty array - not critical for UI
+            return [];
+        }
+        
         console.error('Error getting all subscriptions:', error);
         return [];
     }
@@ -1177,7 +1219,16 @@ export const calculateMonthlyRenewalRevenue = async (): Promise<number> => {
         });
 
         return renewalRevenue;
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Graceful handling: Permission denied is expected for non-owners
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            return 0;
+        }
+        
         console.error('Error calculating monthly renewal revenue:', error);
         return 0;
     }
@@ -1242,7 +1293,16 @@ export const getNearestExpiringSubscription = async (): Promise<{
             branchName,
             tenantName
         };
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Graceful handling: Permission denied is expected for non-owners
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            return null;
+        }
+        
         console.error('Error getting nearest expiring subscription:', error);
         return null;
     }

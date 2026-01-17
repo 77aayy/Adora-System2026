@@ -699,3 +699,35 @@ export const getTicketStatistics = async (tenantId: string): Promise<{
         };
     }
 };
+
+/**
+ * Get count of unresponded support tickets for Owner (SaaS - from all tenants)
+ * ✅ Returns count of tickets with status 'pending' or 'acknowledged' from ALL tenants
+ */
+export const getUnrespondedTicketsCount = async (): Promise<number> => {
+    try {
+        if (!db) {
+            console.warn('Firebase db not initialized, returning 0 for unresponded tickets count');
+            return 0;
+        }
+
+        // Get all tickets with status 'pending' or 'acknowledged' (not resolved or closed)
+        const q = query(
+            getTicketsCollectionRef(),
+            orderBy('createdAt', 'desc')
+        );
+        
+        const snapshot = await getDocs(q);
+        const tickets = snapshot.docs.map(doc => doc.data() as SupportTicket);
+        
+        // Count tickets that haven't been responded to (pending or acknowledged but not resolved/closed)
+        const unrespondedCount = tickets.filter(t => 
+            t.status === 'pending' || t.status === 'acknowledged' || t.status === 'in_progress'
+        ).length;
+        
+        return unrespondedCount;
+    } catch (error) {
+        console.error('Error getting unresponded tickets count:', error);
+        return 0;
+    }
+};

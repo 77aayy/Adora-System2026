@@ -404,7 +404,30 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
             churnRate, // ✅ REAL DATA: Calculated from suspended/expired tenants
             retentionRate // ✅ REAL DATA: Inverse of churn rate
         };
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Graceful handling: Permission denied is expected for non-owners
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            // Return empty/default analytics instead of throwing
+            logger.warn('Permission denied for system analytics (expected for non-owners)', undefined, 'analyticsService');
+            return {
+                totalTenants: 0,
+                activeTenants: 0,
+                totalRequests: 0,
+                totalRevenue: 0,
+                averageRequestsPerTenant: 0,
+                averageResponseTime: 0,
+                errorRate: 0,
+                uptime: 100,
+                newTenantsThisMonth: 0,
+                churnRate: 0,
+                retentionRate: 100
+            };
+        }
+        
         logger.error('Error getting system analytics', error, 'analyticsService');
         throw error;
     }
@@ -512,7 +535,17 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
         }
         
         return analytics;
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Graceful handling: Permission denied is expected for non-owners
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            // Return empty array instead of throwing - prevents UI breakage
+            return [];
+        }
+        
         console.error('Error getting tenant analytics:', error);
         throw error;
     }

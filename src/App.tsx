@@ -545,30 +545,31 @@ const DeveloperFooter: React.FC = () => {
             };
         }
 
-        setupThemeObserver();
+        let observer: MutationObserver | null = null;
 
-        function setupThemeObserver() {
-            if (!document || !document.documentElement) {
-                return;
+        function setupThemeObserver(): (() => void) | undefined {
+            // ✅ COMPREHENSIVE NULL SAFETY: Multiple checks
+            if (typeof window === 'undefined' || typeof document === 'undefined') {
+                return undefined;
             }
 
-            // ✅ ENHANCED NULL SAFETY: Check if targetElement is a valid Node
-            const targetElement = document.documentElement;
-            if (!targetElement) {
-                return;
-            }
-
-            // ✅ Type check: Ensure it's a valid Node
-            if (!(targetElement instanceof Node)) {
-                return;
+            if (!document.documentElement) {
+                return undefined;
             }
 
             // ✅ Additional check: Ensure MutationObserver is available
             if (typeof MutationObserver === 'undefined') {
-                return;
+                return undefined;
             }
 
-            let observer: MutationObserver | null = null;
+            // ✅ Get target element
+            const targetElement = document.documentElement;
+            
+            // ✅ CRITICAL: Ensure targetElement is a valid Node before observing
+            if (!targetElement || !(targetElement instanceof Node)) {
+                console.warn('document.documentElement is not a valid Node');
+                return undefined;
+            }
 
             try {
                 observer = new MutationObserver((mutations) => {
@@ -586,16 +587,16 @@ const DeveloperFooter: React.FC = () => {
                     }
                 });
 
-                // ✅ Final check before observing - ensure element is still valid
-                if (targetElement && targetElement instanceof Node && observer && document.documentElement === targetElement) {
-                    observer.observe(targetElement, { 
-                        attributes: true, 
-                        attributeFilter: ['data-theme'] 
-                    });
+                // ✅ CRITICAL: Only observe if targetNode exists and is a Node (avoids "parameter 1 is not of type 'Node'")
+                if (targetElement && targetElement instanceof Node && observer) {
+                    observer.observe(targetElement, { attributes: true, attributeFilter: ['data-theme'] });
+                } else {
+                    console.warn('Cannot observe: targetElement is null/not a Node, or observer is null');
+                    return undefined;
                 }
             } catch (error) {
                 console.error('Failed to create or observe MutationObserver:', error);
-                return;
+                return undefined;
             }
             
             // ✅ Return cleanup function
@@ -611,9 +612,22 @@ const DeveloperFooter: React.FC = () => {
             };
         }
 
-        // ✅ Return cleanup for DOMContentLoaded listener if needed
+        const cleanup = setupThemeObserver();
+
+        // ✅ Return cleanup function
         return () => {
-            // Cleanup is handled inside setupThemeObserver
+            if (cleanup) {
+                cleanup();
+            }
+            // Also cleanup observer if it exists
+            if (observer) {
+                try {
+                    observer.disconnect();
+                    observer = null;
+                } catch (error) {
+                    console.error('Failed to disconnect observer in cleanup:', error);
+                }
+            }
         };
     }, []);
     

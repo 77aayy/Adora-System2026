@@ -52,39 +52,59 @@ export const AutoTransferSettings: React.FC = () => {
 
     const branchId = (user as any)?.branch || (user as any)?.branchId || 'default';
 
-    const [config, setConfig] = useState<AutoTransferConfig | null>(null);
-    const [loading, setLoading] = useState(true);
+    // Initialize with default config immediately (no null state)
+    const getDefaultConfig = (): AutoTransferConfig => ({
+        enabled: false,
+        checkIntervalMs: 60000,
+        rules: getDefaultRules(),
+        branch: (user as any)?.branch || (user as any)?.branchId || 'default',
+        tenantId: tenantId || 'default',
+    });
+
+    const [config, setConfig] = useState<AutoTransferConfig>(getDefaultConfig());
+    const [loading, setLoading] = useState(false); // Start as false since we have default config
     const [saving, setSaving] = useState(false);
 
     // Load config
     useEffect(() => {
-        const loadConfig = async () => {
-            if (!branchId || !tenantId) return;
-            setLoading(true);
-            try {
-                const loaded = await loadAutoTransferConfig(branchId, tenantId);
-                if (loaded) {
-                    setConfig(loaded);
-                } else {
-                    // Create default config
-                    setConfig({
-                        enabled: false,
-                        checkIntervalMs: 60000,
-                        rules: getDefaultRules(),
-                        branch: branchId,
-                        tenantId,
-                    });
-                }
-            } catch (err: any) {
-                logger.error('Error loading auto-transfer config', err, 'AutoTransferSettings');
-                error('فشل تحميل الإعدادات');
-            } finally {
-                setLoading(false);
-            }
+        // Always create default config first for immediate display
+        const currentBranchId = (user as any)?.branch || (user as any)?.branchId || 'default';
+        const currentTenantId = tenantId || 'default';
+        
+        // Set default config immediately
+        const defaultConfig: AutoTransferConfig = {
+            enabled: false,
+            checkIntervalMs: 60000,
+            rules: getDefaultRules(),
+            branch: currentBranchId,
+            tenantId: currentTenantId,
         };
+        setConfig(defaultConfig);
+        setLoading(false);
 
-        loadConfig();
-    }, [branchId, tenantId]);
+        // If we have valid tenantId and branchId (not 'default'), try to load from Firebase
+        if (tenantId && tenantId !== 'default' && branchId && branchId !== 'default') {
+
+            const loadConfig = async () => {
+                setLoading(true);
+                try {
+                    const loaded = await loadAutoTransferConfig(branchId, tenantId);
+                    if (loaded) {
+                        setConfig(loaded);
+                    }
+                    // If no loaded config, keep the default we already set
+                } catch (err: any) {
+                    logger.error('Error loading auto-transfer config', err, 'AutoTransferSettings');
+                    // Keep default config on error - don't show error toast for missing config
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            loadConfig();
+        }
+        // If no valid tenantId/branchId, config is already set to default above
+    }, [branchId, tenantId, error, user]);
 
     // Save config
     const handleSave = async () => {
@@ -136,30 +156,24 @@ export const AutoTransferSettings: React.FC = () => {
         setConfig({ ...config, rules: updatedRules });
     };
 
+    // Show loading only while fetching from Firebase (config is always available now)
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
+            <div className="px-4 sm:px-6 max-w-7xl mx-auto w-full flex items-center justify-center min-h-[400px]">
                 <AdoraLoader size="md" message="جاري تحميل البيانات..." />
             </div>
         );
     }
 
-    if (!config) {
-        return (
-            <div className="text-center py-12">
-                <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-                <p className="text-white/40">فشل تحميل الإعدادات</p>
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 px-4 sm:px-6 max-w-7xl mx-auto w-full">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold text-white">التحويل التلقائي للطلبات</h2>
-                    <p className="text-white/60 text-sm mt-1">تحويل الطلبات المتأخرة تلقائياً إلى الأقسام الاحتياطية</p>
+                    <p className="text-white/60 text-sm mt-1">
+                        تحويل الطلبات تلقائياً: فوراً للأقسام المعطلة | بعد المدة المحددة للطلبات المتأخرة
+                    </p>
                 </div>
                 <button
                     onClick={handleSave}
@@ -365,11 +379,23 @@ export const AutoTransferSettings: React.FC = () => {
                     <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
                     <div>
                         <h4 className="text-blue-400 font-bold mb-1">كيف يعمل التحويل التلقائي؟</h4>
-                        <ul className="text-white/60 text-sm space-y-1">
-                            <li>• النظام يراقب جميع الطلبات النشطة في الأقسام المحددة</li>
-                            <li>• عند وصول المدة المحددة بدون استجابة، يتم التحويل تلقائياً</li>
-                            <li>• يتم تسجيل التحويل في سجل الطلب وملاحظاته</li>
-                            <li>• يمكن تحديد أنواع طلبات معينة أو مصادر معينة للتحويل</li>
+                        <ul className="text-white/60 text-sm space-y-2">
+                            <li className="flex items-start gap-2">
+                                <span className="text-teal-400 font-bold">✓</span>
+                                <span><strong>تحويل فوري للأقسام المعطلة:</strong> إذا وصل طلب لقسم غير مفعل (مثل الكافي شوب)، يتم تحويله فوراً إلى القسم البديل المحدد في القاعدة.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-teal-400 font-bold">✓</span>
+                                <span><strong>تحويل للطلبات المتأخرة:</strong> النظام يراقب الطلبات النشطة، وعند وصول المدة المحددة بدون استجابة، يتم التحويل تلقائياً.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-teal-400 font-bold">✓</span>
+                                <span>يتم تسجيل جميع التحويلات في سجل الطلب وملاحظاته للشفافية والتدقيق.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="text-teal-400 font-bold">✓</span>
+                                <span>يمكن تحديد أنواع طلبات معينة أو مصادر معينة (QR، استقبال، إلخ) للتحويل.</span>
+                            </li>
                         </ul>
                     </div>
                 </div>

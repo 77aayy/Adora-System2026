@@ -5,7 +5,7 @@
  * Adora Hotel Management System V3
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Globe, Check, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage, updateDirection } from '../../i18n';
@@ -24,7 +24,9 @@ export const LanguageSwitcher: React.FC<{ className?: string }> = ({ className =
     const { i18n } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
     const currentLang = LANGUAGES.find(lang => lang.code === i18n.language) || LANGUAGES[0];
+
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -57,80 +59,60 @@ export const LanguageSwitcher: React.FC<{ className?: string }> = ({ className =
     };
 
     return (
-        <div className={`relative ${className}`} ref={dropdownRef}>
+        <div className={`relative ${className}`} ref={dropdownRef} style={{ position: 'relative' }}>
             {/* Language Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`
-                    flex items-center gap-2 px-3 py-2 rounded-xl
-                    transition-all duration-200
-                    bg-slate-100 dark:bg-slate-800/50
-                    hover:bg-slate-200 dark:hover:bg-slate-700
-                    border border-slate-300 dark:border-slate-600
-                    text-slate-700 dark:text-slate-200
-                    font-medium text-sm
-                    active:scale-95
-                `}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 bg-slate-100 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-medium text-sm active:scale-95 w-full"
                 aria-label="Change Language"
                 aria-expanded={isOpen}
             >
                 <Globe className="w-4 h-4" />
                 <span className="hidden sm:inline">{currentLang.flag}</span>
                 <span className="hidden md:inline text-xs">{currentLang.nativeName}</span>
-                <ChevronDown 
-                    className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
-                />
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} mr-auto`} />
             </button>
 
-            {/* Dropdown Menu - WITHOUT Backdrop, using click outside only */}
+            {/* Languages List - Inside parent menu, no absolute positioning */}
             {isOpen && (
                 <div 
-                    className={`
-                        absolute top-full mt-2 right-0
-                        w-56 rounded-xl overflow-hidden
-                        animate-in fade-in slide-in-from-top-2 duration-200
-                        bg-white dark:bg-slate-800
-                        border border-slate-200 dark:border-slate-700
-                        shadow-xl
-                    `}
+                    className="mt-2 rounded-lg border"
                     style={{ 
-                        position: 'absolute',
-                        top: '100%',
-                        right: 0,
-                        zIndex: 1000,
-                        background: 'white',
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-                        borderRadius: '12px',
+                        background: 'var(--theme-bg-secondary)',
+                        borderColor: 'var(--theme-border-primary)',
                         overflow: 'hidden',
                     }}
                 >
-                        <div className="p-2">
-                            {LANGUAGES.map((lang) => {
-                                const isActive = lang.code === i18n.language;
-                                return (
-                                    <button
-                                        key={lang.code}
-                                        onClick={() => handleLanguageChange(lang.code)}
-                                        className={`
-                                            w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                                            transition-all duration-150
-                                            text-right
-                                            ${isActive
-                                                ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400 font-semibold'
-                                                : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
-                                            }
-                                        `}
-                                    >
-                                        <span className="text-xl">{lang.flag}</span>
-                                        <span className="flex-1 text-sm">{lang.nativeName}</span>
-                                        {isActive && (
-                                            <Check className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    {LANGUAGES.map((lang, index) => {
+                        const isActive = lang.code === i18n.language;
+                        return (
+                            <button
+                                key={lang.code}
+                                onClick={() => handleLanguageChange(lang.code)}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors text-right"
+                                style={{
+                                    borderBottom: index < LANGUAGES.length - 1 ? '1px solid var(--theme-border-primary)' : 'none',
+                                    background: isActive ? 'rgba(20, 184, 166, 0.12)' : 'transparent',
+                                    color: isActive ? 'var(--theme-accent-teal)' : 'var(--theme-text-primary)',
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActive) {
+                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActive) {
+                                        e.currentTarget.style.background = 'transparent';
+                                    }
+                                }}
+                            >
+                                <span className="text-base">{lang.flag}</span>
+                                <span className="flex-1">{lang.nativeName}</span>
+                                {isActive && <Check className="w-4 h-4 text-teal-400" />}
+                            </button>
+                        );
+                    })}
+                </div>
             )}
         </div>
     );

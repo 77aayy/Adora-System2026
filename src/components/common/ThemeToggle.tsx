@@ -138,26 +138,38 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
 export const ThemeToggleButton: React.FC<{ className?: string }> = ({ className = '' }) => {
   const { toggleTheme, isDark } = useTheme();
 
+  const handleToggle = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleTheme();
+  };
+
   return (
     <button
       type="button"
-      onClick={toggleTheme}
+      onClick={handleToggle}
       aria-label={isDark ? 'تفعيل الوضع النهاري' : 'تفعيل الوضع الليلي'}
-      className={`
-        p-2.5 rounded-xl
-        transition-all duration-200
-        ${isDark 
-          ? 'bg-slate-800 hover:bg-slate-700 text-yellow-400' 
-          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-        }
-        ${className}
-      `}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/5 border border-transparent hover:border-white/10"
+      style={{
+        background: 'transparent',
+        color: 'var(--theme-text-primary)',
+        textAlign: 'right',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+      }}
     >
       {isDark ? (
-        <Sun className="w-5 h-5" />
+        <Sun className="w-5 h-5 text-yellow-400" />
       ) : (
-        <Moon className="w-5 h-5" />
+        <Moon className="w-5 h-5 text-blue-400" />
       )}
+      <span className="flex-1 text-sm">
+        {isDark ? 'الوضع النهاري' : 'الوضع الليلي'}
+      </span>
     </button>
   );
 };

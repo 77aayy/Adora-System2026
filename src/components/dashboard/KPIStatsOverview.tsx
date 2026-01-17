@@ -213,7 +213,7 @@ export const KPIStatsOverview: React.FC = () => {
             </div>
 
             {/* Charts Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                 <div className="p-4 transition-colors duration-300" style={{ background: 'var(--theme-bg-primary)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--theme-border-primary)' }}>
                     <h3 className="text-sm font-bold mb-4 flex items-center gap-2 transition-colors duration-300" style={{ color: 'var(--theme-text-primary)' }}>
                         <Calendar className="w-4 h-4 text-blue-400" />

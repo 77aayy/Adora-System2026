@@ -14,7 +14,8 @@ import {
     ArrowRight,
     Lightbulb,
     AlertTriangle,
-    BookOpen
+    BookOpen,
+    MapPin
 } from 'lucide-react';
 
 // ============================================================
@@ -113,47 +114,120 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
     const themeConfig = THEMES[theme];
 
     return (
-        <div className={`rounded-xl overflow-hidden ${compact ? 'mb-3' : 'mb-6'}`}>
-            {/* Quick Guide - Always Visible - ✅ تحسين التصميم */}
-            <div className={`p-3 sm:p-4 bg-gradient-to-r ${themeConfig.primary} border ${themeConfig.border}`}
-                 style={{ borderRadius: isExpanded ? '12px 12px 0 0' : '12px' }}>
-                <div className="flex items-start gap-2 sm:gap-3">
-                    <div className={`p-1.5 sm:p-2 rounded-lg ${themeConfig.bg} flex-shrink-0`}>
-                        {icon || <Info className={`w-4 h-4 sm:w-5 sm:h-5 ${themeConfig.text}`} />}
+        <div className={`rounded-xl sm:rounded-2xl overflow-hidden ${compact ? 'mb-3' : 'mb-6'} glass-card`}
+             style={{
+                 border: '1px solid var(--theme-border-primary)',
+                 boxShadow: 'var(--theme-shadow-card, 0 4px 20px rgba(0, 0, 0, 0.12))',
+             }}>
+            {/* Quick Guide - Always Visible - ✅ Premium Design with Theme Support */}
+            <div className={`p-4 sm:p-5 bg-gradient-to-r ${themeConfig.primary} border ${themeConfig.border} transition-all duration-300`}
+                 style={{ 
+                     borderRadius: isExpanded ? '12px 12px 0 0' : '12px',
+                     background: theme === 'amber' 
+                         ? 'linear-gradient(135deg, var(--theme-primary-500) 0%, var(--theme-primary-600) 100%)' 
+                         : `linear-gradient(135deg, var(--theme-primary-400), var(--theme-primary-500))`,
+                     borderColor: theme === 'amber' ? 'var(--theme-primary-500)' : 'var(--theme-border-primary)',
+                     boxShadow: 'var(--theme-shadow-lg)',
+                 }}>
+                <div className="flex items-start gap-3 sm:gap-4">
+                    {/* Icon Container - Premium Design */}
+                    <div 
+                        className="p-2.5 sm:p-3 rounded-xl flex-shrink-0"
+                        style={{
+                            background: 'var(--theme-bg-secondary)',
+                            border: '1px solid var(--theme-border-primary)',
+                            boxShadow: 'var(--theme-shadow-sm)',
+                        }}
+                    >
+                        {icon || (
+                            <Info 
+                                className="w-5 h-5 sm:w-6 sm:h-6" 
+                                style={{ color: 'var(--theme-primary-500)' }}
+                            />
+                        )}
                     </div>
+                    
+                    {/* Content */}
                     <div className="flex-1 min-w-0">
-                        <h3 className={`font-bold text-sm sm:text-base ${themeConfig.text} mb-1.5 sm:mb-1 flex items-center gap-1.5 sm:gap-2`}>
-                            <span className="text-base sm:text-lg">📍</span> {title}
+                        <h3 
+                            className="font-bold text-base sm:text-lg mb-2 sm:mb-2.5 flex items-center gap-2 sm:gap-3"
+                            style={{ color: 'var(--theme-text-primary)' }}
+                        >
+                            {icon ? null : (
+                                <MapPin 
+                                    className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" 
+                                    style={{ color: 'var(--theme-primary-500)' }}
+                                />
+                            )}
+                            {title}
                         </h3>
-                        <p className="text-xs sm:text-sm text-white/80 bg-slate-800/50 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg leading-relaxed">
+                        <div 
+                            className="text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg leading-relaxed transition-all"
+                            style={{
+                                background: 'var(--theme-bg-tertiary)',
+                                color: 'var(--theme-text-secondary)',
+                                border: '1px solid var(--theme-border-primary)',
+                            }}
+                        >
                             {quickGuide}
-                        </p>
+                        </div>
                     </div>
+                    
+                    {/* Expand Button */}
                     {(steps || tips || warnings || affects) && (
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
-                            className={`p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors ${themeConfig.text} flex-shrink-0`}
+                            className="p-2 sm:p-2.5 rounded-lg transition-all flex-shrink-0 hover:scale-110 active:scale-95"
+                            style={{
+                                background: 'var(--theme-bg-tertiary)',
+                                border: '1px solid var(--theme-border-primary)',
+                                color: 'var(--theme-text-primary)',
+                            }}
                         >
-                            {isExpanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />}
+                            {isExpanded ? (
+                                <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" />
+                            ) : (
+                                <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
+                            )}
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* Expanded Details */}
+            {/* Expanded Details - Theme Compatible */}
             {isExpanded && (steps || tips || warnings || affects) && (
-                <div className={`p-4 bg-slate-800/50 border border-t-0 ${themeConfig.border} rounded-b-xl space-y-4`}>
+                <div 
+                    className="p-4 sm:p-5 border border-t-0 rounded-b-xl space-y-4 transition-all duration-300"
+                    style={{
+                        background: 'var(--theme-bg-secondary)',
+                        borderColor: 'var(--theme-border-primary)',
+                    }}
+                >
                     
-                    {/* What This Affects */}
+                    {/* What This Affects - Theme Compatible */}
                     {affects && affects.length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="text-sm font-semibold text-white/70 flex items-center gap-2">
-                                <ArrowRight className="w-4 h-4 text-amber-400" />
+                        <div className="space-y-3">
+                            <h4 
+                                className="text-sm sm:text-base font-semibold flex items-center gap-2"
+                                style={{ color: 'var(--theme-text-primary)' }}
+                            >
+                                <ArrowRight 
+                                    className="w-4 h-4 sm:w-5 sm:h-5" 
+                                    style={{ color: 'var(--theme-primary-500)' }}
+                                />
                                 سيؤثر على:
                             </h4>
                             <div className="flex flex-wrap gap-2">
                                 {affects.map((item, i) => (
-                                    <span key={i} className="text-xs bg-amber-500/10 text-amber-300 px-3 py-1 rounded-full border border-amber-500/20">
+                                    <span 
+                                        key={i} 
+                                        className="text-xs sm:text-sm px-3 py-1.5 rounded-full font-medium transition-all hover:scale-105"
+                                        style={{
+                                            background: 'var(--theme-primary-100)',
+                                            color: 'var(--theme-primary-700)',
+                                            border: '1px solid var(--theme-primary-300)',
+                                        }}
+                                    >
                                         {item}
                                     </span>
                                 ))}
@@ -161,37 +235,82 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
                         </div>
                     )}
 
-                    {/* Steps */}
+                    {/* Steps - Premium Design */}
                     {steps && steps.length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="text-sm font-semibold text-white/70 flex items-center gap-2">
-                                <BookOpen className="w-4 h-4 text-cyan-400" />
+                        <div className="space-y-3">
+                            <h4 
+                                className="text-sm sm:text-base font-semibold flex items-center gap-2"
+                                style={{ color: 'var(--theme-text-primary)' }}
+                            >
+                                <BookOpen 
+                                    className="w-4 h-4 sm:w-5 sm:h-5" 
+                                    style={{ color: 'var(--theme-primary-500)' }}
+                                />
                                 الخطوات:
                             </h4>
-                            <div className="space-y-2">
+                            <div className="space-y-2.5">
                                 {steps.map((step, i) => (
-                                    <div key={i} className={`flex items-start gap-3 p-2 rounded-lg ${
-                                        step.status === 'done' ? 'bg-green-500/10' :
-                                        step.status === 'current' ? 'bg-blue-500/10 border border-blue-500/30' :
-                                        'bg-white/5'
-                                    }`}>
-                                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                            step.status === 'done' ? 'bg-green-500 text-white' :
-                                            step.status === 'current' ? 'bg-blue-500 text-white' :
-                                            'bg-white/20 text-white/60'
-                                        }`}>
-                                            {step.status === 'done' ? <CheckCircle className="w-4 h-4" /> : i + 1}
+                                    <div 
+                                        key={i} 
+                                        className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl transition-all hover:scale-[1.02]"
+                                        style={{
+                                            background: step.status === 'done' 
+                                                ? 'var(--theme-success-50, rgba(34, 197, 94, 0.1))'
+                                                : step.status === 'current'
+                                                ? 'var(--theme-primary-50, rgba(20, 184, 166, 0.1))'
+                                                : 'var(--theme-bg-tertiary)',
+                                            border: `1px solid ${
+                                                step.status === 'done'
+                                                    ? 'var(--theme-success-300, rgba(34, 197, 94, 0.3))'
+                                                    : step.status === 'current'
+                                                    ? 'var(--theme-primary-300, rgba(20, 184, 166, 0.3))'
+                                                    : 'var(--theme-border-primary)'
+                                            }`,
+                                            boxShadow: step.status === 'current' ? 'var(--theme-shadow-sm)' : 'none',
+                                        }}
+                                    >
+                                        <span 
+                                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0 transition-all"
+                                            style={{
+                                                background: step.status === 'done' 
+                                                    ? 'var(--theme-success-500, #22c55e)' 
+                                                    : step.status === 'current'
+                                                    ? 'var(--theme-primary-500)'
+                                                    : 'var(--theme-bg-tertiary)',
+                                                color: step.status === 'done' || step.status === 'current' 
+                                                    ? 'white' 
+                                                    : 'var(--theme-text-secondary)',
+                                                border: step.status === 'done' || step.status === 'current'
+                                                    ? 'none'
+                                                    : '1px solid var(--theme-border-primary)',
+                                            }}
+                                        >
+                                            {step.status === 'done' ? (
+                                                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                                            ) : (
+                                                i + 1
+                                            )}
                                         </span>
-                                        <div className="flex-1">
-                                            <span className={`text-sm ${
-                                                step.status === 'done' ? 'text-green-400' :
-                                                step.status === 'current' ? 'text-blue-300 font-medium' :
-                                                'text-white/70'
-                                            }`}>
+                                        <div className="flex-1 min-w-0">
+                                            <span 
+                                                className="text-sm sm:text-base font-medium block"
+                                                style={{
+                                                    color: step.status === 'done'
+                                                        ? 'var(--theme-success-600, #16a34a)'
+                                                        : step.status === 'current'
+                                                        ? 'var(--theme-primary-600)'
+                                                        : 'var(--theme-text-primary)',
+                                                }}
+                                            >
                                                 {step.title}
                                             </span>
                                             {step.description && (
-                                                <p className="text-xs text-white/50 mt-0.5">{step.description}</p>
+                                                <p 
+                                                    className="text-xs sm:text-sm mt-1"
+                                                    style={{ color: 'var(--theme-text-secondary)' }}
+                                                >
+                                                    {step.description}
+                                                </p>
                                             )}
                                         </div>
                                     </div>
@@ -200,36 +319,62 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
                         </div>
                     )}
 
-                    {/* Tips */}
+                    {/* Tips - Theme Compatible */}
                     {tips && tips.length > 0 && (
-                        <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-                            <h4 className="text-sm font-semibold text-cyan-400 mb-2 flex items-center gap-2">
-                                <Lightbulb className="w-4 h-4" />
+                        <div 
+                            className="p-4 sm:p-5 rounded-xl transition-all hover:scale-[1.01]"
+                            style={{
+                                background: 'var(--theme-primary-50, rgba(20, 184, 166, 0.1))',
+                                border: '1px solid var(--theme-primary-200, rgba(20, 184, 166, 0.2))',
+                            }}
+                        >
+                            <h4 
+                                className="text-sm sm:text-base font-semibold mb-3 flex items-center gap-2"
+                                style={{ color: 'var(--theme-primary-600)' }}
+                            >
+                                <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5" />
                                 نصائح:
                             </h4>
-                            <ul className="space-y-1">
+                            <ul className="space-y-2">
                                 {tips.map((tip, i) => (
-                                    <li key={i} className="text-xs text-cyan-300 flex items-start gap-2">
-                                        <span className="text-cyan-400">•</span>
-                                        {tip}
+                                    <li 
+                                        key={i} 
+                                        className="text-xs sm:text-sm flex items-start gap-2.5"
+                                        style={{ color: 'var(--theme-text-secondary)' }}
+                                    >
+                                        <span style={{ color: 'var(--theme-primary-500)' }}>•</span>
+                                        <span>{tip}</span>
                                     </li>
                                 ))}
                             </ul>
                         </div>
                     )}
 
-                    {/* Warnings */}
+                    {/* Warnings - Theme Compatible */}
                     {warnings && warnings.length > 0 && (
-                        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                            <h4 className="text-sm font-semibold text-red-400 mb-2 flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4" />
+                        <div 
+                            className="p-4 sm:p-5 rounded-xl transition-all hover:scale-[1.01]"
+                            style={{
+                                background: 'var(--theme-error-50, rgba(239, 68, 68, 0.1))',
+                                border: '1px solid var(--theme-error-200, rgba(239, 68, 68, 0.2))',
+                            }}
+                        >
+                            <h4 
+                                className="text-sm sm:text-base font-semibold mb-3 flex items-center gap-2"
+                                style={{ color: 'var(--theme-error-600, #dc2626)' }}
+                            >
+                                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
                                 تنبيهات:
                             </h4>
-                            <ul className="space-y-1">
+                            <ul className="space-y-2">
                                 {warnings.map((warn, i) => (
-                                    <li key={i} className="text-xs text-red-300 flex items-start gap-2">
-                                        <span className="text-red-400">⚠</span>
-                                        {warn}
+                                    <li 
+                                        key={i} 
+                                        className="text-xs sm:text-sm flex items-start gap-2.5"
+                                        style={{ color: 'var(--theme-error-700, #b91c1c)' }}
+                                    >
+                                        <span>⚠</span>
+                                        <span>{warn}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -245,12 +390,13 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
 // PRE-BUILT HELP CONFIGS
 // ============================================================
 
-/** Help for Create Manager page (Owner) */
+/** Help for Create Manager page (Owner) - Premium Design */
 export const CreateManagerHelp: React.FC = () => (
     <ContextualHelp
         title="إنشاء مدير فندق جديد"
         quickGuide="أكمل بيانات المدير واختر الباقة لإتمام إنشاء الحساب"
         theme="amber"
+        icon={<MapPin className="w-6 h-6" style={{ color: 'var(--theme-primary-500)' }} />}
         affects={[
             'عدد المشتركين النشطين',
             'إجمالي الإيرادات',

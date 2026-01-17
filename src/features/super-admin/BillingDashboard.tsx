@@ -117,6 +117,19 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
         setStatsSelectedExpenseVouchers(selected);
     }, []);
 
+    // ✅ Helper function to calculate total expenses - MOVED BEFORE useEffect
+    const calculateTotalExpenses = async (): Promise<number> => {
+        try {
+            const allExpenseVouchers = await getAllExpenseVouchers();
+            return allExpenseVouchers
+                .filter(v => !v.isDeleted)
+                .reduce((sum, v) => sum + (v.amount || 0), 0);
+        } catch (error) {
+            console.error('Error calculating total expenses:', error);
+            return 0;
+        }
+    };
+
     useEffect(() => {
         loadData();
         loadSystemSettings();
@@ -291,19 +304,6 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
     }
 
     const totalOverdue = overdue.reduce((sum, inv) => sum + inv.amount, 0);
-
-    // ✅ Helper function to calculate total expenses
-    const calculateTotalExpenses = async (): Promise<number> => {
-        try {
-            const allExpenseVouchers = await getAllExpenseVouchers();
-            return allExpenseVouchers
-                .filter(v => !v.isDeleted)
-                .reduce((sum, v) => sum + (v.amount || 0), 0);
-        } catch (error) {
-            console.error('Error calculating total expenses:', error);
-            return 0;
-        }
-    };
 
     // ✅ Main content - shared between embedded and standalone modes
     const mainContent = (
@@ -507,6 +507,7 @@ const ComprehensiveFinancialStats: React.FC<{
     expenseVouchers,
     overdue
 }) => {
+    const { t } = useTranslation(); // ✅ Add translation hook
     const totalReceiptVouchers = receiptVouchers.filter(v => !v.isDeleted).length;
     const totalExpenseVouchers = expenseVouchers.filter(v => !v.isDeleted).length;
     const totalOverdueAmount = overdue.reduce((sum, inv) => sum + inv.amount, 0);
@@ -524,60 +525,79 @@ const ComprehensiveFinancialStats: React.FC<{
 
     return (
         <div className="space-y-4">
-            {/* ✅ Essential Financial KPIs - Single Row */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* ✅ Essential Financial KPIs - Dynamic Responsive Grid (Like Owner KPI Dashboard) */}
+            <div 
+                className="grid"
+                style={{
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: 'clamp(12px, 2vw, 16px)',
+                    padding: 'clamp(12px, 2vw, 16px)',
+                }}
+            >
                 {/* 1. إجمالي الإيرادات */}
-                <StatCard
-                    icon={TrendingUp}
-                    iconColor="green"
-                    label={t('admin.totalRevenue')}
-                    value={`${totalRevenue.toLocaleString()} ${t('common.rs')}`}
-                />
+                <div className="stat-card-pro-compact">
+                    <StatCard
+                        icon={TrendingUp}
+                        iconColor="green"
+                        label={t('admin.totalRevenue')}
+                        value={`${totalRevenue.toLocaleString()} ${t('common.rs')}`}
+                    />
+                </div>
                 
                 {/* 2. إجمالي المصروفات */}
-                <StatCard
-                    icon={TrendingDown}
-                    iconColor="red"
-                    label={t('admin.totalExpenses')}
-                    value={`${totalExpenses.toLocaleString()} ${t('common.rs')}`}
-                />
+                <div className="stat-card-pro-compact">
+                    <StatCard
+                        icon={TrendingDown}
+                        iconColor="red"
+                        label={t('admin.totalExpenses')}
+                        value={`${totalExpenses.toLocaleString()} ${t('common.rs')}`}
+                    />
+                </div>
                 
                 {/* 3. صافي الربح */}
-                <StatCard
-                    icon={netProfit >= 0 ? TrendingUp : TrendingDown}
-                    iconColor={netProfit >= 0 ? "teal" : "orange"}
-                    label={t('admin.netProfit')}
-                    value={`${netProfit.toLocaleString()} ${t('common.rs')}`}
-                    lastUpdate={`${profitMargin.toFixed(0)}%`}
-                />
+                <div className="stat-card-pro-compact">
+                    <StatCard
+                        icon={netProfit >= 0 ? TrendingUp : TrendingDown}
+                        iconColor={netProfit >= 0 ? "teal" : "orange"}
+                        label={t('admin.netProfit')}
+                        value={`${netProfit.toLocaleString()} ${t('common.rs')}`}
+                        lastUpdate={`${profitMargin.toFixed(0)}%`}
+                    />
+                </div>
 
                 {/* 4. سندات القبض */}
-                <StatCard
-                    icon={CreditCard}
-                    iconColor="blue"
-                    label={t('admin.receiptVouchers')}
-                    count={totalReceiptVouchers}
-                    lastUpdate={`${totalReceiptAmount.toLocaleString()} ${t('common.rs')}`}
-                />
+                <div className="stat-card-pro-compact">
+                    <StatCard
+                        icon={CreditCard}
+                        iconColor="blue"
+                        label={t('admin.receiptVouchers')}
+                        count={totalReceiptVouchers}
+                        lastUpdate={`${totalReceiptAmount.toLocaleString()} ${t('common.rs')}`}
+                    />
+                </div>
                 
                 {/* 5. سندات الصرف */}
-                <StatCard
-                    icon={DollarSign}
-                    iconColor="purple"
-                    label={t('admin.expenseVouchers')}
-                    count={totalExpenseVouchers}
-                    lastUpdate={`${totalExpenseAmount.toLocaleString()} ${t('common.rs')}`}
-                />
+                <div className="stat-card-pro-compact">
+                    <StatCard
+                        icon={DollarSign}
+                        iconColor="purple"
+                        label={t('admin.expenseVouchers')}
+                        count={totalExpenseVouchers}
+                        lastUpdate={`${totalExpenseAmount.toLocaleString()} ${t('common.rs')}`}
+                    />
+                </div>
                 
                 {/* 6. مستحقات متأخرة - Only show if there are overdue */}
                 {overdue.length > 0 && (
-                    <StatCard
-                        icon={AlertTriangle}
-                        iconColor="orange"
-                        label={t('admin.overdue')}
-                        value={`${totalOverdueAmount.toLocaleString()} ${t('common.rs')}`}
-                        lastUpdate={`${overdue.length} ${t('admin.invoice')}`}
-                    />
+                    <div className="stat-card-pro-compact">
+                        <StatCard
+                            icon={AlertTriangle}
+                            iconColor="orange"
+                            label={t('admin.overdue')}
+                            value={`${totalOverdueAmount.toLocaleString()} ${t('common.rs')}`}
+                            lastUpdate={`${overdue.length} ${t('admin.invoice')}`}
+                        />
+                    </div>
                 )}
             </div>
         </div>
@@ -620,7 +640,14 @@ const ReceiptVouchersStats: React.FC<{
         .reduce((sum, v) => sum + v.totalAmount, 0);
     
     return (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div 
+            className="grid"
+            style={{
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: 'clamp(12px, 2vw, 16px)',
+                padding: 'clamp(12px, 2vw, 16px)',
+            }}
+        >
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
                     icon={DollarSign}
@@ -705,7 +732,14 @@ const ExpenseVouchersStats: React.FC<{
         .reduce((sum, v) => sum + v.amount, 0);
     
     return (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div 
+            className="grid"
+            style={{
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: 'clamp(12px, 2vw, 16px)',
+                padding: 'clamp(12px, 2vw, 16px)',
+            }}
+        >
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
                     icon={DollarSign}

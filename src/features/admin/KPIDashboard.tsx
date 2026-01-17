@@ -159,34 +159,44 @@ const KPICard: React.FC<{ data: KPICardData; delay?: number }> = ({ data, delay 
 
     return (
         <div
-            className={`rounded-2xl transition-colors duration-300 p-5 transition-all duration-500 hover:scale-[1.02] ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            className={`rounded-2xl transition-all duration-500 hover:scale-[1.02] hover:shadow-lg ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
                 }`}
-            style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}
+            style={{ 
+                background: 'var(--theme-bg-secondary)', 
+                border: '1px solid var(--theme-border-primary)',
+                padding: 'clamp(1rem, 2vw, 1.5rem)',
+                minHeight: '140px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+            }}
         >
-            <div className="flex items-start justify-between mb-4">
-                <div>
-                    <p className="text-white/60 text-sm mb-1">{data.title}</p>
-                    <p className="text-3xl font-bold text-white">
+            <div className="flex items-start justify-between mb-3 sm:mb-4">
+                <div className="flex-1 min-w-0">
+                    <p className="text-white/60 text-xs sm:text-sm mb-1 truncate">{data.title}</p>
+                    <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white break-words">
                         {data.value}
-                        {data.suffix && <span className="text-lg text-white/60 mr-1">{data.suffix}</span>}
+                        {data.suffix && <span className="text-sm sm:text-lg text-white/60 mr-1">{data.suffix}</span>}
                     </p>
                 </div>
                 <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: `${data.color}20`, color: data.color }}
                 >
-                    {data.icon}
+                    <div className="w-5 h-5 sm:w-6 sm:h-6">
+                        {data.icon}
+                    </div>
                 </div>
             </div>
 
-            <div className={`flex items-center gap-1 text-sm ${data.trend === 'up' ? 'text-green-400' : data.trend === 'down' ? 'text-red-400' : 'text-white/40'
+            <div className={`flex items-center gap-1 text-xs sm:text-sm ${data.trend === 'up' ? 'text-green-400' : data.trend === 'down' ? 'text-red-400' : 'text-white/40'
                 }`}>
                 {data.trend === 'up' ? (
-                    <TrendingUp className="w-4 h-4" />
+                    <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                 ) : data.trend === 'down' ? (
-                    <TrendingDown className="w-4 h-4" />
+                    <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                 ) : null}
-                <span>{Math.abs(data.change)}% عن الفترة السابقة</span>
+                <span className="truncate">{Math.abs(data.change)}% عن الفترة السابقة</span>
             </div>
         </div>
     );
@@ -690,8 +700,8 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
                 </div>
             </div>
 
-            {/* KPI Cards Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
+            {/* KPI Cards Grid - Responsive & Dynamic */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
                 {kpiCards.map((kpi, index) => (
                     <KPICard key={kpi.id} data={kpi} delay={index * 100} />
                 ))}

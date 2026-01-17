@@ -260,6 +260,7 @@ export const AboutUs: React.FC = () => {
     const [showTrialModal, setShowTrialModal] = useState(false);
     const [trialName, setTrialName] = useState('');
     const [trialPhone, setTrialPhone] = useState('');
+    const [trialRequiredBranches, setTrialRequiredBranches] = useState<number>(1);
     const [scrollPosition, setScrollPosition] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
@@ -384,7 +385,7 @@ export const AboutUs: React.FC = () => {
         setIsSubmitting(true);
         try {
             // ✅ Architecture: Use service instead of direct Firebase call
-            const result = await submitTrialRequest(trialName.trim(), cleanPhone, 'about_us_page');
+            const result = await submitTrialRequest(trialName.trim(), cleanPhone, 'about_us_page', trialRequiredBranches);
 
             if (result.success) {
                 setIsSuccess(true);
@@ -396,6 +397,7 @@ export const AboutUs: React.FC = () => {
                     setIsSuccess(false);
                     setTrialName('');
                     setTrialPhone('');
+                    setTrialRequiredBranches(1);
                 }, 2000);
             } else {
                 toast.error(result.error || t('aboutUs.trialForm.error'));
@@ -1537,6 +1539,7 @@ export const AboutUs: React.FC = () => {
                         setIsSuccess(false);
                         setTrialName('');
                         setTrialPhone('');
+                        setTrialRequiredBranches(1);
                     }
                 }}
                 title={isSuccess ? undefined : t('aboutUs.trialForm.title')}
@@ -1596,6 +1599,55 @@ export const AboutUs: React.FC = () => {
                             <p className="text-xs text-white/50 mt-1">{t('aboutUs.trialForm.phoneExample')}</p>
                         </div>
 
+                        {/* Required Branches Input - Enhanced with Dropdown */}
+                        <div>
+                            <label className="block text-sm font-medium text-white/80 mb-2">
+                                عدد التراخيص المطلوبة (كل فرع = ترخيص واحد)
+                            </label>
+                            <div className="space-y-3">
+                                {/* Quick Select Buttons */}
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[1, 2, 3, 4, 5, 10, 15, 20].map((num) => (
+                                        <button
+                                            key={num}
+                                            type="button"
+                                            onClick={() => setTrialRequiredBranches(num)}
+                                            disabled={isSubmitting}
+                                            className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                                                trialRequiredBranches === num
+                                                    ? 'bg-teal-500 text-white border-2 border-teal-400'
+                                                    : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                                            }`}
+                                        >
+                                            {num}
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                {/* Custom Input */}
+                                <div className="relative">
+                                    <Key className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="100"
+                                        value={trialRequiredBranches}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value) || 1;
+                                            setTrialRequiredBranches(Math.max(1, Math.min(100, val)));
+                                        }}
+                                        placeholder="أو أدخل عدد مخصص (1-100)"
+                                        className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                                        dir="ltr"
+                                        disabled={isSubmitting}
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-white/50 mt-2">
+                                عدد الفروع التي تحتاجها (كل فرع يحتاج ترخيص واحد) • المحدد: <span className="text-teal-400 font-semibold">{trialRequiredBranches} ترخيص</span>
+                            </p>
+                        </div>
+
                         {/* Submit Button */}
                         <ModalActions
                             onCancel={() => {
@@ -1603,6 +1655,7 @@ export const AboutUs: React.FC = () => {
                                     setShowTrialModal(false);
                                     setTrialName('');
                                     setTrialPhone('');
+                                    setTrialRequiredBranches(1);
                                 }
                             }}
                             onConfirm={handleTrialSubmit}

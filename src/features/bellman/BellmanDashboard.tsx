@@ -372,7 +372,7 @@ const CheckinModal: React.FC<{
                             )}
 
                             {/* Adults & Children */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                                 <div>
                                     <label className="block text-sm text-white/60 mb-2">البالغين</label>
                                     <div className="flex items-center gap-3">
@@ -1231,7 +1231,7 @@ export const BellmanDashboard: React.FC = () => {
                     }
 
                     return (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
                             {currentRequests.map(request => (
                                 <div key={request.id} 
                                     className="p-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] adora-card border shadow-sm adora-border"
@@ -1310,7 +1310,7 @@ export const BellmanDashboard: React.FC = () => {
                             <DoorOpen className="w-4 h-4" />
                             الغرف المشغولة ({roomCards.filter(r => r.status === 'active').length})
                         </h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                             {roomCards.filter(r => r.status === 'active').slice(0, 8).map(room => (
                                 <div key={room.id} className="adora-card p-3 text-center">
                                     <span className="text-lg font-bold adora-text-primary">{room.roomNumber}</span>

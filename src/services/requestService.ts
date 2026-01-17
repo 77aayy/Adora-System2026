@@ -152,6 +152,8 @@ export const createRequest = async (
             initialDepartment = 'bellman';
         } else if (input.type === RequestType.PROCUREMENT) {
             initialDepartment = 'procurement';
+        } else if (input.type === RequestType.COFFEE || input.type === RequestType.MINIBAR) {
+            initialDepartment = 'coffee_shop'; // ✅ Coffee shop department
         }
 
         const requestData: Omit<Request, 'id'> = {
@@ -198,6 +200,22 @@ export const createRequest = async (
         // ✅ STEP 4: Use tenant-scoped collection (Pattern 1)
         const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const docRef = await addDoc(requestsRef, requestData);
+        
+        // ✅ STEP 4.5: Check if target department is disabled and transfer immediately
+        try {
+            const { checkImmediateTransferForDisabledDepartment } = await import('./autoTransferService');
+            // Check if the target department is disabled and transfer immediately if auto-transfer rule exists
+            checkImmediateTransferForDisabledDepartment(
+                docRef.id,
+                initialDepartment,
+                tenantId,
+                branch
+            ).catch(err => {
+                logger.warn('Failed to check immediate transfer for disabled department', err, 'requestService');
+            });
+        } catch (err) {
+            logger.warn('Could not load autoTransferService for immediate transfer check', err, 'requestService');
+        }
         
         // ✅ Auto-check daily attendance
         if (userId) {

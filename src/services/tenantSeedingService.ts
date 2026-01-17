@@ -377,8 +377,20 @@ const isCollectionEmpty = async (collectionName: string): Promise<boolean> => {
         const q = query(collection(db, collectionName), limit(1));
         const snapshot = await getDocs(q);
         return snapshot.empty;
-    } catch (error) {
-        // If we can't read, assume it needs seeding
+    } catch (error: any) {
+        // ✅ Graceful handling: If permission denied, assume collection needs seeding
+        // This allows seeding to proceed even if read access is restricted
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            // If we can't read due to permissions, assume it needs seeding
+            // The seeding write will either succeed (if we have write access) or fail gracefully
+            return true;
+        }
+        
+        // For other errors, also assume it needs seeding to attempt fixing
         return true;
     }
 };

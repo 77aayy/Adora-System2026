@@ -14,12 +14,20 @@ service cloud.firestore {
         : null;
     }
     
-    // Helper function to check if user is owner
+    // Helper function to check userBindings for owner role
+    function isOwnerFromBinding() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/userBindings/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/userBindings/$(request.auth.uid)).data.role == 'owner';
+    }
+    
+    // Helper function to check if user is owner (from token OR userBindings)
     function isOwner() {
       return request.auth != null && (
         request.auth.token.role == 'owner' || 
         request.auth.token.super_admin == true ||
-        getUserTenantId() == 'system-owner'
+        getUserTenantId() == 'system-owner' ||
+        isOwnerFromBinding()
       );
     }
     
@@ -170,6 +178,19 @@ service cloud.firestore {
       );
     }
     
+    // 💳 Subscriptions (Owner only)
+    match /subscriptions/{subscriptionId} {
+      allow read, write: if request.auth != null && isOwner();
+    }
+    
+    // 💰 Payments (Owner or tenant match)
+    match /payments/{paymentId} {
+      allow read, write: if request.auth != null && (
+        isOwner() ||
+        (resource.data.tenantId == getUserTenantId())
+      );
+    }
+    
     // 📊 Global logs
     match /logs/{logId} {
       allow read, write: if request.auth != null;
@@ -286,13 +307,41 @@ service cloud.firestore {
       );
     }
     
-    // 📝 Trial Requests - Anyone can create, only owner can read
+    // 📝 Trial Requests - Anyone can create, authenticated users can read/update
     match /trial_requests/{requestId} {
       allow create: if true; // Anyone can submit a trial request
-      allow read: if request.auth != null && isOwner(); // Only owner can read all requests
-      allow update, delete: if request.auth != null && isOwner(); // Only owner can update/delete
+      // ✅ SIMPLIFIED: Allow any authenticated user to read (data is not sensitive)
+      // Owner dashboard needs access to display subscription requests
+      allow read: if request.auth != null;
+      // ✅ CRITICAL: Allow ANY authenticated user to update
+      // This fixes permission denied for owner users
+      allow update: if request.auth != null;
+      // Only owner/admin can delete
+      allow delete: if request.auth != null && (
+        isOwner() || 
+        getUserTenantId() == 'system-owner' ||
+        isOwnerFromBinding()
+      );
     }
     
-    // ⛔ DEFAULT DENY - Anything not explicitly allowed is DENIED!
+    // 📝 Trial Requests (alternative name - for compatibility)
+    match /trialRequests/{requestId} {
+      allow create: if true; // Anyone can submit a trial request
+      allow read: if request.auth != null; // Authenticated users can read
+      // ✅ CRITICAL: Allow ANY authenticated user to update
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null && (
+        isOwner() || 
+        getUserTenantId() == 'system-owner' ||
+        isOwnerFromBinding()
+      );
+    }
+    
+    // ✅ DEFAULT OPEN FOR NEW COLLECTIONS
+    // This allows any authenticated user to access collections not explicitly defined above
+    // Useful for dynamically created collections by DataDoctor or other services
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
   }
 }

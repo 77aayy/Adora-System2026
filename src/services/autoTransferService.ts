@@ -385,6 +385,109 @@ const checkAndTransfer = async (): Promise<void> => {
 // ============================================================
 
 /**
+ * Check if department is enabled for tenant and transfer immediately if disabled
+ * This is called when a request is created for a department that might be disabled
+ * @param requestId - The newly created request ID
+ * @param targetDepartment - The target department for the request
+ * @param tenantId - Tenant ID
+ * @param branchId - Branch ID
+ * @returns Promise<boolean> - True if transfer was performed, false otherwise
+ */
+export const checkImmediateTransferForDisabledDepartment = async (
+    requestId: string,
+    targetDepartment: string,
+    tenantId: string,
+    branchId: string
+): Promise<boolean> => {
+    try {
+        // Load auto-transfer config
+        const config = await loadAutoTransferConfig(branchId, tenantId);
+        if (!config || !config.enabled) {
+            return false; // Auto-transfer is disabled
+        }
+
+        // Find rule that matches this department (fromDepartment = targetDepartment)
+        const matchingRule = config.rules.find(
+            rule => rule.enabled && rule.fromDepartment === targetDepartment
+        );
+
+        if (!matchingRule) {
+            return false; // No rule found for this department
+        }
+
+        // Check if department is disabled
+        const { isFeatureEnabledForTenant } = await import('./tenantCustomizationService');
+        
+        // Map department to feature name
+        const departmentToFeatureMap: Record<string, string> = {
+            'coffee_shop': 'coffeeshop',
+            'coffeeshop': 'coffeeshop',
+            'procurement': 'procurement',
+            'maintenance': 'maintenance',
+            'housekeeping': 'housekeeping',
+            'bellman': 'bellman',
+        };
+
+        const featureName = departmentToFeatureMap[targetDepartment];
+        if (!featureName) {
+            return false; // Department not in mapping, assume enabled
+        }
+
+        const isEnabled = await isFeatureEnabledForTenant(tenantId, featureName);
+        
+        // If department is enabled, no need to transfer
+        if (isEnabled) {
+            return false;
+        }
+
+        // Department is disabled and we have a matching rule - transfer immediately
+        console.log(`🔄 [Auto-Transfer] Department ${targetDepartment} is disabled, transferring request ${requestId} immediately to ${matchingRule.toDepartment}`);
+
+        // Get the request to transfer
+        const request = await getRequest(requestId, tenantId);
+        if (!request) {
+            console.error(`❌ [Auto-Transfer] Request ${requestId} not found`);
+            return false;
+        }
+
+        // Perform immediate transfer
+        await transferRequestToDepartment(
+            requestId,
+            tenantId,
+            targetDepartment,
+            matchingRule.toDepartment,
+            'AUTO_TRANSFER_SYSTEM',
+            'نظام التحويل التلقائي',
+            undefined,
+            `تحويل تلقائي فوري: القسم ${targetDepartment} غير مفعل، تم التحويل إلى ${matchingRule.toDepartment}`
+        );
+
+        // Update request notes
+        if (!db) {
+            console.error('❌ [Auto-Transfer] Firestore not initialized');
+            return false;
+        }
+
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
+        const currentNotes = request.notes || '';
+        await updateDoc(requestRef, {
+            notes: currentNotes + `\n[نظام التحويل التلقائي] تم التحويل الفوري من ${targetDepartment} إلى ${matchingRule.toDepartment} (القسم غير مفعل)`,
+            autoTransferred: true,
+            autoTransferredAt: Timestamp.now(),
+            autoTransferredFrom: targetDepartment,
+            autoTransferredTo: matchingRule.toDepartment,
+            immediateTransfer: true, // Mark as immediate transfer (not time-based)
+        });
+
+        console.log(`✅ [Auto-Transfer] Successfully transferred request ${requestId} from disabled department ${targetDepartment} to ${matchingRule.toDepartment}`);
+        return true;
+    } catch (error) {
+        console.error(`❌ [Auto-Transfer] Failed to check immediate transfer for request ${requestId}:`, error);
+        return false; // Fail silently - don't block request creation
+    }
+};
+
+/**
  * Get default rules template
  */
 export const getDefaultRules = (): AutoTransferRule[] => {

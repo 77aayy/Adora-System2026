@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Crown, UserPlus, Users, Building2, Trash2, Edit,
-    Save, X, RefreshCw, LogOut, Eye, EyeOff, Check,
+    Save, X, Plus, RefreshCw, LogOut, Eye, EyeOff, Check,
     Calendar, Clock, Pause, Play, AlertTriangle, Key, Shield, ArrowRight, LayoutDashboard, CheckCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -71,6 +71,9 @@ export const OwnerPanel: React.FC = () => {
     const [showAuditChoiceModal, setShowAuditChoiceModal] = useState(false);
     const [showPurgeConfirmModal, setShowPurgeConfirmModal] = useState(false);
     const [resetCode, setResetCode] = useState('');
+    // ✅ فحص/مسح النظام: نافذة كلمة مرور قبل فتح الخيارات (بدون كتابة الباسورد في النافذة)
+    const [showScanPasswordModal, setShowScanPasswordModal] = useState(false);
+    const [scanPassword, setScanPassword] = useState('');
 
     // Manual init not needed - relying on useAuth
     // User role check handles redirection
@@ -599,7 +602,7 @@ export const OwnerPanel: React.FC = () => {
                     </button>
 
                     <button
-                        onClick={() => setShowAuditChoiceModal(true)}
+                        onClick={() => setShowScanPasswordModal(true)}
                         disabled={auditLoading || dataLoading}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all relative overflow-hidden ${
                             auditStatus === 'loading' 
@@ -833,6 +836,103 @@ export const OwnerPanel: React.FC = () => {
                             />
                         )
                     }
+
+                    {/* ✅ نافذة كلمة المرور لفحص/مسح النظام - بدون كتابة الباسورد */}
+                    {showScanPasswordModal && (
+                        <div
+                            className="fixed inset-0 z-[210] flex items-center justify-center p-4"
+                            style={{
+                                background: 'var(--theme-overlay-backdrop, rgba(0, 0, 0, 0.75))',
+                                backdropFilter: 'blur(8px)',
+                            }}
+                            onClick={(e) => {
+                                if (e.target === e.currentTarget) {
+                                    setShowScanPasswordModal(false);
+                                    setScanPassword('');
+                                }
+                            }}
+                        >
+                            <div
+                                className="relative w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl glass-card"
+                                style={{
+                                    background: 'var(--theme-bg-secondary)',
+                                    border: '2px solid var(--theme-primary-500)',
+                                    zIndex: 100000,
+                                    boxShadow: 'var(--theme-shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.3))',
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--theme-primary-500)', opacity: 0.2 }}>
+                                        <Shield className="w-6 h-6" style={{ color: 'var(--theme-primary-400)' }} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>فحص/مسح النظام</h3>
+                                        <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>إدخال كلمة المرور المطلوبة</p>
+                                    </div>
+                                    <button
+                                        onClick={() => { setShowScanPasswordModal(false); setScanPassword(''); }}
+                                        className="p-2 rounded-lg transition-colors hover:opacity-70"
+                                        style={{ background: 'var(--theme-bg-tertiary)', color: 'var(--theme-text-secondary)' }}
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text-primary)' }}>كلمة المرور</label>
+                                    <input
+                                        type="password"
+                                        value={scanPassword}
+                                        onChange={(e) => setScanPassword(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && scanPassword.trim().toLowerCase() === 'adora') {
+                                                setShowScanPasswordModal(false);
+                                                setScanPassword('');
+                                                setShowAuditChoiceModal(true);
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 rounded-xl border transition-all text-center font-mono text-lg tracking-wider input"
+                                        style={{ background: 'var(--theme-bg-tertiary)', borderColor: 'var(--theme-border-primary)', color: 'var(--theme-text-primary)' }}
+                                        placeholder="••••••••"
+                                        autoFocus
+                                    />
+                                    {scanPassword && scanPassword.trim().toLowerCase() !== 'adora' && (
+                                        <p className="text-xs mt-2 flex items-center gap-1" style={{ color: 'var(--theme-error-500, #ef4444)' }}>
+                                            <AlertTriangle className="w-3 h-3" /> كلمة المرور غير صحيحة
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => { setShowScanPasswordModal(false); setScanPassword(''); }}
+                                        className="flex-1 px-6 py-3 rounded-xl border font-medium transition-all"
+                                        style={{ background: 'var(--theme-bg-tertiary)', borderColor: 'var(--theme-border-primary)', color: 'var(--theme-text-primary)' }}
+                                    >
+                                        إلغاء
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (scanPassword.trim().toLowerCase() === 'adora') {
+                                                setShowScanPasswordModal(false);
+                                                setScanPassword('');
+                                                setShowAuditChoiceModal(true);
+                                            }
+                                        }}
+                                        disabled={scanPassword.trim().toLowerCase() !== 'adora'}
+                                        className="flex-1 px-6 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        style={{
+                                            background: scanPassword.trim().toLowerCase() === 'adora' ? 'var(--theme-primary-500)' : 'var(--theme-bg-tertiary)',
+                                            color: scanPassword.trim().toLowerCase() === 'adora' ? 'white' : 'var(--theme-text-disabled)',
+                                            borderColor: scanPassword.trim().toLowerCase() === 'adora' ? 'var(--theme-primary-500)' : 'var(--theme-border-primary)',
+                                            opacity: scanPassword.trim().toLowerCase() === 'adora' ? 1 : 0.5,
+                                        }}
+                                    >
+                                        دخول
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* ✅ Audit Choice Modal - Premium Design */}
                     {showAuditChoiceModal && (
@@ -1262,10 +1362,11 @@ const AddManagerModal: React.FC<AddManagerModalProps> = ({ onClose, onSuccess })
     };
 
     return (
-        <div className={`fixed inset-0 bg-black/90 flex items-center justify-center z-50 ${responsiveClasses.container} overflow-y-auto`}>
-            <div className={`${responsiveClasses.modalMedium} ${responsiveClasses.cardRounded} bg-white/10 backdrop-blur-xl border border-white/20 overflow-hidden max-h-[95vh] sm:max-h-[90vh] flex flex-col my-auto shadow-2xl`}>
-                {/* Header - Mobile-First */}
-                <div className={`flex items-center justify-between ${responsiveClasses.cardPadding} border-b border-white/10 flex-shrink-0`}>
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-3">
+            {/* بدون سكرول: ارتفاع ثابت، خانات مضمومة */}
+            <div className={`w-full max-w-lg ${responsiveClasses.cardRounded} bg-white/10 backdrop-blur-xl border border-white/20 overflow-hidden h-[85vh] max-h-[640px] flex flex-col shadow-2xl`}>
+                {/* Header - مضموم */}
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 flex-shrink-0">
                     <div className={`flex items-center ${responsiveClasses.gridGapSmall} min-w-0 flex-1`}>
                         <div className={`${responsiveClasses.iconButton} ${responsiveClasses.cardRounded} bg-yellow-500/20 flex items-center justify-center flex-shrink-0`}>
                             <UserPlus className={`${responsiveClasses.iconMedium} text-yellow-400`} />
@@ -1280,141 +1381,57 @@ const AddManagerModal: React.FC<AddManagerModalProps> = ({ onClose, onSuccess })
                     </button>
                 </div>
 
-                {/* Content - Mobile-First Scrollable */}
-                <div className={`${responsiveClasses.cardPadding} ${responsiveClasses.gridGap} overflow-y-auto flex-1`}>
-                    {/* Name (Optional) */}
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">اسم المدير (اختياري)</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            className="input"
-                            placeholder="مثال: محمد أحمد"
-                        />
+                {/* Content - بدون سكرول، خانات مضمومة */}
+                <div className="px-4 py-3 overflow-hidden flex-1 min-h-0 flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="block text-xs text-white/60 mb-1">اسم المدير (اختياري)</label>
+                            <input type="text" value={name} onChange={e => setName(e.target.value)} className="input py-2 text-sm" placeholder="محمد أحمد" />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-white/60 mb-1">اسم الفندق / البراند</label>
+                            <input type="text" value={hotelName} onChange={e => setHotelName(e.target.value)} className="input py-2 text-sm" placeholder="سلسلة فنادق الأهرام" />
+                        </div>
                     </div>
-
-                    {/* Code */}
                     <div>
-                        <label className="block text-sm text-white/60 mb-2">كود المدير (4 أرقام) *</label>
+                        <label className="block text-xs text-white/60 mb-1">كود المدير (4 أرقام) *</label>
                         <div className="relative">
-                            <input
-                                type="text"
-                                value={code}
-                                onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                className={`input text-center text-2xl tracking-widest pr-10 ${conflictingCodes.has(code) ? 'border-yellow-500/50 text-yellow-500' : ''}`}
-                                placeholder="0000"
-                                maxLength={4}
-                            />
-                            {checkingCodes && (
-                                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                                    <AdoraLoaderInline size={16} />
+                            <input type="text" value={code} onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))} className={`input py-2 text-center text-xl tracking-widest ${conflictingCodes.has(code) ? 'border-yellow-500/50 text-yellow-500' : ''}`} placeholder="0000" maxLength={4} />
+                            {checkingCodes && <div className="absolute left-2 top-1/2 -translate-y-1/2"><AdoraLoaderInline size={14} /></div>}
+                        </div>
+                        {error && (error.includes(code) || error.includes('المدير')) && <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{error}</p>}
+                    </div>
+                    <div>
+                        <label className="block text-xs text-white/60 mb-1">الفروع (كود + اسم) *</label>
+                        <div className="flex gap-2">
+                            <input type="text" value={currentBranchCode} onChange={e => setCurrentBranchCode(e.target.value.replace(/\D/g, '').slice(0, 4))} className={`input py-2 w-16 text-center text-sm ${conflictingCodes.has(currentBranchCode) ? 'border-yellow-500/50' : ''}`} placeholder="كود" />
+                            <input type="text" value={currentBranchName} onChange={e => setCurrentBranchName(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleAddBranch()} className="input py-2 flex-1 text-sm" placeholder="اسم الفرع" />
+                            <button type="button" onClick={handleAddBranch} disabled={loading || !currentBranchCode.trim() || !currentBranchName.trim()} className="px-3 py-2 rounded-xl bg-primary-500 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-1"><Plus className="w-4 h-4" />إضافة</button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                            {branchCodes.length > 0 ? branchCodes.map((b) => (
+                                <div key={b.code} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+                                    <span className="text-xs font-bold text-primary-400">{b.code}</span>
+                                    <span className="text-xs text-white">{b.name}</span>
+                                    <button type="button" onClick={() => handleRemoveBranch(b.code)} className="text-red-400 hover:text-red-300 p-0.5"><Trash2 className="w-3.5 h-3.5" /></button>
+                                </div>
+                            )) : (
+                                <div className="w-full py-4 rounded-xl border border-dashed border-white/10 flex flex-col items-center justify-center text-center text-white/30">
+                                    <Key className="w-8 h-8 mb-1 opacity-50" />
+                                    <p className="text-xs">أضف فرعاً واحداً على الأقل</p>
                                 </div>
                             )}
                         </div>
-                        <p className="text-xs text-white/40 mt-1">كود الدخول الخاص بالمدير</p>
-                        {error && (error.includes(code) || error.includes('المدير')) && (
-                            <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3" />
-                                {error}
-                            </p>
-                        )}
+                        <p className="text-[10px] text-white/40 mt-1">عدد الفروع: <span className="font-bold text-white">{branchCodes.length}</span></p>
                     </div>
-
-                    {/* Hotel Name */}
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">اسم الفندق / البراند</label>
-                        <input
-                            type="text"
-                            value={hotelName}
-                            onChange={e => setHotelName(e.target.value)}
-                            className="input"
-                            placeholder="مثال: سلسلة فنادق الأهرام"
-                        />
-                    </div>
-
-                    {/* ✅ Branch Codes & Names */}
-                    <div>
-                        <label className="block text-sm text-white/60 mb-2">الفروع (الكود + الاسم) *</label>
-                        <div className="flex flex-col gap-2 mb-3">
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={currentBranchCode}
-                                    onChange={e => setCurrentBranchCode(e.target.value.replace(/\D/g, ''))}
-                                    className={`input w-24 text-center ${conflictingCodes.has(currentBranchCode) ? 'border-yellow-500/50 text-yellow-500' : ''}`}
-                                    placeholder="الكود"
-                                />
-                                <input
-                                    type="text"
-                                    value={currentBranchName}
-                                    onChange={e => setCurrentBranchName(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && handleAddBranch()}
-                                    className="input flex-1"
-                                    placeholder="اسم الفرع (مثل: فرع وسط البلد)"
-                                />
-                            </div>
-                            <button
-                                type="button"
-                                onClick={handleAddBranch}
-                                disabled={loading || !currentBranchCode.trim() || !currentBranchName.trim()}
-                                className="w-full py-2 rounded-xl bg-primary-500 text-white font-medium disabled:opacity-50 hover:bg-primary-600 transition-colors flex items-center justify-center gap-2"
-                            >
-                                {loading && checkingCodes ? <AdoraLoaderInline size={16} /> : <span>إضافة للترخيص ➕</span>}
-                            </button>
-                        </div>
-
-                        {/* List of Added Branches */}
-                        <div className="space-y-2">
-                            {branchCodes.length > 0 ? (
-                                branchCodes.map((branch) => (
-                                    <div
-                                        key={branch.code}
-                                        className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <span className="w-8 h-8 rounded-lg bg-primary-500/20 text-primary-400 text-xs flex items-center justify-center font-bold">
-                                                {branch.code}
-                                            </span>
-                                            <span className="text-sm text-white font-medium">{branch.name}</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveBranch(branch.code)}
-                                            className="text-red-400 hover:text-red-300 p-1"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="glass-card p-8 rounded-[2.5rem] border border-white/5 flex flex-col items-center justify-center text-center h-64 text-white/20">
-                                    <Key className="w-16 h-16 mb-4 opacity-20" />
-                                    <p className="font-bold">الكود (4 أرقام) سيظهر هنا</p>
-                                </div>
-                            )}
-                        </div>
-                        <p className="text-xs text-white/40 mt-2">
-                            عدد الفروع في العقد: <span className="text-white font-bold">{branchCodes.length}</span>
-                        </p>
-                    </div>
-
-                    {/* General Errors (Branch Related or System) */}
                     {error && !error.includes(code) && !error.includes('المدير') && (
-                        <p className="text-red-400 text-sm text-center bg-red-500/10 p-2 rounded-lg flex items-center justify-center gap-2">
-                            <AlertTriangle className="w-4 h-4" />
-                            {error}
-                        </p>
+                        <p className="text-xs text-red-400 bg-red-500/10 p-2 rounded-lg flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" />{error}</p>
                     )}
                 </div>
 
-                {/* Footer - Mobile-First */}
-                <div className={`${responsiveClasses.cardPadding} border-t border-white/10 flex-shrink-0`}>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading || branchCodes.length === 0 || code.length !== 4}
-                        className={`${responsiveClasses.touch} w-full py-3 sm:py-4 ${responsiveClasses.cardRounded} bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-yellow-500/20 transition-all ${responsiveClasses.buttonText}`}
-                    >
+                {/* Footer - مضموم */}
+                <div className="px-4 py-2.5 border-t border-white/10 flex-shrink-0">
+                    <button onClick={handleSubmit} disabled={loading || branchCodes.length === 0 || code.length !== 4} className="w-full py-2.5 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         {loading ? (
                             <AdoraLoaderInline size={20} />
                         ) : (

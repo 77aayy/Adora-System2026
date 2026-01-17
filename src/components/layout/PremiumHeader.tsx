@@ -63,7 +63,7 @@ export const PremiumHeader: React.FC = () => {
 
     // Current branch name
     const currentBranch = branches.find(b => b.id === branchId);
-    const branchName = currentBranch?.name || t('sidebar.branch') || 'الفرع';
+    const branchName = currentBranch?.name || t('sidebar.branch');
 
     // Smart Time-based Greeting
     const greeting = useMemo(() => {
@@ -76,56 +76,56 @@ export const PremiumHeader: React.FC = () => {
         {
             id: 'admin',
             path: '/admin',
-            label: t('sidebar.dashboard') || 'لوحة التحكم',
-            shortLabel: t('departments.admin') || 'التحكم',
+            label: t('sidebar.dashboard'),
+            shortLabel: t('departments.admin'),
             icon: <LayoutDashboard className="w-4 h-4" />,
             color: '#14B8A6',
         },
         {
             id: 'reception',
             path: '/reception',
-            label: t('departments.reception') || 'الاستقبال',
-            shortLabel: t('departments.reception') || 'استقبال',
+            label: t('departments.reception'),
+            shortLabel: t('departments.reception'),
             icon: <Phone className="w-4 h-4" />,
             color: '#3B82F6',
         },
         {
             id: 'housekeeping',
             path: '/housekeeping',
-            label: t('departments.housekeeping') || 'الهاوس كيبنج',
-            shortLabel: t('departments.housekeeping') || 'هاوس',
+            label: t('departments.housekeeping'),
+            shortLabel: t('departments.housekeeping'),
             icon: <Sparkles className="w-4 h-4" />,
             color: '#8B5CF6',
         },
         {
             id: 'bellman',
             path: '/bellman',
-            label: t('departments.bellman') || 'البيلمان',
-            shortLabel: t('departments.bellman') || 'بيلمان',
+            label: t('departments.bellman'),
+            shortLabel: t('departments.bellman'),
             icon: <BellRing className="w-4 h-4" />,
             color: '#F59E0B',
         },
         {
             id: 'coffeeshop',
             path: '/coffeeshop',
-            label: t('departments.coffeeshop') || 'الكافي شوب',
-            shortLabel: t('departments.coffeeshop') || 'كافي',
+            label: t('departments.coffeeshop'),
+            shortLabel: t('departments.coffeeshop'),
             icon: <Coffee className="w-4 h-4" />,
             color: '#78350F',
         },
         {
             id: 'maintenance',
             path: '/maintenance',
-            label: t('departments.maintenance') || 'الصيانة',
-            shortLabel: t('departments.maintenance') || 'صيانة',
+            label: t('departments.maintenance'),
+            shortLabel: t('departments.maintenance'),
             icon: <Wrench className="w-4 h-4" />,
             color: '#EF4444',
         },
         ...(isProcurementEnabled ? [{
             id: 'procurement',
             path: '/procurement',
-            label: t('departments.procurement') || 'المشتريات',
-            shortLabel: t('departments.procurement') || 'مشتريات',
+            label: t('departments.procurement'),
+            shortLabel: t('departments.procurement'),
             icon: <ShoppingCart className="w-4 h-4" />,
             color: '#10B981',
         }] : []),
@@ -247,7 +247,7 @@ export const PremiumHeader: React.FC = () => {
                                         : 'var(--theme-bg-secondary)',
                                     border: '1px solid var(--theme-border-primary)',
                                 }}
-                                aria-label={t('sidebar.openAdminMenu') || 'فتح القائمة الإدارية'}
+                                aria-label={t('sidebar.openAdminMenu')}
                             >
                                 <Menu 
                                     className="w-5 h-5 transition-colors duration-200" 
@@ -402,9 +402,9 @@ export const PremiumHeader: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Points Tracker - Desktop Only (XL screens) */}
+                            {/* Points Tracker - Visible in header on all screen sizes */}
                             {user?.id && (
-                                <div className="hidden xl:block">
+                                <div className="hidden lg:block">
                                     <PointsTracker 
                                         employeeId={user.id} 
                                         inline 
@@ -413,98 +413,37 @@ export const PremiumHeader: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Actions Menu - All Secondary Actions Here - ADORA MASTER UI PROTOCOL V3.1 */}
+                            {/* Actions Menu - Clean Simple Button */}
                             <div 
                                 ref={actionsMenuRef}
-                                className="relative" 
+                                className="relative"
                                 data-menu-container
-                                style={{
-                                    position: 'relative',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    padding: '8px 16px',
-                                    cursor: 'pointer',
-                                    gap: '6px',
-                                    transition: 'all 0.2s ease-in-out',
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!showActionsMenu) {
-                                        e.currentTarget.style.color = ADORA_THEME.colors.primary;
-                                        e.currentTarget.style.background = 'rgba(32, 178, 170, 0.04)';
-                                        e.currentTarget.style.borderRadius = '12px';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!showActionsMenu) {
-                                        e.currentTarget.style.color = ADORA_THEME.colors.text;
-                                        e.currentTarget.style.background = 'transparent';
-                                        e.currentTarget.style.borderRadius = '0';
-                                    }
-                                }}
                             >
                                 <button
                                     onClick={() => setShowActionsMenu(!showActionsMenu)}
-                                    className="transition-all duration-200 active:scale-95"
+                                    className="relative p-2.5 rounded-xl transition-all duration-200 active:scale-95"
                                     style={{
-                                        width: '42px',
-                                        height: '42px',
-                                        borderRadius: '12px',
-                                        background: 'var(--theme-bg-secondary)',
-                                        border: '1px solid var(--theme-border-primary)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                        ...(showActionsMenu ? {
-                                            borderColor: ADORA_THEME.colors.primary,
-                                            background: 'var(--theme-bg-primary)',
-                                            boxShadow: '0 4px 12px rgba(32, 178, 170, 0.1)',
-                                        } : {}),
+                                        background: showActionsMenu 
+                                            ? 'rgba(20, 184, 166, 0.1)' 
+                                            : 'var(--theme-bg-secondary)',
+                                        border: `1px solid ${showActionsMenu ? ADORA_THEME.colors.primary : 'var(--theme-border-primary)'}`,
+                                        color: 'var(--theme-text-primary)',
                                     }}
                                     onMouseEnter={(e) => {
                                         if (!showActionsMenu) {
+                                            e.currentTarget.style.background = 'rgba(20, 184, 166, 0.08)';
                                             e.currentTarget.style.borderColor = ADORA_THEME.colors.primary;
-                                            e.currentTarget.style.background = 'var(--theme-bg-primary)';
-                                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(32, 178, 170, 0.1)';
                                         }
                                     }}
                                     onMouseLeave={(e) => {
                                         if (!showActionsMenu) {
                                             e.currentTarget.style.background = 'var(--theme-bg-secondary)';
                                             e.currentTarget.style.borderColor = 'var(--theme-border-primary)';
-                                            e.currentTarget.style.boxShadow = 'none';
                                         }
                                     }}
-                                    aria-label="الإعدادات"
+                                    aria-label={t('sidebar.settings')}
                                 >
-                                    <MoreVertical className="w-5 h-5 transition-transform duration-200" style={{ color: 'var(--theme-text-primary)' }} />
-                                    {/* Badge for Points on Mobile - ADORA MASTER UI PROTOCOL V3.1 */}
-                                    {user?.id && (
-                                        <span 
-                                            className="xl:hidden flex items-center justify-center"
-                                            style={{
-                                                position: 'absolute !important',
-                                                top: '-4px',
-                                                right: '-4px',
-                                                background: `${ADORA_THEME.colors.primary} !important`,
-                                                color: 'white',
-                                                fontSize: '10px',
-                                                fontWeight: 700,
-                                                minWidth: '18px',
-                                                height: '18px',
-                                                borderRadius: '50%',
-                                                border: '2px solid var(--theme-bg-primary) !important',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                zIndex: 10,
-                                            }}
-                                        >
-                                            0
-                                        </span>
-                                    )}
+                                    <MoreVertical className="w-5 h-5" />
                                 </button>
 
                                 {/* Actions Dropdown - Premium Styling WITHOUT Backdrop */}
@@ -513,44 +452,37 @@ export const PremiumHeader: React.FC = () => {
                                         className=""
                                         style={{
                                             position: 'absolute',
-                                            top: 'calc(100% + 5px)',
-                                            right: 0,
+                                            top: 'calc(100% + 8px)',
+                                            right: 'auto',
+                                            left: 0,
                                             zIndex: ADORA_THEME.zIndex.dropdown,
                                             background: 'var(--theme-bg-secondary)',
-                                            minWidth: '220px',
+                                            minWidth: '240px',
+                                            maxWidth: '280px',
                                             borderRadius: '16px',
                                             border: '1px solid var(--theme-border-primary)',
-                                            boxShadow: 'var(--theme-shadow-lg)',
+                                            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
                                             overflow: 'hidden',
                                         }}
                                     >
-                                            <div style={{ padding: '8px' }}>
-                                                {/* Points Tracker - Mobile/Tablet */}
-                                                {user?.id && (
-                                                    <>
-                                                        <div className="xl:hidden px-3 py-2 mb-2">
-                                                            <PointsTracker 
-                                                                employeeId={user.id} 
-                                                                inline 
-                                                                showHistory 
-                                                            />
-                                                        </div>
-                                                        <div className="h-px my-2" style={{ background: 'var(--theme-border-primary)' }} />
-                                                    </>
-                                                )}
+                                            <div style={{ 
+                                                padding: '12px',
+                                                overflow: 'hidden',
+                                            }}>
 
                                                 {/* Language Switcher */}
-                                                <div className="px-3 py-2.5 mb-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200">
+                                                <div className="px-2 py-2 mb-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200">
                                                     <LanguageSwitcher />
                                                 </div>
                                                 
                                                 {/* Theme Toggle */}
-                                                <div className="px-3 py-2.5 mb-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200">
-                                                    <ThemeToggleButton />
-                                                </div>
+                                                <ThemeToggleButton />
 
                                                 {/* Divider */}
-                                                <div className="h-px my-2" style={{ background: 'var(--theme-border-primary)' }} />
+                                                <div className="h-px my-2" style={{ 
+                                                    background: 'var(--theme-border-primary)',
+                                                    margin: '8px 0',
+                                                }} />
 
                                                 {/* Logout */}
                                                 <button
@@ -558,10 +490,10 @@ export const PremiumHeader: React.FC = () => {
                                                         setShowActionsMenu(false);
                                                         logout();
                                                     }}
-                                                    className="w-full px-4 py-3 text-right flex items-center gap-3 rounded-xl transition-all duration-200 hover:bg-red-500/10 text-red-500 hover:scale-[1.02]"
+                                                    className="w-full px-3 py-2.5 text-right flex items-center gap-3 rounded-xl transition-all duration-200 hover:bg-red-500/10 text-red-500 hover:scale-[1.02]"
                                                 >
                                                     <LogOut className="w-4 h-4 transition-transform duration-200" />
-                                                    <span className="text-sm font-medium">{t('auth.logout') || 'تسجيل الخروج'}</span>
+                                                    <span className="text-sm font-medium">{t('auth.logout')}</span>
                                                 </button>
                                             </div>
                                         </div>

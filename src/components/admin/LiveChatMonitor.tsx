@@ -39,6 +39,7 @@ import {
     ChatMessage,
     subscribeToMessages
 } from '../../services/smartChatService';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES

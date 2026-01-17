@@ -1904,7 +1904,7 @@ export const HousekeepingDashboard: React.FC = () => {
 
                 {/* Tasks List - Grid for Mobile */}
                 <div className="px-4 sm:px-6 max-w-7xl mx-auto pb-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                         {currentTasks.length === 0 ? (
                     <div className="col-span-full adora-card p-8 text-center">
                         <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 adora-bg-tertiary">

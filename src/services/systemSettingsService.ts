@@ -139,6 +139,15 @@ export interface SystemSettings {
         archiveAfterDays: number;
     };
     
+    // ✅ Developer Branding (for copyright signature and support links)
+    developerBranding?: {
+        devPhoneSA?: string; // WhatsApp Saudi Arabia
+        devPhoneEG?: string; // WhatsApp Egypt
+        devEmail?: string; // Developer email
+        devName?: string; // Developer/Company name
+        devSignature?: string; // Copyright signature text
+    };
+    
     // Metadata
     updatedAt?: Date;
     updatedBy?: string;

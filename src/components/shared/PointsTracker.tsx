@@ -413,29 +413,78 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
 
                 {/* 🆕 History Modal for Inline Mode - Rendered via Portal */}
                 {showHistoryModal && createPortal(
-                    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fadeIn" style={{ backdropFilter: 'blur(4px)' }}>
-                        <div className="adora-card w-full max-w-xl max-h-[85vh] flex flex-col rounded-[2rem] overflow-hidden shadow-2xl">
-                            {/* Modal Header */}
-                            <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--theme-border-primary)', background: 'var(--theme-bg-tertiary)' }}>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-yellow-500/20 flex items-center justify-center">
-                                        <Trophy className="w-6 h-6 text-yellow-500" />
+                    <div 
+                        className="fixed inset-0 flex items-center justify-center p-4 animate-fadeIn" 
+                        style={{ 
+                            backdropFilter: 'blur(8px) saturate(180%)',
+                            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                            zIndex: 9999 
+                        }}
+                        onClick={() => setShowHistoryModal(false)}
+                    >
+                        <div 
+                            className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.95)',
+                                backdropFilter: 'blur(20px) saturate(180%)',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1) inset'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Modal Header - Premium Glassmorphism */}
+                            <div 
+                                className="px-6 py-5 flex items-center justify-between relative overflow-hidden"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%)',
+                                    borderBottom: '1px solid rgba(255, 215, 0, 0.2)'
+                                }}
+                            >
+                                {/* Decorative gradient overlay */}
+                                <div 
+                                    className="absolute inset-0 opacity-10"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)'
+                                    }}
+                                />
+                                <div className="flex items-center gap-4 relative z-10">
+                                    <div 
+                                        className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
+                                        style={{
+                                            background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                                            boxShadow: '0 8px 24px rgba(255, 215, 0, 0.4)'
+                                        }}
+                                    >
+                                        <Trophy className="w-7 h-7 text-white drop-shadow-md" />
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-black adora-text-primary">سجل النقاط</h3>
-                                        <p className="text-xs adora-text-tertiary">كل نقطة موضحة بالتفصيل</p>
+                                        <h3 className="text-2xl font-black bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+                                            سجل النقاط
+                                        </h3>
+                                        <p className="text-sm mt-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                            كل نقطة موضحة بالتفصيل والوقت
+                                        </p>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setShowHistoryModal(false)}
-                                    className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:bg-red-500/10"
-                                    style={{ background: 'var(--theme-bg-secondary)', color: 'var(--theme-text-secondary)' }}
+                                    className="w-11 h-11 rounded-xl flex items-center justify-center transition-all relative z-10 hover:scale-110 active:scale-95"
+                                    style={{ 
+                                        background: 'rgba(239, 68, 68, 0.1)',
+                                        color: '#ef4444'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                                    }}
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
 
-                            {/* ✅ إجمالي النقاط الكبير - ديناميكي حسب التبويب */}
+                            {/* ✅ إجمالي النقاط الكبير - ديناميكي حسب التبويب - Premium Design */}
                             {(() => {
                                 // حساب القيم الديناميكية حسب التبويب المختار
                                 const displayConfig = {
@@ -444,7 +493,8 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                         title: 'إجمالي نقاطك',
                                         value: points ?? 0,
                                         subtitle: 'نقطة متاحة للصرف',
-                                        gradient: 'linear-gradient(135deg, var(--theme-primary-500) 0%, var(--theme-primary-600) 100%)',
+                                        gradient: 'linear-gradient(135deg, #20B2AA 0%, #14B8A6 50%, #0D9488 100%)',
+                                        glow: 'rgba(20, 178, 170, 0.3)',
                                         count: history.length
                                     },
                                     performance: {
@@ -452,7 +502,8 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                         title: 'نقاط سرعة الأداء',
                                         value: categoryStats.performance.total,
                                         subtitle: `من ${categoryStats.performance.count} عملية`,
-                                        gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                        gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
+                                        glow: 'rgba(59, 130, 246, 0.3)',
                                         count: categoryStats.performance.count
                                     },
                                     attendance: {
@@ -460,7 +511,8 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                         title: 'نقاط الالتزام',
                                         value: categoryStats.attendance.total,
                                         subtitle: `من ${categoryStats.attendance.count} عملية`,
-                                        gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+                                        gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%)',
+                                        glow: 'rgba(34, 197, 94, 0.3)',
                                         count: categoryStats.attendance.count
                                     },
                                     achievements: {
@@ -468,41 +520,64 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                         title: 'نقاط الأوسمة والرتب',
                                         value: categoryStats.achievements.total,
                                         subtitle: `من ${categoryStats.achievements.count} إنجاز`,
-                                        gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                                        gradient: 'linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%)',
+                                        glow: 'rgba(255, 215, 0, 0.4)',
                                         count: categoryStats.achievements.count
                                     }
                                 };
                                 const config = displayConfig[activityFilter];
                                 
                                 return (
-                                    <div className="p-6 text-center transition-all duration-300" style={{ background: config.gradient }}>
-                                        <div className="flex items-center justify-center gap-3 mb-2">
-                                            <span className="text-3xl">{config.icon}</span>
-                                            <span className="text-white/90 text-sm font-bold">{config.title}</span>
-                                        </div>
-                                        <div className={`text-5xl font-black text-white mb-1 ${config.value < 0 ? 'text-red-200' : ''}`}>
-                                            {config.value > 0 && activityFilter !== 'all' ? '+' : ''}{config.value}
-                                        </div>
-                                        <div className="text-white/70 text-sm">{config.subtitle}</div>
-                                        {activityFilter === 'all' && (
-                                            <div className="mt-3 pt-3 border-t border-white/20 flex justify-center gap-6">
-                                                <div className="text-center">
-                                                    <div className="text-lg font-bold text-white">{lifetimePoints}</div>
-                                                    <div className="text-[10px] text-white/60">الإجمالي التاريخي</div>
-                                                </div>
-                                                <div className="text-center">
-                                                    <div className="text-lg font-bold text-white">{history.length}</div>
-                                                    <div className="text-[10px] text-white/60">عدد العمليات</div>
-                                                </div>
+                                    <div 
+                                        className="relative px-8 py-8 text-center transition-all duration-500 overflow-hidden"
+                                        style={{ 
+                                            background: config.gradient,
+                                            boxShadow: `0 10px 40px ${config.glow}`
+                                        }}
+                                    >
+                                        {/* Animated background pattern */}
+                                        <div 
+                                            className="absolute inset-0 opacity-10"
+                                            style={{
+                                                backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.3) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.2) 0%, transparent 50%)'
+                                            }}
+                                        />
+                                        <div className="relative z-10">
+                                            <div className="flex items-center justify-center gap-3 mb-3">
+                                                <span className="text-4xl drop-shadow-lg filter">{config.icon}</span>
+                                                <span className="text-white/95 text-base font-bold drop-shadow-md">{config.title}</span>
                                             </div>
-                                        )}
+                                            <div className={`text-6xl font-black text-white mb-2 drop-shadow-lg ${config.value < 0 ? 'text-red-200' : ''}`}>
+                                                {config.value > 0 && activityFilter !== 'all' ? '+' : ''}{config.value}
+                                            </div>
+                                            <div className="text-white/80 text-sm font-medium drop-shadow-sm">{config.subtitle}</div>
+                                            {activityFilter === 'all' && (
+                                                <div className="mt-4 pt-4 border-t border-white/20 flex justify-center gap-8">
+                                                    <div className="text-center">
+                                                        <div className="text-xl font-bold text-white drop-shadow-md">{lifetimePoints}</div>
+                                                        <div className="text-xs text-white/70 mt-1">الإجمالي التاريخي</div>
+                                                    </div>
+                                                    <div className="w-px h-12 bg-white/20" />
+                                                    <div className="text-center">
+                                                        <div className="text-xl font-bold text-white drop-shadow-md">{history.length}</div>
+                                                        <div className="text-xs text-white/70 mt-1">عدد العمليات</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })()}
 
-                            {/* ✅ تبويبات تصنيف النقاط */}
-                            <div className="p-3" style={{ background: 'var(--theme-bg-secondary)', borderBottom: '1px solid var(--theme-border-primary)' }}>
-                                <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                            {/* ✅ تبويبات تصنيف النقاط - Premium Design */}
+                            <div 
+                                className="px-6 py-4" 
+                                style={{ 
+                                    background: 'rgba(248, 250, 252, 0.8)',
+                                    borderBottom: '1px solid rgba(226, 232, 240, 0.5)'
+                                }}
+                            >
+                                <div className="flex gap-2 p-1.5 rounded-2xl" style={{ background: 'rgba(241, 245, 249, 0.8)' }}>
                                     <button
                                         onClick={() => setActivityFilter('all')}
                                         className={`flex-1 py-2.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
@@ -710,7 +785,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
 
             {/* Transparency Modal (History) */}
             {showHistoryModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fadeIn" style={{ backdropFilter: 'none' }}>
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 animate-fadeIn" style={{ backdropFilter: 'none', zIndex: 9999 }}>
                     <div className="glass-card w-full max-w-xl max-h-[85vh] flex flex-col rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
                         {/* Modal Header */}
                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-500/5 to-transparent">
@@ -977,7 +1052,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
 
             {/* Leaderboard Modal */}
             {showLeaderboardModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fadeIn" style={{ backdropFilter: 'none' }}>
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 animate-fadeIn" style={{ backdropFilter: 'none', zIndex: 9999 }}>
                     <div className="glass-card w-full max-w-lg max-h-[85vh] flex flex-col rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
                         <div className="p-6 border-b border-white/5 flex items-center justify-between">
                             <div className="flex items-center gap-4">

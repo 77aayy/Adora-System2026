@@ -336,7 +336,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                             <p className="adora-text-tertiary">{t('coffeeshop.noOrdersInList')}</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                         {currentOrders.map(order => (
                             <div key={order.id} className="p-3 rounded-xl adora-card border adora-border shadow-sm hover:scale-[1.01] transition-all">
                                 {/* Row 1: Room + Items Count + Status */}

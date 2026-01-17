@@ -405,12 +405,41 @@ const auditFirestoreNuclear = async (ownerId: string): Promise<DeepAuditReport['
         try {
             const codesRef = collection(db, 'globalCodes');
             const codesSnap = await getDocs(codesRef);
+            
+            // ✅ CRITICAL: Use batch for atomic deletion to prevent race conditions
+            let codesBatch = writeBatch(db);
+            let codesBatchCount = 0;
+            let codesDeletedCount = 0;
+            
             for (const cDoc of codesSnap.docs) {
-                if (cDoc.id !== '765255' && cDoc.id !== '000000') {
-                    await deleteDoc(cDoc.ref);
+                // ✅ HARD RESET: Delete ALL codes except Owner's code (765255)
+                // This ensures managers cannot login with old codes after reset
+                if (cDoc.id !== '765255') {
+                    codesBatch.delete(cDoc.ref);
+                    codesBatchCount++;
+                    codesDeletedCount++;
                     totalDeleted++;
+                    
+                    // Firestore batch limit is 500
+                    if (codesBatchCount >= 500) {
+                        await codesBatch.commit();
+                        logger.info(`🗑️ Deleted batch of globalCodes (${codesBatchCount} codes)`);
+                        codesBatchCount = 0;
+                        // Create new batch for remaining codes
+                        codesBatch = writeBatch(db);
+                    }
+                } else {
+                    logger.info(`🛡️ Preserved Owner code: ${cDoc.id}`);
                 }
             }
+            
+            // Commit any remaining codes in batch
+            if (codesBatchCount > 0) {
+                await codesBatch.commit();
+                logger.info(`🗑️ Deleted final batch of globalCodes (${codesBatchCount} codes)`);
+            }
+            
+            logger.info(`✅ GlobalCodes purge complete: Deleted ${codesDeletedCount} codes (preserved Owner code 765255)`);
         } catch (e: any) {
             report.errors.push(`GlobalCodes purge error: ${e.message}`);
             logger.error("Codes purge error:", e);

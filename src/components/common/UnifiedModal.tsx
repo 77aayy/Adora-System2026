@@ -6,6 +6,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { haptic } from '../../utils/uxEffects';
 
 // ============================================================
@@ -243,6 +244,7 @@ export const ModalButton: React.FC<ModalButtonProps> = ({
     loading = false,
     className = '',
 }) => {
+    const { t } = useTranslation();
     const handleClick = () => {
         if (!disabled && !loading) {
             haptic('light');
@@ -264,7 +266,7 @@ export const ModalButton: React.FC<ModalButtonProps> = ({
             {loading ? (
                 <span className="flex items-center justify-center gap-2">
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    جاري...
+                    {t('common.loading')}
                 </span>
             ) : (
                 children
@@ -290,16 +292,21 @@ export interface ModalActionsProps {
 export const ModalActions: React.FC<ModalActionsProps> = ({
     onCancel,
     onConfirm,
-    cancelText = 'إلغاء',
-    confirmText = 'تأكيد',
+    cancelText,
+    confirmText,
     confirmVariant = 'primary',
     loading = false,
     disabled = false,
-}) => (
+}) => {
+    const { t } = useTranslation();
+    const finalCancelText = cancelText || t('common.cancel');
+    const finalConfirmText = confirmText || t('common.confirm');
+    
+    return (
     <div className="flex gap-3">
         {onCancel && (
             <ModalButton variant="secondary" onClick={onCancel} className="flex-1">
-                {cancelText}
+                {finalCancelText}
             </ModalButton>
         )}
         {onConfirm && (
@@ -310,10 +317,11 @@ export const ModalActions: React.FC<ModalActionsProps> = ({
                 disabled={disabled}
                 className="flex-1"
             >
-                {confirmText}
+                {finalConfirmText}
             </ModalButton>
         )}
     </div>
-);
+    );
+};
 
 export default UnifiedModal;

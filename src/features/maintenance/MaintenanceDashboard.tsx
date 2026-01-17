@@ -1432,7 +1432,7 @@ export const MaintenanceDashboard: React.FC = () => {
                         {/* Content - Scrollable */}
                         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)] space-y-4">
                             {/* Request Info */}
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                 <div className="adora-card p-3 rounded-xl">
                                     <p className="adora-text-secondary text-xs mb-1">نوع الصيانة</p>
                                     <p className="text-white font-medium text-sm">{currentCompleteRequest.maintenanceType || 'عام'}</p>
