@@ -1,9 +1,13 @@
 /**
  * useUX Hook
- * standardized user experience feedback (Haptics, Sounds, Toasts)
+ * Standardized user experience feedback (Haptics, Sounds, Toasts)
+ * 
+ * ✅ FIX: Uses uxEffects for sound and haptic feedback
+ * Adora Hotel Management System V3
  */
 
 import { useCallback } from 'react';
+import { playSound as playSoundEffect, haptic as hapticEffect, type SoundType } from '../utils/uxEffects';
 
 // Simple Toast Implementation
 const showToast = (message: string, type: 'success' | 'error' | 'info') => {
@@ -24,13 +28,15 @@ const showToast = (message: string, type: 'success' | 'error' | 'info') => {
     // Add to body
     document.body.appendChild(toast);
 
-    // Play sound
+    // ✅ FIX: Play sound using uxEffects (Web Audio API)
     if (type === 'success') {
-        const audio = new Audio('/sounds/success.mp3');
-        audio.volume = 0.5;
-        audio.play().catch(() => { }); // Ignore interaction errors
+        playSoundEffect('success');
+        hapticEffect('success');
     } else if (type === 'error') {
-        // navigator.vibrate([100, 50, 100]); // Haptic
+        playSoundEffect('error');
+        hapticEffect('error');
+    } else if (type === 'info') {
+        playSoundEffect('notification');
     }
 
     // Remove after 3 seconds
@@ -58,14 +64,18 @@ export const useUX = () => {
         showToast(message, 'info');
     }, []);
 
-    const triggerHaptic = useCallback(() => {
-        if (navigator.vibrate) {
-            navigator.vibrate(50);
-        }
+    const triggerHaptic = useCallback((type: 'light' | 'medium' | 'heavy' | 'success' | 'error' | 'notification' | 'warning' = 'light') => {
+        hapticEffect(type);
     }, []);
 
-    const playSound = useCallback((type: 'success' | 'error' | 'notification' = 'notification') => {
-        // Placeholder for sound logic
+    // ✅ FIX: Implemented sound logic using uxEffects
+    const playSound = useCallback((type: 'success' | 'error' | 'notification' | SoundType = 'notification') => {
+        // Map simple types to SoundType if needed
+        const soundType: SoundType = (type === 'success' || type === 'error' || type === 'notification') 
+            ? type 
+            : (type as SoundType);
+        
+        playSoundEffect(soundType);
     }, []);
 
     return {
@@ -73,6 +83,7 @@ export const useUX = () => {
         showError,
         showInfo,
         triggerHaptic,
+        haptic: triggerHaptic, // Alias for compatibility
         playSound
     };
 };
