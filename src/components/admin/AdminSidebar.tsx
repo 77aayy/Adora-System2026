@@ -401,15 +401,17 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 )}
             </div>
 
-            {/* 🔗 Navigation - ✅ Scrollable with proper flex layout */}
+            {/* 🔗 Navigation - ✅ No scroll, proper flex layout */}
             <div 
-                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+                className="flex-1 min-h-0 overflow-hidden"
                 style={{
                     padding: isCollapsed ? '12px 4px' : '16px 8px',
                     paddingBottom: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
                 }}
             >
-                <nav className="space-y-1">
+                <nav className="space-y-1 flex-1" style={{ overflow: 'hidden' }}>
                     {sections.map((section) => {
                         const isExpanded = expandedSections.includes(section.id);
                         return (
@@ -737,12 +739,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 </nav>
             </div>
 
-            {/* 🚪 Logout Button - ✅ Integrated with Navigation Items Style */}
+            {/* 🚪 Logout Button - ✅ Fixed at bottom, never overlaps */}
             <div 
-                className="flex-none"
+                className="flex-none mt-auto"
                 style={{
                     padding: isCollapsed ? '8px 4px' : '12px 8px',
-                    paddingTop: '8px',
+                    paddingTop: '12px',
+                    borderTop: '1px solid #f1f5f9',
                 }}
             >
                 <button
