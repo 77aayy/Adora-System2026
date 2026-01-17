@@ -45,7 +45,7 @@ import SimulationCanvas from './components/SimulationCanvas';
 import { MaintenanceMode } from './components/system/MaintenanceMode';
 import { BroadcastMessages } from './components/system/BroadcastMessages';
 import { UpdateNotifications } from './components/system/UpdateNotifications';
-import { UnifiedManagerHeader } from './components/layout/UnifiedManagerHeader';
+import { PremiumHeader } from './components/layout/PremiumHeader';
 import './index.css';
 
 // ============================================================
@@ -728,13 +728,13 @@ const AppContent: React.FC = () => {
             className={`min-h-screen overflow-x-hidden ${isOnLoginOrGuest ? '' : 'pb-12 sm:pb-16 md:pb-20'}`} 
             style={{ background: isOnLoginOrGuest ? 'transparent' : 'var(--theme-bg-primary)' }}
         >
-            {/* ✅ Unified Manager Header - Sticky tabs navigation */}
-            {showUnifiedHeader && <UnifiedManagerHeader />}
+            {/* ✅ Premium Header - Two-Tier Architecture with Turquoise DNA */}
+            {showUnifiedHeader && <PremiumHeader />}
             
             {/* ✅ Regular Navigation Bar for employees */}
             {showRegularNav && <NavigationBar isVoiceEnabled={voiceEnabled} onToggleVoice={toggleVoice} />}
             
-            <main className={`overflow-x-hidden w-full ${showRegularNav ? 'pt-16 sm:pt-20 md:pt-24' : ''}`}>
+            <main className={`overflow-x-hidden w-full ${showRegularNav ? 'pt-16 sm:pt-20 md:pt-24' : showUnifiedHeader ? 'pt-0' : ''}`}>
                 <ErrorBoundary key={location.pathname}>
                     <AppRoutes />
                 </ErrorBoundary>

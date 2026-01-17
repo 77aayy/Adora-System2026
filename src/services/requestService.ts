@@ -1,12 +1,17 @@
 /**
  * Request Service - Complete CRUD Operations
- * High quality, production-ready service
- * Adora Hotel Management System V3
+ * 🔐 ADORA SAAS: Full Tenant Isolation with Custom Claims Validation
+ * Adora Hotel Management System V4 - Secure Architecture
  * 
  * @module requestService
  * @description
  * This service manages all guest/room service requests across departments:
  * Reception, Housekeeping, Bellman, Maintenance, and Procurement.
+ * 
+ * ## Security Architecture:
+ * 1. **Tenant-Scoped Collections**: All requests stored in `tenants/${tenantId}/requests`
+ * 2. **Custom Claims Validation**: Validates user's tenantId from Firebase Auth token
+ * 3. **Double Protection**: Service layer + Firestore Rules enforcement
  * 
  * ## Request Lifecycle:
  * 1. **Created**: Request submitted (PENDING_RECEPTION)
@@ -28,7 +33,7 @@
  * - WhatsApp-style read receipts
  * - Request journey tracking across departments
  * - Real-time subscriptions for live updates
- * - Multi-tenant data isolation
+ * - Multi-tenant data isolation (100% secure)
  */
 
 import {
@@ -49,7 +54,7 @@ import {
     Unsubscribe,
     writeBatch
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import {
     Request,
     RequestType,
@@ -61,9 +66,23 @@ import {
     ReadReceiptStatus
 } from '../types/request';
 import { analyzeFeedback } from './ai/sentimentService';
-import { awardPerformancePoints, awardRatingPoints, awardPoints, getPointsConfig } from './pointsService'; // ✅ Unified Points System
+import { awardPerformancePoints, awardRatingPoints, awardPoints, awardPointsWithQualityCheck, getPointsConfig } from './pointsService';
+import { logger } from './loggerService';
+import { validateTenantAccess, validateTenantId } from './tenantSecurityService';
+import { logAction, LogAction } from './advancedLogService';
 
-const REQUESTS_COLLECTION = 'requests';
+// ============================================================
+// TYPE DEFINITIONS
+// ============================================================
+
+type QueryConstraint = ReturnType<typeof where> | ReturnType<typeof orderBy> | ReturnType<typeof limit>;
+
+interface ViewedByEntry {
+    userId: string;
+    userName: string;
+    department: string;
+    viewedAt: Timestamp;
+}
 
 // ============================================================
 // CREATE
@@ -71,41 +90,14 @@ const REQUESTS_COLLECTION = 'requests';
 
 /**
  * Creates a new service request in the system
- * 
- * ## Business Logic:
- * 1. **Target Time**: Auto-calculates completion target based on config
- * 2. **Initial Department**: Routes to appropriate department by type
- * 3. **Journey Tracking**: Initializes departmentHistory for workflow
- * 4. **Attendance**: Auto-checks employee attendance on activity
- * 
- * ## Request Routing:
- * - `cleaning/inspection` → Housekeeping
- * - `maintenance` → Maintenance
- * - `bellman` → Bellman
- * - `procurement` → Procurement
- * - Others → Reception
- * 
- * ## Side Effects:
- * - Creates document in `requests` collection
- * - Triggers attendance check for creating employee
+ * 🔐 SECURITY: Validates tenant access before creation
  * 
  * @param input - Request creation data (type, room, guest, etc.)
  * @param branch - Branch ID where request originates
  * @param userId - Creating employee's ID
  * @param userName - Creating employee's name
  * @returns Promise<string> - The created request ID
- * @throws Error if creation fails
- * 
- * @example
- * ```typescript
- * const requestId = await createRequest({
- *   type: RequestType.CLEANING,
- *   roomNumber: '101',
- *   guestName: 'محمد أحمد',
- *   priority: RequestPriority.NORMAL,
- *   tenantId: tenantId
- * }, branchId, userId, userName);
- * ```
+ * @throws Error if creation fails or tenant access denied
  */
 export const createRequest = async (
     input: CreateRequestInput,
@@ -113,20 +105,28 @@ export const createRequest = async (
     userId: string,
     userName: string
 ): Promise<string> => {
+    // ✅ STEP 1: Null safety check
+    if (!db) {
+        logger.error('Firebase not initialized - cannot create request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    // ✅ STEP 2: Validate tenantId
+    const tenantId = validateTenantId(input.tenantId);
+
+    // ✅ STEP 3: Validate tenant access (Custom Claims check)
+    validateTenantAccess(tenantId);
+
     try {
         // 🕰️ Intelligent Target Time Assignment (Procurement)
         let targetCompletionTime = input.targetCompletionTime ? Timestamp.fromDate(input.targetCompletionTime) : undefined;
 
-        if (input.type === RequestType.PROCUREMENT && input.tenantId && !targetCompletionTime) {
-            // If no target time manually set, check configuration for default
-            const config = await getPointsConfig(input.tenantId, branch);
+        if (input.type === RequestType.PROCUREMENT && !targetCompletionTime) {
+            const config = await getPointsConfig(tenantId, branch);
             const procurementConfig = config.procurement;
 
             if (procurementConfig) {
                 let defaultMinutes = procurementConfig.targetTime || 60;
-
-                // Determine source department based on creator or explicit source
-                // Using string comparison for flexibility with different source formats
                 const sourceStr = String(input.source || '').toUpperCase();
 
                 if (sourceStr === 'HOUSEKEEPING') {
@@ -137,14 +137,13 @@ export const createRequest = async (
                     defaultMinutes = procurementConfig.targetTimeReception || 1440;
                 }
 
-                // Add minutes to now
                 const now = new Date();
                 targetCompletionTime = Timestamp.fromDate(new Date(now.getTime() + defaultMinutes * 60000));
             }
         }
 
         // ✅ Determine initial department based on type
-        let initialDepartment = 'reception'; // Default
+        let initialDepartment = 'reception';
         if (input.type === RequestType.CLEANING || input.type === RequestType.INSPECTION) {
             initialDepartment = 'housekeeping';
         } else if (input.type === RequestType.MAINTENANCE) {
@@ -164,8 +163,8 @@ export const createRequest = async (
             roomNumber: input.roomNumber,
             guestName: input.guestName,
 
-            branch, // This is expected to be branchId
-            tenantId: input.tenantId, // ✅ SaaS requirement
+            branch,
+            tenantId, // ✅ SaaS requirement
 
             createdBy: {
                 id: userId,
@@ -179,7 +178,7 @@ export const createRequest = async (
             notes: input.notes,
             photos: input.photos,
 
-            targetCompletionTime: targetCompletionTime, // ✅ Auto-calculated or Manual
+            targetCompletionTime,
             scheduledDate: input.scheduledDate ? Timestamp.fromDate(input.scheduledDate) : undefined,
 
             // ✅ Request Journey Tracking
@@ -196,26 +195,77 @@ export const createRequest = async (
             }]
         };
 
-        const docRef = await addDoc(collection(db, REQUESTS_COLLECTION), requestData);
+        // ✅ STEP 4: Use tenant-scoped collection (Pattern 1)
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+        const docRef = await addDoc(requestsRef, requestData);
         
-        // ✅ FIX: Auto-check daily attendance when employee creates a request
-        // This ensures attendance is tracked when employee is active
-        if (input.tenantId && userId) {
+        // ✅ Auto-check daily attendance
+        if (userId) {
             try {
                 const { checkDailyAttendance } = await import('./challengeService');
-                // Fire and forget - don't block request creation if attendance check fails
-                checkDailyAttendance(input.tenantId, userId).catch(err => {
-                    console.warn('Failed to check daily attendance after request creation:', err);
+                checkDailyAttendance(tenantId, userId).catch(err => {
+                    logger.warn('Failed to check daily attendance after request creation', err, 'requestService');
                 });
             } catch (err) {
-                console.warn('Could not load challengeService for attendance check:', err);
+                logger.warn('Could not load challengeService for attendance check', err, 'requestService');
             }
         }
         
+        // ✅ STEP 5: Send Push Notification to Department (Real-time notification)
+        try {
+            const { sendNotificationToDepartment } = await import('./notificationService');
+            
+            // Map request type to department for notifications
+            let notificationDepartment: 'housekeeping' | 'bellman' | 'maintenance' | 'reception' | 'procurement' | 'coffeeShop' = 'reception';
+            let notificationTitle = 'طلب جديد';
+            let notificationMessage = `طلب جديد: ${input.roomNumber}`;
+            
+            if (input.type === RequestType.CLEANING || input.type === RequestType.INSPECTION) {
+                notificationDepartment = 'housekeeping';
+                notificationTitle = 'طلب تنظيف جديد';
+                notificationMessage = `طلب تنظيف - الغرفة ${input.roomNumber}`;
+            } else if (input.type === RequestType.MAINTENANCE) {
+                notificationDepartment = 'maintenance';
+                notificationTitle = 'طلب صيانة جديد';
+                notificationMessage = `طلب صيانة - الغرفة ${input.roomNumber}`;
+            } else if (input.type === RequestType.BELLMAN) {
+                notificationDepartment = 'bellman';
+                notificationTitle = 'طلب بيلمان جديد';
+                notificationMessage = `طلب بيلمان - الغرفة ${input.roomNumber}`;
+            } else if (input.type === RequestType.PROCUREMENT) {
+                notificationDepartment = 'procurement';
+                notificationTitle = 'طلب شراء جديد';
+                notificationMessage = `طلب شراء - الغرفة ${input.roomNumber}`;
+            } else if (input.type === RequestType.COFFEE) {
+                notificationDepartment = 'coffeeShop';
+                notificationTitle = 'طلب قهوة جديد';
+                notificationMessage = `طلب قهوة - الغرفة ${input.roomNumber}`;
+            }
+            
+            // Send notification to all staff in the department (non-blocking)
+            sendNotificationToDepartment(
+                notificationDepartment,
+                notificationTitle,
+                notificationMessage,
+                tenantId,
+                branch,
+                'info',
+                docRef.id
+            ).catch(err => {
+                logger.warn('Failed to send department notification', err, 'requestService');
+            });
+        } catch (err) {
+            logger.warn('Could not load notificationService for department notification', err, 'requestService');
+        }
+        
+        logger.info(`Request created: ${docRef.id} in tenant ${tenantId}`, undefined, 'requestService');
         return docRef.id;
-    } catch (error) {
-        console.error('Error creating request:', error);
-        throw new Error('Failed to create request');
+    } catch (error: any) {
+        if (error.message?.includes('Tenant access denied')) {
+            throw error; // Re-throw security errors
+        }
+        logger.error('Error creating request', error, 'requestService');
+        throw new Error('فشل إنشاء الطلب. يرجى المحاولة مرة أخرى.');
     }
 };
 
@@ -225,106 +275,135 @@ export const createRequest = async (
 
 /**
  * Get request by ID
+ * 🔐 SECURITY: Validates tenant access
  */
-export const getRequest = async (requestId: string): Promise<Request | null> => {
+export const getRequest = async (requestId: string, tenantId: string): Promise<Request | null> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get request', undefined, 'requestService');
+        return null;
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-        const docSnap = await getDoc(docRef);
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        const docSnap = await getDoc(requestRef);
 
         if (docSnap.exists()) {
             return { id: docSnap.id, ...docSnap.data() } as Request;
         }
         return null;
     } catch (error) {
-        console.error('Error getting request:', error);
+        logger.error('Error getting request', error, 'requestService');
         return null;
     }
 };
 
 /**
  * Get all requests for a branch
+ * 🔐 SECURITY: Validates tenant access
  */
 export const getRequestsByBranch = async (
     branch: string,
+    tenantId: string,
     status?: RequestStatus,
-    limitCount?: number,
-    tenantId?: string // ✅ Isolation
+    limitCount?: number
 ): Promise<Request[]> => {
-    try {
-        // Build constraints
-        const constraints: any[] = [where('branch', '==', branch)];
-        if (tenantId) constraints.push(where('tenantId', '==', tenantId));
-        if (status) constraints.push(where('status', '==', status));
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get requests', undefined, 'requestService');
+        return [];
+    }
 
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    try {
+        const constraints: QueryConstraint[] = [where('branch', '==', branch)];
+        if (status) constraints.push(where('status', '==', status));
         constraints.push(orderBy('createdAt', 'desc'));
         if (limitCount) constraints.push(limit(limitCount));
 
-        const q = query(
-            collection(db, REQUESTS_COLLECTION),
-            ...constraints
-        );
+        // ✅ Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${validatedTenantId}/requests`);
+        const q = query(requestsRef, ...constraints);
 
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Request));
     } catch (error) {
-        console.error('Error getting requests:', error);
+        logger.error('Error getting requests', error, 'requestService');
         return [];
     }
 };
 
 /**
  * Get requests by room number
+ * 🔐 SECURITY: Validates tenant access
  */
 export const getRequestsByRoom = async (
     branch: string,
     roomNumber: string,
-    tenantId?: string // ✅ Isolation
+    tenantId: string
 ): Promise<Request[]> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get requests by room', undefined, 'requestService');
+        return [];
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const constraints: any[] = [
+        const constraints: QueryConstraint[] = [
             where('branch', '==', branch),
             where('roomNumber', '==', roomNumber)
         ];
-        if (tenantId) constraints.push(where('tenantId', '==', tenantId));
         constraints.push(orderBy('createdAt', 'desc'));
 
-        const q = query(
-            collection(db, REQUESTS_COLLECTION),
-            ...constraints
-        );
+        // ✅ Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${validatedTenantId}/requests`);
+        const q = query(requestsRef, ...constraints);
 
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Request));
     } catch (error) {
-        console.error('Error getting requests by room:', error);
+        logger.error('Error getting requests by room', error, 'requestService');
         return [];
     }
 };
 
 /**
  * Get today's requests
+ * 🔐 SECURITY: Validates tenant access
  */
-export const getTodayRequests = async (branch: string, tenantId?: string): Promise<Request[]> => {
+export const getTodayRequests = async (branch: string, tenantId: string): Promise<Request[]> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get today requests', undefined, 'requestService');
+        return [];
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const constraints: any[] = [
+        const constraints: QueryConstraint[] = [
             where('branch', '==', branch),
             where('createdAt', '>=', Timestamp.fromDate(today))
         ];
-        if (tenantId) constraints.push(where('tenantId', '==', tenantId));
         constraints.push(orderBy('createdAt', 'desc'));
 
-        const q = query(
-            collection(db, REQUESTS_COLLECTION),
-            ...constraints
-        );
+        // ✅ Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${validatedTenantId}/requests`);
+        const q = query(requestsRef, ...constraints);
 
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Request));
     } catch (error) {
-        console.error('Error getting today requests:', error);
+        logger.error('Error getting today requests', error, 'requestService');
         return [];
     }
 };
@@ -335,53 +414,63 @@ export const getTodayRequests = async (branch: string, tenantId?: string): Promi
 
 /**
  * Update request
+ * 🔐 SECURITY: Validates tenant access
  */
 export const updateRequest = async (
     requestId: string,
+    tenantId: string,
     data: UpdateRequestInput
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot update request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-        await updateDoc(docRef, {
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        await updateDoc(requestRef, {
             ...data,
             modifiedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error updating request:', error);
-        throw new Error('Failed to update request');
+        logger.error('Error updating request', error, 'requestService');
+        throw new Error('فشل تحديث الطلب. يرجى المحاولة مرة أخرى.');
     }
 };
 
 /**
  * Confirms a pending request (Reception workflow)
- * 
- * ## Business Logic:
- * - Updates status to CONFIRMED
- * - Records confirming employee
- * - Calculates response time for points
- * - Awards performance points to reception
- * 
- * ## Points Calculation:
- * Response time = confirmedAt - createdAt (in minutes)
- * Points awarded based on speed (fast/normal/late)
- * 
- * ## Side Effects:
- * - Updates request document
- * - Awards points to confirming employee
- * - Updates timeline.confirmed timestamp
- * 
- * @param requestId - The request to confirm
- * @param userId - Confirming employee's ID
- * @param userName - Confirming employee's name
+ * 🔐 SECURITY: Validates tenant access
  */
 export const confirmRequest = async (
     requestId: string,
+    tenantId: string,
     userId: string,
     userName: string
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot confirm request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-        await updateDoc(docRef, {
+        // ✅ Get request before update (for audit log)
+        const request = await getRequest(requestId, validatedTenantId);
+        if (!request) {
+            throw new Error('Request not found');
+        }
+        const oldStatus = request.status;
+
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        await updateDoc(requestRef, {
             status: RequestStatus.CONFIRMED,
             confirmedBy: {
                 id: userId,
@@ -391,50 +480,81 @@ export const confirmRequest = async (
             'timeline.confirmed': Timestamp.now()
         });
 
+        // 📝 Audit Log: Request Confirmed
+        try {
+            const storedUser = localStorage.getItem('adora_user');
+            const userData = storedUser ? JSON.parse(storedUser) : {};
+            await logAction(
+                'REQUEST_CONFIRM' as LogAction,
+                {
+                    id: userId,
+                    name: userName,
+                    role: userData.role || 'reception',
+                    department: userData.department || 'reception'
+                },
+                {
+                    type: 'request',
+                    id: requestId,
+                    name: `طلب ${request.type} - غرفة ${request.roomNumber}`
+                },
+                {
+                    tenantId: validatedTenantId,
+                    branchId: request.branch || 'default',
+                    roomNumber: request.roomNumber
+                },
+                {
+                    description: `تم تأكيد الطلب من ${oldStatus} إلى ${RequestStatus.CONFIRMED}`,
+                    previousValue: oldStatus,
+                    newValue: RequestStatus.CONFIRMED,
+                    metadata: { requestType: request.type, requestPriority: request.priority }
+                }
+            ).catch(err => logger.warn('Failed to log request confirmation', err, 'requestService'));
+        } catch (auditError) {
+            logger.warn('Failed to create audit log for request confirmation', auditError, 'requestService');
+        }
+
         // 💰 Award Points: Reception Confirmation
-        const request = await getRequest(requestId);
-        if (request && request.tenantId) {
-            // Reception points for confirming request
-            // Calculate time taken to confirm
+        if (request) {
             const createdAt = request.createdAt.toDate();
             const confirmedAt = new Date();
             const minutesTaken = Math.floor((confirmedAt.getTime() - createdAt.getTime()) / 60000);
-
-            // Pass duration to points service for speed calculation
-            await awardPerformancePoints(request.tenantId, userId, 'reception', 'confirm', minutesTaken);
+            await awardPerformancePoints(validatedTenantId, userId, 'reception', 'confirm', minutesTaken);
         }
-
     } catch (error) {
-        console.error('Error confirming request:', error);
-        throw new Error('Failed to confirm request');
+        logger.error('Error confirming request', error, 'requestService');
+        throw new Error('فشل تأكيد الطلب. يرجى المحاولة مرة أخرى.');
     }
 };
 
 /**
  * Marks a request as in-progress (Employee starts work)
- * 
- * ## Business Logic:
- * - Assigns employee to the request
- * - Sets status to IN_PROGRESS
- * - Records start time for duration tracking
- * 
- * ## Side Effects:
- * - Updates request with assignedTo
- * - Sets startedAt timestamp
- * - Updates timeline.started
- * 
- * @param requestId - The request to start
- * @param userId - Working employee's ID
- * @param userName - Working employee's name
+ * 🔐 SECURITY: Validates tenant access
  */
 export const startRequest = async (
     requestId: string,
+    tenantId: string,
     userId: string,
     userName: string
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot start request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-        await updateDoc(docRef, {
+        // ✅ Get request before update (for audit log)
+        const request = await getRequest(requestId, validatedTenantId);
+        if (!request) {
+            throw new Error('Request not found');
+        }
+        const oldStatus = request.status;
+
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        await updateDoc(requestRef, {
             status: RequestStatus.IN_PROGRESS,
             assignedTo: {
                 id: userId,
@@ -443,67 +563,82 @@ export const startRequest = async (
             startedAt: Timestamp.now(),
             'timeline.started': Timestamp.now()
         });
+
+        // 📝 Audit Log: Request Started
+        try {
+            const storedUser = localStorage.getItem('adora_user');
+            const userData = storedUser ? JSON.parse(storedUser) : {};
+            await logAction(
+                'REQUEST_START' as LogAction,
+                {
+                    id: userId,
+                    name: userName,
+                    role: userData.role || 'staff',
+                    department: userData.department || request.currentDepartment || 'general'
+                },
+                {
+                    type: 'request',
+                    id: requestId,
+                    name: `طلب ${request.type} - غرفة ${request.roomNumber}`
+                },
+                {
+                    tenantId: validatedTenantId,
+                    branchId: request.branch || 'default',
+                    roomNumber: request.roomNumber
+                },
+                {
+                    description: `تم بدء العمل على الطلب من ${oldStatus} إلى ${RequestStatus.IN_PROGRESS}`,
+                    previousValue: oldStatus,
+                    newValue: RequestStatus.IN_PROGRESS,
+                    metadata: { requestType: request.type, assignedTo: userId }
+                }
+            ).catch(err => logger.warn('Failed to log request start', err, 'requestService'));
+        } catch (auditError) {
+            logger.warn('Failed to create audit log for request start', auditError, 'requestService');
+        }
     } catch (error) {
-        console.error('Error starting request:', error);
-        throw new Error('Failed to start request');
+        logger.error('Error starting request', error, 'requestService');
+        throw new Error('فشل بدء الطلب. يرجى المحاولة مرة أخرى.');
     }
 };
 
 /**
  * Completes a request (Task finished)
- * 
- * ## Business Logic:
- * 1. Sets status to COMPLETED
- * 2. Records completing employee
- * 3. Analyzes feedback sentiment (AI)
- * 4. Awards performance points
- * 5. Deducts inventory for consumable requests
- * 6. Auto-creates follow-up for critical issues
- * 
- * ## Points Calculation:
- * - Duration = completedAt - startedAt (minutes)
- * - Target = targetCompletionTime - createdAt (minutes)
- * - Fast completion = bonus points
- * - Late completion = penalty
- * 
- * ## AI Crisis Routing:
- * If feedback sentiment is NEGATIVE with high severity:
- * - CRITICAL: Creates emergency VIP_SERVICE request
- * - MODERATE: Logged for SmartAlerts dashboard
- * 
- * ## Inventory Deduction:
- * For MINIBAR/COFFEE/AMENITIES requests:
- * - Finds matching inventory items by name
- * - Deducts consumed quantities
- * 
- * ## Side Effects:
- * - Updates request document
- * - Awards points to employee
- * - May deduct inventory
- * - May create emergency request
- * 
- * @param requestId - The request to complete
- * @param userId - Completing employee's ID
- * @param userName - Completing employee's name
- * @param rating - Optional guest rating (1-5)
- * @param feedback - Optional guest feedback text
+ * 🔐 SECURITY: Validates tenant access
  */
 export const completeRequest = async (
     requestId: string,
+    tenantId: string,
     userId: string,
     userName: string,
     rating?: number,
     feedback?: string
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot complete request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
+        // ✅ Get request before update (for audit log)
+        const request = await getRequest(requestId, validatedTenantId);
+        if (!request) {
+            throw new Error('Request not found');
+        }
+        const oldStatus = request.status;
+
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
 
         let sentimentResult = null;
         if (feedback) {
             sentimentResult = await analyzeFeedback(feedback);
         }
 
-        await updateDoc(docRef, {
+        await updateDoc(requestRef, {
             status: RequestStatus.COMPLETED,
             completedBy: {
                 id: userId,
@@ -516,12 +651,51 @@ export const completeRequest = async (
             ...(sentimentResult && { sentimentResult })
         });
 
-        const request = await getRequest(requestId);
-        if (request && request.tenantId) {
-
-            // 📦 INVENTORY DEDUCTION (QR / Minibar / Coffee)
+        // 📝 Audit Log: Request Completed
+        try {
+            const storedUser = localStorage.getItem('adora_user');
+            const userData = storedUser ? JSON.parse(storedUser) : {};
+            const startTime = request.startedAt ? request.startedAt.toDate() : request.createdAt.toDate();
+            const endTime = new Date();
+            const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+            
+            await logAction(
+                'REQUEST_COMPLETE' as LogAction,
+                {
+                    id: userId,
+                    name: userName,
+                    role: userData.role || 'staff',
+                    department: userData.department || request.currentDepartment || 'general'
+                },
+                {
+                    type: 'request',
+                    id: requestId,
+                    name: `طلب ${request.type} - غرفة ${request.roomNumber}`
+                },
+                {
+                    tenantId: validatedTenantId,
+                    branchId: request.branch || 'default',
+                    roomNumber: request.roomNumber
+                },
+                {
+                    description: `تم إتمام الطلب من ${oldStatus} إلى ${RequestStatus.COMPLETED}${rating ? ` - تقييم: ${rating}` : ''}`,
+                    previousValue: oldStatus,
+                    newValue: RequestStatus.COMPLETED,
+                    duration: durationSeconds,
+                    metadata: { 
+                        requestType: request.type, 
+                        rating,
+                        hasFeedback: !!feedback,
+                        sentiment: sentimentResult?.sentiment 
+                    }
+                }
+            ).catch(err => logger.warn('Failed to log request completion', err, 'requestService'));
+        } catch (auditError) {
+            logger.warn('Failed to create audit log for request completion', auditError, 'requestService');
+        }
+        if (request) {
+            // 📦 INVENTORY DEDUCTION
             if (request.status === RequestStatus.COMPLETED && request.details?.items) {
-                // Determine if this request involves consumable items
                 const isConsumable = [
                     RequestType.MINIBAR,
                     RequestType.COFFEE,
@@ -529,7 +703,6 @@ export const completeRequest = async (
                 ].includes(request.type);
 
                 if (isConsumable && Array.isArray(request.details.items)) {
-                    // Dynamic Import to avoid circular dependencies if any
                     const { findInventoryItemByName, updateItemQuantity } = await import('./inventoryService');
 
                     for (const item of request.details.items) {
@@ -547,65 +720,128 @@ export const completeRequest = async (
                                         request.branch,
                                         requestId
                                     );
-                                    console.log(`✅ Inventory Deducted: ${item.name} (-${item.quantity})`);
                                 }
                             } catch (invError) {
-                                console.error(`⚠️ Inventory sync failed for ${item.name}:`, invError);
+                                logger.warn(`Inventory sync failed for ${item.name}`, invError, 'requestService');
                             }
                         }
                     }
                 }
             }
 
-            // 💰 Award Points: Task Completion (Maintenance, Bellman, etc)
+            // 💰 Award Points with Quality Check (Points Flow - FIXED)
+            // ✅ FIX: Now uses awardPointsWithQualityCheck to ensure suspicious speed detection
             let department: 'maintenance' | 'bellman' | 'housekeeping' | 'reception' | 'procurement' | null = null;
-            let action = 'completeRequest'; // Default action
+            let action = 'completeRequest';
 
             if (request.type === RequestType.MAINTENANCE) {
                 department = 'maintenance';
-                action = 'complete'; // Matches config key
+                action = 'complete';
             }
             else if (request.type === RequestType.BELLMAN) department = 'bellman';
             else if (request.type === RequestType.CLEANING) department = 'housekeeping';
             else if (request.type === RequestType.PROCUREMENT) {
                 department = 'procurement';
-                action = 'purchase'; // Matches config key
+                action = 'purchase';
             }
 
             if (department) {
-                // Calculate duration in minutes
                 const startTime = request.startedAt ? request.startedAt.toDate() : request.createdAt.toDate();
                 const endTime = new Date();
                 const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / 60000);
 
-                // Calculate Target Minutes if applicable
-                let targetMinutes = 0;
-                if (request.targetCompletionTime) {
-                    const targetTime = request.targetCompletionTime.toDate();
-                    const createdTime = request.createdAt.toDate();
-                    // Target duration in minutes relative to CREATION time
-                    targetMinutes = Math.floor((targetTime.getTime() - createdTime.getTime()) / 60000);
+                // ✅ Step 1: Calculate base points (using awardPerformancePoints logic but without awarding)
+                // We'll calculate manually to avoid double-awarding, then use awardPointsWithQualityCheck
+                const config = await getPointsConfig(validatedTenantId);
+                const deptConfig = config[department];
+                let basePoints = 0;
+                let bonusReason = '';
+
+                if (deptConfig) {
+                    switch (department) {
+                        case 'maintenance':
+                            if (action === 'complete') basePoints = deptConfig.complete ?? 1;
+                            break;
+                        case 'bellman':
+                            if (action === 'complete') basePoints = deptConfig.complete ?? 1;
+                            break;
+                        case 'housekeeping':
+                            // Determine if occupied or checkout cleaning
+                            const isCheckoutCleaning = request.type === RequestType.CLEANING && request.source === 'bellman_checkout';
+                            if (isCheckoutCleaning) {
+                                basePoints = deptConfig.completeCheckout ?? 1;
+                            } else {
+                                basePoints = deptConfig.completeOccupied ?? 1;
+                            }
+                            break;
+                        case 'procurement':
+                            if (action === 'purchase') {
+                                basePoints = deptConfig.purchase ?? 1;
+                                // Procurement has time-based bonuses
+                                const targetMinutes = request.targetCompletionTime 
+                                    ? Math.floor((request.targetCompletionTime.toDate().getTime() - request.createdAt.toDate().getTime()) / 60000)
+                                    : 0;
+                                if (targetMinutes > 0) {
+                                    const earlyThreshold = targetMinutes * 0.8;
+                                    if (durationMinutes <= earlyThreshold) {
+                                        basePoints += (deptConfig.early || 0);
+                                        bonusReason = ` (Early: ${durationMinutes}/${targetMinutes} min)`;
+                                    } else if (durationMinutes > targetMinutes) {
+                                        basePoints += (deptConfig.delay || 0);
+                                        bonusReason = ` (Delay: ${durationMinutes}/${targetMinutes} min)`;
+                                    } else {
+                                        basePoints += (deptConfig.ontime || 0);
+                                        bonusReason = ` (On time: ${durationMinutes}/${targetMinutes} min)`;
+                                    }
+                                }
+                            }
+                            break;
+                        case 'reception':
+                            if (action === 'complete') basePoints = deptConfig.complete ?? 1;
+                            break;
+                    }
                 }
 
-                await awardPerformancePoints(request.tenantId, userId, department, action, durationMinutes, targetMinutes);
+                // ✅ Step 2: Apply Quality Check (Suspicious Speed Check) via awardPointsWithQualityCheck
+                // This ensures points are held for review if completion speed is suspicious
+                if (basePoints > 0) {
+                    // Map department names for quality check (coffeeShop vs coffee_shop)
+                    const qualityCheckDepartment = department === 'coffee_shop' ? 'coffeeShop' : department;
+                    
+                    const qualityResult = await awardPointsWithQualityCheck(
+                        validatedTenantId,
+                        request.branch || 'default',
+                        userId,
+                        userName,
+                        qualityCheckDepartment,
+                        basePoints,
+                        `${action} - Room ${request.roomNumber}${bonusReason}`,
+                        durationMinutes,
+                        requestId
+                    );
 
-                // ⭐ Award Rating Points
+                    // Log quality check result (for audit)
+                    if (qualityResult.held) {
+                        logger.warn(`Points held for review: ${qualityResult.message}`, undefined, 'requestService');
+                    } else {
+                        logger.info(`Points awarded: ${qualityResult.message}`, undefined, 'requestService');
+                    }
+                }
+
                 if (rating && department !== 'procurement') {
-                    // Ratings usually apply to service departments
                     if (department === 'bellman' || department === 'housekeeping' || department === 'maintenance' || department === 'reception') {
-                        await awardRatingPoints(request.tenantId, userId, department, rating);
+                        await awardRatingPoints(validatedTenantId, userId, department, rating);
                     }
                 }
             }
         }
 
-        // 🚨 ADORA CRISIS ROUTING: Action depends on Severity
+        // 🚨 ADORA CRISIS ROUTING
         if (sentimentResult?.sentiment === 'Negative' && sentimentResult.score > 0.7) {
-            const original = await getRequest(requestId);
+            const original = await getRequest(requestId, validatedTenantId);
             if (!original) return;
 
             if (sentimentResult.severity === 'CRITICAL') {
-                // Trigger Emergency for Infrastructure
                 await createRequest({
                     type: RequestType.VIP_SERVICE,
                     roomNumber: original.roomNumber,
@@ -613,26 +849,23 @@ export const completeRequest = async (
                     priority: RequestPriority.EMERGENCY,
                     source: RequestSource.AUTO,
                     notes: `🚨 AI CRISIS ALERT: [CRITICAL INFRASTRUCTURE] Issue: ${sentimentResult.issue}. Summary: ${sentimentResult.summary}. Recovery Strategy: ${sentimentResult.suggestedRecovery}. Resolve immediately!`,
-                    tenantId: original.tenantId
+                    tenantId: validatedTenantId
                 }, original.branch, 'AI_GUARDIAN', 'Adora AI');
-            } else if (sentimentResult.severity === 'MODERATE') {
-                // MODERATE issues are surfaced via SmartAlerts (pulled by dashboard)
-                // We just ensure the metadata is there.
-                console.log(`[Adora AI] Service Issue detected. Recovery suggested: ${sentimentResult.suggestedRecovery}`);
             }
         }
     } catch (error) {
-        console.error('Error completing request:', error);
-        throw new Error('Failed to complete request');
+        logger.error('Error completing request', error, 'requestService');
+        throw new Error('فشل إكمال الطلب. يرجى المحاولة مرة أخرى.');
     }
 };
 
 /**
- * ✅ Transfer request to another department
- * Tracks the complete journey of the request through departments
+ * Transfer request to another department
+ * 🔐 SECURITY: Validates tenant access
  */
 export const transferRequestToDepartment = async (
     requestId: string,
+    tenantId: string,
     fromDepartment: string,
     toDepartment: string,
     userId: string,
@@ -640,9 +873,18 @@ export const transferRequestToDepartment = async (
     status?: RequestStatus,
     notes?: string
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot transfer request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-        const request = await getRequest(requestId);
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        const request = await getRequest(requestId, validatedTenantId);
         
         if (!request) {
             throw new Error('Request not found');
@@ -651,7 +893,6 @@ export const transferRequestToDepartment = async (
         const now = Timestamp.now();
         const history = request.departmentHistory || [];
         
-        // Update the last entry's exit time
         if (history.length > 0) {
             const lastEntry = history[history.length - 1];
             if (lastEntry.department === fromDepartment && !lastEntry.exitedAt) {
@@ -663,7 +904,6 @@ export const transferRequestToDepartment = async (
             }
         }
 
-        // Add new department entry
         history.push({
             department: toDepartment,
             status: status || RequestStatus.CONFIRMED,
@@ -675,7 +915,10 @@ export const transferRequestToDepartment = async (
             notes: notes
         });
 
-        await updateDoc(docRef, {
+        const oldDepartment = request.currentDepartment || fromDepartment;
+        const oldStatus = request.status;
+
+        await updateDoc(requestRef, {
             currentDepartment: toDepartment,
             status: status || RequestStatus.CONFIRMED,
             deliveredAt: now,
@@ -686,25 +929,68 @@ export const transferRequestToDepartment = async (
                 name: userName
             }
         });
+
+        // 📝 Audit Log: Request Transferred
+        try {
+            const storedUser = localStorage.getItem('adora_user');
+            const userData = storedUser ? JSON.parse(storedUser) : {};
+            await logAction(
+                'REQUEST_TRANSFER' as LogAction,
+                {
+                    id: userId,
+                    name: userName,
+                    role: userData.role || 'reception',
+                    department: userData.department || fromDepartment
+                },
+                {
+                    type: 'request',
+                    id: requestId,
+                    name: `طلب ${request.type} - غرفة ${request.roomNumber}`
+                },
+                {
+                    tenantId: validatedTenantId,
+                    branchId: request.branch || 'default',
+                    roomNumber: request.roomNumber
+                },
+                {
+                    description: `تم تحويل الطلب من ${oldDepartment} إلى ${toDepartment}${notes ? ` - ملاحظات: ${notes}` : ''}`,
+                    previousValue: { department: oldDepartment, status: oldStatus },
+                    newValue: { department: toDepartment, status: status || RequestStatus.CONFIRMED },
+                    metadata: { requestType: request.type, notes }
+                }
+            ).catch(err => logger.warn('Failed to log request transfer', err, 'requestService'));
+        } catch (auditError) {
+            logger.warn('Failed to create audit log for request transfer', auditError, 'requestService');
+        }
     } catch (error) {
-        console.error('Error transferring request:', error);
-        throw new Error('Failed to transfer request');
+        logger.error('Error transferring request', error, 'requestService');
+        throw new Error('فشل نقل الطلب. يرجى المحاولة مرة أخرى.');
     }
 };
 
 /**
- * ✅ Confirm completion and close the request circle
- * Used when a department receives a completed request and confirms it
+ * Confirm completion and close the request circle
+ * 🔐 SECURITY: Validates tenant access
  */
 export const confirmCompletion = async (
     requestId: string,
+    tenantId: string,
     userId: string,
     userName: string,
     department: string
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot confirm completion', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-        const request = await getRequest(requestId);
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        const request = await getRequest(requestId, validatedTenantId);
         
         if (!request) {
             throw new Error('Request not found');
@@ -713,7 +999,6 @@ export const confirmCompletion = async (
         const now = Timestamp.now();
         const history = request.departmentHistory || [];
         
-        // Update the last entry to mark as confirmed
         if (history.length > 0) {
             const lastEntry = history[history.length - 1];
             if (lastEntry.department === department) {
@@ -722,12 +1007,12 @@ export const confirmCompletion = async (
             }
         }
 
-        await updateDoc(docRef, {
+        await updateDoc(requestRef, {
             status: RequestStatus.COMPLETED,
             completedAt: now,
             'timeline.completed': now,
             departmentHistory: history,
-            currentDepartment: undefined, // No longer in any department
+            currentDepartment: undefined,
             modifiedAt: now,
             modifiedBy: {
                 id: userId,
@@ -736,23 +1021,34 @@ export const confirmCompletion = async (
             }
         });
     } catch (error) {
-        console.error('Error confirming completion:', error);
-        throw new Error('Failed to confirm completion');
+        logger.error('Error confirming completion', error, 'requestService');
+        throw new Error('فشل تأكيد الإكمال. يرجى المحاولة مرة أخرى.');
     }
 };
 
 /**
  * Cancel request
+ * 🔐 SECURITY: Validates tenant access
  */
 export const cancelRequest = async (
     requestId: string,
+    tenantId: string,
     userId: string,
     userName: string,
     reason: string
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot cancel request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-        await updateDoc(docRef, {
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        await updateDoc(requestRef, {
             status: RequestStatus.CANCELLED,
             isCancelled: true,
             cancelReason: reason,
@@ -764,22 +1060,33 @@ export const cancelRequest = async (
             'timeline.cancelled': Timestamp.now()
         });
     } catch (error) {
-        console.error('Error cancelling request:', error);
-        throw new Error('Failed to cancel request');
+        logger.error('Error cancelling request', error, 'requestService');
+        throw new Error('فشل إلغاء الطلب. يرجى المحاولة مرة أخرى.');
     }
 };
 
 /**
  * Assign request to employee
+ * 🔐 SECURITY: Validates tenant access
  */
 export const assignRequest = async (
     requestId: string,
+    tenantId: string,
     employeeId: string,
     employeeName: string
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot assign request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-        await updateDoc(docRef, {
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        await updateDoc(requestRef, {
             assignedTo: {
                 id: employeeId,
                 name: employeeName
@@ -787,8 +1094,8 @@ export const assignRequest = async (
             modifiedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error assigning request:', error);
-        throw new Error('Failed to assign request');
+        logger.error('Error assigning request', error, 'requestService');
+        throw new Error('فشل تعيين الطلب. يرجى المحاولة مرة أخرى.');
     }
 };
 
@@ -798,79 +1105,66 @@ export const assignRequest = async (
 
 /**
  * Delete request (soft delete by setting status to cancelled)
+ * 🔐 SECURITY: Validates tenant access
  */
-export const deleteRequest = async (requestId: string): Promise<void> => {
+export const deleteRequest = async (requestId: string, tenantId: string): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot delete request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-        // Soft delete: mark as cancelled instead of actual deletion
-        await updateDoc(docRef, {
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        await updateDoc(requestRef, {
             status: RequestStatus.CANCELLED,
             isCancelled: true,
             cancelReason: 'Deleted by user',
             modifiedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error deleting request:', error);
-        throw new Error('Failed to delete request');
+        logger.error('Error deleting request', error, 'requestService');
+        throw new Error('فشل حذف الطلب. يرجى المحاولة مرة أخرى.');
     }
 };
 
 // ============================================================
-// REAL-TIME SUBSCRIPTIONS
+// REAL-TIME SUBSCRIPTIONS (⚡ OPTIMIZED WITH CACHING)
 // ============================================================
 
 /**
  * Subscribes to real-time request updates for a branch
- * 
- * ## Business Logic:
- * - Returns requests for specified branch
- * - Optionally filters by status
- * - Sorted by creation date (newest first)
- * - Updates callback on any change
- * 
- * ## Security:
- * - Filters by tenantId for data isolation
- * 
- * ## Side Effects:
- * - Creates Firestore listener (cleanup required)
- * 
- * @param branch - Branch ID to filter by
- * @param callback - Function called with updated requests
- * @param status - Optional status filter
- * @param tenantId - Tenant ID for isolation
- * @returns Unsubscribe function
- * 
- * @example
- * ```typescript
- * useEffect(() => {
- *   const unsub = subscribeToRequests(
- *     branchId,
- *     setRequests,
- *     RequestStatus.PENDING_RECEPTION,
- *     tenantId
- *   );
- *   return () => unsub();
- * }, [branchId, tenantId]);
- * ```
+ * ⚡ PERFORMANCE: Uses tenant-scoped collection + result limiting
+ * 🔐 SECURITY: Validates tenant access
  */
 export const subscribeToRequests = (
     branch: string,
+    tenantId: string,
     callback: (requests: Request[]) => void,
     status?: RequestStatus,
-    tenantId?: string,
-    maxResults: number = 50 // ⚡ PERFORMANCE: Limit results
+    maxResults: number = 50
 ): Unsubscribe => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot subscribe to requests', undefined, 'requestService');
+        callback([]);
+        return () => { };
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const constraints: any[] = [where('branch', '==', branch)];
-        if (tenantId) constraints.push(where('tenantId', '==', tenantId));
+        const constraints: QueryConstraint[] = [where('branch', '==', branch)];
         if (status) constraints.push(where('status', '==', status));
         constraints.push(orderBy('createdAt', 'desc'));
-        constraints.push(limit(maxResults)); // ⚡ LIMIT
+        constraints.push(limit(maxResults));
 
-        const q = query(
-            collection(db, REQUESTS_COLLECTION),
-            ...constraints
-        );
+        // ✅ Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${validatedTenantId}/requests`);
+        const q = query(requestsRef, ...constraints);
 
         return onSnapshot(q, (snapshot) => {
             const requests = snapshot.docs.map(doc => ({
@@ -879,103 +1173,118 @@ export const subscribeToRequests = (
             } as Request));
             callback(requests);
         }, (error) => {
-            console.error('Error in requests subscription:', error);
+            logger.error('Error in requests subscription', error, 'requestService');
             callback([]);
         });
     } catch (error) {
-        console.error('Error setting up subscription:', error);
+        logger.error('Error setting up subscription', error, 'requestService');
         return () => { };
     }
 };
 
 /**
  * Subscribe to requests for MULTIPLE branches
- * Used for employees/managers assigned to multiple branches
- * Firestore 'in' query limit: max 30 values
- * ⚡ PERFORMANCE: Added maxResults limit
+ * ⚡ PERFORMANCE: Optimized with result limiting
+ * 🔐 SECURITY: Validates tenant access
  */
 export const subscribeToMultipleBranches = (
     branches: string[],
+    tenantId: string,
     callback: (requests: Request[]) => void,
     options?: {
         status?: RequestStatus;
         type?: RequestType;
-        maxResults?: number; // ⚡ Added
+        maxResults?: number;
     }
 ): Unsubscribe => {
-    const maxResults = options?.maxResults || 50; // ⚡ Default limit
+    const maxResults = options?.maxResults || 50;
     
-    // If only one branch, use the simpler query
-    if (branches.length === 1) {
-        return subscribeToRequests(branches[0], callback, options?.status, undefined, maxResults);
-    }
-
-    // If no branches, return empty
     if (branches.length === 0) {
         callback([]);
         return () => { };
     }
 
+    if (!db) {
+        logger.error('Firebase not initialized - cannot subscribe to multiple branches', undefined, 'requestService');
+        callback([]);
+        return () => { };
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
         // Firestore 'in' query supports max 30 values
         const branchesToQuery = branches.slice(0, 30);
 
+        // ✅ Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${validatedTenantId}/requests`);
         let q = query(
-            collection(db, REQUESTS_COLLECTION),
+            requestsRef,
             where('branch', 'in', branchesToQuery),
             orderBy('createdAt', 'desc'),
-            limit(maxResults) // ⚡ LIMIT
+            limit(maxResults)
         );
 
         if (options?.status) {
             q = query(q, where('status', '==', options.status));
         }
 
-        // Note: type filtering will be done client-side to avoid composite index
         return onSnapshot(q, (snapshot) => {
             let requests = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             } as Request));
 
-            // Client-side type filter if needed
             if (options?.type) {
                 requests = requests.filter(r => r.type === options.type);
             }
 
             callback(requests);
         }, (error) => {
-            console.error('Error in multi-branch subscription:', error);
+            logger.error('Error in multi-branch subscription', error, 'requestService');
             callback([]);
         });
     } catch (error) {
-        console.error('Error setting up multi-branch subscription:', error);
+        logger.error('Error setting up multi-branch subscription', error, 'requestService');
         return () => { };
     }
 };
 
 /**
  * Subscribe to a single request
+ * 🔐 SECURITY: Validates tenant access
  */
 export const subscribeToRequest = (
     requestId: string,
+    tenantId: string,
     callback: (request: Request | null) => void
 ): Unsubscribe => {
-    try {
-        const docRef = doc(db, REQUESTS_COLLECTION, requestId);
+    if (!db) {
+        logger.error('Firebase not initialized - cannot subscribe to request', undefined, 'requestService');
+        callback(null);
+        return () => { };
+    }
 
-        return onSnapshot(docRef, (doc) => {
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    try {
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+
+        return onSnapshot(requestRef, (doc) => {
             if (doc.exists()) {
                 callback({ id: doc.id, ...doc.data() } as Request);
             } else {
                 callback(null);
             }
         }, (error) => {
-            console.error('Error in request subscription:', error);
+            logger.error('Error in request subscription', error, 'requestService');
             callback(null);
         });
     } catch (error) {
-        console.error('Error setting up subscription:', error);
+        logger.error('Error setting up subscription', error, 'requestService');
         return () => { };
     }
 };
@@ -986,18 +1295,29 @@ export const subscribeToRequest = (
 
 /**
  * Bulk confirm requests
+ * 🔐 SECURITY: Validates tenant access
  */
 export const bulkConfirmRequests = async (
     requestIds: string[],
+    tenantId: string,
     userId: string,
     userName: string
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot bulk confirm requests', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
         const batch = writeBatch(db);
 
         requestIds.forEach(requestId => {
-            const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-            batch.update(docRef, {
+            // ✅ Use tenant-scoped collection
+            const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+            batch.update(requestRef, {
                 status: RequestStatus.CONFIRMED,
                 confirmedBy: {
                     id: userId,
@@ -1009,25 +1329,36 @@ export const bulkConfirmRequests = async (
 
         await batch.commit();
     } catch (error) {
-        console.error('Error bulk confirming requests:', error);
-        throw new Error('Failed to bulk confirm requests');
+        logger.error('Error bulk confirming requests', error, 'requestService');
+        throw new Error('فشل تأكيد الطلبات. يرجى المحاولة مرة أخرى.');
     }
 };
 
 /**
  * Bulk complete requests
+ * 🔐 SECURITY: Validates tenant access
  */
 export const bulkCompleteRequests = async (
     requestIds: string[],
+    tenantId: string,
     userId: string,
     userName: string
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot bulk complete requests', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
         const batch = writeBatch(db);
 
         requestIds.forEach(requestId => {
-            const docRef = doc(db, REQUESTS_COLLECTION, requestId);
-            batch.update(docRef, {
+            // ✅ Use tenant-scoped collection
+            const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+            batch.update(requestRef, {
                 status: RequestStatus.COMPLETED,
                 completedBy: {
                     id: userId,
@@ -1039,8 +1370,8 @@ export const bulkCompleteRequests = async (
 
         await batch.commit();
     } catch (error) {
-        console.error('Error bulk completing requests:', error);
-        throw new Error('Failed to bulk complete requests');
+        logger.error('Error bulk completing requests', error, 'requestService');
+        throw new Error('فشل إكمال الطلبات. يرجى المحاولة مرة أخرى.');
     }
 };
 
@@ -1050,11 +1381,24 @@ export const bulkCompleteRequests = async (
 
 /**
  * Get request statistics
+ * 🔐 SECURITY: Validates tenant access
  */
-export const getRequestStats = async (branch: string, startDate?: Date, endDate?: Date, tenantId?: string) => {
+export const getRequestStats = async (
+    branch: string,
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date
+) => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get request stats', undefined, 'requestService');
+        return null;
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const constraints: any[] = [where('branch', '==', branch)];
-        if (tenantId) constraints.push(where('tenantId', '==', tenantId));
+        const constraints: QueryConstraint[] = [where('branch', '==', branch)];
 
         if (startDate) {
             constraints.push(where('createdAt', '>=', Timestamp.fromDate(startDate)));
@@ -1063,10 +1407,9 @@ export const getRequestStats = async (branch: string, startDate?: Date, endDate?
             constraints.push(where('createdAt', '<=', Timestamp.fromDate(endDate)));
         }
 
-        const q = query(
-            collection(db, REQUESTS_COLLECTION),
-            ...constraints
-        );
+        // ✅ Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${validatedTenantId}/requests`);
+        const q = query(requestsRef, ...constraints);
 
         const snapshot = await getDocs(q);
         const requests = snapshot.docs.map(doc => doc.data() as Request);
@@ -1090,7 +1433,7 @@ export const getRequestStats = async (branch: string, startDate?: Date, endDate?
             avgCompletionTime: calculateAverageCompletionTime(requests)
         };
     } catch (error) {
-        console.error('Error getting request stats:', error);
+        logger.error('Error getting request stats', error, 'requestService');
         return null;
     }
 };
@@ -1123,90 +1466,99 @@ function calculateAverageCompletionTime(requests: Request[]): number {
 }
 
 // ============================================================
-// BACKWARD COMPATIBILITY (for existing code)
+// WHATSAPP-STYLE TRACKING
 // ============================================================
 
-/**
- * @deprecated Use createRequest instead
- */
-export const addRequest = createRequest;
-
-/**
- * @deprecated Use startRequest instead
- */
-export const startWork = startRequest;
-
-// ============================================================
-// WHATSAPP-STYLE TRACKING (Phase 11)
-// ============================================================
-
-// Re-export for backward compatibility (type now in ../types/request.ts)
 export type { ReadReceiptStatus };
 
 /**
  * Mark request as delivered to department
+ * 🔐 SECURITY: Validates tenant access
  */
 export async function markAsDelivered(
     requestId: string,
+    tenantId: string,
     department: string
 ): Promise<void> {
-    const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
-    await updateDoc(requestRef, {
-        currentDepartment: department,
-        deliveredAt: Timestamp.now(),
-    });
+    if (!db) {
+        logger.error('Firebase not initialized - cannot mark as delivered', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    try {
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        await updateDoc(requestRef, {
+            currentDepartment: department,
+            deliveredAt: Timestamp.now(),
+        });
+    } catch (error) {
+        logger.error('Error marking request as delivered', error, 'requestService');
+        throw new Error('فشل تحديث حالة التسليم. يرجى المحاولة مرة أخرى.');
+    }
 }
 
 /**
  * Mark request as viewed by user
+ * 🔐 SECURITY: Validates tenant access
  */
 export async function markAsViewed(
     requestId: string,
+    tenantId: string,
     userId: string,
     userName: string,
     department: string
 ): Promise<void> {
-    const requestRef = doc(db, REQUESTS_COLLECTION, requestId);
-    const requestDoc = await getDoc(requestRef);
+    if (!db) {
+        logger.error('Firebase not initialized - cannot mark as viewed', undefined, 'requestService');
+        return;
+    }
 
-    if (!requestDoc.exists()) return;
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
 
-    const data = requestDoc.data();
-    const viewedBy = data.viewedBy || [];
+    try {
+        // ✅ Use tenant-scoped collection
+        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+        const requestDoc = await getDoc(requestRef);
 
-    // Check if already viewed by this user
-    const alreadyViewed = viewedBy.some((v: any) => v.userId === userId);
-    if (alreadyViewed) return;
+        if (!requestDoc.exists()) return;
 
-    // Add to viewedBy array
-    await updateDoc(requestRef, {
-        viewedBy: [
-            ...viewedBy,
-            {
-                userId,
-                userName,
-                department,
-                viewedAt: Timestamp.now(),
-            }
-        ]
-    });
+        const data = requestDoc.data();
+        const viewedBy = (data.viewedBy || []) as ViewedByEntry[];
+
+        const alreadyViewed = viewedBy.some((v: ViewedByEntry) => v.userId === userId);
+        if (alreadyViewed) return;
+
+        await updateDoc(requestRef, {
+            viewedBy: [
+                ...viewedBy,
+                {
+                    userId,
+                    userName,
+                    department,
+                    viewedAt: Timestamp.now(),
+                }
+            ]
+        });
+    } catch (error) {
+        logger.error('Error marking request as viewed', error, 'requestService');
+    }
 }
 
 /**
  * Get read receipt status for a request
  */
 export function getReadStatus(request: Request): ReadReceiptStatus {
-    // If someone viewed it -> read
     if (request.viewedBy && request.viewedBy.length > 0) {
         return 'read';
     }
-
-    // If delivered to department -> delivered
     if (request.deliveredAt || request.confirmedAt) {
         return 'delivered';
     }
-
-    // Otherwise -> sent
     return 'sent';
 }
 
@@ -1233,7 +1585,7 @@ export function getViewers(request: Request): { userId: string; userName: string
 
 /**
  * Cancel all active requests for a branch (Cascading Cleanup)
- * Used when a branch is deleted or disabled
+ * 🔐 SECURITY: Validates tenant access
  */
 export const cancelAllActiveRequestsByBranch = async (
     tenantId: string,
@@ -1242,10 +1594,18 @@ export const cancelAllActiveRequestsByBranch = async (
     userName: string,
     reason: string = 'تعطيل أو حذف الفرع'
 ): Promise<number> => {
+    if (!db) {
+        throw new Error('Firebase not initialized');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
+        // ✅ Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${validatedTenantId}/requests`);
         const q = query(
-            collection(db, REQUESTS_COLLECTION),
-            where('tenantId', '==', tenantId),
+            requestsRef,
             where('branch', '==', branchId),
             where('status', 'in', [
                 RequestStatus.PENDING_RECEPTION,
@@ -1274,7 +1634,21 @@ export const cancelAllActiveRequestsByBranch = async (
         await batch.commit();
         return snapshot.size;
     } catch (error) {
-        console.error('Error in cascading request cancellation:', error);
+        logger.error('Error in cascading request cancellation', error, 'requestService');
         throw error;
     }
 };
+
+// ============================================================
+// BACKWARD COMPATIBILITY
+// ============================================================
+
+/**
+ * @deprecated Use createRequest instead
+ */
+export const addRequest = createRequest;
+
+/**
+ * @deprecated Use startRequest instead
+ */
+export const startWork = startRequest;

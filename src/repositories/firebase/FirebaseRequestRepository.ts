@@ -43,6 +43,9 @@ import {
     bulkCompleteRequests as firebaseBulkCompleteRequests,
     cancelAllActiveRequestsByBranch as firebaseCancelAllActiveRequestsByBranch
 } from '../../services/requestService';
+import {
+    assignRequest as staffAssignRequest,
+} from '../../services/staffService';
 
 /**
  * Firebase implementation of IRequestRepository
@@ -152,10 +155,15 @@ export class FirebaseRequestRepository implements IRequestRepository {
 
     async assignRequest(
         requestId: string,
+        tenantId: string,
         employeeId: string,
-        employeeName: string
+        employeeName: string,
+        branchId: string,
+        maxWorkload?: number
     ): Promise<void> {
-        return firebaseAssignRequest(requestId, employeeId, employeeName);
+        // ✅ FIX: Use staffService.assignRequest instead of requestService.assignRequest
+        // This ensures workload and online status checks are performed
+        return staffAssignRequest(requestId, tenantId, employeeId, employeeName, branchId, maxWorkload);
     }
 
     async transferRequestToDepartment(

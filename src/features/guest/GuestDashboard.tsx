@@ -1382,7 +1382,9 @@ export const GuestDashboard: React.FC = () => {
     };
 
     const listenForActiveRequests = (sessionData: GuestSession) => {
-        const requestsRef = collection(db, 'requests');
+        // ✅ Use tenant-scoped collection
+        const tenantId = sessionData.hotelId || 'default';
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
             where('roomNumber', '==', sessionData.roomNumber),
@@ -1425,7 +1427,9 @@ export const GuestDashboard: React.FC = () => {
 
     // Listen for recently completed requests to show rating modal automatically
     const listenForCompletedRequests = (sessionData: GuestSession) => {
-        const requestsRef = collection(db, 'requests');
+        // ✅ Use tenant-scoped collection
+        const tenantId = sessionData.hotelId || 'default';
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
             where('roomNumber', '==', sessionData.roomNumber),
@@ -1455,7 +1459,9 @@ export const GuestDashboard: React.FC = () => {
 
     const loadRecentRequests = async (sessionData: GuestSession) => {
         try {
-            const requestsRef = collection(db, 'requests');
+            // ✅ Use tenant-scoped collection
+            const tenantId = sessionData.hotelId || 'default';
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
             const q = query(
                 requestsRef,
                 where('roomNumber', '==', sessionData.roomNumber),
@@ -1727,7 +1733,10 @@ export const GuestDashboard: React.FC = () => {
             }
             if (scheduleTime) requestData.scheduledFor = scheduleTime;
 
-            const docRef = await addDoc(collection(db, 'requests'), requestData);
+            // ✅ Use tenant-scoped collection
+            const tenantId = session.hotelId || 'default';
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+            const docRef = await addDoc(requestsRef, requestData);
             
             // ✅ تسجيل الطلب في Rate Limiter
             recordRequest();
@@ -2337,7 +2346,10 @@ export const GuestDashboard: React.FC = () => {
                     return { id, name: item?.name, qty, price: item?.price };
                 });
 
-            await addDoc(collection(db, 'requests'), {
+            // ✅ Use tenant-scoped collection
+            const tenantId = session.hotelId || 'default';
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+            await addDoc(requestsRef, {
                 type: type === 'coffee' ? 'room_service' : 'minibar',
                 serviceType: type === 'coffee' ? 'room_service' : 'minibar',
                 roomNumber: session.roomNumber,
@@ -2345,7 +2357,7 @@ export const GuestDashboard: React.FC = () => {
                 guestIdentity: session.guestIdentity, // ✅ Identity/Phone
                 guestPhone: session.guestPhone, // ✅ Phone number
                 branch: session.branch,
-                tenantId: session.hotelId, // ✅ SaaS: Add tenantId
+                tenantId: tenantId, // ✅ SaaS: Add tenantId
                 status: 'PENDING_RECEPTION', // ✅ Send to Reception for confirmation
                 priority: 'normal',
                 items,
@@ -2423,7 +2435,10 @@ export const GuestDashboard: React.FC = () => {
                 return; // Block request if checks fail
             }
             
-            await addDoc(collection(db, 'requests'), {
+            // ✅ Use tenant-scoped collection
+            const tenantId = session.hotelId || 'default';
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+            await addDoc(requestsRef, {
                 type: 'extension',
                 serviceType: 'extension',
                 roomNumber: session.roomNumber,
@@ -2431,7 +2446,7 @@ export const GuestDashboard: React.FC = () => {
                 guestIdentity: session.guestIdentity, // ✅ Identity/Phone
                 guestPhone: session.guestPhone, // ✅ Phone number
                 branch: session.branch,
-                tenantId: session.hotelId, // ✅ SaaS: Add tenantId
+                tenantId: tenantId, // ✅ SaaS: Add tenantId
                 status: 'PENDING_RECEPTION', // ✅ Send to Reception for confirmation
                 priority: 'normal',
                 notes: 'طلب تمديد الإقامة من النزيل',

@@ -7,6 +7,7 @@
 
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
+import { autoTranslateNewText } from './dynamicTranslationService'; // ✅ Auto-translation
 
 // ============================================================
 // TYPES
@@ -84,6 +85,31 @@ export const createGeneralInstruction = async (
 
         const docRef = doc(getInstructionsCollectionRef(tenantId));
         await setDoc(docRef, instructionData);
+
+        // ✅ AUTO-TRANSLATE: Translate Arabic text to all languages automatically
+        if (instruction.titleAr || instruction.contentAr) {
+            try {
+                // Translate title
+                if (instruction.titleAr) {
+                    await autoTranslateNewText(
+                        tenantId,
+                        `instruction_${docRef.id}_title`,
+                        instruction.titleAr
+                    );
+                }
+                // Translate content
+                if (instruction.contentAr) {
+                    await autoTranslateNewText(
+                        tenantId,
+                        `instruction_${docRef.id}_content`,
+                        instruction.contentAr
+                    );
+                }
+            } catch (translationError) {
+                // Don't fail the instruction creation if translation fails
+                console.warn('Auto-translation failed for instruction:', translationError);
+            }
+        }
 
         return docRef.id;
     } catch (error) {

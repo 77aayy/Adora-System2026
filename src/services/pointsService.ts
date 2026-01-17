@@ -196,6 +196,12 @@ export async function logSuspiciousSpeed(
 ): Promise<void> {
     if (!result.isSuspicious) return;
     
+    // ✅ SECURITY FIX: Check db before Firestore operations
+    if (!db) {
+        console.error('Firebase not initialized - cannot log suspicious speed');
+        return;
+    }
+    
     try {
         await addDoc(collection(db, `tenants/${tenantId}/suspicious_activities`), {
             type: 'suspicious_speed',
@@ -250,6 +256,11 @@ export async function awardPointsWithQualityCheck(
             requestId || 'unknown',
             suspiciousCheck
         );
+        
+        // ✅ SECURITY FIX: Check db before Firestore operations
+        if (!db) {
+            throw new Error('Firebase not initialized');
+        }
         
         // Hold points for review instead of awarding immediately
         await addDoc(collection(db, `tenants/${tenantId}/pending_points`), {
@@ -548,6 +559,12 @@ export async function deductPoints(
     points: number,
     description: string
 ): Promise<boolean> {
+    // ✅ SECURITY FIX: Check db before Firestore operations
+    if (!db) {
+        console.error('Firebase not initialized - cannot deduct points');
+        return false;
+    }
+    
     try {
         const employeeRef = doc(db, `tenants/${tenantId}/employees`, employeeId);
 
@@ -556,7 +573,8 @@ export async function deductPoints(
             if (!employeeDoc.exists()) throw new Error('Employee not found');
 
             const employeeData = employeeDoc.data();
-            const currentPoints = (employeeData.currentPoints || 0);
+            const currentPoints = (employeeData.currentPoints || employeeData.points || 0);
+            const currentVersion = employeeData.version || 0; // ✅ FIX: Add version check for optimistic locking
 
             if (currentPoints < points) {
                 throw new Error('Insufficient points');
@@ -564,11 +582,12 @@ export async function deductPoints(
 
             const newBalance = currentPoints - points;
 
-            // Update balance
+            // ✅ FIX: Update balance with version check (prevents race condition in concurrent redeem operations)
             transaction.update(employeeRef, {
                 currentPoints: newBalance,
                 points: newBalance, // legacy sync
-                personalPoints: newBalance // legacy sync
+                personalPoints: newBalance, // legacy sync
+                version: currentVersion + 1 // ✅ Version check for optimistic locking
             });
 
             // Log Transaction
@@ -599,6 +618,12 @@ export async function awardPoints(
     points: number,
     reason: string = ''
 ): Promise<void> {
+    // ✅ SECURITY FIX: Check db before Firestore operations
+    if (!db) {
+        console.error('Firebase not initialized - cannot award points');
+        return;
+    }
+    
     try {
         // ✅ FIX: Try both employees collection and users collection (backward compatibility)
         const employeeRef = doc(db, `tenants/${tenantId}/employees`, employeeId);

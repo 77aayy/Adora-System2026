@@ -25,7 +25,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useTranslation } from 'react-i18next';
 import { db } from '../../services/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, Timestamp, orderBy, getDocs, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, Timestamp, orderBy, getDocs, arrayUnion, Unsubscribe } from 'firebase/firestore';
+import { logger } from '../../services/loggerService'; // ✅ Adora Premium: Structured logging
 import { useSmartAgent } from '../../hooks/useSmartAgent';
 import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboarding tour
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
@@ -79,15 +80,15 @@ interface MaintenanceRequest {
     afterPhoto?: string;
     estimatedCost?: number;
     actualCost?: number;
-    createdAt: any;
+    createdAt: Timestamp | { toDate: () => Date } | Date;
     timeline?: {
-        confirmed?: any;
-        started?: any;
-        completed?: any;
+        confirmed?: Timestamp | { toDate: () => Date } | Date;
+        started?: Timestamp | { toDate: () => Date } | Date;
+        completed?: Timestamp | { toDate: () => Date } | Date;
     };
     // Department tracking
     currentDepartment?: 'maintenance' | 'reception' | 'housekeeping';
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 // ============================================================
@@ -110,7 +111,7 @@ export const MaintenanceDashboard: React.FC = () => {
     useEffect(() => {
         const fastUITimeout = setTimeout(() => {
             if (loading) {
-                console.log('⚡ Fast UI: Showing Maintenance page now');
+                logger.info('Fast UI: Showing Maintenance page now', undefined, 'MaintenanceDashboard');
                 setLoading(false);
             }
         }, 2000);
@@ -254,7 +255,7 @@ export const MaintenanceDashboard: React.FC = () => {
                     setShowLocationWarning(true);
                 }
             } catch (err) {
-                console.error('Location check error:', err);
+                logger.error('Location check error', err, 'MaintenanceDashboard');
                 // Fail open - allow access
             }
         };
@@ -266,20 +267,37 @@ export const MaintenanceDashboard: React.FC = () => {
         if (!user || !branchId) return;
 
         // ✅ Auto-sync tenant if missing (Crucial for direct navigation)
-        const userTenantId = (user as any)?.tenantId;
+        const userTenantId = (user as { tenantId?: string })?.tenantId;
         if (userTenantId && !tenantId) {
-            console.log('🔄 Syncing Tenant ID from Auth:', userTenantId);
-            setTenant(userTenantId).catch(console.error);
+            logger.info('Syncing Tenant ID from Auth', { userTenantId }, 'MaintenanceDashboard');
+            setTenant(userTenantId).catch((err) => {
+                logger.error('Failed to sync tenant ID', err, 'MaintenanceDashboard');
+            });
+        }
+
+        // ✅ ADORA SECURITY: Null safety check before subscription
+        if (!db) {
+            logger.error('Firebase not initialized - cannot listen to maintenance requests', undefined, 'MaintenanceDashboard');
+            setLoading(false);
+            return;
         }
 
         // ✅ FIX: Store unsubscribe function for cleanup
         const unsubscribe = listenToMaintenanceRequests();
+        if (!unsubscribe) {
+            logger.warn('Failed to create subscription - unsubscribe is null', undefined, 'MaintenanceDashboard');
+            setLoading(false);
+            return;
+        }
+
         setLoading(false);
-        console.log('✅ Maintenance page initialized');
+        logger.info('Maintenance page initialized', undefined, 'MaintenanceDashboard');
         
         // ✅ Cleanup on unmount to prevent memory leaks
         return () => {
-            if (unsubscribe) unsubscribe();
+            if (unsubscribe) {
+                unsubscribe();
+            }
         };
     }, [user, tenantId, branchId]);
 
@@ -309,7 +327,7 @@ export const MaintenanceDashboard: React.FC = () => {
             }
         },
         onSuccess: (action, params) => {
-            console.log("AI Action Success (Maintenance):", action, params);
+            logger.info('AI Action Success (Maintenance)', { action, params }, 'MaintenanceDashboard');
             haptic('success');
             if (action === 'UPDATE_STATUS') {
                 if (params.status === 'start') {
@@ -325,18 +343,36 @@ export const MaintenanceDashboard: React.FC = () => {
     // REALTIME LISTENERS
     // ============================================================
 
-    const listenToMaintenanceRequests = () => {
-        const tenantId = (user as any)?.tenantId;
+    const listenToMaintenanceRequests = (): Unsubscribe | null => {
+        // ✅ ADORA SECURITY: Null safety check (MANDATORY per Adora Rules)
+        if (!db) {
+            logger.error('Firebase not initialized - cannot listen to maintenance requests', undefined, 'MaintenanceDashboard');
+            return null;
+        }
 
-        if (!branchId) return;
+        const userTenantId = (user as { tenantId?: string })?.tenantId;
 
-        const requestsRef = collection(db, 'requests');
+        if (!branchId) {
+            logger.warn('Branch ID missing - cannot listen to maintenance requests', undefined, 'MaintenanceDashboard');
+            return null;
+        }
 
-        let constraints = [
+        // ✅ FIX: Use tenant-scoped collection (tenants/${tenantId}/requests)
+        if (!userTenantId) {
+            console.warn('⚠️ [MaintenanceDashboard] Cannot subscribe to requests: tenantId is missing');
+            setNewRequests([]);
+            setInProgressRequests([]);
+            setCompletedRequests([]);
+            return;
+        }
+        
+        const requestsRef = collection(db, `tenants/${userTenantId}/requests`);
+
+        // ✅ ADORA PREMIUM: Type-safe constraints (Zero `any` Policy)
+        const constraints: Array<ReturnType<typeof where> | ReturnType<typeof orderBy>> = [
             where('branch', '==', branchId),
-            where('serviceType', '==', 'maintenance')
+            where('type', '==', 'maintenance') // ✅ FIX: Use 'type' instead of 'serviceType'
         ];
-        if (tenantId) constraints.push(where('tenantId', '==', tenantId));
 
         const q = query(
             requestsRef,
@@ -344,27 +380,51 @@ export const MaintenanceDashboard: React.FC = () => {
             orderBy('createdAt', 'desc')
         );
 
-        return onSnapshot(q, (snapshot) => {
+        // ✅ FIX: Store fallback unsubscribe to prevent multiple subscriptions
+        let fallbackUnsubscribe: Unsubscribe | null = null;
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             processMaintenanceSnapshot(snapshot);
         }, (error) => {
-            console.error('Error listening to maintenance requests:', error);
+            logger.error('Error listening to maintenance requests', error, 'MaintenanceDashboard');
             // Fallback without orderBy if index missing
             if (error.code === 'failed-precondition') {
-                // Re-construct constraints for fallback (reusing constraints array from above)
-                const q2 = query(requestsRef, ...constraints);
-                onSnapshot(q2, processMaintenanceSnapshot);
+                // ✅ FIX: Cleanup previous fallback subscription if exists
+                if (fallbackUnsubscribe) {
+                    fallbackUnsubscribe();
+                }
+                // ✅ FIX: Re-construct constraints for fallback (without orderBy)
+                // Filter out orderBy by checking if it's a where constraint
+                const fallbackConstraints = constraints.filter((c): c is ReturnType<typeof where> => {
+                    // orderBy doesn't have 'fieldPath' property, where does
+                    return 'fieldPath' in c || 'op' in c;
+                });
+                // ✅ FIX: Use tenant-scoped collection in fallback too
+                const fallbackRequestsRef = collection(db, `tenants/${userTenantId}/requests`);
+                const q2 = query(fallbackRequestsRef, ...fallbackConstraints);
+                fallbackUnsubscribe = onSnapshot(q2, processMaintenanceSnapshot, (fallbackError) => {
+                    logger.error('Error in fallback subscription', fallbackError, 'MaintenanceDashboard');
+                });
             }
         });
+
+        // ✅ Return cleanup function that handles both subscriptions
+        return () => {
+            unsubscribe();
+            if (fallbackUnsubscribe) {
+                fallbackUnsubscribe();
+            }
+        };
     };
 
-    const processMaintenanceSnapshot = (snapshot: any, localSort = false) => {
+    const processMaintenanceSnapshot = (snapshot: { forEach: (callback: (doc: { id: string; data: () => Record<string, unknown> }) => void) => void }, localSort = false) => {
         const newList: MaintenanceRequest[] = [];
         const inProgressList: MaintenanceRequest[] = [];
         const completed: MaintenanceRequest[] = [];
         const now = new Date();
 
         // ✅ Helper: Check if scheduled request should be shown (only if scheduledDate <= now)
-        const isScheduledRequestVisible = (r: any): boolean => {
+        const isScheduledRequestVisible = (r: MaintenanceRequest): boolean => {
             const scheduledDateTime = r.scheduledDate || r.scheduledAt;
             if (!scheduledDateTime) return true; // Not scheduled - always visible
             
@@ -373,7 +433,7 @@ export const MaintenanceDashboard: React.FC = () => {
             return scheduledTime <= now;
         };
 
-        snapshot.forEach((doc: any) => {
+        snapshot.forEach((doc: { id: string; data: () => Record<string, unknown> }) => {
             const request = { id: doc.id, ...doc.data() } as MaintenanceRequest;
 
             // ✅ Scheduled requests: Show only if scheduledDate <= now
@@ -414,14 +474,14 @@ export const MaintenanceDashboard: React.FC = () => {
     // UTILITY FUNCTIONS
     // ============================================================
 
-    const isToday = (timestamp: any): boolean => {
+    const isToday = (timestamp: Timestamp | { toDate: () => Date } | Date | null | undefined): boolean => {
         if (!timestamp) return false;
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         const today = new Date();
         return date.toDateString() === today.toDateString();
     };
 
-    const getTimeAgo = (timestamp: any): string => {
+    const getTimeAgo = (timestamp: Timestamp | { toDate: () => Date } | Date | null | undefined): string => {
         if (!timestamp) return '';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         const now = new Date();
@@ -505,9 +565,10 @@ export const MaintenanceDashboard: React.FC = () => {
                 error('فشل رفع الصورة: ' + (result.error || 'خطأ غير معروف'));
                 setBeforePhoto(null);
             }
-        } catch (err: any) {
-            console.error('Before photo upload error:', err);
-            error('فشل رفع الصورة: ' + (err.message || 'خطأ غير معروف'));
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'خطأ غير معروف';
+            logger.error('Before photo upload error', err, 'MaintenanceDashboard');
+            error('فشل رفع الصورة: ' + errorMessage);
             setBeforePhoto(null);
         }
     };
@@ -519,9 +580,16 @@ export const MaintenanceDashboard: React.FC = () => {
     const confirmStart = async () => {
         if (!currentStartRequest) return;
 
+        // ✅ ADORA SECURITY: Null safety check
+        if (!db) {
+            logger.error('Firebase not initialized - cannot start maintenance', undefined, 'MaintenanceDashboard');
+            error(t('maintenance.workflow.startedFailed'));
+            return;
+        }
+
         try {
             const now = Timestamp.now();
-            const updateData: any = {
+            const updateData: Record<string, unknown> = {
                 status: 'IN_PROGRESS',
                 'timeline.started': now,
                 startedBy: user?.id,
@@ -556,16 +624,16 @@ export const MaintenanceDashboard: React.FC = () => {
                 try {
                     const { checkDailyAttendance } = await import('../../services/challengeService');
                     checkDailyAttendance(tenantId, user.id).catch(err => {
-                        console.warn('Failed to check daily attendance:', err);
+                        logger.warn('Failed to check daily attendance', err, 'MaintenanceDashboard');
                     });
                 } catch (err) {
-                    console.warn('Could not load challengeService:', err);
+                    logger.warn('Could not load challengeService', err, 'MaintenanceDashboard');
                 }
             }
 
             success(t('maintenance.workflow.startedSuccess'));
         } catch (err) {
-            console.error('Error starting maintenance:', err);
+            logger.error('Error starting maintenance', err, 'MaintenanceDashboard');
             error(t('maintenance.workflow.startedFailed'));
         }
     };
@@ -636,9 +704,10 @@ export const MaintenanceDashboard: React.FC = () => {
                 setAfterPhoto(null);
                 setAfterPhotoFile(null);
             }
-        } catch (err: any) {
-            console.error('Upload error:', err);
-            error('فشل رفع الصورة: ' + (err.message || 'خطأ غير معروف'));
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'خطأ غير معروف';
+            logger.error('Upload error', err, 'MaintenanceDashboard');
+            error('فشل رفع الصورة: ' + errorMessage);
             setAfterPhoto(null);
             setAfterPhotoFile(null);
         } finally {
@@ -665,6 +734,13 @@ export const MaintenanceDashboard: React.FC = () => {
     const confirmComplete = async () => {
         if (!currentCompleteRequest) return;
 
+        // ✅ ADORA SECURITY: Null safety check
+        if (!db) {
+            logger.error('Firebase not initialized - cannot complete maintenance', undefined, 'MaintenanceDashboard');
+            error(t('maintenance.workflow.completedFailed'));
+            return;
+        }
+
         // ✅ MANDATORY: After Photo is required
         if (!afterPhoto) {
             error(t('maintenance.photoUpload.afterRequired'));
@@ -678,9 +754,14 @@ export const MaintenanceDashboard: React.FC = () => {
         }
 
         try {
+            if (!tenantId) {
+                error(t('maintenance.tenantIdRequired') || 'Tenant ID is required');
+                return;
+            }
             // ✅ Use transferRequestToDepartment to properly track the journey
             await transferRequestToDepartment(
                 currentCompleteRequest.id,
+                tenantId, // ✅ Pass tenantId as 2nd parameter
                 'maintenance',
                 'housekeeping',
                 user?.id || '',
@@ -690,7 +771,7 @@ export const MaintenanceDashboard: React.FC = () => {
             );
 
             // ✅ Update request with completion data and afterPhoto
-            const updateData: any = {
+            const updateData: Record<string, unknown> = {
                 status: 'NEEDS_INSPECTION',
                 'timeline.completed': Timestamp.now(),
                 completedBy: { id: user?.id || '', name: user?.name || '' },
@@ -720,7 +801,7 @@ export const MaintenanceDashboard: React.FC = () => {
                     await updateRoomStatus(tenantId, branchId, currentCompleteRequest.roomNumber, 'cleaning');
                 }
             } catch (err) {
-                console.warn('Could not auto-update room status:', err);
+                logger.warn('Could not auto-update room status', err, 'MaintenanceDashboard');
             }
 
             // ✅ Close modal (don't delete request - it's transferred to housekeeping)
@@ -734,9 +815,10 @@ export const MaintenanceDashboard: React.FC = () => {
             
             success(t('maintenance.workflow.completedSentForInspection'));
             haptic('success');
-        } catch (err: any) {
-            console.error('Error completing maintenance:', err);
-            error(t('maintenance.workflow.completedFailed', { error: err.message || t('common.error') }));
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : t('common.error');
+            logger.error('Error completing maintenance', err, 'MaintenanceDashboard');
+            error(t('maintenance.workflow.completedFailed', { error: errorMessage }));
         }
     };
 
@@ -745,6 +827,13 @@ export const MaintenanceDashboard: React.FC = () => {
     // ============================================================
 
     const handleHoldRequest = async (request: MaintenanceRequest) => {
+        // ✅ ADORA SECURITY: Null safety check
+        if (!db) {
+            logger.error('Firebase not initialized - cannot hold request', undefined, 'MaintenanceDashboard');
+            error(t('maintenance.workflow.suspendedFailed'));
+            return;
+        }
+
         try {
             await updateDoc(doc(db, 'requests', request.id), {
                 status: 'WAITING_PARTS',
@@ -752,12 +841,19 @@ export const MaintenanceDashboard: React.FC = () => {
             });
             success(t('maintenance.workflow.suspended'));
         } catch (err) {
-            console.error(err);
+            logger.error('Error holding request', err, 'MaintenanceDashboard');
             error(t('maintenance.workflow.suspendedFailed'));
         }
     };
 
     const handleResumeRequest = async (request: MaintenanceRequest) => {
+        // ✅ ADORA SECURITY: Null safety check
+        if (!db) {
+            logger.error('Firebase not initialized - cannot resume request', undefined, 'MaintenanceDashboard');
+            error(t('maintenance.workflow.resumedFailed'));
+            return;
+        }
+
         try {
             await updateDoc(doc(db, 'requests', request.id), {
                 status: 'IN_PROGRESS',
@@ -765,7 +861,7 @@ export const MaintenanceDashboard: React.FC = () => {
             });
             success(t('maintenance.workflow.resumed'));
         } catch (err) {
-            console.error(err);
+            logger.error('Error resuming request', err, 'MaintenanceDashboard');
             error(t('maintenance.workflow.resumedFailed'));
         }
     };
@@ -775,6 +871,12 @@ export const MaintenanceDashboard: React.FC = () => {
     // ============================================================
 
     const getRoomMaintenanceHistory = async (roomNumber: string, limit = 10): Promise<MaintenanceRequest[]> => {
+        // ✅ ADORA SECURITY: Null safety check
+        if (!db) {
+            logger.error('Firebase not initialized - cannot get room history', undefined, 'MaintenanceDashboard');
+            return [];
+        }
+
         try {
             // ✅ Use branchId from AuthContext (already defined above)
             if (!branchId) return [];
@@ -788,7 +890,7 @@ export const MaintenanceDashboard: React.FC = () => {
             const snapshot = await getDocs(q);
             return snapshot.docs.slice(0, limit).map(d => ({ id: d.id, ...d.data() } as MaintenanceRequest));
         } catch (error) {
-            console.error('Error getting room history:', error);
+            logger.error('Error getting room history', error, 'MaintenanceDashboard');
             return [];
         }
     };
@@ -813,7 +915,13 @@ export const MaintenanceDashboard: React.FC = () => {
     // POINTS SYSTEM
     // ============================================================
 
-    const addPointToEmployee = async (action: string, details: any = {}) => {
+    const addPointToEmployee = async (action: string, details: Record<string, unknown> = {}) => {
+        // ✅ ADORA SECURITY: Null safety check
+        if (!db) {
+            logger.error('Firebase not initialized - cannot add points', undefined, 'MaintenanceDashboard');
+            return;
+        }
+
         try {
             // ✅ Use branchId and tenantId from AuthContext (already defined above)
             if (!branchId || !tenantId) return;
@@ -835,7 +943,7 @@ export const MaintenanceDashboard: React.FC = () => {
                 createdAt: Timestamp.now()
             });
         } catch (error) {
-            console.error('Error adding points:', error);
+            logger.error('Error adding points', error, 'MaintenanceDashboard');
         }
     };
 
@@ -888,9 +996,9 @@ export const MaintenanceDashboard: React.FC = () => {
     const [selectedDetailRequest, setSelectedDetailRequest] = useState<MaintenanceRequest | null>(null);
 
     const handleCardClick = async (requestId: string) => {
-        if (user?.id && user?.name) {
+        if (user?.id && user?.name && tenantId) {
             try {
-                await markAsViewed(requestId, user.id, user.name, 'maintenance');
+                await markAsViewed(requestId, tenantId, user.id, user.name, 'maintenance');
             } catch (e) {
                 // Silent fail
             }
@@ -1032,9 +1140,9 @@ export const MaintenanceDashboard: React.FC = () => {
             <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
             
             <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
-            {/* ✅ Unified Responsive Action Bar - Same Order as Reception */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
-                <ResponsiveActionBar
+                {/* ✅ Unified Responsive Action Bar - Same Order as Reception */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <ResponsiveActionBar
                     actions={[
                         {
                             id: 'history',
@@ -1066,43 +1174,52 @@ export const MaintenanceDashboard: React.FC = () => {
                             label: t('maintenance.technicalSupport'),
                             onClick: () => setShowSupportTicket(true),
                         },
-                    ]}
-                />
-            </div>
-
-            {/* ✅ Challenge Timeline - شريط الالتزام */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
-                <ChallengeTimeline />
-            </div>
-
-            {/* Golden Alert - Broadcast Messages */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
-                <GoldenAlertDisplay department="maintenance" />
-            </div>
-
-            {/* ✅ Room Transfer Notifications */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
-                <div className="flex justify-end">
-                    <TransferNotificationBadge department="maintenance" />
+                        ]}
+                    />
                 </div>
-            </div>
 
-            {/* ✅ Points Notification - Show for active CONFIRMED requests */}
-            {notificationRequest && tenantId && (
-                <PointsNotification
-                    requestId={notificationRequest.id}
-                    requestType={notificationRequest.type || 'maintenance'}
-                    department="maintenance"
-                    createdAt={notificationRequest.createdAt}
-                    tenantId={tenantId}
-                    onDismiss={() => setNotificationRequest(null)}
-                />
-            )}
+                {/* ✅ Challenge Timeline - شريط الالتزام */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <ChallengeTimeline />
+                </div>
 
-            {/* Stats Cards - Unified Style - ✅ Mobile-First Compact */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                <div className="stat-card-pro-compact">
+                {/* Golden Alert - Broadcast Messages */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <GoldenAlertDisplay department="maintenance" />
+                </div>
+
+                {/* ✅ Room Transfer Notifications */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <div className="flex justify-end">
+                        <TransferNotificationBadge department="maintenance" />
+                    </div>
+                </div>
+
+                {/* ✅ Points Notification - Show for active CONFIRMED requests */}
+                {notificationRequest && tenantId && (
+                    <PointsNotification
+                        requestId={notificationRequest.id}
+                        requestType={notificationRequest.type || 'maintenance'}
+                        department="maintenance"
+                        createdAt={notificationRequest.createdAt}
+                        tenantId={tenantId}
+                        onDismiss={() => setNotificationRequest(null)}
+                    />
+                )}
+
+                {/* Stats Cards - Unified Style - ✅ ADORA PREMIUM COMPACT DESIGN */}
+                <div 
+                    className="max-w-7xl mx-auto mb-4"
+                    style={{ padding: '24px' }}
+                >
+                    <div 
+                        className="grid"
+                        style={{
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                            gap: '24px',
+                        }}
+                    >
+                        <div className="stat-card-pro-compact">
                     <StatCard
                         count={activeRequests.filter(r => r.status === 'IN_PROGRESS').length}
                         label="🔧 قيد التنفيذ"
@@ -1140,35 +1257,36 @@ export const MaintenanceDashboard: React.FC = () => {
                         iconColor="red"
                         status={activeRequests.filter(r => r.priority === 'urgent').length > 0 ? 'error' : 'normal'}
                         lastUpdate={t('maintenance.lastUpdate')}
-                    />
+                        />
+                    </div>
                 </div>
             </div>
 
-            {/* Progress Tracker */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                {/* Progress Tracker */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
                 <TaskProgress
                     completed={completedRequests.length}
                     total={activeRequests.length + completedRequests.length}
                     label="📊 إنجاز اليوم"
                     color="#F59E0B"
-                />
-            </div>
+                    />
+                </div>
 
-            {/* ✅ Unified Tabs - Same as Reception */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <UnifiedRequestTabs
-                    currentTab={currentTab}
-                    onTabChange={(tab) => switchTab(tab)}
-                    newCount={filteredNewRequests.length}
-                    inProgressCount={filteredInProgressRequests.length}
-                    completedCount={filteredCompletedRequests.length}
-                />
-            </div>
+                {/* ✅ Unified Tabs - Same as Reception */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                    <UnifiedRequestTabs
+                        currentTab={currentTab}
+                        onTabChange={(tab) => switchTab(tab)}
+                        newCount={filteredNewRequests.length}
+                        inProgressCount={filteredInProgressRequests.length}
+                        completedCount={filteredCompletedRequests.length}
+                    />
+                </div>
 
-            {/* Issue Type Filter */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -webkit-overflow-scrolling-touch">
-                <span className="adora-text-tertiary text-sm flex-shrink-0">{t('maintenance.issueType')}:</span>
+                {/* Issue Type Filter */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -webkit-overflow-scrolling-touch">
+                        <span className="adora-text-tertiary text-sm flex-shrink-0">{t('maintenance.issueType')}:</span>
                 {[
                     { key: 'all', label: t('maintenance.all'), icon: '🔧' },
                     { key: 'كهرب', label: t('maintenance.categories.electrical'), icon: '⚡' },
@@ -1187,39 +1305,39 @@ export const MaintenanceDashboard: React.FC = () => {
                             : 'adora-card adora-text-secondary hover:opacity-80'
                             }`}
                     >
-                        <span>{type.icon}</span>
-                        <span>{type.label}</span>
-                    </button>
-                ))}
+                            <span>{type.icon}</span>
+                            <span>{type.label}</span>
+                        </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
 
-            {/* Content - ✅ Unified 3 tabs */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto space-y-4">
-                {currentTab === 'new' && filteredNewRequests.map(renderMaintenanceCard)}
-                {currentTab === 'in_progress' && filteredInProgressRequests.map(renderMaintenanceCard)}
-                {currentTab === 'completed' && filteredCompletedRequests.map(renderMaintenanceCard)}
+                {/* Content - ✅ Unified 3 tabs */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto space-y-4">
+                    {currentTab === 'new' && filteredNewRequests.map(renderMaintenanceCard)}
+                    {currentTab === 'in_progress' && filteredInProgressRequests.map(renderMaintenanceCard)}
+                    {currentTab === 'completed' && filteredCompletedRequests.map(renderMaintenanceCard)}
 
-                {currentTab === 'new' && filteredNewRequests.length === 0 && (
-                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات صيانة جديدة</div>
-                )}
-                {currentTab === 'in_progress' && filteredInProgressRequests.length === 0 && (
-                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات قيد التنفيذ</div>
-                )}
-                {currentTab === 'completed' && filteredCompletedRequests.length === 0 && (
-                    <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات مكتملة اليوم</div>
-                )}
-            </div>
+                    {currentTab === 'new' && filteredNewRequests.length === 0 && (
+                        <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات صيانة جديدة</div>
+                    )}
+                    {currentTab === 'in_progress' && filteredInProgressRequests.length === 0 && (
+                        <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات قيد التنفيذ</div>
+                    )}
+                    {currentTab === 'completed' && filteredCompletedRequests.length === 0 && (
+                        <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات مكتملة اليوم</div>
+                    )}
+                </div>
 
-            {/* Details Modal */}
-            <RequestDetailsModal
-                isOpen={!!selectedDetailRequest}
-                request={selectedDetailRequest}
-                onClose={() => setSelectedDetailRequest(null)}
-            />
+                {/* Details Modal */}
+                <RequestDetailsModal
+                    isOpen={!!selectedDetailRequest}
+                    request={selectedDetailRequest}
+                    onClose={() => setSelectedDetailRequest(null)}
+                />
 
-            {/* Start Modal */}
-            {currentStartRequest && (
+                {/* Start Modal */}
+                {currentStartRequest && (
                 <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'none' }}>
                     {/* ✅ SOLID Modal - no glass effects */}
                     <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg">
@@ -1430,31 +1548,31 @@ export const MaintenanceDashboard: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            )}
+                )}
 
-            {/* Shared Modals */}
-            <ProcurementCartWizard department="maintenance" tenantId={tenantId || ''} isOpen={showProcurement} onClose={() => setShowProcurement(false)} />
-            <ShiftNotes isOpen={showShiftNotes} onClose={() => setShowShiftNotes(false)} />
-            <UnifiedHistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} defaultDepartment="maintenance" />
-            <TeamMembers isOpen={showTeam} onClose={() => setShowTeam(false)} department="maintenance" showPoints={true} />
+                {/* Shared Modals */}
+                <ProcurementCartWizard department="maintenance" tenantId={tenantId || ''} isOpen={showProcurement} onClose={() => setShowProcurement(false)} />
+                <ShiftNotes isOpen={showShiftNotes} onClose={() => setShowShiftNotes(false)} />
+                <UnifiedHistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} defaultDepartment="maintenance" />
+                <TeamMembers isOpen={showTeam} onClose={() => setShowTeam(false)} department="maintenance" showPoints={true} />
 
-            {/* 🎤 Smart Voice FAB (No Overlay) - Verified Fix */}
-            <VoiceInputButton
-                onResult={processCommand}
-                isFallbackMode={isFallbackMode}
-                errorCount={errorCount}
-                lastError={lastError}
-                onRetry={retryLastCommand}
-                onResetErrors={resetErrors}
-            />
+                {/* 🎤 Smart Voice FAB (No Overlay) - Verified Fix */}
+                <VoiceInputButton
+                    onResult={processCommand}
+                    isFallbackMode={isFallbackMode}
+                    errorCount={errorCount}
+                    lastError={lastError}
+                    onRetry={retryLastCommand}
+                    onResetErrors={resetErrors}
+                />
 
-            {/* Mobile Menu */}
-            <MobileMenu
-                isOpen={showMobileMenu}
-                onClose={() => setShowMobileMenu(false)}
-                user={user || undefined}
-                onLogout={logout}
-                items={[
+                {/* Mobile Menu */}
+                <MobileMenu
+                    isOpen={showMobileMenu}
+                    onClose={() => setShowMobileMenu(false)}
+                    user={user || undefined}
+                    onLogout={logout}
+                    items={[
                     {
                         id: 'history',
                         label: 'سجل العمليات',
@@ -1495,53 +1613,53 @@ export const MaintenanceDashboard: React.FC = () => {
                         label: 'دعم فني',
                         icon: <Headphones className="w-5 h-5" />,
                         onClick: () => setShowSupportTicket(true),
-                        color: 'text-white/60'
-                    }
-                ]}
-            />
-
-            {/* ✅ Branch Location Warning */}
-            {showLocationWarning && locationWarningData && branchId && (
-                <BranchLocationWarning
-                    branchId={branchId}
-                    onConfirm={() => {
-                        setShowLocationWarning(false);
-                        // Continue anyway
-                    }}
-                    onCancel={() => {
-                        setShowLocationWarning(false);
-                        navigate('/admin');
-                    }}
+                            color: 'text-white/60'
+                        }
+                    ]}
                 />
-            )}
 
-            {/* General Instructions Modal */}
-            <GeneralInstructionsView
-                department="maintenance"
-                isOpen={showGeneralInstructions}
-                onClose={() => setShowGeneralInstructions(false)}
-            />
+                {/* ✅ Branch Location Warning */}
+                {showLocationWarning && locationWarningData && branchId && (
+                    <BranchLocationWarning
+                        branchId={branchId}
+                        onConfirm={() => {
+                            setShowLocationWarning(false);
+                            // Continue anyway
+                        }}
+                        onCancel={() => {
+                            setShowLocationWarning(false);
+                            navigate('/admin');
+                        }}
+                    />
+                )}
 
-            {/* Support Ticket Modal */}
-            {showSupportTicket && (
-                <SupportTicketModal
-                    isOpen={showSupportTicket}
-                    onClose={() => setShowSupportTicket(false)}
+                {/* General Instructions Modal */}
+                <GeneralInstructionsView
                     department="maintenance"
+                    isOpen={showGeneralInstructions}
+                    onClose={() => setShowGeneralInstructions(false)}
                 />
-            )}
 
-            {/* ✅ Onboarding Tour */}
-            <TourGuide
-                steps={tourSteps}
-                isOpen={showTour}
-                onClose={closeTour}
-                onComplete={completeTour}
-            />
+                {/* Support Ticket Modal */}
+                {showSupportTicket && (
+                    <SupportTicketModal
+                        isOpen={showSupportTicket}
+                        onClose={() => setShowSupportTicket(false)}
+                        department="maintenance"
+                    />
+                )}
 
-            {/* 📝 Developer Signature */}
-            {/* Developer Signature is in GlobalFooter (App.tsx) */}
-        </div>
+                {/* ✅ Onboarding Tour */}
+                <TourGuide
+                    steps={tourSteps}
+                    isOpen={showTour}
+                    onClose={closeTour}
+                    onComplete={completeTour}
+                />
+
+                {/* 📝 Developer Signature */}
+                {/* Developer Signature is in GlobalFooter (App.tsx) */}
+            </div>
         </PageTransition>
     );
 };

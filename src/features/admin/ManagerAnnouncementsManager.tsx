@@ -18,8 +18,10 @@ import {
     updateManagerAnnouncement,
     deactivateManagerAnnouncement,
     getManagerAnnouncementStats,
+    getAnnouncementAuditLog,
     type ManagerAnnouncement,
-    type DepartmentType
+    type DepartmentType,
+    type ManagerAnnouncementView
 } from '../../services/managerAnnouncementService';
 import { Timestamp } from 'firebase/firestore';
 
@@ -46,6 +48,9 @@ export const ManagerAnnouncementsManager: React.FC = () => {
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<ManagerAnnouncement | null>(null);
     const [showStats, setShowStats] = useState(false);
     const [stats, setStats] = useState<any>(null);
+    const [showAuditLog, setShowAuditLog] = useState(false);
+    const [auditLog, setAuditLog] = useState<ManagerAnnouncementView[]>([]);
+    const [auditAnnouncement, setAuditAnnouncement] = useState<ManagerAnnouncement | null>(null);
 
     // Form state
     const [formData, setFormData] = useState<Partial<ManagerAnnouncement>>({
@@ -104,6 +109,18 @@ export const ManagerAnnouncementsManager: React.FC = () => {
             setShowStats(true);
         } catch (err) {
             error('فشل تحميل الإحصائيات');
+        }
+    };
+
+    const handleViewAuditLog = async (announcement: ManagerAnnouncement) => {
+        if (!tenantId) return;
+        try {
+            const log = await getAnnouncementAuditLog(tenantId, announcement.id);
+            setAuditLog(log.views);
+            setAuditAnnouncement(announcement);
+            setShowAuditLog(true);
+        } catch (err) {
+            error('فشل تحميل سجل الرسالة');
         }
     };
 
@@ -369,6 +386,13 @@ export const ManagerAnnouncementsManager: React.FC = () => {
                                             <Eye className="w-4 h-4" />
                                         </button>
                                         <button
+                                            onClick={() => handleViewAuditLog(announcement)}
+                                            className="p-2 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-colors"
+                                            title="سجل الرسالة (من شاهد/ألغى)"
+                                        >
+                                            <Clock className="w-4 h-4" />
+                                        </button>
+                                        <button
                                             onClick={() => handleEdit(announcement)}
                                             className="p-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
                                         >
@@ -441,6 +465,19 @@ export const ManagerAnnouncementsManager: React.FC = () => {
                         setShowStats(false);
                         setSelectedAnnouncement(null);
                         setStats(null);
+                    }}
+                />
+            )}
+
+            {/* Audit Log Modal */}
+            {showAuditLog && auditAnnouncement && (
+                <AuditLogModal
+                    announcement={auditAnnouncement}
+                    auditLog={auditLog}
+                    onClose={() => {
+                        setShowAuditLog(false);
+                        setAuditAnnouncement(null);
+                        setAuditLog([]);
                     }}
                 />
             )}
@@ -663,6 +700,108 @@ const AnnouncementModal: React.FC<{
                                 {formData.id ? 'تحديث' : 'إرسال'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Audit Log Modal Component
+const AuditLogModal: React.FC<{
+    announcement: ManagerAnnouncement;
+    auditLog: ManagerAnnouncementView[];
+    onClose: () => void;
+}> = ({ announcement, auditLog, onClose }) => {
+    const viewedEmployees = auditLog.filter(v => v.viewedAt && !v.dismissedAt);
+    const dismissedEmployees = auditLog.filter(v => v.dismissedAt);
+
+    return (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+            <div className="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl modal-enter">
+                <div className="p-6">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-xl font-bold text-white mb-1">سجل الرسالة</h2>
+                            <p className="text-sm text-white/60">{announcement.titleAr || announcement.title}</p>
+                        </div>
+                        <button onClick={onClose} className="text-white/60 hover:text-white">
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    {/* Summary */}
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
+                            <div className="text-2xl font-bold text-blue-400">{auditLog.length}</div>
+                            <div className="text-sm text-white/60">إجمالي الموظفين</div>
+                        </div>
+                        <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30">
+                            <div className="text-2xl font-bold text-green-400">{viewedEmployees.length}</div>
+                            <div className="text-sm text-white/60">شاهدوا الرسالة</div>
+                        </div>
+                        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+                            <div className="text-2xl font-bold text-red-400">{dismissedEmployees.length}</div>
+                            <div className="text-sm text-white/60">ألغوا الرسالة</div>
+                        </div>
+                    </div>
+
+                    {/* Detailed Log */}
+                    <div className="space-y-3">
+                        <h3 className="text-lg font-semibold text-white mb-4">التفاصيل:</h3>
+                        {auditLog.length === 0 ? (
+                            <div className="text-center py-8 text-white/40">
+                                <Clock className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                                <p>لا يوجد سجل بعد</p>
+                            </div>
+                        ) : (
+                            auditLog.map((log) => {
+                                const viewedAt = log.viewedAt?.toDate ? log.viewedAt.toDate() : new Date(log.viewedAt);
+                                const dismissedAt = log.dismissedAt?.toDate ? log.dismissedAt.toDate() : (log.dismissedAt ? new Date(log.dismissedAt) : null);
+
+                                return (
+                                    <div
+                                        key={log.id}
+                                        className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-all"
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="font-semibold text-white">{log.employeeName}</span>
+                                                    <span className="text-xs text-white/40">({log.department})</span>
+                                                    {log.branchId && (
+                                                        <span className="text-xs text-white/40">• {log.branchId}</span>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-1 text-sm">
+                                                    <div className="flex items-center gap-2 text-green-400">
+                                                        <Eye className="w-4 h-4" />
+                                                        <span>شاهد: {viewedAt.toLocaleString('ar-SA')}</span>
+                                                        <span className="text-white/40">({log.viewCount} مرة)</span>
+                                                    </div>
+                                                    {dismissedAt && (
+                                                        <div className="flex items-center gap-2 text-red-400">
+                                                            <X className="w-4 h-4" />
+                                                            <span>ألغى: {dismissedAt.toLocaleString('ar-SA')}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {dismissedAt ? (
+                                                <span className="px-3 py-1 rounded-lg bg-red-500/20 text-red-400 text-xs font-medium border border-red-500/30">
+                                                    ألغى
+                                                </span>
+                                            ) : (
+                                                <span className="px-3 py-1 rounded-lg bg-green-500/20 text-green-400 text-xs font-medium border border-green-500/30">
+                                                    شاهد فقط
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
                     </div>
                 </div>
             </div>

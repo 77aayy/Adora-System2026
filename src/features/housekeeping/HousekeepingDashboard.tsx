@@ -132,9 +132,10 @@ const TaskCard: React.FC<{
     onView?: () => void;
     userId?: string;
     userName?: string;
+    tenantId?: string; // ✅ Add tenantId prop
     statusConfig: Record<string, { label: string; color: string; bg: string; icon: any }>;
     cleaningTypeConfig: Record<string, { label: string; color: string; bg: string }>;
-}> = ({ task, onStart, onComplete, onView, userId, userName, statusConfig, cleaningTypeConfig }) => {
+}> = ({ task, onStart, onComplete, onView, userId, userName, tenantId, statusConfig, cleaningTypeConfig }) => {
     const { t } = useTranslation();
     const config = statusConfig[task.status] || statusConfig.CONFIRMED;
     const typeConfig = cleaningTypeConfig[task.cleaningType] || cleaningTypeConfig.occupied;
@@ -160,8 +161,8 @@ const TaskCard: React.FC<{
     const isQR = (task as any).source === 'QR';
 
     const handleClick = async () => {
-        if (userId && userName && task.id) {
-            try { await markAsViewed(task.id, userId, userName, 'housekeeping'); } catch {}
+        if (userId && userName && task.id && tenantId) {
+            try { await markAsViewed(task.id, tenantId, userId, userName, 'housekeeping'); } catch {}
         }
         if (onView) onView();
     };
@@ -256,6 +257,7 @@ const SwipeableTaskCard: React.FC<{
     onComplete?: () => void;
     onView?: () => void;
     userId?: string;
+    tenantId?: string; // ✅ Add tenantId prop
     userName?: string;
     statusConfig: Record<string, { label: string; color: string; bg: string; icon: any }>;
     cleaningTypeConfig: Record<string, { label: string; color: string; bg: string }>;
@@ -1105,14 +1107,20 @@ export const HousekeepingDashboard: React.FC = () => {
     useEffect(() => {
         if (!user || !branchId) return;
 
-        const requestsRef = collection(db, 'requests');
+        // ✅ FIX: Use tenant-scoped collection (tenants/${tenantId}/requests)
+        if (!tenantId) {
+            console.warn('⚠️ [HousekeepingDashboard] Cannot subscribe to requests: tenantId is missing');
+            setLoading(false);
+            return;
+        }
+        
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         // ✅ FIX: Remove orderBy with 'in' query (requires composite index)
         // We'll sort manually after fetching
         const constraints = [
             where('branch', '==', branchId),
             where('type', 'in', ['cleaning', 'inspection', 'maintenance'])
         ];
-        if (tenantId) constraints.push(where('tenantId', '==', tenantId));
 
         const q = query(requestsRef, ...constraints);
 
@@ -1709,14 +1717,14 @@ export const HousekeepingDashboard: React.FC = () => {
             <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
             
             <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
-            {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
-            <FlexibleHeader
-                title={t('housekeeping.title')}
-                titleIcon={<Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400 flex-shrink-0" />}
-                showGreeting={false}
-                brandName={brandName}
-                subtitle={undefined}
-                actions={[
+                {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
+                <FlexibleHeader
+                    title={t('housekeeping.title')}
+                    titleIcon={<Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400 flex-shrink-0" />}
+                    showGreeting={false}
+                    brandName={brandName}
+                    subtitle={undefined}
+                    actions={[
                     {
                         id: 'history',
                         icon: <History className="w-5 h-5" />,
@@ -1755,42 +1763,51 @@ export const HousekeepingDashboard: React.FC = () => {
                         label: t('housekeeping.technicalSupport'),
                         onClick: () => setShowSupportTicket(true)
                     }
-                ]}
-            />
-
-            {/* Challenge Timeline */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
-                <ChallengeTimeline />
-            </div>
-
-            {/* Golden Alert - Broadcast Messages */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
-                <GoldenAlertDisplay department="housekeeping" />
-            </div>
-
-            {/* ✅ Room Transfer Notifications */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
-                <div className="flex justify-end">
-                    <TransferNotificationBadge department="housekeeping" />
-                </div>
-            </div>
-
-            {/* ✅ Points Notification - Show for active CONFIRMED tasks */}
-            {notificationTask && tenantId && (
-                <PointsNotification
-                    requestId={notificationTask.id}
-                    requestType={notificationTask.type || 'cleaning'}
-                    department="housekeeping"
-                    createdAt={notificationTask.createdAt}
-                    tenantId={tenantId}
-                    onDismiss={() => setNotificationTask(null)}
+                    ]}
                 />
-            )}
 
-            {/* Stats - Unified Style */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <div className="stat-card-pro-compact">
+                {/* Challenge Timeline */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <ChallengeTimeline />
+                </div>
+
+                {/* Golden Alert - Broadcast Messages */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <GoldenAlertDisplay department="housekeeping" />
+                </div>
+
+                {/* ✅ Room Transfer Notifications */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <div className="flex justify-end">
+                        <TransferNotificationBadge department="housekeeping" />
+                    </div>
+                </div>
+
+                {/* ✅ Points Notification - Show for active CONFIRMED tasks */}
+                {notificationTask && tenantId && (
+                    <PointsNotification
+                        requestId={notificationTask.id}
+                        requestType={notificationTask.type || 'cleaning'}
+                        department="housekeeping"
+                        createdAt={notificationTask.createdAt}
+                        tenantId={tenantId}
+                        onDismiss={() => setNotificationTask(null)}
+                    />
+                )}
+
+                {/* Stats - Unified Style - ✅ ADORA PREMIUM COMPACT DESIGN */}
+                <div 
+                    className="max-w-7xl mx-auto mb-4"
+                    style={{ padding: '24px' }}
+                >
+                    <div 
+                        className="grid"
+                        style={{
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                            gap: '24px',
+                        }}
+                    >
+                        <div className="stat-card-pro-compact">
                     <StatCard
                         count={groupedTasks.new.length}
                         label={t('housekeeping.statusLabels.confirmed')}
@@ -1819,13 +1836,14 @@ export const HousekeepingDashboard: React.FC = () => {
                         status="success"
                         lastUpdate={t('common.lastUpdate')}
                     />
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            {/* Room Type Filter - Segmented Control Style */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <div className="adora-card p-1 rounded-2xl flex relative z-0">
-                {[
+                {/* Room Type Filter - Segmented Control Style */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                    <div className="adora-card p-1 rounded-2xl flex relative z-0">
+                        {[
                     { key: 'all', label: t('housekeeping.filterAll'), icon: <DoorOpen className="w-4 h-4" /> },
                     { key: 'occupied', label: t('housekeeping.filterOccupied'), icon: <span>🏠</span> },
                     { key: 'checkout', label: t('housekeeping.filterCheckout'), icon: <span>🚪</span> }
@@ -1843,15 +1861,15 @@ export const HousekeepingDashboard: React.FC = () => {
                     >
                         {filter.icon}
                         <span>{filter.label}</span>
-                    </button>
-                ))}
+                        </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
 
-            {/* Floor Filter */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                <span className="adora-text-tertiary text-sm flex-shrink-0">{t('housekeeping.floorFilter')}:</span>
+                {/* Floor Filter */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                        <span className="adora-text-tertiary text-sm flex-shrink-0">{t('housekeeping.floorFilter')}:</span>
                 {availableFloors.map((floor) => (
                     <button
                         key={floor}
@@ -1863,31 +1881,31 @@ export const HousekeepingDashboard: React.FC = () => {
                             ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25'
                             : 'adora-card adora-text-secondary hover:opacity-80'
                             }`}
-                    >
-                        {floor === 0 ? t('housekeeping.filterAll') : floor}
-                    </button>
-                ))}
+                        >
+                            {floor === 0 ? t('housekeeping.filterAll') : floor}
+                        </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
 
-            {/* ✅ Unified Tabs - Same as Reception */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <UnifiedRequestTabs
-                currentTab={currentTab}
+                {/* ✅ Unified Tabs - Same as Reception */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                    <UnifiedRequestTabs
+                        currentTab={currentTab}
                 onTabChange={(tab) => {
                     setCurrentTab(tab);
                     haptic('light');
                 }}
                 newCount={groupedTasks.new.length}
                 inProgressCount={groupedTasks.inProgress.length}
-                completedCount={groupedTasks.completed.length}
-                />
-            </div>
+                        completedCount={groupedTasks.completed.length}
+                    />
+                </div>
 
-            {/* Tasks List - Grid for Mobile */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto pb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                {currentTasks.length === 0 ? (
+                {/* Tasks List - Grid for Mobile */}
+                <div className="px-4 sm:px-6 max-w-7xl mx-auto pb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                        {currentTasks.length === 0 ? (
                     <div className="col-span-full adora-card p-8 text-center">
                         <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 adora-bg-tertiary">
                             <Sparkles className="w-6 h-6 adora-text-disabled" />
@@ -1901,6 +1919,7 @@ export const HousekeepingDashboard: React.FC = () => {
                             task={task}
                             userId={user?.id}
                             userName={user?.name}
+                            tenantId={tenantId} // ✅ Pass tenantId
                             statusConfig={STATUS_CONFIG}
                             cleaningTypeConfig={CLEANING_TYPE_CONFIG}
                             onStart={() => {
@@ -1933,47 +1952,48 @@ export const HousekeepingDashboard: React.FC = () => {
                                     setInspectionTask(task);
                                 }
                             }}
-                        />
-                    ))
+                            />
+                        ))
+                        )}
+                    </div>
+                </div>
+
+                {/* ✅ UX: Undo Toast */}
+                {undoState?.show && (
+                    <UndoToast
+                        message={undoState.message}
+                        onUndo={() => {
+                            undoState.onUndo();
+                            setUndoState(null);
+                        }}
+                        onDismiss={() => setUndoState(null)}
+                    />
                 )}
-            </div>
 
-            {/* ✅ UX: Undo Toast */}
-            {undoState?.show && (
-                <UndoToast
-                    message={undoState.message}
-                    onUndo={() => {
-                        undoState.onUndo();
-                        setUndoState(null);
-                    }}
-                    onDismiss={() => setUndoState(null)}
-                />
-            )}
-
-            {/* Modals */}
-            <InspectionModal
+                {/* Modals */}
+                <InspectionModal
                 isOpen={!!inspectionTask}
                 task={inspectionTask}
                 onClose={() => setInspectionTask(null)}
                 onSubmit={handleInspectionSubmit}
-                isSubmitting={isSubmitting}
-                tenantId={tenantId || undefined}
-            />
+                    isSubmitting={isSubmitting}
+                    tenantId={tenantId || undefined}
+                />
 
-            {/* ⭐ Start Cleaning Modal with Room Assignment */}
-            <StartCleaningModal
-                isOpen={!!startCleaningTask}
-                task={startCleaningTask}
-                onClose={() => setStartCleaningTask(null)}
-                onSubmit={handleStartCleaningSubmit}
-                teamMembers={teamMembers}
-            />
+                {/* ⭐ Start Cleaning Modal with Room Assignment */}
+                <StartCleaningModal
+                    isOpen={!!startCleaningTask}
+                    task={startCleaningTask}
+                    onClose={() => setStartCleaningTask(null)}
+                    onSubmit={handleStartCleaningSubmit}
+                    teamMembers={teamMembers}
+                />
 
-            <ShiftNotes isOpen={showShiftNotes} onClose={() => setShowShiftNotes(false)} />
-            <ProcurementCartWizard isOpen={showProcurement} onClose={() => setShowProcurement(false)} department="housekeeping" tenantId={tenantContext?.tenantId || ''} />
-            <LaundryInventory isOpen={showLaundryInventory} onClose={() => setShowLaundryInventory(false)} />
-            <TeamMembers isOpen={showTeam} onClose={() => setShowTeam(false)} department="housekeeping" />
-            <HousekeepingTeamManager
+                <ShiftNotes isOpen={showShiftNotes} onClose={() => setShowShiftNotes(false)} />
+                <ProcurementCartWizard isOpen={showProcurement} onClose={() => setShowProcurement(false)} department="housekeeping" tenantId={tenantContext?.tenantId || ''} />
+                <LaundryInventory isOpen={showLaundryInventory} onClose={() => setShowLaundryInventory(false)} />
+                <TeamMembers isOpen={showTeam} onClose={() => setShowTeam(false)} department="housekeeping" />
+                <HousekeepingTeamManager
                 isOpen={showTeamManager}
                 onClose={() => {
                     setShowTeamManager(false);
@@ -2101,34 +2121,34 @@ export const HousekeepingDashboard: React.FC = () => {
                     onClose={() => setShowSupportTicket(false)}
                     department="housekeeping"
                 />
-            )}
+                )}
 
-            {/* ✅ Branch Location Warning */}
-            {showLocationWarning && locationWarningData && branchId && (
-                <BranchLocationWarning
-                    branchId={branchId}
-                    onConfirm={() => {
-                        setShowLocationWarning(false);
-                        // Continue anyway
-                    }}
-                    onCancel={() => {
-                        setShowLocationWarning(false);
-                        navigate('/admin');
-                    }}
+                {/* ✅ Branch Location Warning */}
+                {showLocationWarning && locationWarningData && branchId && (
+                    <BranchLocationWarning
+                        branchId={branchId}
+                        onConfirm={() => {
+                            setShowLocationWarning(false);
+                            // Continue anyway
+                        }}
+                        onCancel={() => {
+                            setShowLocationWarning(false);
+                            navigate('/admin');
+                        }}
+                    />
+                )}
+
+                {/* ✅ Onboarding Tour */}
+                <TourGuide
+                    steps={tourSteps}
+                    isOpen={showTour}
+                    onClose={closeTour}
+                    onComplete={completeTour}
                 />
-            )}
 
-            {/* ✅ Onboarding Tour */}
-            <TourGuide
-                steps={tourSteps}
-                isOpen={showTour}
-                onClose={closeTour}
-                onComplete={completeTour}
-            />
-
-            {/* 📝 Developer Signature */}
-            {/* Developer Signature is in GlobalFooter (App.tsx) */}
-        </div>
+                {/* 📝 Developer Signature */}
+                {/* Developer Signature is in GlobalFooter (App.tsx) */}
+            </div>
         </PageTransition>
     );
 };

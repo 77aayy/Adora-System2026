@@ -7,6 +7,7 @@
 
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
+import { autoTranslateNewText } from './dynamicTranslationService'; // ✅ Auto-translation
 
 // ============================================================
 // TYPES
@@ -69,12 +70,26 @@ export interface ManagerAnnouncementView {
     viewCount: number;
 }
 
+export interface AnnouncementAuditLog {
+    announcementId: string;
+    views: ManagerAnnouncementView[];
+    totalViews: number;
+    totalDismissals: number;
+    viewedBy: string[]; // employee IDs
+    dismissedBy: string[]; // employee IDs
+}
+
 // ============================================================
 // COLLECTION HELPERS
 // ============================================================
 
-const getAnnouncementsCollectionRef = (tenantId: string) => 
-    collection(db, 'tenants', tenantId, 'manager_announcements');
+const getAnnouncementsCollectionRef = (tenantId: string) => {
+    if (!db) {
+        console.error('[managerAnnouncementService] Firestore not initialized');
+        throw new Error('Firestore not initialized');
+    }
+    return collection(db, 'tenants', tenantId, 'manager_announcements');
+};
 const getAnnouncementDocRef = (tenantId: string, announcementId: string) => 
     doc(db, 'tenants', tenantId, 'manager_announcements', announcementId);
 const getViewsCollectionRef = (tenantId: string) => 
@@ -105,6 +120,31 @@ export const createManagerAnnouncement = async (
 
         const docRef = doc(getAnnouncementsCollectionRef(tenantId));
         await setDoc(docRef, announcementData);
+
+        // ✅ AUTO-TRANSLATE: Translate Arabic text to all languages automatically
+        if (announcement.titleAr || announcement.messageAr) {
+            try {
+                // Translate title
+                if (announcement.titleAr) {
+                    await autoTranslateNewText(
+                        tenantId,
+                        `announcement_${docRef.id}_title`,
+                        announcement.titleAr
+                    );
+                }
+                // Translate message
+                if (announcement.messageAr) {
+                    await autoTranslateNewText(
+                        tenantId,
+                        `announcement_${docRef.id}_message`,
+                        announcement.messageAr
+                    );
+                }
+            } catch (translationError) {
+                // Don't fail the announcement creation if translation fails
+                console.warn('Auto-translation failed for announcement:', translationError);
+            }
+        }
 
         return docRef.id;
     } catch (error) {
@@ -235,7 +275,16 @@ export const subscribeToManagerAnnouncements = (
     branchId: string | undefined,
     callback: (announcements: ManagerAnnouncement[]) => void
 ): (() => void) => {
-    const q = query(
+    if (!db) {
+        console.error('[managerAnnouncementService] Firestore not initialized');
+        callback([]);
+        return () => {};
+    }
+
+    console.log('[managerAnnouncementService] Subscribing to announcements:', { tenantId, department, branchId });
+    
+    // ✅ FIX: Try with orderBy first, fallback to simple query if index missing
+    let q = query(
         getAnnouncementsCollectionRef(tenantId),
         where('isActive', '==', true),
         orderBy('createdAt', 'desc')
@@ -244,6 +293,7 @@ export const subscribeToManagerAnnouncements = (
     return onSnapshot(
         q,
         (snapshot) => {
+            console.log('[managerAnnouncementService] ✅ Snapshot received:', snapshot.size, 'documents');
             const now = new Date();
             const announcements: ManagerAnnouncement[] = [];
 
@@ -301,9 +351,74 @@ export const subscribeToManagerAnnouncements = (
 
             callback(sorted);
         },
-        (error) => {
-            console.error('Error subscribing to manager announcements:', error);
-            callback([]);
+        (error: any) => {
+            console.error('[managerAnnouncementService] ❌ Error subscribing:', error.code, error.message);
+            
+            // ✅ FIX: Fallback to simple query without orderBy if index missing
+            if (error.code === 'failed-precondition') {
+                const fallbackQ = query(
+                    getAnnouncementsCollectionRef(tenantId),
+                    where('isActive', '==', true)
+                );
+                
+                return onSnapshot(
+                    fallbackQ,
+                    (snapshot) => {
+                        const now = new Date();
+                        const announcements: ManagerAnnouncement[] = [];
+
+                        snapshot.forEach(doc => {
+                            const data = doc.data() as ManagerAnnouncement;
+                            
+                            // Check if expired
+                            if (data.expiresAt) {
+                                const expiresAt = data.expiresAt.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
+                                if (expiresAt < now) return;
+                            }
+
+                            // Check start/end date
+                            if (data.startDate) {
+                                const startDate = data.startDate.toDate ? data.startDate.toDate() : new Date(data.startDate);
+                                if (startDate > now) return;
+                            }
+                            if (data.endDate) {
+                                const endDate = data.endDate.toDate ? data.endDate.toDate() : new Date(data.endDate);
+                                if (endDate < now) return;
+                            }
+
+                            // Check branch targeting
+                            if (data.branchId && branchId && data.branchId !== branchId) return;
+
+                            // Check department targeting
+                            if (!data.targetDepartments.includes('all') && !data.targetDepartments.includes(department as DepartmentType)) return;
+
+                            announcements.push({
+                                id: doc.id,
+                                ...data
+                            });
+                        });
+
+                        // Sort by priority and creation time (client-side)
+                        const sorted = announcements.sort((a, b) => {
+                            const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+                            const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+                            if (priorityDiff !== 0) return priorityDiff;
+                            
+                            const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+                            const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+                            return bTime.getTime() - aTime.getTime();
+                        });
+
+                        callback(sorted);
+                    },
+                    (fallbackError) => {
+                        console.error('[managerAnnouncementService] ❌ Fallback query also failed:', fallbackError);
+                        callback([]);
+                    }
+                );
+            } else {
+                callback([]);
+            }
         }
     );
 };
@@ -529,6 +644,51 @@ export const getManagerAnnouncementStats = async (
             totalDismissals: 0,
             viewsByDepartment: {},
             dismissalsByDepartment: {}
+        };
+    }
+};
+
+/**
+ * Get audit log for an announcement (views and dismissals)
+ */
+export const getAnnouncementAuditLog = async (
+    tenantId: string,
+    announcementId: string
+): Promise<AnnouncementAuditLog> => {
+    try {
+        const viewsQuery = query(
+            getViewsCollectionRef(tenantId),
+            where('announcementId', '==', announcementId)
+        );
+        const viewsSnapshot = await getDocs(viewsQuery);
+        
+        const views = viewsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as ManagerAnnouncementView));
+
+        const totalViews = views.reduce((sum, v) => sum + (v.viewCount || 0), 0);
+        const totalDismissals = views.filter(v => v.dismissedAt).length;
+        const viewedBy = [...new Set(views.map(v => v.employeeId))];
+        const dismissedBy = [...new Set(views.filter(v => v.dismissedAt).map(v => v.employeeId))];
+
+        return {
+            announcementId,
+            views,
+            totalViews,
+            totalDismissals,
+            viewedBy,
+            dismissedBy
+        };
+    } catch (error) {
+        console.error('Error getting announcement audit log:', error);
+        return {
+            announcementId,
+            views: [],
+            totalViews: 0,
+            totalDismissals: 0,
+            viewedBy: [],
+            dismissedBy: []
         };
     }
 };

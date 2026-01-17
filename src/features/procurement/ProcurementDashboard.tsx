@@ -610,9 +610,18 @@ export const ProcurementDashboard: React.FC = () => {
                 onResetErrors={resetErrors}
             />
 
-            {/* Stats - ✅ Moved BEFORE Challenge Timeline to prevent hiding - Mobile-First */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+            {/* Stats - ✅ ADORA PREMIUM COMPACT DESIGN */}
+            <div 
+                className="max-w-7xl mx-auto mb-3 sm:mb-4"
+                style={{ padding: '24px' }}
+            >
+                <div 
+                    className="grid"
+                    style={{
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                        gap: '24px',
+                    }}
+                >
                 <StatCard
                     count={pendingApproval.length}
                     label="⏳ بانتظار التعميد"

@@ -7,6 +7,8 @@
 import { collection, query, where, getDocs, Timestamp, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { getRooms } from './roomService';
+import { validateTenantId, validateTenantAccess } from './tenantSecurityService';
+import { logger } from './loggerService';
 
 // ============================================================
 // 6. CAPACITY PLANNING
@@ -64,14 +66,30 @@ export const handleConcurrentRequests = async (
     requestIds: string[],
     action: 'confirm' | 'cancel',
     userId: string,
-    userName: string
+    userName: string,
+    tenantId: string // ✅ FIX: Add tenantId parameter
 ): Promise<{ success: string[]; failed: string[] }> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot handle concurrent requests', undefined, 'receptionCoreService');
+        return { success: [], failed: requestIds };
+    }
+
+    // ✅ FIX: Validate tenant access
+    if (!tenantId || tenantId.trim() === '') {
+        logger.error('TenantId is required for handleConcurrentRequests', undefined, 'receptionCoreService');
+        return { success: [], failed: requestIds };
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     const batch = writeBatch(db);
     const success: string[] = [];
 
     try {
+        // ✅ FIX: Use tenant-scoped collection
         for (const id of requestIds) {
-            const ref = doc(db, 'requests', id);
+            const ref = doc(db, `tenants/${validatedTenantId}/requests`, id);
             if (action === 'confirm') {
                 batch.update(ref, { status: 'CONFIRMED', confirmedBy: { id: userId, name: userName }, 'timeline.confirmed': Timestamp.now() });
             } else {
@@ -82,6 +100,7 @@ export const handleConcurrentRequests = async (
         await batch.commit();
         return { success, failed: [] };
     } catch (error) {
+        logger.error('Error handling concurrent requests', error, 'receptionCoreService');
         return { success: [], failed: requestIds };
     }
 };
@@ -101,12 +120,33 @@ export const mergeRequests = async (requestIds: string[], mergedType: string): P
 // 9. DUPLICATE DETECTION
 // ============================================================
 
-export const detectDuplicates = async (roomNumber: string, serviceType: string, branch: string, windowMins: number = 30): Promise<string[]> => {
+export const detectDuplicates = async (
+    roomNumber: string,
+    serviceType: string,
+    branch: string,
+    tenantId: string, // ✅ FIX: Add tenantId parameter
+    windowMins: number = 30
+): Promise<string[]> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot detect duplicates', undefined, 'receptionCoreService');
+        return [];
+    }
+
+    // ✅ FIX: Validate tenant access
+    if (!tenantId || tenantId.trim() === '') {
+        logger.error('TenantId is required for detectDuplicates', undefined, 'receptionCoreService');
+        return [];
+    }
+
     try {
+        const validatedTenantId = validateTenantId(tenantId);
+        validateTenantAccess(validatedTenantId);
+
         const cutoff = new Date(Date.now() - windowMins * 60000);
+        // ✅ FIX: Use tenant-scoped collection
         const snapshot = await getDocs(
             query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${validatedTenantId}/requests`),
                 where('roomNumber', '==', roomNumber),
                 where('type', '==', serviceType),
                 where('branch', '==', branch),
@@ -114,7 +154,8 @@ export const detectDuplicates = async (roomNumber: string, serviceType: string, 
             )
         );
         return snapshot.docs.map(d => d.id);
-    } catch {
+    } catch (error) {
+        logger.error('Error detecting duplicates', error, 'receptionCoreService');
         return [];
     }
 };
@@ -141,16 +182,40 @@ export const balanceWorkload = async (department: string, branch: string): Promi
 // 12. PEAK TIME MANAGEMENT
 // ============================================================
 
-export const getPeakTimes = async (branch: string): Promise<Record<number, number>> => {
+export const getPeakTimes = async (
+    branch: string,
+    tenantId: string // ✅ FIX: Add tenantId parameter
+): Promise<Record<number, number>> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get peak times', undefined, 'receptionCoreService');
+        return {};
+    }
+
+    // ✅ FIX: Validate tenant access
+    if (!tenantId || tenantId.trim() === '') {
+        logger.error('TenantId is required for getPeakTimes', undefined, 'receptionCoreService');
+        return {};
+    }
+
     try {
-        const snapshot = await getDocs(query(collection(db, 'requests'), where('branch', '==', branch)));
+        const validatedTenantId = validateTenantId(tenantId);
+        validateTenantAccess(validatedTenantId);
+
+        // ✅ FIX: Use tenant-scoped collection
+        const snapshot = await getDocs(
+            query(
+                collection(db, `tenants/${validatedTenantId}/requests`),
+                where('branch', '==', branch)
+            )
+        );
         const hourlyCount: Record<number, number> = {};
         snapshot.docs.forEach(d => {
             const hour = d.data().createdAt?.toDate?.()?.getHours() || 0;
             hourlyCount[hour] = (hourlyCount[hour] || 0) + 1;
         });
         return hourlyCount;
-    } catch {
+    } catch (error) {
+        logger.error('Error getting peak times', error, 'receptionCoreService');
         return {};
     }
 };
@@ -159,12 +224,31 @@ export const getPeakTimes = async (branch: string): Promise<Record<number, numbe
 // 13. EMERGENCY PROTOCOLS
 // ============================================================
 
-export const triggerEmergency = async (requestId: string, type: 'medical' | 'fire' | 'security'): Promise<void> => {
+export const triggerEmergency = async (
+    requestId: string,
+    type: 'medical' | 'fire' | 'security',
+    tenantId: string // ✅ FIX: Add tenantId parameter
+): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot trigger emergency', undefined, 'receptionCoreService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    // ✅ FIX: Validate tenant access
+    if (!tenantId || tenantId.trim() === '') {
+        throw new Error('Tenant ID is required for all operations');
+    }
+
     try {
-        const ref = doc(db, 'requests', requestId);
+        const validatedTenantId = validateTenantId(tenantId);
+        validateTenantAccess(validatedTenantId);
+
+        // ✅ FIX: Use tenant-scoped collection
+        const ref = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
         await updateDoc(ref, { isEmergency: true, emergencyType: type, priority: 'critical', 'timeline.emergencyTriggered': Timestamp.now() });
-        console.log(`🚨 EMERGENCY ${type} triggered`);
+        logger.info(`🚨 EMERGENCY ${type} triggered for request ${requestId}`, undefined, 'receptionCoreService');
     } catch (error) {
+        logger.error('Error triggering emergency', error, 'receptionCoreService');
         throw error;
     }
 };
@@ -173,11 +257,32 @@ export const triggerEmergency = async (requestId: string, type: 'medical' | 'fir
 // 14. ESCALATION WORKFLOWS
 // ============================================================
 
-export const escalateRequest = async (requestId: string, to: 'supervisor' | 'manager' | 'gm', reason: string): Promise<void> => {
+export const escalateRequest = async (
+    requestId: string,
+    to: 'supervisor' | 'manager' | 'gm',
+    reason: string,
+    tenantId: string // ✅ FIX: Add tenantId parameter
+): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot escalate request', undefined, 'receptionCoreService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    // ✅ FIX: Validate tenant access
+    if (!tenantId || tenantId.trim() === '') {
+        throw new Error('Tenant ID is required for all operations');
+    }
+
     try {
-        const ref = doc(db, 'requests', requestId);
+        const validatedTenantId = validateTenantId(tenantId);
+        validateTenantAccess(validatedTenantId);
+
+        // ✅ FIX: Use tenant-scoped collection
+        const ref = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
         await updateDoc(ref, { isEscalated: true, escalatedTo: to, escalationReason: reason, 'timeline.escalated': Timestamp.now() });
+        logger.info(`Request ${requestId} escalated to ${to}`, undefined, 'receptionCoreService');
     } catch (error) {
+        logger.error('Error escalating request', error, 'receptionCoreService');
         throw error;
     }
 };
@@ -194,11 +299,31 @@ export interface SLAMetrics {
     slaCompliance: number;
 }
 
-export const getSLAMetrics = async (branch: string, startDate: Date, endDate: Date): Promise<SLAMetrics> => {
+export const getSLAMetrics = async (
+    branch: string,
+    tenantId: string, // ✅ FIX: Add tenantId parameter
+    startDate: Date,
+    endDate: Date
+): Promise<SLAMetrics> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get SLA metrics', undefined, 'receptionCoreService');
+        return { totalRequests: 0, withinSLA: 0, breachedSLA: 0, avgResponseTime: 0, slaCompliance: 0 };
+    }
+
+    // ✅ FIX: Validate tenant access
+    if (!tenantId || tenantId.trim() === '') {
+        logger.error('TenantId is required for getSLAMetrics', undefined, 'receptionCoreService');
+        return { totalRequests: 0, withinSLA: 0, breachedSLA: 0, avgResponseTime: 0, slaCompliance: 0 };
+    }
+
     try {
+        const validatedTenantId = validateTenantId(tenantId);
+        validateTenantAccess(validatedTenantId);
+
+        // ✅ FIX: Use tenant-scoped collection
         const snapshot = await getDocs(
             query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${validatedTenantId}/requests`),
                 where('branch', '==', branch),
                 where('createdAt', '>=', Timestamp.fromDate(startDate)),
                 where('createdAt', '<=', Timestamp.fromDate(endDate)),
@@ -227,7 +352,8 @@ export const getSLAMetrics = async (branch: string, startDate: Date, endDate: Da
             avgResponseTime: total > 0 ? totalTime / total : 0,
             slaCompliance: total > 0 ? (withinSLA / total) * 100 : 0
         };
-    } catch {
+    } catch (error) {
+        logger.error('Error getting SLA metrics', error, 'receptionCoreService');
         return { totalRequests: 0, withinSLA: 0, breachedSLA: 0, avgResponseTime: 0, slaCompliance: 0 };
     }
 };

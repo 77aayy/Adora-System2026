@@ -60,49 +60,52 @@ export const ResponsiveActionBar: React.FC<ResponsiveActionBarProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showMenu]);
 
-    // Desktop/Tablet View - ✅ Compact, Gray by Default, Teal on Hover (Like Header)
+    // Desktop/Tablet View - ✅ Premium Styling Matching Premium Header
     if (!isCollapsed) {
         return (
-            <div className={`flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-1 scrollbar-hide ${className}`}>
+            <div className={`flex items-center gap-2 sm:gap-2.5 overflow-x-auto pb-2 scrollbar-hide ${className}`}>
                 {actions.map((action) => (
                     <button
                         key={action.id}
                         onClick={action.onClick}
-                        className={`group relative flex flex-col items-center justify-center gap-0.5
-                            min-w-[52px] sm:min-w-[60px] px-2 sm:px-2.5 py-1.5 sm:py-2
-                            rounded-lg sm:rounded-xl
-                            border transition-all duration-200
-                            hover:scale-105 active:scale-95
+                        className={`group relative flex flex-col items-center justify-center gap-1.5
+                            min-w-[64px] sm:min-w-[72px] lg:min-w-[80px] px-3 sm:px-4 py-2.5 sm:py-3
+                            rounded-xl sm:rounded-2xl
+                            border transition-all duration-300 ease-out
+                            hover:scale-[1.02] active:scale-[0.98]
                             ${action.isActive 
-                                ? 'bg-teal-500/20 dark:bg-teal-500/20 border-teal-400 dark:border-teal-500 shadow-md shadow-teal-500/20' 
-                                : 'bg-white/10 dark:bg-slate-800/40 backdrop-blur-sm border-white/20 dark:border-slate-700/50 hover:border-teal-400 dark:hover:border-teal-500 hover:bg-teal-500/10 dark:hover:bg-teal-500/10'
+                                ? 'bg-gradient-to-br from-teal-500/15 to-cyan-500/10 border-teal-400/40 dark:border-teal-500/50 shadow-lg shadow-teal-500/20' 
+                                : 'bg-white/5 dark:bg-slate-800/30 backdrop-blur-sm border-white/10 dark:border-slate-700/30 hover:border-teal-400/30 dark:hover:border-teal-500/40 hover:bg-teal-500/5 dark:hover:bg-teal-500/5'
                             }`}
+                        style={{
+                            boxShadow: action.isActive 
+                                ? '0 4px 12px rgba(20, 184, 166, 0.15)' 
+                                : '0 2px 8px rgba(0,0,0,0.05)'
+                        }}
                     >
                         {/* Badge */}
                         {action.badge && action.badge > 0 && (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow animate-pulse">
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-red-500/30 animate-pulse z-10">
                                 {action.badge > 9 ? '9+' : action.badge}
                             </span>
                         )}
                         
-                        {/* Icon - Theme-aware colors */}
-                        <span className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors duration-200
+                        {/* Icon - Premium Styling */}
+                        <span className={`w-5 h-5 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-all duration-300
                             ${action.isActive 
-                                ? 'text-teal-500 dark:text-teal-400' 
-                                : 'text-slate-400 dark:text-slate-400 group-hover:text-teal-500 dark:group-hover:text-teal-400'
+                                ? 'text-teal-500 dark:text-teal-400 scale-110' 
+                                : 'text-slate-500 dark:text-slate-400 group-hover:text-teal-500 dark:group-hover:text-teal-400 group-hover:scale-110'
                             }`}
-                            style={action.isActive ? {} : { color: 'var(--theme-text-secondary)' }}
                         >
                             {action.icon}
                         </span>
                         
-                        {/* Label - Small and Compact - Theme-aware */}
-                        <span className={`text-[9px] sm:text-[10px] font-medium text-center whitespace-nowrap leading-tight transition-colors duration-200
+                        {/* Label - Premium Typography */}
+                        <span className={`text-[10px] sm:text-xs lg:text-sm font-semibold text-center whitespace-nowrap leading-tight transition-colors duration-300
                             ${action.isActive 
                                 ? 'text-teal-600 dark:text-teal-300' 
-                                : ''
+                                : 'text-slate-600 dark:text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400'
                             }`}
-                            style={action.isActive ? {} : { color: 'var(--theme-text-secondary)' }}
                         >
                             {action.label}
                         </span>

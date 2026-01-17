@@ -388,12 +388,11 @@ export const OperationsQuickView: React.FC<OperationsQuickViewProps> = ({
     useEffect(() => {
         if (!tenantId || !branchId) return;
 
-        // ✅ FIXED: Listen to the CORRECT 'requests' collection (root level)
-        // This is where ReceptionDashboard creates requests
-        const requestsRef = collection(db, 'requests');
+        // ✅ FIX: Use tenant-scoped collection (tenants/${tenantId}/requests)
+        // This ensures proper Tenant Isolation and Security
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
-            where('tenantId', '==', tenantId),
             where('branch', '==', branchId),
             where('status', 'in', ['PENDING', 'PENDING_RECEPTION', 'CONFIRMED', 'IN_PROGRESS', 'NEEDS_INSPECTION']),
             orderBy('createdAt', 'desc')

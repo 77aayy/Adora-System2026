@@ -294,7 +294,14 @@ export const MultiBranchDashboard: React.FC = () => {
                     )}
 
                     {/* Quick Stats - Unified Style like Owner Dashboard */}
-                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div 
+                        className="grid"
+                        style={{
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                            gap: '24px',
+                            padding: '24px',
+                        }}
+                    >
                         <div className="stat-card-pro-compact">
                             <StatCard
                                 icon={Building2}

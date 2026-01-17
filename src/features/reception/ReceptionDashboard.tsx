@@ -78,6 +78,7 @@ import { VoiceInputButton } from '../../components/shared/VoiceInputButton'; // 
 import { ReceptionVerificationPanel } from '../../components/shared/ReceptionVerificationPanel'; // 🆕 Guest Verification
 
 import { subscribeToRooms } from '../../services/roomService';
+import { subscribeToActiveRoomCards } from '../../services/roomCardService'; // ✅ For occupancy calculation
 import { subscribeToEmployees } from '../../services/employeeService'; // Assuming this exists or userService
 import { FloorRoomSelector } from '../../components/shared/FloorRoomSelector';
 import { SmartInsight } from '../../components/shared/SmartInsight'; // 🧠 Smart Genius Insight
@@ -90,7 +91,7 @@ import { MobileMenu } from '../../components/common/MobileMenu';
 import { StatCard } from '../../components/common/StatCard';
 import { TeamMembers } from '../../components/shared/TeamMembers';
 import { awardPoints } from '../../services/pointsService';
-import { markAsViewed, markAsDelivered } from '../../services/requestService';
+import { markAsViewed, markAsDelivered, subscribeToRequests } from '../../services/requestService';
 // ✅ Lost & Found imports - MOVED TO: components/reception/modals/LostFoundModal.tsx
 import { useSmartAgent } from '../../hooks/useSmartAgent';
 import { useOnboardingTour } from '../../hooks/useOnboardingTour';
@@ -236,6 +237,8 @@ export const ReceptionDashboard: React.FC = () => {
         setRooms,
         activeRoomDetails,
         setActiveRoomDetails,
+        activeRoomCards,
+        setActiveRoomCards,
         teamMembers,
         setTeamMembers,
         roomHistoryRoom,
@@ -402,7 +405,25 @@ export const ReceptionDashboard: React.FC = () => {
             }
         });
 
+        // ✅ Subscribe to Active Room Cards (for occupancy calculation)
+        let unsubRoomCards: (() => void) | null = null;
+        if (tenantId && branchId) {
+            unsubRoomCards = subscribeToActiveRoomCards(
+                (cards) => {
+                    setActiveRoomCards(cards);
+                },
+                tenantId,
+                branchId
+            );
+        }
+
         // Subscribe to rooms (Grouped for Modal)
+        // ✅ FIX: Pass tenantId as required parameter
+        if (!tenantId) {
+            console.warn('⚠️ [ReceptionDashboard] Cannot subscribe to rooms: tenantId is missing');
+            return;
+        }
+        
         const unsubRooms = subscribeToRooms(branchId, (updatedRooms) => {
             const grouped = updatedRooms.reduce((acc, room) => {
                 const floor = room.floor;
@@ -442,6 +463,7 @@ export const ReceptionDashboard: React.FC = () => {
         return () => {
             unsubRooms();
             unsubTeam();
+            if (unsubRoomCards) unsubRoomCards();
         };
     }, [branchId, tenantId, t]);
 
@@ -488,88 +510,58 @@ export const ReceptionDashboard: React.FC = () => {
         // Rooms are handled by the real-time subscription in the first useEffect
 
 
-        // ✅ PERFORMANCE: Subscribe to requests with limit for initial load
-        const requestsRef = collection(db, 'requests');
+        // ✅ FIX: Use subscribeToRequests from requestService (Tenant-Scoped + Real-time)
+        // This ensures proper Tenant Isolation and Security
+        if (!tenantId) {
+            console.warn('⚠️ [ReceptionDashboard] Cannot subscribe to requests: tenantId is missing');
+            setLoading(false);
+            return;
+        }
 
-        // Try with orderBy first, fallback to simple query if index not ready
-        const trySubscribe = (useOrderBy: boolean) => {
-            const constraints = [where('branch', '==', branchId)];
-            if (tenantId) constraints.push(where('tenantId', '==', tenantId));
+        // ✅ Use subscribeToRequests (Tenant-Scoped Collection: tenants/${tenantId}/requests)
+        const unsubscribe = subscribeToRequests(
+            branchId,
+            tenantId,
+            (loadedRequests) => {
+                // ✅ Map to ServiceRequest format (for compatibility)
+                const mappedRequests: ServiceRequest[] = loadedRequests.map(req => ({
+                    id: req.id,
+                    type: req.type as any,
+                    status: req.status as any,
+                    roomNumber: req.roomNumber,
+                    priority: req.priority as any,
+                    isEmergency: req.priority === 'urgent' || req.priority === 'emergency',
+                    source: req.source as any,
+                    createdAt: req.createdAt,
+                    currentDepartment: req.currentDepartment,
+                    originDepartment: req.originDepartment,
+                    guestName: req.guestName,
+                    guestPhone: req.guestPhone,
+                    guestIdentity: req.guestIdentity,
+                    guestStatus: req.guestStatus as any,
+                    notes: typeof req.notes === 'string' ? req.notes.substring(0, 100) : req.notes,
+                    departmentHistory: req.departmentHistory,
+                    scheduledAt: req.scheduledDate,
+                    scheduledDate: req.scheduledDate
+                } as ServiceRequest));
 
-            // ✅ PERFORMANCE: Limit initial load to 100 requests (most recent)
-            // Filter completed requests client-side to avoid index requirements
-            const q = useOrderBy
-                ? query(requestsRef, ...constraints, orderBy('createdAt', 'desc'), limit(100))
-                : query(requestsRef, ...constraints, limit(100));
+                setRequests(mappedRequests);
+                setLoading(false);
 
-            return onSnapshot(q,
-                (snapshot) => {
-                    let loadedRequests: ServiceRequest[] = [];
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        // ✅ PERFORMANCE: Only fetch essential fields for list view
-                        // Full details will be fetched when viewing individual request
-                        loadedRequests.push({
-                            id: doc.id,
-                            type: data.type,
-                            status: data.status,
-                            roomNumber: data.roomNumber,
-                            priority: data.priority,
-                            isEmergency: data.isEmergency,
-                            source: data.source,
-                            createdAt: data.createdAt,
-                            currentDepartment: data.currentDepartment,
-                            originDepartment: data.originDepartment,
-                            guestName: data.guestName,
-                            guestPhone: data.guestPhone,
-                            guestIdentity: data.guestIdentity,
-                            guestStatus: data.guestStatus,
-                            notes: data.notes?.substring(0, 100), // Truncate notes for list view
-                            departmentHistory: data.departmentHistory,
-                            scheduledAt: data.scheduledAt,
-                            scheduledDate: data.scheduledDate
-                        } as ServiceRequest);
-                    });
-
-                    // Sort manually if we couldn't use orderBy
-                    if (!useOrderBy) {
-                        loadedRequests = loadedRequests.sort((a, b) => {
-                            const aTime = a.createdAt?.toDate?.() || new Date(0);
-                            const bTime = b.createdAt?.toDate?.() || new Date(0);
-                            return bTime.getTime() - aTime.getTime();
-                        });
-                    }
-
-                    // ✅ PERFORMANCE: Prioritize active requests (filter completed client-side if needed)
-                    // Keep all requests but prioritize active ones in UI
-                    setRequests(loadedRequests);
-                    setLoading(false);
-
-                    // Play sound for new pending requests
-                    const newPendingCount = loadedRequests.filter(r => r.status === 'PENDING').length;
-
-                    if (newPendingCount > prevPendingCount.current) {
-                        playSound('notification');
-                        haptic('medium');
-                    }
-                    prevPendingCount.current = newPendingCount;
-                },
-                (error) => {
-                    console.error('Query error:', error);
-                    // If index error, try without orderBy
-                    if (useOrderBy && error.code === 'failed-precondition') {
-                        console.warn('Index not ready, using fallback query');
-                        trySubscribe(false);
-                    } else {
-                        setLoading(false);
-                    }
+                // Play sound for new pending requests
+                const newPendingCount = mappedRequests.filter(r => r.status === 'PENDING' || r.status === 'PENDING_RECEPTION').length;
+                if (newPendingCount > prevPendingCount.current) {
+                    playSound('notification');
+                    haptic('medium');
                 }
-            );
-        };
-
-        const unsubscribe = trySubscribe(true);
+                prevPendingCount.current = newPendingCount;
+            },
+            undefined, // status filter (undefined = all)
+            100 // maxResults
+        );
+        
         return () => unsubscribe();
-    }, [user, branchId]);
+    }, [user, branchId, tenantId]);
 
     // ============================================================
     // ACTIONS
@@ -787,13 +779,18 @@ export const ReceptionDashboard: React.FC = () => {
     // ============================================================
 
     // 🧠 GENIUS: Smart Occupancy & Pricing Logic
+    // ✅ NEW LOGIC: Based on Active Room Cards (from Bellman) vs Total Rooms
     const pricingInsight = useMemo(() => {
+        // إجمالي الغرف في الفرع
         const allRooms = rooms.flatMap(r => r.rooms);
-        const total = allRooms.length;
-        if (total === 0) return null;
+        const totalRooms = allRooms.length;
+        if (totalRooms === 0) return null;
 
-        const occupied = allRooms.filter(r => (r as any).status === 'occupied').length;
-        const occupancyRate = (occupied / total) * 100;
+        // عدد الغرف النشطة (Room Cards) من صفحة البيلمان
+        const occupiedRooms = activeRoomCards.length;
+        
+        // حساب معدل الإشغال
+        const occupancyRate = (occupiedRooms / totalRooms) * 100;
         const currentHour = new Date().getHours();
 
         // 💰 High Demand Rule
@@ -817,7 +814,7 @@ export const ReceptionDashboard: React.FC = () => {
         }
 
         return null;
-    }, [rooms, t]);
+    }, [rooms, activeRoomCards, t]);
 
     if (loading) return (
         <div className="min-h-screen theme-page p-4 sm:p-6">

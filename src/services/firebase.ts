@@ -135,6 +135,10 @@ let analytics: Analytics | null = null;
 let appCheck: AppCheck | null = null;
 let isConfigured = false;
 
+// 🛡️ ADORA FIREBASE PROTECTION LAYER
+// Prevent premature Firestore calls and fix lingering Persistence issues
+let isFirestoreReady = false;
+
 const initializeFirebaseServices = () => {
     const config = getFirebaseConfig();
 
@@ -165,11 +169,15 @@ const initializeFirebaseServices = () => {
                 })
             });
             console.log('✅ Firestore initialized with persistent multi-tab cache (unlimited)');
+            // 🛡️ Mark Firestore as ready after successful initialization
+            isFirestoreReady = true;
         } catch (e: any) {
             // Fallback to legacy persistence if modern API fails
             if (e.code === 'failed-precondition' || e.message?.includes('already been called')) {
                 db = getFirestore(app);
                 console.log('ℹ️ Using existing Firestore instance');
+                // 🛡️ Mark Firestore as ready even if using existing instance
+                isFirestoreReady = true;
             } else {
                 db = getFirestore(app);
                 // Enable legacy offline persistence
@@ -177,13 +185,21 @@ const initializeFirebaseServices = () => {
                     forceOwnership: false
                 }).then(() => {
                     console.log('✅ Offline persistence enabled (legacy mode)');
+                    // 🛡️ Mark Firestore as ready after persistence is enabled
+                    isFirestoreReady = true;
                 }).catch((err) => {
                     if (err.code === 'failed-precondition') {
                         console.warn('⚠️ Multiple tabs open - persistence active in another tab');
+                        // 🛡️ Still mark as ready even if persistence failed (multi-tab scenario)
+                        isFirestoreReady = true;
                     } else if (err.code === 'unimplemented') {
                         console.warn('⚠️ Browser does not support IndexedDB');
+                        // 🛡️ Mark as ready even without persistence
+                        isFirestoreReady = true;
                     } else {
                         console.error('❌ Error enabling persistence:', err);
+                        // 🛡️ Mark as ready anyway (Firestore works without persistence)
+                        isFirestoreReady = true;
                     }
                 });
             }
@@ -612,6 +628,57 @@ export const testFirebaseConnection = async (config: FirebaseConfig): Promise<{
             }
         }
     }
+};
+
+// ============================================================
+// 🛡️ ADORA FIREBASE PROTECTION LAYER
+// ============================================================
+
+/**
+ * Get safe Firestore instance with initialization check
+ * Prevents premature Firestore calls and fixes lingering Persistence issues
+ * 
+ * @returns Promise<Firestore | null> - Firestore instance or null if not ready
+ * 
+ * @example
+ * const db = await getSafeFirestore();
+ * if (!db) {
+ *   console.warn('Firestore not ready yet');
+ *   return;
+ * }
+ */
+export const getSafeFirestore = async (): Promise<Firestore | null> => {
+    // If already ready, return immediately
+    if (isFirestoreReady && db) {
+        return db;
+    }
+    
+    // Wait for initialization (max 2 seconds)
+    const maxWait = 2000; // 2 seconds
+    const checkInterval = 100; // Check every 100ms
+    let elapsed = 0;
+    
+    while (!isFirestoreReady && elapsed < maxWait) {
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+        elapsed += checkInterval;
+    }
+    
+    // If still not ready after waiting, log warning
+    if (!isFirestoreReady) {
+        console.warn('⚠️ ADORA: Firestore initialization timeout. Proceeding with caution.');
+        // Still return db if it exists (might be ready but flag not set)
+        return db;
+    }
+    
+    return db;
+};
+
+/**
+ * Check if Firestore is ready for use
+ * @returns boolean - true if Firestore is initialized and ready
+ */
+export const isFirestoreReadyForUse = (): boolean => {
+    return isFirestoreReady && db !== null;
 };
 
 // ============================================================

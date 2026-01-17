@@ -75,12 +75,16 @@ export const startAutoTransfer = async (
         // Stop existing monitoring
         stopAutoTransfer();
 
-        // Listen to active requests
-        const requestsRef = collection(db, 'requests');
+        // ✅ SECURITY FIX: Use tenant-scoped collection
+        if (!db) {
+            console.error('🔄 Auto-transfer: Firestore not initialized');
+            return;
+        }
+        
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
             where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
             where('status', 'in', ['PENDING_RECEPTION', 'CONFIRMED', 'IN_PROGRESS'])
         );
 
@@ -88,16 +92,21 @@ export const startAutoTransfer = async (
             monitoredRequests.clear();
             snapshot.docs.forEach(docSnap => {
                 const data = docSnap.data();
+                const entryTime = getDepartmentEntryTime(data);
+                
                 monitoredRequests.set(docSnap.id, {
                     id: docSnap.id,
                     ...data,
-                    createdAt: data.createdAt?.toDate() || new Date(),
-                    departmentEnteredAt: getDepartmentEntryTime(data),
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt || Date.now())),
+                    departmentEnteredAt: entryTime, // ✅ Already a Date object from getDepartmentEntryTime
+                    currentDepartment: data.currentDepartment || data.originDepartment || (data.departmentHistory && data.departmentHistory.length > 0 ? data.departmentHistory[data.departmentHistory.length - 1].department : null),
                 });
             });
 
             // Check immediately on update
             checkAndTransfer();
+        }, (error) => {
+            console.error('❌ Auto-transfer subscription error:', error);
         });
 
         // Start periodic checks
@@ -140,23 +149,34 @@ export const loadAutoTransferConfig = async (
     branchId: string,
     tenantId: string
 ): Promise<AutoTransferConfig | null> => {
+    if (!db) {
+        console.error('🔄 [Auto-Transfer] Firestore not initialized');
+        return null;
+    }
+    
     try {
         const { getDoc } = await import('firebase/firestore');
-        const configRef = doc(db, 'settings', `autoTransfer_${branchId}`);
+        // ✅ SECURITY FIX: Use tenant-scoped collection for settings
+        const configRef = doc(db, `tenants/${tenantId}/settings`, `autoTransfer_${branchId}`);
         const configSnap = await getDoc(configRef);
+        
+        console.log(`🔍 [Auto-Transfer] Loading config for branch ${branchId}, tenant ${tenantId}`);
 
         if (configSnap.exists()) {
             const data = configSnap.data();
-            return {
+            const config = {
                 enabled: data.enabled ?? true,
                 checkIntervalMs: data.checkIntervalMs || 60000,
                 rules: data.rules || [],
                 branch: branchId,
                 tenantId,
             };
+            console.log(`✅ [Auto-Transfer] Config loaded: ${config.enabled ? 'ENABLED' : 'DISABLED'}, ${config.rules.length} rule(s)`);
+            return config;
         }
 
         // Return default config if not exists
+        console.log(`ℹ️ [Auto-Transfer] No config found, using default (disabled)`);
         return {
             enabled: false,
             checkIntervalMs: 60000,
@@ -176,9 +196,14 @@ export const loadAutoTransferConfig = async (
 export const saveAutoTransferConfig = async (
     config: AutoTransferConfig
 ): Promise<void> => {
+    if (!db) {
+        throw new Error('Firestore not initialized');
+    }
+    
     try {
         const { setDoc } = await import('firebase/firestore');
-        const configRef = doc(db, 'settings', `autoTransfer_${config.branch}`);
+        // ✅ SECURITY FIX: Use tenant-scoped collection for settings
+        const configRef = doc(db, `tenants/${config.tenantId}/settings`, `autoTransfer_${config.branch}`);
         await setDoc(configRef, {
             enabled: config.enabled,
             checkIntervalMs: config.checkIntervalMs,
@@ -203,24 +228,51 @@ export const saveAutoTransferConfig = async (
 
 /**
  * Get the time when request entered current department
+ * ✅ FIX: Properly handle Timestamp conversion and fallbacks
  */
 const getDepartmentEntryTime = (request: any): Date => {
-    if (request.departmentHistory && request.departmentHistory.length > 0) {
+    // Try to get from departmentHistory (most accurate)
+    if (request.departmentHistory && Array.isArray(request.departmentHistory) && request.departmentHistory.length > 0) {
         const lastEntry = request.departmentHistory[request.departmentHistory.length - 1];
-        if (lastEntry.enteredAt) {
-            return lastEntry.enteredAt.toDate ? lastEntry.enteredAt.toDate() : new Date(lastEntry.enteredAt);
+        if (lastEntry && lastEntry.enteredAt) {
+            // Handle Firestore Timestamp
+            if (lastEntry.enteredAt.toDate) {
+                return lastEntry.enteredAt.toDate();
+            }
+            // Handle Date object
+            if (lastEntry.enteredAt instanceof Date) {
+                return lastEntry.enteredAt;
+            }
+            // Handle string or number timestamp
+            return new Date(lastEntry.enteredAt);
         }
     }
+    
     // Fallback to creation time
-    return request.createdAt?.toDate ? request.createdAt.toDate() : new Date(request.createdAt);
+    if (request.createdAt) {
+        if (request.createdAt.toDate) {
+            return request.createdAt.toDate();
+        }
+        if (request.createdAt instanceof Date) {
+            return request.createdAt;
+        }
+        return new Date(request.createdAt);
+    }
+    
+    // Last resort: current time (shouldn't happen)
+    console.warn('⚠️ Could not determine department entry time for request, using current time');
+    return new Date();
 };
 
 /**
  * Check if request matches rule
  */
 const matchesRule = (request: any, rule: AutoTransferRule): boolean => {
+    // ✅ FIX: Get current department from request (fallback to originDepartment or initial department)
+    const currentDept = request.currentDepartment || request.originDepartment || (request.departmentHistory && request.departmentHistory.length > 0 ? request.departmentHistory[request.departmentHistory.length - 1].department : null);
+    
     // Check department
-    if (request.currentDepartment !== rule.fromDepartment) {
+    if (!currentDept || currentDept !== rule.fromDepartment) {
         return false;
     }
 
@@ -253,7 +305,11 @@ const checkAndTransfer = async (): Promise<void> => {
 
     // Find requests that need transfer
     monitoredRequests.forEach((request) => {
-        const departmentEntryTime = request.departmentEnteredAt || request.createdAt;
+        // ✅ FIX: Ensure departmentEntryTime is a Date object
+        const departmentEntryTime = request.departmentEnteredAt instanceof Date 
+            ? request.departmentEnteredAt 
+            : (request.createdAt instanceof Date ? request.createdAt : new Date(request.createdAt || Date.now()));
+        
         const elapsedMinutes = Math.floor((now.getTime() - departmentEntryTime.getTime()) / (1000 * 60));
 
         // Check each rule
@@ -269,15 +325,21 @@ const checkAndTransfer = async (): Promise<void> => {
 
     // Perform transfers
     if (transfers.length > 0) {
-        console.log(`🔄 Auto-transferring ${transfers.length} request(s)`);
+        console.log(`🔄 [Auto-Transfer] Found ${transfers.length} request(s) ready for transfer`);
+        
+        if (!db) {
+            console.error('❌ [Auto-Transfer] Firestore not initialized - cannot perform transfers');
+            return;
+        }
         
         const batch = writeBatch(db);
 
         for (const { requestId, rule, request } of transfers) {
             try {
-                // Transfer to backup department
+                // ✅ FIX: Pass tenantId as first parameter (required by transferRequestToDepartment)
                 await transferRequestToDepartment(
                     requestId,
+                    currentConfig.tenantId, // ✅ CRITICAL: Add tenantId
                     rule.fromDepartment,
                     rule.toDepartment,
                     'AUTO_TRANSFER_SYSTEM',
@@ -286,8 +348,8 @@ const checkAndTransfer = async (): Promise<void> => {
                     `تحويل تلقائي: تأخر الطلب في ${rule.fromDepartment} لمدة ${rule.timeoutMinutes} دقيقة`
                 );
 
-                // Log to request notes
-                const requestRef = doc(db, 'requests', requestId);
+                // ✅ SECURITY FIX: Use tenant-scoped collection
+                const requestRef = doc(db, `tenants/${currentConfig.tenantId}/requests`, requestId);
                 const currentNotes = request.notes || '';
                 batch.update(requestRef, {
                     notes: currentNotes + `\n[نظام التحويل التلقائي] تم التحويل من ${rule.fromDepartment} إلى ${rule.toDepartment} بعد ${rule.timeoutMinutes} دقيقة`,
@@ -297,13 +359,24 @@ const checkAndTransfer = async (): Promise<void> => {
                     autoTransferredTo: rule.toDepartment,
                 });
 
-                console.log(`✅ Auto-transferred request ${requestId} from ${rule.fromDepartment} to ${rule.toDepartment}`);
+                console.log(`✅ [Auto-Transfer] Successfully transferred request ${requestId} from ${rule.fromDepartment} to ${rule.toDepartment} after ${rule.timeoutMinutes} minutes`);
             } catch (error) {
-                console.error(`❌ Error auto-transferring request ${requestId}:`, error);
+                console.error(`❌ [Auto-Transfer] Failed to transfer request ${requestId} from ${rule.fromDepartment} to ${rule.toDepartment}:`, error);
+                // Continue with other transfers even if one fails
             }
         }
 
-        await batch.commit();
+        try {
+            await batch.commit();
+            console.log(`✅ [Auto-Transfer] Batch committed successfully for ${transfers.length} transfer(s)`);
+        } catch (error) {
+            console.error(`❌ [Auto-Transfer] Failed to commit batch:`, error);
+        }
+    } else {
+        // Log when no transfers are needed (only in debug mode)
+        if (monitoredRequests.size > 0) {
+            console.debug(`🔍 [Auto-Transfer] Checked ${monitoredRequests.size} request(s), none ready for transfer`);
+        }
     }
 };
 

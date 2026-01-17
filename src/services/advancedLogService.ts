@@ -152,7 +152,8 @@ export interface LogStats {
 // CONSTANTS
 // ============================================================
 
-const LOGS_COLLECTION = 'advancedLogs';
+// ✅ FIX: Use tenant-scoped collection (SaaS isolation)
+const getLogsCollection = (tenantId: string): string => `tenants/${tenantId}/activityLogs`;
 
 export const CATEGORY_CONFIG: Record<LogCategory, { label: string; icon: string; color: string }> = {
     all: { label: 'الكل', icon: '📋', color: 'slate' },
@@ -327,7 +328,9 @@ export const logAction = async (
             newValue: options?.newValue,
         };
         
-        const docRef = await addDoc(collection(db, LOGS_COLLECTION), {
+        // ✅ FIX: Use tenant-scoped collection
+        const logsCollection = getLogsCollection(context.tenantId);
+        const docRef = await addDoc(collection(db, logsCollection), {
             ...logEntry,
             timestamp: serverTimestamp(),
         });
@@ -398,7 +401,9 @@ export const getLogs = async (
     filter: LogFilter = {}
 ): Promise<{ logs: AdvancedLogEntry[]; hasMore: boolean }> => {
     try {
-        const logsRef = collection(db, LOGS_COLLECTION);
+        // ✅ FIX: Use tenant-scoped collection
+        const logsCollection = getLogsCollection(tenantId);
+        const logsRef = collection(db, logsCollection);
         let constraints: any[] = [
             where('tenantId', '==', tenantId),
         ];

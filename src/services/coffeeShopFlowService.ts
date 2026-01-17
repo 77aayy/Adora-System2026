@@ -25,10 +25,13 @@ import {
     orderBy,
     onSnapshot,
     Timestamp,
-    serverTimestamp
+    serverTimestamp,
+    runTransaction
 } from 'firebase/firestore';
-import { sendNotification } from './notificationService';
+import { sendNotificationToDepartment } from './notificationService';
 import { createTransactionFromRequest } from './financialTrackingService';
+import { addChargeToRoomCard } from './roomCardService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -130,12 +133,15 @@ export async function createCoffeeOrder(
     });
 
     // Notify reception
-    await sendNotification(order.tenantId, order.branchId, 'reception', {
-        type: 'coffee_order',
-        title: '☕ طلب كوفي شوب جديد',
-        body: `غرفة ${order.roomNumber} - ${order.items.length} أصناف - ${order.totalAmount} ر.س`,
-        data: { orderId: docRef.id, roomNumber: order.roomNumber }
-    });
+    await sendNotificationToDepartment(
+        'reception',
+        '☕ طلب كوفي شوب جديد',
+        `غرفة ${order.roomNumber} - ${order.items.length} أصناف - ${order.totalAmount} ر.س`,
+        order.tenantId,
+        order.branchId,
+        'info',
+        docRef.id
+    );
 
     console.log(`☕ Coffee order created: ${docRef.id} - awaiting reception approval`);
     return docRef.id;
@@ -170,13 +176,15 @@ export async function approveOrder(
     const order = orderSnap.data() as CoffeeOrder;
 
     // Notify coffee shop
-    await sendNotification(tenantId, branchId, 'coffee_shop', {
-        type: 'order_approved',
-        title: '✅ طلب جديد للتحضير',
-        body: `غرفة ${order.roomNumber} - ${order.items.length} أصناف`,
-        data: { orderId, roomNumber: order.roomNumber },
-        sound: 'order_new.mp3'
-    });
+    await sendNotificationToDepartment(
+        'coffeeShop',
+        '✅ طلب جديد للتحضير',
+        `غرفة ${order.roomNumber} - ${order.items.length} أصناف`,
+        tenantId,
+        branchId,
+        'info',
+        orderId
+    );
 
     // Create financial transaction
     await createTransactionFromRequest(tenantId, branchId, {
@@ -273,12 +281,15 @@ export async function markReady(
     const order = orderSnap.data() as CoffeeOrder;
 
     // Notify bellman for delivery
-    await sendNotification(tenantId, branchId, 'bellman', {
-        type: 'delivery_ready',
-        title: '📦 طلب جاهز للتوصيل',
-        body: `غرفة ${order.roomNumber} - كوفي شوب`,
-        data: { orderId, roomNumber: order.roomNumber }
-    });
+    await sendNotificationToDepartment(
+        'bellman',
+        '📦 طلب جاهز للتوصيل',
+        `غرفة ${order.roomNumber} - كوفي شوب`,
+        tenantId,
+        branchId,
+        'info',
+        orderId
+    );
 
     console.log(`✅ Order ${orderId} ready for delivery`);
 }
@@ -311,33 +322,115 @@ export async function startDelivery(
 
 /**
  * Complete delivery
+ * ✅ ATOMIC: Uses runTransaction to prevent Race Conditions
+ * ✅ BILLING: Automatically charges Room Card
  */
 export async function completeDelivery(
     tenantId: string,
     branchId: string,
     orderId: string
 ): Promise<void> {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot complete delivery', undefined, 'coffeeShopFlowService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
     const orderRef = doc(db, `tenants/${tenantId}/branches/${branchId}/coffee_orders/${orderId}`);
 
-    await updateDoc(orderRef, {
-        status: 'COMPLETED',
-        deliveredAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+    // ✅ ATOMIC TRANSACTION: Update order status + Charge Room Card
+    await runTransaction(db, async (transaction) => {
+        // 1. Read order
+        const orderSnap = await transaction.get(orderRef);
+
+        if (!orderSnap.exists()) {
+            throw new Error('الطلب غير موجود');
+        }
+
+        const order = orderSnap.data() as CoffeeOrder;
+
+        // 🛡️ VALIDATE: Only DELIVERING orders can be completed
+        if (order.status !== 'DELIVERING' && order.status !== 'READY') {
+            throw new Error(`لا يمكن إكمال الطلب في الحالة: ${order.status}`);
+        }
+
+        // 2. Update order status
+        transaction.update(orderRef, {
+            status: 'COMPLETED',
+            deliveredAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+
+        logger.info(`✅ ATOMIC: Coffee order ${orderId} completed. Charging Room Card...`, undefined, 'coffeeShopFlowService');
     });
 
-    // Get order for notification
+    // 3. Get order details for Room Card charge (outside transaction to avoid conflicts)
     const orderSnap = await getDoc(orderRef);
     const order = orderSnap.data() as CoffeeOrder;
 
-    // Notify reception for closing the loop
-    await sendNotification(tenantId, branchId, 'reception', {
-        type: 'order_completed',
-        title: '✅ تم توصيل الطلب',
-        body: `غرفة ${order.roomNumber} - في انتظار تأكيد الرضا`,
-        data: { orderId, roomNumber: order.roomNumber }
-    });
+    // 4. ✅ Charge Room Card (non-blocking, but linked)
+    if (order.guestId && order.roomNumber) {
+        try {
+            // Get active room card for this room
+            const { getActiveRoomCard } = await import('./roomCardService');
+            const roomCard = await getActiveRoomCard(order.roomNumber, tenantId);
 
-    console.log(`✅ Order ${orderId} delivered`);
+            if (roomCard) {
+                await addChargeToRoomCard(
+                    tenantId,
+                    branchId,
+                    roomCard.id,
+                    order.roomNumber,
+                    {
+                        type: 'coffee_shop',
+                        description: `طلب كوفي شوب - ${order.items.map(i => `${i.name} (${i.quantity})`).join(', ')}`,
+                        amount: order.totalAmount,
+                        currency: 'SAR',
+                        requestId: orderId,
+                        items: order.items.map(i => ({
+                            name: i.name,
+                            quantity: i.quantity,
+                            price: i.price
+                        }))
+                    },
+                    order.deliveredById,
+                    order.deliveredBy
+                );
+
+                logger.info(`✅ Room Card charged for Coffee Shop order. Amount: ${order.totalAmount} SAR`, undefined, 'coffeeShopFlowService');
+            }
+        } catch (chargeError) {
+            logger.warn('Failed to charge Room Card for coffee shop order (non-critical)', chargeError, 'coffeeShopFlowService');
+            // Don't fail order completion if charging fails
+        }
+    }
+
+    // 5. Create financial transaction (legacy support)
+    try {
+        await createTransactionFromRequest(tenantId, branchId, {
+            id: orderId,
+            roomNumber: order.roomNumber,
+            type: 'room_service',
+            guestId: order.guestId,
+            guestName: order.guestName,
+            items: order.items.map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
+            totalAmount: order.totalAmount
+        });
+    } catch (transactionError) {
+        logger.warn('Failed to create financial transaction (non-critical)', transactionError, 'coffeeShopFlowService');
+    }
+
+    // 6. Notify reception for closing the loop
+    await sendNotificationToDepartment(
+        'reception',
+        '✅ تم توصيل الطلب',
+        `غرفة ${order.roomNumber} - في انتظار تأكيد الرضا`,
+        tenantId,
+        branchId,
+        'success',
+        orderId
+    );
+
+    console.log(`✅ Order ${orderId} delivered and charged to Room Card`);
 }
 
 // ============================================================

@@ -25,30 +25,41 @@ export const ReceptionStats: React.FC<ReceptionStatsProps> = React.memo(({
     t
 }) => {
     return (
-        <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-3">
-            <StatCard
-                count={newCount}
-                label={t('reception.newTab')}
-                icon={AlertCircle}
-                iconColor="orange"
-                status={newCount > 10 ? 'warning' : 'normal'}
-            />
-            <StatCard
-                count={inProgressCount}
-                label={t('reception.inProgressTab')}
-                icon={Clock}
-                iconColor="blue"
-                status={inProgressCount > 15 ? 'warning' : 'normal'}
-            />
-            <StatCard
-                count={completedCount}
-                label={t('reception.completedTab')}
-                icon={CheckCircle2}
-                iconColor="green"
-                status="success"
-                trend="+12%"
-            />
+        <div 
+            className="max-w-7xl mx-auto mb-4"
+            style={{
+                padding: '24px', // ✅ Padding as per spec
+            }}
+        >
+            <div 
+                className="grid"
+                style={{
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', // ✅ Grid as per spec
+                    gap: '24px', // ✅ Gap: 24px as per spec
+                }}
+            >
+                <StatCard
+                    count={newCount}
+                    label={t('reception.newTab')}
+                    icon={AlertCircle}
+                    iconColor="orange"
+                    status={newCount > 10 ? 'warning' : 'normal'}
+                />
+                <StatCard
+                    count={inProgressCount}
+                    label={t('reception.inProgressTab')}
+                    icon={Clock}
+                    iconColor="blue"
+                    status={inProgressCount > 15 ? 'warning' : 'normal'}
+                />
+                <StatCard
+                    count={completedCount}
+                    label={t('reception.completedTab')}
+                    icon={CheckCircle2}
+                    iconColor="green"
+                    status="success"
+                    trend="+12%"
+                />
             </div>
         </div>
     );

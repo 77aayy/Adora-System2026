@@ -71,6 +71,8 @@ interface ReceptionContextValue {
     setRooms: React.Dispatch<React.SetStateAction<{ floor: number; rooms: string[] }[]>>;
     activeRoomDetails: Record<string, { guestId: string; guestName: string }>;
     setActiveRoomDetails: React.Dispatch<React.SetStateAction<Record<string, { guestId: string; guestName: string }>>>;
+    activeRoomCards: any[]; // ✅ Room Cards from Bellman (for occupancy calculation)
+    setActiveRoomCards: React.Dispatch<React.SetStateAction<any[]>>;
     teamMembers: any[];
     setTeamMembers: React.Dispatch<React.SetStateAction<any[]>>;
     roomHistoryRoom: string | null;
@@ -137,6 +139,7 @@ export const ReceptionProvider: React.FC<ReceptionProviderProps> = ({ children }
     // Room & Team State
     const [rooms, setRooms] = useState<{ floor: number; rooms: string[] }[]>([]);
     const [activeRoomDetails, setActiveRoomDetails] = useState<Record<string, { guestId: string; guestName: string }>>({});
+    const [activeRoomCards, setActiveRoomCards] = useState<any[]>([]); // ✅ Room Cards from Bellman
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [roomHistoryRoom, setRoomHistoryRoom] = useState<string | null>(null);
     
@@ -213,6 +216,8 @@ export const ReceptionProvider: React.FC<ReceptionProviderProps> = ({ children }
         setRooms,
         activeRoomDetails,
         setActiveRoomDetails,
+        activeRoomCards,
+        setActiveRoomCards,
         teamMembers,
         setTeamMembers,
         roomHistoryRoom,

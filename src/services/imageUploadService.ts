@@ -25,10 +25,9 @@ const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload';
 const loadImgbbKey = async (): Promise<string> => {
     if (!IMGBB_API_KEY) {
         IMGBB_API_KEY = await getImgbbApiKey();
-        // Fallback to hardcoded key if not configured
+        // ✅ SECURITY FIX: No hardcoded fallback - throw error if not configured
         if (!IMGBB_API_KEY) {
-            IMGBB_API_KEY = 'b9bbddc62f8ce1f335a9bad733a5afc5';
-            console.warn('⚠️ Using fallback ImgBB API key');
+            throw new Error('ImgBB API key not configured. Please set it in System Settings > API Keys.');
         }
     }
     return IMGBB_API_KEY;

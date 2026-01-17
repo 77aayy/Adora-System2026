@@ -230,15 +230,22 @@ export interface IRequestRepository {
 
     /**
      * Assigns a request to an employee
+     * ✅ FIX: Updated to match staffService.assignRequest signature (includes branchId)
      * 
      * @param requestId - Request to assign
+     * @param tenantId - Tenant ID for SaaS isolation
      * @param employeeId - Employee to assign to
      * @param employeeName - Employee's name
+     * @param branchId - Branch ID for workload check (required)
+     * @param maxWorkload - Maximum allowed workload (optional, default: 5)
      */
     assignRequest(
         requestId: string,
+        tenantId: string,
         employeeId: string,
-        employeeName: string
+        employeeName: string,
+        branchId: string,
+        maxWorkload?: number
     ): Promise<void>;
 
     /**

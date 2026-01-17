@@ -155,14 +155,16 @@ export function useTenantBranches() {
 
 /**
  * Subscribe to tenant rooms
+ * ✅ FIX: Use useTenant() instead of useRequireTenant() to handle cases where tenantId might not be set (e.g., owner)
  */
 export function useTenantRooms(constraints: QueryConstraint[] = []) {
-    const { tenantId } = useRequireTenant();
+    const { tenantId } = useTenant(); // ✅ Changed from useRequireTenant to useTenant (Safe)
     const [rooms, setRooms] = useState<TenantRoom[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!tenantId || !db) {
+            setRooms([]); // ✅ Clear rooms if no tenantId or db
             setLoading(false);
             return;
         }
@@ -178,6 +180,10 @@ export function useTenantRooms(constraints: QueryConstraint[] = []) {
                 ...doc.data()
             } as TenantRoom));
             setRooms(data);
+            setLoading(false);
+        }, (error) => {
+            console.error('Error loading rooms:', error);
+            setRooms([]); // ✅ Clear rooms on error
             setLoading(false);
         });
 

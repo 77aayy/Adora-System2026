@@ -177,8 +177,15 @@ export const AnalyticsDashboard: React.FC = () => {
                 </div>
 
                 <div className="max-w-7xl mx-auto p-6 space-y-6">
-                    {/* Quick Stats - ✅ Using project StatCard */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Quick Stats - ✅ ADORA PREMIUM COMPACT DESIGN */}
+                    <div 
+                        className="grid"
+                        style={{
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                            gap: '24px',
+                            padding: '24px',
+                        }}
+                    >
                         <StatCard
                             icon={Building2}
                             iconColor="purple"

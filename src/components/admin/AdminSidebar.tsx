@@ -10,6 +10,7 @@ import {
     Shirt,
     Building2,
     ChevronDown,
+    ChevronRight,
     DollarSign,
     HandCoins,
     ArrowLeft,
@@ -25,7 +26,9 @@ import {
     ShieldCheck,
     Mail,
     Bell,
-    Award
+    Award,
+    Menu,
+    X
 } from 'lucide-react';
 import { BookOpen, MessageCircle, Radio, Languages } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -40,9 +43,10 @@ interface AdminSidebarProps {
     isOwner: boolean;
     onClose?: () => void; // ✅ For mobile closing
     className?: string;   // ✅ For custom styling
+    onCollapseChange?: (isCollapsed: boolean) => void; // ✅ Callback for collapse state
 }
 
-export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, className = '' }) => {
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, className = '', onCollapseChange }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -52,6 +56,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     const { tenantId } = useTenant();
     const { isDark } = useTheme(); // ✅ Use theme context for live updates
     const [ticketStatus, setTicketStatus] = React.useState<SupportTicketStatus | null>(null);
+    
+    // ✅ ADORA SMART SIDEBAR: Collapsed State Management
+    const [isCollapsed, setIsCollapsed] = React.useState<boolean>(false);
+    const [hoveredItem, setHoveredItem] = React.useState<string | null>(null);
+
+    // ✅ Notify parent component of collapse state changes
+    React.useEffect(() => {
+        onCollapseChange?.(isCollapsed);
+    }, [isCollapsed, onCollapseChange]);
 
     // ✅ Filter Branches based on Access Control (SaaS Dynamic)
     const filteredBranches = React.useMemo<Branch[]>(() => {
@@ -244,86 +257,159 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     // ✅ Use filteredBranches for active branch (respects access control)
     const activeBranch = filteredBranches.find(b => b.id === branchId) || filteredBranches[0];
 
-    // ✅ MOBILE-FIRST DESIGN: Modern glassmorphism sidebar
+    // ✅ ADORA SMART & FLUID SIDEBAR V5.2 - Premium Specifications
     return (
-        <div 
-            className={`w-full sm:w-72 lg:w-80 flex flex-col h-screen overflow-hidden relative transition-all duration-300 ${className}`} 
+        <aside 
+            className={`flex flex-col h-screen overflow-hidden relative ${className}`} 
             style={{ 
-                background: 'var(--theme-bg-primary)',
-                borderLeft: '1px solid var(--theme-border-primary)',
+                width: isCollapsed ? '80px' : '280px',
+                height: '100vh',
+                background: '#ffffff',
+                borderRight: '1px solid #f1f5f9',
+                padding: isCollapsed ? '15px 8px' : '15px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                zIndex: 100,
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
         >
-            {/* 🎨 Header with Dynamic Logo - ✅ MOBILE-FIRST */}
-            <div className="p-3 sm:p-4 flex-none border-b space-y-3 sm:space-y-4 transition-colors duration-300" style={{ borderColor: 'var(--theme-border-primary)' }}>
-                <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                        {/* Check if active branch has logo, else fallback */}
-                        {activeBranch?.logoUrl ? (
-                            <img
-                                src={activeBranch.logoUrl}
-                                alt="Hotel Logo"
-                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-lg border transition-all duration-300 flex-shrink-0"
-                                style={{ borderColor: 'var(--theme-border-primary)' }}
-                            />
-                        ) : (
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-500/20 flex-shrink-0">
-                                <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                            </div>
-                        )}
+            {/* 🎨 Header with Dynamic Logo & Toggle Button - ✅ ADORA SMART SIDEBAR */}
+            <div 
+                className="flex-none border-b relative transition-colors duration-300" 
+                style={{ 
+                    borderColor: '#f1f5f9',
+                    padding: isCollapsed ? '12px 8px' : '16px 12px',
+                    minHeight: '64px',
+                }}
+            >
+                {/* ✅ Toggle Button - Circular on Sidebar Edge */}
+                <button
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border border-gray-200 shadow-md flex items-center justify-center z-10 hover:bg-gray-50 transition-all duration-200"
+                    style={{
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    }}
+                    aria-label={isCollapsed ? t('sidebar.expand') || 'توسيع' : t('sidebar.collapse') || 'طي'}
+                >
+                    {isCollapsed ? (
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-600" />
+                    ) : (
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-600 rotate-180" />
+                    )}
+                </button>
 
+                {/* ✅ Logo Area - Dynamic based on state */}
+                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+                    {activeBranch?.logoUrl ? (
+                        <img
+                            src={activeBranch.logoUrl}
+                            alt="Hotel Logo"
+                            className={`rounded-xl object-cover shadow-lg border transition-all duration-300 flex-shrink-0`}
+                            style={{ 
+                                width: isCollapsed ? '32px' : '48px',
+                                height: isCollapsed ? '32px' : '48px',
+                                borderColor: '#f1f5f9',
+                            }}
+                        />
+                    ) : (
+                        <div 
+                            className="rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-500/20 flex-shrink-0"
+                            style={{
+                                width: isCollapsed ? '32px' : '48px',
+                                height: isCollapsed ? '32px' : '48px',
+                            }}
+                        >
+                            {isCollapsed ? (
+                                <Crown className="w-4 h-4 text-white" />
+                            ) : (
+                                <Crown className="w-6 h-6 text-white" />
+                            )}
+                        </div>
+                    )}
+
+                    {/* ✅ Branch Name - Hidden when collapsed */}
+                    {!isCollapsed && (
                         <div className="min-w-0 flex-1">
-                            <h1 className="text-base sm:text-lg font-bold truncate leading-tight transition-colors duration-300" style={{ color: 'var(--theme-text-primary)' }}>
+                            <h1 
+                                className="text-base font-bold leading-tight transition-colors duration-300" 
+                                style={{ 
+                                    color: '#1e293b',
+                                    fontSize: '16px',
+                                    fontFamily: 'Cairo, sans-serif',
+                                    fontWeight: 600,
+                                }}
+                            >
                                 {activeBranch?.name || 'Adora Admin'}
                             </h1>
-                            <p className="text-[8px] sm:text-[9px] text-teal-500 font-bold tracking-wider uppercase opacity-80 truncate">
+                            <p 
+                                className="text-[9px] text-teal-500 font-bold tracking-wider uppercase opacity-80"
+                                style={{
+                                    fontFamily: 'Cairo, sans-serif',
+                                }}
+                            >
                                 {isOwner ? (t('admin.ownerDashboard') || 'لوحة المالك') : (t('admin.managerDashboard') || 'مدير النظام')}
                             </p>
                         </div>
-                    </div>
-
-                    {/* ✅ Mobile Close Button */}
-                    {onClose && (
-                        <button
-                            onClick={onClose}
-                            className="lg:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-all duration-300 active:scale-95 flex-shrink-0"
-                            style={{ background: 'var(--theme-bg-tertiary)', color: 'var(--theme-text-secondary)' }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--theme-text-primary)'; e.currentTarget.style.background = 'var(--theme-bg-secondary)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--theme-text-secondary)'; e.currentTarget.style.background = 'var(--theme-bg-tertiary)'; }}
-                        >
-                            <ArrowLeft className="w-4 h-4 flip-rtl" />
-                        </button>
                     )}
                 </div>
 
-                {/* ✅ Branch Selector - MANAGER ONLY: Owner doesn't have branches - ✅ MOBILE-FIRST */}
-                {!isOwnerRole && filteredBranches.length > 1 && (
-                    <div className="p-1.5 rounded-xl border transition-all duration-300 hover:border-teal-500/50" style={{ background: 'var(--theme-bg-secondary)', borderColor: 'var(--theme-border-primary)' }}>
+                {/* ✅ Branch Selector - Hidden when collapsed */}
+                {!isOwnerRole && filteredBranches.length > 1 && !isCollapsed && (
+                    <div 
+                        className="p-1.5 rounded-xl border transition-all duration-300 hover:border-teal-500/50 mt-3" 
+                        style={{ 
+                            background: '#f8fafc', 
+                            borderColor: '#f1f5f9',
+                        }}
+                    >
                         <div className="flex items-center gap-2 px-2.5 py-2">
-                            <Building2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 transition-colors duration-300 flex-shrink-0" style={{ color: 'var(--theme-text-tertiary)' }} />
+                            <Building2 className="w-4 h-4 transition-colors duration-300 flex-shrink-0" style={{ color: '#64748b' }} />
                             <select
                                 value={branchId || ''}
                                 onChange={(e) => {
                                     setBranch(e.target.value);
-                                    // ✅ Trigger page reload to update all branch-scoped data
                                     window.dispatchEvent(new CustomEvent('branch-changed', { detail: { branchId: e.target.value } }));
                                 }}
-                                className="flex-1 bg-transparent text-xs sm:text-[11px] outline-none cursor-pointer appearance-none transition-colors duration-300 truncate"
-                                style={{ color: 'var(--theme-text-primary)' }}
+                                className="flex-1 bg-transparent text-xs outline-none cursor-pointer appearance-none transition-colors duration-300"
+                                style={{ 
+                                    color: '#1e293b',
+                                    fontFamily: 'Cairo, sans-serif',
+                                }}
                             >
                                 {filteredBranches.map(b => (
-                                    <option key={b.id} value={b.id} style={{ background: 'var(--theme-bg-primary)', color: 'var(--theme-text-primary)' }}>
+                                    <option key={b.id} value={b.id} style={{ background: '#ffffff', color: '#1e293b' }}>
                                         {(b as any).name || `فرع ${(b as any).code || b.id}`}
                                     </option>
                                 ))}
                             </select>
-                            <ChevronDown className="w-3.5 h-3.5 sm:w-3 sm:h-3 transition-colors duration-300 flex-shrink-0" style={{ color: 'var(--theme-text-tertiary)' }} />
+                            <ChevronDown className="w-3.5 h-3.5 transition-colors duration-300 flex-shrink-0" style={{ color: '#64748b' }} />
                         </div>
                     </div>
                 )}
+
+                {/* ✅ Mobile Close Button */}
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="lg:hidden absolute top-2 right-2 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 active:scale-95"
+                        style={{ background: '#f8fafc', color: '#64748b' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = '#1e293b'; e.currentTarget.style.background = '#e2e8f0'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.background = '#f8fafc'; }}
+                    >
+                        <ArrowLeft className="w-4 h-4 flip-rtl" />
+                    </button>
+                )}
             </div>
 
-            {/* 🔗 Scrollable Navigation - ✅ MOBILE-FIRST */}
-            <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 custom-scrollbar space-y-3 sm:space-y-4 pb-20 sm:pb-24">
+            {/* 🔗 Navigation - ✅ NO SCROLL (as requested) */}
+            <div 
+                className="flex-1"
+                style={{
+                    padding: isCollapsed ? '12px 4px' : '16px 8px',
+                    paddingBottom: '8px',
+                    overflow: 'hidden', // ✅ NO SCROLL - as requested
+                }}
+            >
                 <nav className="space-y-1">
                     {sections.map((section) => {
                         const isExpanded = expandedSections.includes(section.id);
@@ -354,7 +440,16 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                              style={!isExpanded ? { background: 'var(--theme-bg-secondary)' } : {}}>
                                             {section.icon}
                                         </div>
-                                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate">{section.label}</span>
+                                        <span 
+                                            className="text-[10px] sm:text-xs font-bold uppercase tracking-wider"
+                                            style={{
+                                                whiteSpace: 'normal',
+                                                wordBreak: 'break-word',
+                                                lineHeight: '1.4',
+                                            }}
+                                        >
+                                            {section.label}
+                                        </span>
                                     </div>
                                     <ChevronDown
                                         className={`w-3.5 h-3.5 sm:w-3 sm:h-3 transition-transform duration-300 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
@@ -391,18 +486,101 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                     <button
                                                         key={item.to}
                                                         onClick={handleClick}
-                                                        className={`w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all relative active:scale-[0.98] ${isActive
-                                                            ? 'bg-teal-500/15 text-teal-400 font-bold shadow-sm'
-                                                            : ''
-                                                        }`}
+                                                        className={`w-full flex items-center relative active:scale-[0.98] ${isActive ? 'font-semibold' : ''}`}
                                                         style={{
-                                                            color: isActive ? 'var(--theme-primary-500)' : 'var(--theme-text-secondary)',
-                                                            background: isActive ? 'rgba(20, 184, 166, 0.15)' : 'transparent'
+                                                            height: '40px', // ✅ Strict height
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '10px', // ✅ Strict gap
+                                                            padding: '0 12px', // ✅ Strict padding
+                                                            marginBottom: '2px', // ✅ Minimal margin
+                                                            borderRadius: '8px', // ✅ Strict border radius
+                                                            fontSize: '13.5px', // ✅ Strict font size
+                                                            fontWeight: 500, // ✅ Strict font weight
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.15s ease-in-out', // ✅ Strict transition
+                                                            color: isActive ? '#20B2AA' : '#475569', // ✅ Active: Turquoise | Inactive: Slate gray
+                                                            background: isActive ? 'rgba(32, 178, 170, 0.06)' : 'transparent', // ✅ Active: Light turquoise | Inactive: Transparent
+                                                            position: 'relative', // ✅ For ActiveBar positioning
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (!isActive) {
+                                                                e.currentTarget.style.background = '#f8fafc'; // ✅ Hover: Light gray
+                                                                e.currentTarget.style.color = '#20B2AA'; // ✅ Hover: Turquoise
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (!isActive) {
+                                                                e.currentTarget.style.background = 'transparent'; // ✅ Reset to transparent
+                                                                e.currentTarget.style.color = '#475569'; // ✅ Reset to slate gray
+                                                            }
                                                         }}
                                                     >
-                                                        {isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 sm:w-1 h-4 sm:h-5 bg-teal-500 rounded-l-full shadow-[0_0_8px_rgba(20,184,166,0.5)]" />}
-                                                        <span className="flex-shrink-0 w-4 h-4 sm:w-4 sm:h-4" style={{ color: 'inherit' }}>{item.icon}</span>
-                                                        <span className="text-right flex-1 truncate">{item.label}</span>
+                                                        {/* ✅ ActiveBar - Thin vertical indicator on the right (RTL) */}
+                                                        {isActive && (
+                                                            <div 
+                                                                className="absolute right-0 top-1/2 -translate-y-1/2"
+                                                                style={{
+                                                                    width: '3px', // ✅ Thin bar
+                                                                    height: '20px', // ✅ Premium height
+                                                                    background: '#20B2AA', // ✅ Turquoise DNA
+                                                                    borderRadius: '10px', // ✅ Rounded
+                                                                    position: 'absolute',
+                                                                    right: 0, // ✅ RTL positioning
+                                                                }}
+                                                            />
+                                                        )}
+                                                        {/* ✅ Icon styling - Premium Lucide icons */}
+                                                        <span 
+                                                            className="flex-shrink-0 transition-colors duration-300" 
+                                                            style={{ 
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                            }}
+                                                        >
+                                                            {React.isValidElement(item.icon) 
+                                                                ? React.cloneElement(item.icon as React.ReactElement<any>, {
+                                                                    className: isCollapsed ? 'w-5.5 h-5.5' : 'w-5 h-5',
+                                                                    size: 22, // ✅ Premium size
+                                                                    strokeWidth: 2.5, // ✅ Premium stroke width
+                                                                    style: { 
+                                                                        color: 'inherit', // ✅ Inherits color from parent
+                                                                        opacity: 1,
+                                                                    }
+                                                                })
+                                                                : item.icon
+                                                            }
+                                                        </span>
+                                                        {/* ✅ Label - Hidden when collapsed */}
+                                                        {!isCollapsed && (
+                                                            <span 
+                                                                className="flex-1 truncate"
+                                                                style={{
+                                                                    fontFamily: 'Cairo, sans-serif',
+                                                                    fontSize: '14px',
+                                                                    fontWeight: 600,
+                                                                }}
+                                                            >
+                                                                {item.label}
+                                                            </span>
+                                                        )}
+                                                        {/* ✅ Tooltip - Shows when collapsed and hovered */}
+                                                        {isCollapsed && hoveredItem === item.to && (
+                                                            <div
+                                                                className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50 whitespace-nowrap"
+                                                                style={{
+                                                                    fontFamily: 'Cairo, sans-serif',
+                                                                    fontSize: '12px',
+                                                                    fontWeight: 500,
+                                                                }}
+                                                            >
+                                                                {item.label}
+                                                                <div 
+                                                                    className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-4 border-t-transparent border-r-4 border-r-gray-900 border-b-4 border-b-transparent"
+                                                                />
+                                                            </div>
+                                                        )}
                                                         {(item as any).badge && (item as any).badge > 0 && (
                                                             <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold bg-red-500 text-white rounded-full min-w-[16px] sm:min-w-[18px] text-center flex-shrink-0">
                                                                 {(item as any).badge}
@@ -419,35 +597,85 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                     end={(item as any).end}
                                                     onClick={onClose}
                                                     className={({ isActive }) =>
-                                                        `flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all relative active:scale-[0.98] ${isActive
-                                                            ? 'bg-teal-500/15 text-teal-400 font-bold shadow-sm'
-                                                            : ''
-                                                        }`
+                                                        `flex items-center relative active:scale-[0.98] ${isActive ? 'font-semibold' : ''}`
                                                     }
                                                     style={({ isActive }) => ({
-                                                        color: isActive ? 'var(--theme-primary-500)' : 'var(--theme-text-secondary)',
-                                                        background: isActive ? 'rgba(20, 184, 166, 0.15)' : 'transparent'
+                                                        height: '40px', // ✅ Strict height
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '10px', // ✅ Strict gap
+                                                        padding: '0 12px', // ✅ Strict padding
+                                                        marginBottom: '2px', // ✅ Minimal margin
+                                                        borderRadius: '8px', // ✅ Strict border radius
+                                                        fontSize: '13.5px', // ✅ Strict font size
+                                                        fontWeight: 500, // ✅ Strict font weight
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.15s ease-in-out', // ✅ Strict transition
+                                                        color: isActive ? '#20B2AA' : '#475569', // ✅ Active: Turquoise | Inactive: Slate gray
+                                                        background: isActive ? 'rgba(32, 178, 170, 0.06)' : 'transparent', // ✅ Active: Light turquoise | Inactive: Transparent
+                                                        position: 'relative', // ✅ For ActiveBar positioning
                                                     })}
                                                     onMouseEnter={(e) => {
                                                         if (!e.currentTarget.classList.contains('bg-teal-500/15')) {
-                                                            e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
-                                                            e.currentTarget.style.color = 'var(--theme-text-primary)';
+                                                            e.currentTarget.style.background = '#f8fafc'; // ✅ Hover: Light gray
+                                                            e.currentTarget.style.color = '#20B2AA'; // ✅ Hover: Turquoise
                                                         }
                                                     }}
                                                     onMouseLeave={(e) => {
                                                         if (!e.currentTarget.classList.contains('bg-teal-500/15')) {
-                                                            e.currentTarget.style.background = 'transparent';
-                                                            e.currentTarget.style.color = 'var(--theme-text-secondary)';
+                                                            e.currentTarget.style.background = 'transparent'; // ✅ Reset to transparent
+                                                            e.currentTarget.style.color = '#475569'; // ✅ Reset to slate gray
                                                         }
                                                     }}
                                                 >
                                                     {({ isActive }) => (
                                                         <>
-                                                            {isActive && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-0.5 sm:w-1 h-4 sm:h-5 bg-teal-500 rounded-l-full shadow-[0_0_8px_rgba(20,184,166,0.5)]" />}
-                                                            <span className="flex-shrink-0 w-4 h-4 sm:w-4 sm:h-4 transition-colors duration-300" style={{ color: 'inherit' }}>
-                                                                {item.icon}
+                                                            {/* ✅ ActiveBar - Thin indicator on the right (RTL) */}
+                                                            {isActive && (
+                                                                <div 
+                                                                    className="absolute right-0 top-1/2 -translate-y-1/2"
+                                                                    style={{
+                                                                        width: '3px', // ✅ Thin bar
+                                                                        height: '16px', // ✅ Compact height
+                                                                        background: '#20B2AA', // ✅ ADORA Turquoise
+                                                                        borderRadius: '10px', // ✅ Rounded
+                                                                        position: 'absolute',
+                                                                        right: 0, // ✅ RTL positioning
+                                                                    }}
+                                                                />
+                                                            )}
+                                                            {/* ✅ Icon styling - Inherits color from parent */}
+                                                            <span 
+                                                                className="flex-shrink-0 transition-colors duration-300" 
+                                                                style={{ 
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                }}
+                                                            >
+                                                                {React.isValidElement(item.icon) 
+                                                                    ? React.cloneElement(item.icon as React.ReactElement<any>, {
+                                                                        className: 'w-4 h-4', // ✅ Smaller icon for compact sidebar
+                                                                        size: 16,
+                                                                        strokeWidth: 2, // ✅ Normal stroke width
+                                                                        style: { 
+                                                                            color: 'inherit', // ✅ Inherits color from parent (Turquoise when active, Slate when inactive)
+                                                                            opacity: 1,
+                                                                        }
+                                                                    })
+                                                                    : item.icon
+                                                                }
                                                             </span>
-                                                            <span className="flex-1 truncate">{item.label}</span>
+                                                            <span 
+                                                                className="flex-1 text-sm"
+                                                                style={{
+                                                                    whiteSpace: 'normal',
+                                                                    wordBreak: 'break-word',
+                                                                    lineHeight: '1.4',
+                                                                }}
+                                                            >
+                                                                {item.label}
+                                                            </span>
                                                             {(item as any).badge && (item as any).badge > 0 && (
                                                                 <span className={`ml-auto px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-xs font-bold flex-shrink-0 ${
                                                                     isActive 
@@ -470,39 +698,149 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
 
 
 
-                    {/* 🏥 Data Health Indicator - ✅ MOBILE-FIRST COMPACT */}
-                    <div className="mt-6 sm:mt-8 mx-0.5 sm:mx-1 px-2.5 sm:px-3 py-2.5 sm:py-3 rounded-xl border flex items-center gap-2.5 sm:gap-3 transition-all duration-300 hover:border-teal-500/30" style={{ background: 'var(--theme-bg-secondary)', borderColor: 'var(--theme-border-primary)' }}>
-                        <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" style={{ color: 'var(--theme-primary-500)' }} />
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1 sm:mb-1.5 gap-1">
-                                <span className="text-[9px] sm:text-[10px] font-bold uppercase transition-colors duration-300 truncate" style={{ color: 'var(--theme-primary-500)' }}>{t('admin.safeWorkEnvironment') || 'بيئة العمل آمنة'}</span>
-                                <span className="text-[9px] sm:text-[10px] transition-colors duration-300 flex-shrink-0" style={{ color: 'var(--theme-primary-500)' }}>100%</span>
-                            </div>
-                            <div className="h-0.5 sm:h-1 w-full rounded-full overflow-hidden transition-colors duration-300" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                <div className="h-full w-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full shadow-[0_0_8px_rgba(20,184,166,0.5)]"></div>
+                    {/* 🏥 Data Health Indicator - ✅ Hidden when collapsed */}
+                    {!isCollapsed && (
+                        <div 
+                            className="mt-6 mx-0.5 px-2.5 py-2.5 rounded-xl border flex items-center gap-2.5 transition-all duration-300 hover:border-teal-500/30" 
+                            style={{ 
+                                background: '#f8fafc', 
+                                borderColor: '#f1f5f9',
+                                marginTop: '16px',
+                            }}
+                        >
+                            <Activity className="w-3.5 h-3.5 shrink-0" style={{ color: '#20B2AA' }} />
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1 gap-1">
+                                    <span 
+                                        className="text-[10px] font-bold uppercase transition-colors duration-300"
+                                        style={{ 
+                                            color: '#20B2AA',
+                                            fontFamily: 'Cairo, sans-serif',
+                                            whiteSpace: 'normal',
+                                            wordBreak: 'break-word',
+                                        }}
+                                    >
+                                        {t('admin.safeWorkEnvironment') || 'بيئة العمل آمنة'}
+                                    </span>
+                                    <span 
+                                        className="text-[10px] transition-colors duration-300 flex-shrink-0" 
+                                        style={{ color: '#20B2AA' }}
+                                    >
+                                        100%
+                                    </span>
+                                </div>
+                                <div className="h-1 w-full rounded-full overflow-hidden transition-colors duration-300" style={{ background: '#e2e8f0' }}>
+                                    <div className="h-full w-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full shadow-[0_0_8px_rgba(20,184,166,0.5)]"></div>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
                 </nav>
             </div>
 
-            {/* 🚪 Fixed Footer - ✅ MOBILE-FIRST */}
-            <div className="flex-none p-3 sm:p-4 border-t flex items-center justify-center gap-2 z-10 transition-colors duration-300" style={{ 
-                background: 'var(--theme-bg-primary)',
-                borderColor: 'var(--theme-border-primary)',
-            }}>
-                {/* ✅ Logout Button - Centered, Mobile-optimized */}
+            {/* 🚪 Logout Button - ✅ Integrated with Navigation Items Style */}
+            <div 
+                className="flex-none"
+                style={{
+                    padding: isCollapsed ? '8px 4px' : '12px 8px',
+                    paddingTop: '8px',
+                }}
+            >
                 <button
                     onClick={() => {
                         if (onClose) onClose();
                         logout();
                     }}
-                    className="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 active:scale-95 transition-all outline-none border border-red-500/20 hover:border-red-500/40"
+                    className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} relative active:scale-[0.98]`}
+                    style={{
+                        height: '44px', // ✅ Same height as nav items
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: isCollapsed ? 'center' : 'flex-start',
+                        gap: isCollapsed ? '0' : '12px',
+                        padding: isCollapsed ? '0' : '0 12px',
+                        borderRadius: '10px', // ✅ Same border radius
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                        color: '#64748B', // ✅ Default gray
+                        background: 'transparent',
+                        position: 'relative',
+                        fontFamily: 'Cairo, sans-serif',
+                        border: '1px solid #f1f5f9', // ✅ Border like other items
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#F8FAFC'; // ✅ Hover: Light background
+                        e.currentTarget.style.color = '#ef4444'; // ✅ Hover: Red color
+                        e.currentTarget.style.borderColor = '#fecaca'; // ✅ Hover: Light red border
+                        if (!isCollapsed) {
+                            e.currentTarget.style.transform = 'translateX(-5px)'; // ✅ RTL slide animation
+                        }
+                        setHoveredItem('logout'); // ✅ Show tooltip
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = '#64748B';
+                        e.currentTarget.style.borderColor = '#f1f5f9';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                        setHoveredItem(null); // ✅ Hide tooltip
+                    }}
                     title={t('auth.logout') || 'تسجيل الخروج'}
                 >
-                    <LogOut className="w-4 h-4 sm:w-5 sm:h-5 flip-rtl" />
+                    {/* ✅ Icon */}
+                    <span 
+                        className="flex-shrink-0 transition-colors duration-300" 
+                        style={{ 
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <LogOut 
+                            className={isCollapsed ? 'w-5.5 h-5.5' : 'w-5 h-5'}
+                            size={22}
+                            strokeWidth={2.5}
+                            style={{ 
+                                color: 'inherit',
+                                opacity: 1,
+                            }}
+                        />
+                    </span>
+                    {/* ✅ Label - Hidden when collapsed */}
+                    {!isCollapsed && (
+                        <span 
+                            className="flex-1"
+                            style={{
+                                fontFamily: 'Cairo, sans-serif',
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                whiteSpace: 'normal',
+                                wordBreak: 'break-word',
+                                lineHeight: '1.4',
+                            }}
+                        >
+                            {t('auth.logout') || 'تسجيل الخروج'}
+                        </span>
+                    )}
+                    {/* ✅ Tooltip - Shows when collapsed and hovered */}
+                    {isCollapsed && hoveredItem === 'logout' && (
+                        <div
+                            className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50 whitespace-nowrap"
+                            style={{
+                                fontFamily: 'Cairo, sans-serif',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                            }}
+                        >
+                            {t('auth.logout') || 'تسجيل الخروج'}
+                            <div 
+                                className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-4 border-t-transparent border-r-4 border-r-gray-900 border-b-4 border-b-transparent"
+                            />
+                        </div>
+                    )}
                 </button>
             </div>
-        </div>
+        </aside>
     );
 };

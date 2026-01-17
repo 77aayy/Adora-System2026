@@ -4,109 +4,175 @@ service cloud.firestore {
     
     // ============================================
     // 🔐 Adora Hotel Management System Rules
-    // V4 Simplified - Easy to Understand
+    // V5 - Production-Ready Multi-Tenant Security
     // ============================================
     
-    // 🏢 Tenant data - accessible by all (for demo/testing)
-    // ⚠️ TEMPORARY: Relaxed for demo system (TODO: Improve security for production)
-    match /tenants/{tenantId}/{document=**} {
-      allow read, write: if true;  // Allow demo system to read/write tenant data
+    // Helper function to get user's tenantId from Custom Claims
+    function getUserTenantId() {
+      return request.auth != null && request.auth.token.tenantId != null 
+        ? request.auth.token.tenantId 
+        : null;
     }
     
-    // 🔑 Global codes - readable by all (for PIN login), writable by authenticated
+    // Helper function to check if user is owner
+    function isOwner() {
+      return request.auth != null && (
+        request.auth.token.role == 'owner' || 
+        request.auth.token.super_admin == true ||
+        getUserTenantId() == 'system-owner'
+      );
+    }
+    
+    // Helper function to validate tenant data matches path
+    function validateTenantData(data, tenantId) {
+      return data.tenantId == tenantId || data.tenantId == null;
+    }
+    
+    // ============================================
+    // 🏢 TENANT-SCOPED COLLECTIONS (Pattern 1)
+    // ============================================
+    
+    // ✅ SECURE: Tenant data - isolated by tenantId in path
+    match /tenants/{tenantId}/{document=**} {
+      // Read: User must be authenticated AND (tenantId matches OR is owner)
+      allow read: if request.auth != null && (
+        getUserTenantId() == tenantId || 
+        isOwner()
+      );
+      
+      // Write: Same validation + data must match tenantId
+      allow write: if request.auth != null && (
+        getUserTenantId() == tenantId || 
+        isOwner()
+      ) && (
+        // For create/update: validate tenantId in data matches path
+        request.resource.data.tenantId == tenantId ||
+        request.resource.data.tenantId == null ||
+        isOwner()
+      );
+      
+      // Delete: Only owner or same tenant
+      allow delete: if request.auth != null && (
+        getUserTenantId() == tenantId || 
+        isOwner()
+      );
+    }
+    
+    // ============================================
+    // 🔑 GLOBAL COLLECTIONS (Legacy Support)
+    // ============================================
+    
+    // Global codes - readable by all (for PIN login), writable by authenticated
     match /globalCodes/{codeId} {
       allow read: if true;
       allow write: if request.auth != null;
     }
     
-    // 👤 Users collection
-    // ✅ V5 FIX: Allow owner/admin to manage all users
+    // 👤 Users collection - Owner can manage all, others only their tenant
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;  // Allows owner to delete/modify managers
+      allow read: if request.auth != null && (
+        isOwner() ||
+        getUserTenantId() != null
+      );
+      allow write: if request.auth != null && (
+        isOwner() ||
+        (getUserTenantId() != null && 
+         request.resource.data.tenantId == getUserTenantId())
+      );
     }
     
-    // 📋 Requests collection - accessible by authenticated users
+    // 📋 Requests collection (LEGACY - Migrating to tenants/{tenantId}/requests)
+    // ⚠️ TEMPORARY: Keep for backward compatibility during migration
     match /requests/{requestId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null && (
+        isOwner() ||
+        (resource.data.tenantId == getUserTenantId())
+      );
+      allow write: if request.auth != null && (
+        isOwner() ||
+        (request.resource.data.tenantId == getUserTenantId() &&
+         (request.resource.data.tenantId == resource.data.tenantId || resource == null))
+      );
     }
     
     // 🛡️ Guest Orders (Service Requests) - Token-based access control
-    // Guests can only access their own orders using valid token
     match /guestOrders/{orderId} {
-      // ✅ Create: Only if token matches (prevent token manipulation)
       allow create: if request.resource.data.token != null;
-      // ✅ Read: Only if token matches the order's token (prevent IDOR)
       allow read: if resource.data.token == request.query.token || request.auth != null;
-      // ❌ Update/Delete: Only authenticated staff (not guests)
-      allow update, delete: if request.auth != null;
+      allow update, delete: if request.auth != null && (
+        isOwner() ||
+        (resource.data.tenantId == getUserTenantId())
+      );
     }
     
-    // 🏥 Health check collection - for connection testing
+    // 🏥 Health check collection
     match /health_check/{docId} {
       allow read: if true;
       allow write: if request.auth != null;
     }
     
-    // ⚙️ System settings - read by all, write by authenticated
+    // ⚙️ System settings
     match /system/{settingId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null && isOwner();
     }
     
-    // ⚙️ System settings (alternate path)
     match /systemSettings/{docId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null && isOwner();
     }
     
-    // ⚙️ System configs
     match /system_configs/{configId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isOwner();
     }
     
     // 👔 Managers collection (Owner's view)
     match /managers/{managerId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && isOwner();
     }
     
     // 🗑️ Deleted managers archive
     match /deleted_managers/{managerId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && isOwner();
     }
     
     // 🔗 User bindings (role mapping)
     match /userBindings/{uid} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && isOwner();
     }
     
     // 📜 Audit logs - append only (immutable)
     match /audit_logs/{logId} {
-      allow read: if true;
-      allow create: if true;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
       allow update, delete: if false;
     }
     
-    // 📜 Audit logs (alternate path)
     match /auditLogs/{logId} {
-      allow read: if true;
-      allow create: if true;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
       allow update, delete: if false;
     }
     
     // 🧾 Receipts & Invoices
     match /receiptVouchers/{id} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && (
+        isOwner() ||
+        (resource.data.tenantId == getUserTenantId())
+      );
     }
     
     match /invoices/{id} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && (
+        isOwner() ||
+        (resource.data.tenantId == getUserTenantId())
+      );
     }
     
     // 📊 Global logs
     match /logs/{logId} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
     
     // 🔐 Secure access tokens
@@ -114,93 +180,110 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
-    // ⚙️ Global settings
+    // ⚙️ Global settings (Owner only)
     match /settings/{settingId} {
-      allow read: if true;
-      allow write: if true; // ✅ Allow demo seeding
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isOwner();
     }
     
     // 🛏️ Room statuses (for seeding)
     match /roomStatuses/{statusId} {
-      allow read, write: if true; // ✅ Allow demo seeding
+      allow read, write: if request.auth != null;
     }
     
     // 🏢 Departments (for seeding)
     match /departments/{deptId} {
-      allow read, write: if true; // ✅ Allow demo seeding
+      allow read, write: if request.auth != null;
     }
     
     // 👤 Roles (for seeding)
     match /roles/{roleId} {
-      allow read, write: if true; // ✅ Allow demo seeding
+      allow read, write: if request.auth != null;
     }
     
-    // 🔧 Maintenance templates (for seeding)
+    // 🔧 Maintenance templates
     match /maintenanceTemplates/{templateId} {
-      allow read, write: if true; // ✅ Allow demo seeding
+      allow read, write: if request.auth != null;
     }
     
-    // 🎖️ Ranks (for seeding)
+    // 🎖️ Ranks
     match /ranks/{rankId} {
-      allow read, write: if true; // ✅ Allow demo seeding
+      allow read, write: if request.auth != null;
     }
     
-    // 🏨 Room Cards (for check-in/check-out)
+    // 🏨 Room Cards (LEGACY - Migrating to tenants/{tenantId}/roomCards)
     match /roomCards/{cardId} {
-      allow read, write: if true; // ✅ Allow demo check-in/check-out
+      allow read, write: if request.auth != null && (
+        isOwner() ||
+        (resource.data.tenantId == getUserTenantId())
+      );
     }
     
-    // 🛏️ Rooms collection (for room management)
+    // 🛏️ Rooms collection (LEGACY - Migrating to tenants/{tenantId}/rooms)
     match /rooms/{roomId} {
-      allow read, write: if true; // ✅ Allow demo room management
+      allow read, write: if request.auth != null && (
+        isOwner() ||
+        (resource.data.tenantId == getUserTenantId())
+      );
     }
     
-    // 🎓 Onboarding status (tour completion tracking)
+    // 🎓 Onboarding status
     match /onboardingStatus/{userId} {
-      allow read, write: if true; // ✅ Allow tour tracking for all users
+      allow read, write: if request.auth != null;
     }
     
-    // 📱 Demo links - readable and writable by all (for demo access)
+    // 📱 Demo links
     match /demoLinks/{linkId} {
-      allow read: if true;  // ✅ Allow demo users to read link info
-      allow write: if true; // ✅ Allow demo system to update usage
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
-    // 📱 Demo sessions - for demo system
+    // 📱 Demo sessions
     match /demoSessions/{sessionId} {
-      allow read: if true;  // ✅ Allow demo users to read their session
-      allow write: if true; // ✅ Allow creating demo sessions without auth (temporary demo data)
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
     // 🌱 Demo seeding logs
     match /demoSeedingLogs/{logId} {
-      allow read, write: if true; // ✅ Allow demo system to log seeding actions
+      allow read, write: if request.auth != null;
     }
     
-    // 🛒 Procurement requests
+    // 🛒 Procurement requests (LEGACY - Migrating to tenants/{tenantId}/procurementRequests)
     match /procurementRequests/{requestId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && (
+        isOwner() ||
+        (resource.data.tenantId == getUserTenantId())
+      );
     }
     
     // 📜 License notifications
     match /licenseNotifications/{notificationId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && isOwner();
     }
     
     // 💾 Global backups
     match /backups/{backupId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && isOwner();
     }
     
-    // 🚨 Emergency alerts - readable by all (for guests), writable by authenticated
+    // 🚨 Emergency alerts
     match /emergency_alerts/{alertId} {
-      allow read: if true; // ✅ Guests need to read alerts
-      allow write: if request.auth != null; // ✅ Only authenticated users can create/update
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
-    // 📖 Emergency alert reads (tracking which guests read which alerts)
+    // 📖 Emergency alert reads
     match /emergency_alert_reads/{readId} {
-      allow read, write: if true; // ✅ Allow guests to mark alerts as read
+      allow read, write: if true;
+    }
+    
+    // 🗑️ Lost & Found (LEGACY - Migrating to tenants/{tenantId}/lost_found)
+    match /lost_found/{itemId} {
+      allow read, write: if request.auth != null && (
+        isOwner() ||
+        (resource.data.tenantId == getUserTenantId())
+      );
     }
     
     // ⛔ DEFAULT DENY - Anything not explicitly allowed is DENIED!

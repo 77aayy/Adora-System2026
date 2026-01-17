@@ -26,6 +26,7 @@
 import {
     collection,
     doc,
+    getDoc,
     setDoc,
     updateDoc,
     deleteDoc,
@@ -42,8 +43,9 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Room, RoomStatus, RoomType } from '../types';
-
-const ROOMS_COLLECTION = 'rooms';
+import { validateTenantAccess, validateTenantId } from './tenantSecurityService';
+import { logger } from './loggerService';
+import { logAction, LogAction } from './advancedLogService';
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -124,13 +126,16 @@ const getRoomDocId = (branchId: string, roomNumber: string) => `${branchId}_${ro
  */
 export const getRooms = async (
     branchId: string,
-    tenantId?: string,
+    tenantId: string,
     maxResults: number = 100 // ⚡ Limit results
 ): Promise<Room[]> => {
-    if (!tenantId) {
-        console.warn("getRooms called without tenantId. Returning empty list.");
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get rooms', undefined, 'roomService');
         return [];
     }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
     
     const { cachedFetch } = await import('../utils/requestCache');
     const cacheKey = `rooms:${tenantId}:${branchId}`;
@@ -138,7 +143,8 @@ export const getRooms = async (
     return cachedFetch<Room[]>(
         cacheKey,
         async () => {
-            const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+            // ✅ Use tenant-scoped collection
+            const roomsRef = collection(db, `tenants/${validatedTenantId}/rooms`);
             const q = query(
                 roomsRef,
                 where('branchId', '==', branchId),
@@ -164,33 +170,62 @@ export const getRooms = async (
 export const subscribeToRooms = (
     branchId: string,
     callback: (rooms: Room[]) => void,
-    tenantId?: string,
+    tenantId: string,
     maxResults: number = 100 // ⚡ Added limit
 ): Unsubscribe => {
-    if (!tenantId) {
-        console.warn("subscribeToRooms called without tenantId. Returning empty list.");
+    // 🛡️ ADORA PROTECTION: Block subscription without TenantId
+    if (!tenantId || tenantId.trim() === '') {
+        console.warn('⚠️ ADORA: Attempted to subscribe to rooms without TenantId. Blocked.');
+        logger.error('TenantId is required for subscribeToRooms', undefined, 'roomService');
+        callback([]);
+        return () => { }; // Return empty unsubscribe function
+    }
+
+    // 🛡️ ADORA PROTECTION: Check Firestore initialization
+    if (!db) {
+        logger.error('Firebase not initialized - cannot subscribe to rooms', undefined, 'roomService');
         callback([]);
         return () => { };
     }
-    const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
-    const q = query(
-        roomsRef,
-        where('branchId', '==', branchId),
-        limit(maxResults) // ⚡ LIMIT
-    );
 
-    return onSnapshot(q, (snapshot) => {
-        // Sort client-side to avoid Firestore composite index requirements
-        const rooms = snapshot.docs
-            .map(mapDocToRoom)
-            .sort((a, b) => {
-                if (a.floor !== b.floor) return a.floor - b.floor;
-                return a.number.localeCompare(b.number, undefined, { numeric: true });
-            });
-        callback(rooms);
-    }, (error) => {
-        console.error("Error subscribing to rooms:", error);
-    });
+    try {
+        const validatedTenantId = validateTenantId(tenantId);
+        validateTenantAccess(validatedTenantId);
+
+        // ✅ Use tenant-scoped collection
+        const roomsRef = collection(db, `tenants/${validatedTenantId}/rooms`);
+        const q = query(
+            roomsRef,
+            where('branchId', '==', branchId),
+            limit(maxResults) // ⚡ LIMIT
+        );
+
+        return onSnapshot(q, (snapshot) => {
+            try {
+                // Sort client-side to avoid Firestore composite index requirements
+                const rooms = snapshot.docs
+                    .map(mapDocToRoom)
+                    .sort((a, b) => {
+                        if (a.floor !== b.floor) return a.floor - b.floor;
+                        return a.number.localeCompare(b.number, undefined, { numeric: true });
+                    });
+                callback(rooms);
+            } catch (error) {
+                console.error('🔥 ADORA Firestore Error in subscribeToRooms callback:', error);
+                logger.error('Error processing rooms snapshot', error, 'roomService');
+                callback([]); // Return empty array on error
+            }
+        }, (error) => {
+            console.error('🔥 ADORA Firestore Error subscribing to rooms:', error);
+            logger.error('Error subscribing to rooms', error, 'roomService');
+            callback([]); // Return empty array on subscription error
+        });
+    } catch (error) {
+        console.error('🔥 ADORA Firestore Error in subscribeToRooms:', error);
+        logger.error('Error in subscribeToRooms', error, 'roomService');
+        callback([]);
+        return () => { }; // Return empty unsubscribe function
+    }
 };
 
 // ============================================================
@@ -227,11 +262,18 @@ export const subscribeToRooms = (
  * ```
  */
 export const addRoom = async (room: Omit<Room, 'id' | 'currentGuestId'>): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot add room', undefined, 'roomService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
     if (!room.branchId) throw new Error('Branch ID is required for adding a room');
-    if (!room.tenantId) throw new Error('Tenant ID is required for adding a room in SaaS mode');
+    const validatedTenantId = validateTenantId(room.tenantId);
+    validateTenantAccess(validatedTenantId);
 
     const docId = getRoomDocId(room.branchId, room.number);
-    const roomsCollection = collection(db, `tenants/${room.tenantId}/rooms`);
+    // ✅ Use tenant-scoped collection
+    const roomsCollection = collection(db, `tenants/${validatedTenantId}/rooms`);
     const roomRef = doc(roomsCollection, docId);
     await setDoc(roomRef, {
         ...room,
@@ -256,11 +298,18 @@ export const addRoom = async (room: Omit<Room, 'id' | 'currentGuestId'>): Promis
  * @throws Error if tenantId or branchId is missing
  */
 export const updateRoom = async (tenantId: string, branchId: string, roomNumber: string, updates: Partial<Room>): Promise<void> => {
-    if (!tenantId) throw new Error('Tenant ID is required for updating a room');
+    if (!db) {
+        logger.error('Firebase not initialized - cannot update room', undefined, 'roomService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
     if (!branchId) throw new Error('Branch ID is required for updating a room');
 
     const docId = getRoomDocId(branchId, roomNumber);
-    const roomRef = doc(db, `tenants/${tenantId}/rooms`, docId);
+    // ✅ Use tenant-scoped collection
+    const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, docId);
     await updateDoc(roomRef, updates);
 };
 
@@ -285,11 +334,18 @@ export const updateRoom = async (tenantId: string, branchId: string, roomNumber:
  * @throws Error if tenantId or branchId is missing
  */
 export const deleteRoom = async (tenantId: string, branchId: string, roomNumber: string): Promise<void> => {
-    if (!tenantId) throw new Error('Tenant ID is required for deleting a room');
+    if (!db) {
+        logger.error('Firebase not initialized - cannot delete room', undefined, 'roomService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
     if (!branchId) throw new Error('Branch ID is required for deleting a room');
 
     const docId = getRoomDocId(branchId, roomNumber);
-    const roomRef = doc(db, `tenants/${tenantId}/rooms`, docId);
+    // ✅ Use tenant-scoped collection
+    const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, docId);
     await deleteDoc(roomRef);
 };
 
@@ -335,14 +391,22 @@ export const createRoomBatch = async (
     branchId: string,
     tenantId: string
 ): Promise<number> => {
-    if (!tenantId) throw new Error('Tenant ID is required for batch room creation');
+    if (!db) {
+        logger.error('Firebase not initialized - cannot create room batch', undefined, 'roomService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     const batch = writeBatch(db);
     let count = 0;
 
     for (let num = startNumber; num <= endNumber; num++) {
         const roomNumber = num.toString();
         const docId = getRoomDocId(branchId, roomNumber);
-        const roomRef = doc(db, `tenants/${tenantId}/rooms`, docId);
+        // ✅ Use tenant-scoped collection
+        const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, docId);
 
         batch.set(roomRef, {
             number: roomNumber,
@@ -351,7 +415,7 @@ export const createRoomBatch = async (
             status: 'available' as RoomStatus,
             currentGuestId: null,
             branchId,
-            tenantId
+            tenantId: validatedTenantId
         });
         count++;
     }
@@ -399,8 +463,16 @@ export const getRoomStats = async (branchId: string, tenantId: string): Promise<
     cleaning: number;
     maintenance: number;
 }> => {
-    if (!tenantId) throw new Error('Tenant ID is required for getRoomStats');
-    const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get room stats', undefined, 'roomService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    // ✅ Use tenant-scoped collection
+    const roomsRef = collection(db, `tenants/${validatedTenantId}/rooms`);
     const q = query(roomsRef, where('branchId', '==', branchId));
     const snapshot = await getDocs(q);
 
@@ -443,8 +515,16 @@ export const getRoomStats = async (branchId: string, tenantId: string): Promise<
  * ```
  */
 export const getRoomStatsByType = async (branchId: string, tenantId: string): Promise<Record<string, { total: number; occupied: number }>> => {
-    if (!tenantId) throw new Error('Tenant ID is required for getRoomStatsByType');
-    const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get room stats by type', undefined, 'roomService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    // ✅ Use tenant-scoped collection
+    const roomsRef = collection(db, `tenants/${validatedTenantId}/rooms`);
     const q = query(roomsRef, where('branchId', '==', branchId));
     const snapshot = await getDocs(q);
 
@@ -503,14 +583,59 @@ export const updateRoomStatus = async (
     roomNumber: string,
     status: RoomStatus
 ): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot update room status', undefined, 'roomService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
     try {
-        if (!tenantId) throw new Error('Tenant ID is required for updateRoomStatus');
+        const validatedTenantId = validateTenantId(tenantId);
+        validateTenantAccess(validatedTenantId);
         const docId = getRoomDocId(branchId, roomNumber);
-        const roomRef = doc(db, `tenants/${tenantId}/rooms`, docId);
+        
+        // ✅ Get room before update (for audit log)
+        const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, docId);
+        const roomSnap = await getDoc(roomRef);
+        const oldStatus = roomSnap.exists() ? (roomSnap.data().status as RoomStatus) : null;
+        
+        // ✅ Use tenant-scoped collection
         await updateDoc(roomRef, {
             status,
             updatedAt: serverTimestamp()
         });
+
+        // 📝 Audit Log: Room Status Change
+        try {
+            const storedUser = localStorage.getItem('adora_user');
+            const userData = storedUser ? JSON.parse(storedUser) : {};
+            await logAction(
+                'ROOM_STATUS_CHANGE' as LogAction,
+                {
+                    id: userData.id || 'system',
+                    name: userData.name || 'System',
+                    role: userData.role || 'staff',
+                    department: userData.department || 'reception'
+                },
+                {
+                    type: 'room',
+                    id: docId,
+                    name: `غرفة ${roomNumber}`
+                },
+                {
+                    tenantId: validatedTenantId,
+                    branchId: branchId,
+                    roomNumber: roomNumber
+                },
+                {
+                    description: `تم تغيير حالة الغرفة من ${oldStatus || 'unknown'} إلى ${status}`,
+                    previousValue: oldStatus,
+                    newValue: status,
+                    metadata: { roomNumber, branchId }
+                }
+            ).catch(err => logger.warn('Failed to log room status change', err, 'roomService'));
+        } catch (auditError) {
+            logger.warn('Failed to create audit log for room status change', auditError, 'roomService');
+        }
     } catch (error) {
         console.error(`Error updating room ${roomNumber} status:`, error);
         throw error;
@@ -535,10 +660,17 @@ export const getRoomStatus = async (
     branchId: string,
     roomNumber: string
 ): Promise<RoomStatus | null> => {
-    try {
-        if (!tenantId) throw new Error('Tenant ID is required for getRoomStatus');
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get room status', undefined, 'roomService');
+        return null;
+    }
 
-        const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+    try {
+        const validatedTenantId = validateTenantId(tenantId);
+        validateTenantAccess(validatedTenantId);
+
+        // ✅ Use tenant-scoped collection
+        const roomsRef = collection(db, `tenants/${validatedTenantId}/rooms`);
         const q = query(roomsRef, where('branchId', '==', branchId), where('number', '==', roomNumber));
         const snapshot = await getDocs(q);
 
@@ -684,15 +816,23 @@ export const transferGuest = async (
     guestId: string,
     guestName: string
 ): Promise<void> => {
-    if (!tenantId) throw new Error('Tenant ID is required for transferGuest');
+    if (!db) {
+        logger.error('Firebase not initialized - cannot transfer guest', undefined, 'roomService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
         const oldDocId = getRoomDocId(branchId, oldRoomNumber);
         const newDocId = getRoomDocId(branchId, newRoomNumber);
 
-        const roomsCollPath = `tenants/${tenantId}/rooms`;
+        // ✅ Use tenant-scoped collections
+        const roomsCollPath = `tenants/${validatedTenantId}/rooms`;
         const oldRoomRef = doc(db, roomsCollPath, oldDocId);
         const newRoomRef = doc(db, roomsCollPath, newDocId);
-        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+        const requestsRef = collection(db, `tenants/${validatedTenantId}/requests`);
 
         // Atomic room status update
         await runTransaction(db, async (transaction) => {
@@ -757,7 +897,7 @@ export const transferGuest = async (
             title: `نقل أمتعة (تحويل غرفة)`,
             description: `نقل الأمتعة من الغرفة ${oldRoomNumber} إلى ${newRoomNumber}`,
             branchId: branchId,
-            tenantId: tenantId,
+            tenantId: validatedTenantId,
             createdAt: timestamp,
             timeline: { created: timestamp },
             source: 'system_auto'
@@ -773,7 +913,7 @@ export const transferGuest = async (
             title: 'تنظيف خروج (نقل نزيل)',
             description: `الغرفة بحاجة لتنظيف بعد نقل النزيل إلى ${newRoomNumber}`,
             branchId: branchId,
-            tenantId: tenantId,
+            tenantId: validatedTenantId,
             createdAt: timestamp,
             timeline: { created: timestamp },
             source: 'system_auto'

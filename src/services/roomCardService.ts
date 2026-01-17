@@ -27,11 +27,10 @@ import { RoomStatus } from '../types/room';
 import { calculateBellmanPoints } from '../utils/pointsCalculator';
 import { updateRoomStatus } from './roomService';
 import { retryFirestoreOperation } from '../utils/retry';
-import { archiveChatRoom } from './smartChatService'; // ✅ أرشفة الشات عند الخروج
-
-// Collection references
-const ROOM_CARDS_COLLECTION = 'roomCards';
-const ROOMS_COLLECTION = 'rooms';
+import { archiveChatRoom } from './smartChatService';
+import { validateTenantAccess, validateTenantId } from './tenantSecurityService';
+import { logger } from './loggerService';
+import { logAction, LogAction } from './advancedLogService';
 
 // ============================================================
 // HELPERS
@@ -67,20 +66,24 @@ const mapDocToRoomCard = (doc: any): RoomCard => {
 /**
  * Check-in a guest
  * Creates room card and updates room status
- * ✅ SECURITY: Prevents double check-in
+ * 🔐 SECURITY: Validates tenant access and prevents double check-in
  */
-export const checkIn = async (data: CheckInData, tenantId?: string): Promise<string> => {
+export const checkIn = async (data: CheckInData, tenantId: string): Promise<string> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot check in', undefined, 'roomCardService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     try {
-        const roomCardsRef = collection(db, ROOM_CARDS_COLLECTION);
         const now = Timestamp.now();
 
-        // ✅ STEP 1: Validate that room exists and is available (SaaS aware)
-        // Use tenant-scoped collection when tenantId is provided
-        const roomsRef = tenantId
-            ? collection(db, `tenants/${tenantId}/rooms`)
-            : collection(db, ROOMS_COLLECTION);
+        // ✅ STEP 1: Validate that room exists and is available
+        // ✅ Use tenant-scoped collection
+        const roomsRef = collection(db, `tenants/${validatedTenantId}/rooms`);
         const constraints: any[] = [where('number', '==', data.roomNumber)];
-        if (tenantId) constraints.push(where('tenantId', '==', tenantId));
 
         const roomQuery = query(roomsRef, ...constraints);
         const roomSnapshot = await getDocs(roomQuery);
@@ -105,25 +108,11 @@ export const checkIn = async (data: CheckInData, tenantId?: string): Promise<str
             throw new Error(`الغرفة رقم ${data.roomNumber} قيد التنظيف. يرجى الانتظار حتى تصبح جاهزة`);
         }
 
-        // ✅ STEP 2: Check for existing active room card (double check-in prevention)
-        let activeCardConstraints = [
-            where('roomNumber', '==', data.roomNumber),
-            where('status', '==', 'active')
-        ];
-        if (tenantId) activeCardConstraints.push(where('tenantId', '==', tenantId));
-
-        const activeCardQuery = query(roomCardsRef, ...activeCardConstraints);
-        const activeCardSnapshot = await getDocs(activeCardQuery);
-
-        if (!activeCardSnapshot.empty) {
-            const existingCard = activeCardSnapshot.docs[0].data();
-            throw new Error(
-                `الغرفة رقم ${data.roomNumber} مشغولة بالفعل من قبل: ${existingCard.guestName}\n` +
-                `تاريخ الدخول: ${existingCard.checkInTime?.toDate().toLocaleDateString('ar-SA')}`
-            );
-        }
-
-        // ✅ STEP 3: Create room card (now safe)
+        // ✅ STEP 2, 3 & 4: ATOMIC TRANSACTION - Check duplicate + Create room card + Update room status (ALL-IN-ONE)
+        // ✅ FIX: Combine duplicate check + room card creation + room status update in SINGLE transaction to prevent ALL race conditions
+        const roomCardsRef = collection(db, `tenants/${validatedTenantId}/roomCards`);
+        const roomCardDocRef = doc(roomCardsRef); // Pre-generate ID for transaction
+        
         const roomCard = {
             roomNumber: data.roomNumber,
             guestName: data.guestName,
@@ -138,58 +127,158 @@ export const checkIn = async (data: CheckInData, tenantId?: string): Promise<str
             needsCart: data.needsCart || false,
             createdBy: data.createdBy,
             notes: data.notes || null,
-            tenantId: tenantId || null, // ✅ Save tenantId
+            tenantId: validatedTenantId, // ✅ Save tenantId
             qrActive: true, // ✅ Enable QR access when room is checked in
             branch: roomData.branchId || roomData.branch || 'default' // ✅ Save branch for QR checks
         };
 
-        // Create room card with retry
-        const docRef = await retryFirestoreOperation(
-            () => addDoc(roomCardsRef, roomCard),
-            'Create room card'
-        );
+        const branchId = roomData.branchId || roomData.branch || 'default';
+        const roomDocId = `${branchId}_${data.roomNumber}`;
+        const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, roomDocId);
 
-        // ✅ STEP 4: Update room status to occupied (SaaS aware)
-        try {
-            const branchId = roomData.branchId || roomData.branch || 'default';
-            if (tenantId) {
-                await updateRoomStatus(tenantId, branchId, data.roomNumber, 'occupied' as RoomStatus);
-                // Link current guest id
-                await updateDoc(doc(db, `tenants/${tenantId}/rooms`, `${branchId}_${data.roomNumber}`), {
-                    currentGuestId: docRef.id,
-                    lastUpdated: now
-                });
-            } else {
-                // Legacy path fallback
-                await updateDoc(doc(db, ROOMS_COLLECTION, roomDoc.id), {
-                    status: 'occupied',
-                    currentGuestId: docRef.id,
-                    lastUpdated: now
-                });
-            }
-        } catch (err) {
-            // Rollback: delete the room card if room update fails
-            console.error('Failed to update room status, rolling back:', err);
-            await retryFirestoreOperation(
-                () => updateDoc(doc(db, ROOM_CARDS_COLLECTION, docRef.id), {
-                    status: 'cancelled'
-                }),
-                'Rollback room card'
+        // ✅ ATOMIC TRANSACTION: All operations in single transaction (prevents ALL race conditions)
+        const docRef = await runTransaction(db, async (transaction) => {
+            // 1. Check for existing active room card INSIDE transaction (prevents double booking)
+            const activeCardQuery = query(
+                roomCardsRef,
+                where('roomNumber', '==', data.roomNumber),
+                where('status', '==', 'active')
             );
-            throw new Error('فشل تحديث حالة الغرفة. تم إلغاء عملية تسجيل الدخول');
+            const activeCardSnapshot = await getDocs(activeCardQuery);
+            
+            if (!activeCardSnapshot.empty) {
+                const existingCard = activeCardSnapshot.docs[0].data();
+                throw new Error(
+                    `الغرفة رقم ${data.roomNumber} مشغولة بالفعل من قبل: ${existingCard.guestName}\n` +
+                    `تاريخ الدخول: ${existingCard.checkInTime?.toDate().toLocaleDateString('ar-SA')}`
+                );
+            }
+            
+            // 2. Check room status INSIDE transaction (prevents race condition)
+            const roomSnap = await transaction.get(roomRef);
+            if (!roomSnap.exists()) {
+                throw new Error(`الغرفة رقم ${data.roomNumber} غير موجودة`);
+            }
+            
+            const currentRoomData = roomSnap.data();
+            if (currentRoomData.status === 'occupied') {
+                throw new Error(`الغرفة رقم ${data.roomNumber} مشغولة بالفعل`);
+            }
+            
+            // 3. Create room card INSIDE same transaction (atomic operation)
+            transaction.set(roomCardDocRef, roomCard);
+            
+            // 4. Update room status + link guest ID INSIDE same transaction (atomic operation)
+            transaction.update(roomRef, {
+                status: 'occupied' as RoomStatus,
+                currentGuestId: roomCardDocRef.id,
+                lastUpdated: serverTimestamp()
+            });
+            
+            return roomCardDocRef; // Return doc reference
+        });
+
+        // ✅ STEP 5: Generate secure QR token automatically on check-in
+        try {
+            const { generateSecureAccessToken } = await import('./secureAccessService');
+            const branchId = roomData.branchId || roomData.branch || 'default';
+            
+            // Generate QR token for this room (linked to room card)
+            const { token } = await generateSecureAccessToken(
+                data.roomNumber,
+                branchId,
+                validatedTenantId,
+                data.createdBy || 'system',
+                {
+                    expiresInHours: null, // Never expires (until checkout)
+                    maxDevices: 3,
+                    roomCardId: docRef.id // Link to room card
+                }
+            );
+            
+            // Store token in room card for easy access
+            await updateDoc(docRef, {
+                qrToken: token,
+                qrGeneratedAt: now
+            });
+            
+            console.log(`🔐 QR token generated automatically for Room ${data.roomNumber} on check-in`);
+        } catch (qrError) {
+            // Non-critical: Log warning but don't fail check-in
+            logger.warn('Failed to generate QR token on check-in (non-critical)', qrError, 'roomCardService');
         }
 
-        // ✅ STEP 5: Award bellman points for check-in
+        // ✅ STEP 6: Award bellman points for check-in (ATOMIC: Uses runTransaction to prevent Race Condition)
         if (data.createdBy) {
             try {
                 const points = calculateBellmanPoints('check-in');
-                const userRef = doc(db, 'users', data.createdBy);
-                await updateDoc(userRef, {
-                    points: increment(points),
+                // ✅ FIX: Use runTransaction to prevent race condition when multiple check-ins happen simultaneously
+                const userRef = doc(db, `tenants/${validatedTenantId}/employees`, data.createdBy);
+                // Try employees collection first, fallback to users collection
+                await runTransaction(db, async (transaction) => {
+                    const userSnap = await transaction.get(userRef);
+                    if (userSnap.exists()) {
+                        const currentPoints = userSnap.data()?.points || userSnap.data()?.currentPoints || 0;
+                        transaction.update(userRef, {
+                            points: currentPoints + points,
+                            currentPoints: currentPoints + points  // Sync both fields
+                        });
+                    } else {
+                        // Fallback to users collection (backward compatibility)
+                        const legacyUserRef = doc(db, 'users', data.createdBy);
+                        const legacyUserSnap = await transaction.get(legacyUserRef);
+                        if (legacyUserSnap.exists()) {
+                            const currentPoints = legacyUserSnap.data()?.points || 0;
+                            transaction.update(legacyUserRef, {
+                                points: currentPoints + points
+                            });
+                        }
+                    }
                 });
             } catch (err) {
                 console.warn('Could not update employee points:', err);
+                logger.warn('Failed to award bellman points on check-in', err, 'roomCardService');
             }
+        }
+
+        // 📝 Audit Log: Guest Check-in
+        try {
+            const storedUser = localStorage.getItem('adora_user');
+            const userData = storedUser ? JSON.parse(storedUser) : {};
+            const branchId = roomData.branchId || roomData.branch || 'default';
+            await logAction(
+                'GUEST_CHECKIN' as LogAction,
+                {
+                    id: data.createdBy || userData.id || 'system',
+                    name: userData.name || 'System',
+                    role: userData.role || 'bellman',
+                    department: userData.department || 'bellman'
+                },
+                {
+                    type: 'room_card',
+                    id: docRef.id,
+                    name: `بطاقة غرفة ${data.roomNumber} - ${data.guestName}`
+                },
+                {
+                    tenantId: validatedTenantId,
+                    branchId: branchId,
+                    roomNumber: data.roomNumber
+                },
+                {
+                    description: `تم تسجيل دخول النزيل ${data.guestName} إلى الغرفة ${data.roomNumber}`,
+                    previousValue: roomData.status || 'available',
+                    newValue: 'occupied',
+                    metadata: { 
+                        guestName: data.guestName, 
+                        guestIdentity: data.guestIdentity,
+                        adults: data.adults,
+                        children: data.children,
+                        roomCardId: docRef.id
+                    }
+                }
+            ).catch(err => logger.warn('Failed to log guest check-in', err, 'roomCardService'));
+        } catch (auditError) {
+            logger.warn('Failed to create audit log for guest check-in', auditError, 'roomCardService');
         }
 
         return docRef.id;
@@ -214,6 +303,7 @@ export const checkIn = async (data: CheckInData, tenantId?: string): Promise<str
 export const checkOut = async (
     cardId: string,
     roomNumber: string,
+    tenantId: string,
     employeeId?: string,
     employeeName?: string,
     options?: {
@@ -221,16 +311,25 @@ export const checkOut = async (
         receptionistId?: string;
         receptionistName?: string;
         notes?: string;
-    },
-    tenantId?: string // ✅ optional tenantId
+    }
 ): Promise<string | null> => {
-    const cardRef = doc(db, ROOM_CARDS_COLLECTION, cardId);
+    if (!db) {
+        logger.error('Firebase not initialized - cannot check out', undefined, 'roomCardService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    // ✅ Use tenant-scoped collection
+    const roomCardsRef = collection(db, `tenants/${validatedTenantId}/roomCards`);
+    const cardRef = doc(roomCardsRef, cardId);
     const now = Timestamp.now();
 
     try {
         // Get card data first
         const cardSnap = await getDocs(query(
-            collection(db, ROOM_CARDS_COLLECTION),
+            roomCardsRef,
             where('__name__', '==', cardId)
         ));
 
@@ -250,8 +349,7 @@ export const checkOut = async (
         try {
             const { deactivateTokenOnCheckout } = await import('./secureAccessService');
             const branchId = cardData?.branch || cardData?.branchId || 'default';
-            const finalTenantId = tenantId || cardData?.tenantId || cardData?.hotelId || 'default';
-            await deactivateTokenOnCheckout(roomNumber, branchId, finalTenantId);
+            await deactivateTokenOnCheckout(roomNumber, branchId, validatedTenantId);
             console.log(`🔐 QR tokens deactivated for Room ${roomNumber} on checkout`);
         } catch (tokenError) {
             console.warn('⚠️ Failed to deactivate tokens on checkout (non-critical):', tokenError);
@@ -262,7 +360,7 @@ export const checkOut = async (
         const inspectionRequest = {
             roomNumber,
             branch: cardData?.branch || 'default',
-            tenantId: tenantId || cardData?.tenantId, // ✅ Include tenantId
+            tenantId: validatedTenantId, // ✅ Include tenantId
             hotelId: cardData?.hotelId || null,
             serviceType: 'inspection',
             requestType: 'inspection',
@@ -311,8 +409,10 @@ export const checkOut = async (
         let inspectionRefId: string | null = null;
 
         try {
+            // ✅ Use tenant-scoped collection
+            const requestsRef = collection(db, `tenants/${validatedTenantId}/requests`);
             const inspectionRef = await retryFirestoreOperation(
-                () => addDoc(collection(db, 'requests'), inspectionRequest),
+                () => addDoc(requestsRef, inspectionRequest),
                 'Create inspection request'
             );
             inspectionRefId = inspectionRef.id;
@@ -357,6 +457,45 @@ export const checkOut = async (
                 // Non-network error - rethrow
                 throw error;
             }
+        }
+
+        // 📝 Audit Log: Guest Check-out
+        try {
+            const storedUser = localStorage.getItem('adora_user');
+            const userData = storedUser ? JSON.parse(storedUser) : {};
+            const branchId = cardData?.branch || cardData?.branchId || 'default';
+            await logAction(
+                'GUEST_CHECKOUT' as LogAction,
+                {
+                    id: employeeId || userData.id || 'system',
+                    name: employeeName || userData.name || 'System',
+                    role: userData.role || 'bellman',
+                    department: userData.department || 'bellman'
+                },
+                {
+                    type: 'room_card',
+                    id: cardId,
+                    name: `بطاقة غرفة ${roomNumber} - ${cardData?.guestName || 'نزيل'}`
+                },
+                {
+                    tenantId: validatedTenantId,
+                    branchId: branchId,
+                    roomNumber: roomNumber
+                },
+                {
+                    description: `تم تسجيل خروج النزيل ${cardData?.guestName || 'نزيل'} من الغرفة ${roomNumber}`,
+                    previousValue: cardData?.status || 'active',
+                    newValue: 'checkout_pending',
+                    metadata: { 
+                        guestName: cardData?.guestName,
+                        guestIdentity: cardData?.guestIdentity,
+                        inspectionRequestId: inspectionRefId,
+                        checkoutBy: employeeName
+                    }
+                }
+            ).catch(err => logger.warn('Failed to log guest check-out', err, 'roomCardService'));
+        } catch (auditError) {
+            logger.warn('Failed to create audit log for guest check-out', auditError, 'roomCardService');
         }
 
         // 3. Update room status to DIRTY (needs cleaning after checkout) - SaaS aware
@@ -408,12 +547,9 @@ export const checkOut = async (
         
         // 6. ✅ أرشفة الشات تلقائياً عند الخروج (تنظيف + خصوصية)
         try {
-            const effectiveTenantId = tenantId || cardData?.tenantId;
             const branchId = cardData?.branch || 'default';
-            if (effectiveTenantId) {
-                await archiveChatRoom(effectiveTenantId, branchId, roomNumber);
-                console.log(`✅ Chat archived for room ${roomNumber}`);
-            }
+            await archiveChatRoom(validatedTenantId, branchId, roomNumber);
+            console.log(`✅ Chat archived for room ${roomNumber}`);
         } catch (chatError) {
             // لا نفشل الخروج لو فشلت أرشفة الشات
             console.warn('Could not archive chat room:', chatError);
@@ -421,13 +557,10 @@ export const checkOut = async (
 
         // 7. ✅ تنظيف بيانات Rate Limit للنزيل (خصوصية + توفير مساحة)
         try {
-            const effectiveTenantId = tenantId || cardData?.tenantId;
-            if (effectiveTenantId) {
-                const { cleanupGuestRateLimitOnCheckout } = await import('./anonymousAuthService');
-                const cleanupResult = await cleanupGuestRateLimitOnCheckout(effectiveTenantId, roomNumber);
-                if (cleanupResult.deletedCount > 0) {
-                    console.log(`🗑️ Guest rate limit cleanup: ${cleanupResult.deletedCount} record(s) deleted`);
-                }
+            const { cleanupGuestRateLimitOnCheckout } = await import('./anonymousAuthService');
+            const cleanupResult = await cleanupGuestRateLimitOnCheckout(validatedTenantId, roomNumber);
+            if (cleanupResult.deletedCount > 0) {
+                console.log(`🗑️ Guest rate limit cleanup: ${cleanupResult.deletedCount} record(s) deleted`);
             }
         } catch (cleanupError) {
             // لا نفشل الخروج لو فشل التنظيف
@@ -443,19 +576,127 @@ export const checkOut = async (
 };
 
 // ============================================================
+// BILLING & CHARGES
+// ============================================================
+
+/**
+ * Add charge to Room Card
+ * 🔐 SECURITY: Validates tenant access
+ * ✅ ATOMIC: Uses runTransaction to prevent Race Conditions
+ * Automatically links charge to Room Card for final billing
+ */
+export const addChargeToRoomCard = async (
+    tenantId: string,
+    branchId: string,
+    roomCardId: string,
+    roomNumber: string,
+    charge: {
+        type: 'minibar' | 'coffee_shop' | 'laundry' | 'room_service' | 'other';
+        description: string;
+        amount: number;
+        currency?: string;
+        requestId?: string;
+        items?: Array<{ name: string; quantity: number; price: number }>;
+    },
+    recordedBy?: string,
+    recordedByName?: string
+): Promise<void> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot add charge to room card', undefined, 'roomCardService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    // ✅ ATOMIC TRANSACTION: Add charge to Room Card + Update financial tracking
+    await runTransaction(db, async (transaction) => {
+        // 1. Verify Room Card exists and is active
+        const roomCardRef = doc(db, `tenants/${validatedTenantId}/roomCards`, roomCardId);
+        const roomCardSnap = await transaction.get(roomCardRef);
+
+        if (!roomCardSnap.exists()) {
+            throw new Error(`Room Card ${roomCardId} not found`);
+        }
+
+        const roomCardData = roomCardSnap.data();
+
+        if (roomCardData.status !== 'active') {
+            throw new Error(`لا يمكن إضافة رسوم لبطاقة غرفة غير نشطة (الحالة: ${roomCardData.status})`);
+        }
+
+        // 2. Create financial transaction record
+        const transactionsRef = collection(db, `tenants/${validatedTenantId}/branches/${branchId}/financial_transactions`);
+        const transactionRef = doc(transactionsRef);
+        transaction.set(transactionRef, {
+            tenantId: validatedTenantId,
+            branchId,
+            roomNumber,
+            roomCardId, // ✅ Link to Room Card
+            guestId: roomCardData.guestId || null,
+            guestName: roomCardData.guestName || null,
+            type: charge.type as 'room_service' | 'minibar' | 'laundry' | 'other' | 'penalty' | 'bonus',
+            category: charge.type,
+            description: charge.description,
+            amount: charge.amount,
+            currency: charge.currency || 'SAR',
+            status: 'pending',
+            requestId: charge.requestId || null,
+            employeeId: recordedBy || null,
+            employeeName: recordedByName || null,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now()
+        });
+
+        // 3. Update Room Bill Summary (atomic increment)
+        const roomBillRef = doc(db, `tenants/${validatedTenantId}/branches/${branchId}/room_bills`, roomNumber);
+        const roomBillSnap = await transaction.get(roomBillRef);
+
+        if (roomBillSnap.exists()) {
+            transaction.update(roomBillRef, {
+                pendingAmount: increment(charge.amount),
+                totalAmount: increment(charge.amount),
+                lastUpdated: serverTimestamp()
+            });
+        } else {
+            transaction.set(roomBillRef, {
+                roomNumber,
+                guestName: roomCardData.guestName || null,
+                totalAmount: charge.amount,
+                pendingAmount: charge.amount,
+                confirmedAmount: 0,
+                paidAmount: 0,
+                lastUpdated: serverTimestamp()
+            });
+        }
+
+        logger.info(`✅ ATOMIC: Charge added to Room Card ${roomCardId}. Amount: ${charge.amount} SAR`, undefined, 'roomCardService');
+    });
+};
+
+// ============================================================
 // QUERIES
 // ============================================================
 
 /**
  * Get active room card for a room
+ * 🔐 SECURITY: Validates tenant access
  */
-export const getActiveRoomCard = async (roomNumber: string, tenantId?: string): Promise<RoomCard | null> => {
-    const roomCardsRef = collection(db, ROOM_CARDS_COLLECTION);
+export const getActiveRoomCard = async (roomNumber: string, tenantId: string): Promise<RoomCard | null> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot get active room card', undefined, 'roomCardService');
+        return null;
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    // ✅ Use tenant-scoped collection
+    const roomCardsRef = collection(db, `tenants/${validatedTenantId}/roomCards`);
     const constraints: any[] = [
         where('roomNumber', '==', roomNumber),
         where('status', '==', 'active')
     ];
-    if (tenantId) constraints.push(where('tenantId', '==', tenantId));
 
     const q = query(roomCardsRef, ...constraints);
     const snapshot = await getDocs(q);
@@ -466,20 +707,27 @@ export const getActiveRoomCard = async (roomNumber: string, tenantId?: string): 
 
 /**
  * Subscribe to active room cards (real-time)
- */
-/**
+ * 🔐 SECURITY: Validates tenant access
  * ✅ SECURITY FIX: Now requires branchId for proper data isolation
  * Prevents duplicate Room Cards from other branches
  */
 export const subscribeToActiveRoomCards = (
     callback: (cards: RoomCard[]) => void,
-    tenantId?: string,
+    tenantId: string,
     branchId?: string
 ): Unsubscribe => {
-    const roomCardsRef = collection(db, ROOM_CARDS_COLLECTION);
-    const constraints: any[] = [where('status', '==', 'active')];
+    if (!db) {
+        logger.error('Firebase not initialized - cannot subscribe to room cards', undefined, 'roomCardService');
+        callback([]);
+        return () => { };
+    }
 
-    if (tenantId) constraints.push(where('tenantId', '==', tenantId));
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    // ✅ Use tenant-scoped collection
+    const roomCardsRef = collection(db, `tenants/${validatedTenantId}/roomCards`);
+    const constraints: any[] = [where('status', '==', 'active')];
     
     // ✅ CRITICAL FIX: Filter by branchId to prevent duplicates from other branches
     if (branchId) {
@@ -512,12 +760,23 @@ export const subscribeToActiveRoomCards = (
 
 /**
  * Subscribe to today's room cards (for stats)
+ * 🔐 SECURITY: Validates tenant access
  */
 export const subscribeToTodayRoomCards = (
     callback: (cards: RoomCard[]) => void,
-    tenantId?: string
+    tenantId: string
 ): Unsubscribe => {
-    const roomCardsRef = collection(db, ROOM_CARDS_COLLECTION);
+    if (!db) {
+        logger.error('Firebase not initialized - cannot subscribe to today room cards', undefined, 'roomCardService');
+        callback([]);
+        return () => { };
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    // ✅ Use tenant-scoped collection
+    const roomCardsRef = collection(db, `tenants/${validatedTenantId}/roomCards`);
 
     // Get start of today
     const today = new Date();
@@ -526,8 +785,6 @@ export const subscribeToTodayRoomCards = (
     const constraints: any[] = [
         where('checkInTime', '>=', Timestamp.fromDate(today))
     ];
-
-    if (tenantId) constraints.push(where('tenantId', '==', tenantId));
 
     const q = query(
         roomCardsRef,

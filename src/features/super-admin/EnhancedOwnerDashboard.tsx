@@ -1569,8 +1569,15 @@ const OverviewTab: React.FC<{
                     </div>
                 )}
 
-                {/* Quick Stats - ✅ COMPACT PREMIUM DESIGN */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                {/* Quick Stats - ✅ ADORA PREMIUM COMPACT DESIGN */}
+                <div 
+                    className="grid"
+                    style={{
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                        gap: '24px',
+                        padding: '24px',
+                    }}
+                >
                     <StatCard
                         icon={Building2}
                         iconColor="teal"

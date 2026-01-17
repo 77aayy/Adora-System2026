@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { ServiceRequest } from '../types/request';
 import { awardPoints } from '../services/pointsService';
-import { transferRequestToDepartment } from '../services/requestService';
+import { transferRequestToDepartment, confirmCompletion, completeRequest } from '../services/requestService';
 import { haptic, playSound } from '../utils/uxEffects';
 
 export interface UseReceptionActionsParams {
@@ -31,7 +31,8 @@ export interface UseReceptionActionsReturn {
     handleCompleteRequest: (requestId: string) => Promise<void>;
     handleConfirmCompletion: (requestId: string) => Promise<void>;
     handleDeleteRequest: (requestId: string) => Promise<void>;
-    handleTransferRequest: (request: ServiceRequest, targetRoomNumber: string) => Promise<void>;
+    handleTransferRequest: (request: ServiceRequest, targetRoomNumber: string) => Promise<void>; // Room Transfer
+    handleTransferToDepartment: (request: ServiceRequest, targetDepartment: string, notes?: string) => Promise<void>; // ✅ Department Transfer
     handleCreateRequest: (data: {
         roomNumber: string;
         type: string;
@@ -77,8 +78,10 @@ export const useReceptionActions = ({
 
     const handleConfirmRequest = useCallback(async (requestId: string) => {
         try {
-            const requestRef = doc(db, 'requests', requestId);
-            const requestSnap = await getDocs(query(collection(db, 'requests'), where('__name__', '==', requestId)));
+            // ✅ Use tenant-scoped collection
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+            const requestRef = doc(requestsRef, requestId);
+            const requestSnap = await getDocs(query(requestsRef, where('__name__', '==', requestId)));
 
             if (requestSnap.empty) return;
 
@@ -110,7 +113,8 @@ export const useReceptionActions = ({
                     cleaningRequestData.inspectionResult = requestData.inspectionResult;
                 }
                 
-                await addDoc(collection(db, 'requests'), cleaningRequestData);
+                // ✅ Use tenant-scoped collection
+                await addDoc(collection(db, `tenants/${tenantId}/requests`), cleaningRequestData);
 
                 await updateDoc(requestRef, {
                     status: 'COMPLETED',
@@ -153,6 +157,7 @@ export const useReceptionActions = ({
                 if (targetDepartment !== 'reception') {
                     await transferRequestToDepartment(
                         requestId,
+                        tenantId,
                         'reception',
                         targetDepartment,
                         user?.id || '',
@@ -201,36 +206,51 @@ export const useReceptionActions = ({
     }, [user, branchId, tenantId, t, success, error]);
 
     const handleCompleteRequest = useCallback(async (requestId: string) => {
+        if (!user?.id || !user?.name) {
+            error(t('reception.completeRequestFailedNoUser'));
+            return;
+        }
+
+        if (!tenantId) {
+            error(t('reception.completeRequestFailedNoTenant'));
+            return;
+        }
+
         try {
-            await updateDoc(doc(db, 'requests', requestId), {
-                status: 'COMPLETED',
-                completedAt: Timestamp.now(),
-                currentDepartment: 'reception'
-            });
+            // ✅ FIX: Use completeRequest from requestService (includes Quality Check)
+            await completeRequest(
+                requestId,
+                tenantId,
+                user.id,
+                user.name,
+                undefined, // rating (optional)
+                undefined  // feedback (optional)
+            );
 
             success(t('reception.requestCompletedSuccess'));
         } catch (err) {
             console.error('Error completing:', err);
             error(t('reception.requestCompleteFailed'));
         }
-    }, [t, success, error]);
+    }, [user, tenantId, t, success, error]);
 
     const handleConfirmCompletion = useCallback(async (requestId: string) => {
         try {
-            const { confirmCompletion } = await import('../services/requestService');
-            await confirmCompletion(requestId, user?.id || '', user?.name || '', 'reception');
+            await confirmCompletion(requestId, tenantId, user?.id || '', user?.name || '', 'reception');
             success(t('reception.requestClosedAndCompleted'));
         } catch (err) {
             console.error('Error confirming completion:', err);
             error(t('reception.requestCloseFailed'));
         }
-    }, [user, t, success, error]);
+    }, [user, tenantId, t, success, error]);
 
     const handleDeleteRequest = useCallback(async (requestId: string) => {
         setDeleteConfirmation(null);
 
         try {
-            await deleteDoc(doc(db, 'requests', requestId));
+            // ✅ Use tenant-scoped collection
+            const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
+            await deleteDoc(requestRef);
             success(t('reception.requestDeletedSuccess'));
         } catch (err: any) {
             console.error('❌ Delete failed:', err);
@@ -239,8 +259,9 @@ export const useReceptionActions = ({
                 : t('reception.requestDeleteFailed') + ' ' + (err?.message || t('reception.unknownError'));
             error(errorMsg);
         }
-    }, [t, success, error]);
+    }, [tenantId, t, success, error]);
 
+    // ✅ Room Transfer (Transfer request to different room)
     const handleTransferRequest = useCallback(async (request: ServiceRequest, targetRoomNumber: string) => {
         if (targetRoomNumber === request.roomNumber) {
             error(t('reception.cannotTransferToSameRoom'));
@@ -250,7 +271,9 @@ export const useReceptionActions = ({
         setIsTransferring(true);
 
         try {
-            await updateDoc(doc(db, 'requests', request.id), {
+            // ✅ Use tenant-scoped collection
+            const requestRef = doc(db, `tenants/${tenantId}/requests`, request.id);
+            await updateDoc(requestRef, {
                 roomNumber: targetRoomNumber,
                 modifiedAt: Timestamp.now(),
                 modifiedBy: { id: user?.id || '', name: user?.name || '' }
@@ -263,7 +286,46 @@ export const useReceptionActions = ({
         } finally {
             setIsTransferring(false);
         }
-    }, [user, t, success, error]);
+    }, [user, tenantId, t, success, error]);
+
+    // ✅ Department Transfer (Transfer request between departments)
+    const handleTransferToDepartment = useCallback(async (
+        request: ServiceRequest,
+        targetDepartment: string,
+        notes?: string
+    ) => {
+        if (!request.currentDepartment) {
+            error(t('reception.cannotTransferRequestWithoutDepartment'));
+            return;
+        }
+
+        if (request.currentDepartment === targetDepartment) {
+            error(t('reception.cannotTransferToSameDepartment'));
+            return;
+        }
+
+        setIsTransferring(true);
+
+        try {
+            await transferRequestToDepartment(
+                request.id,
+                tenantId,
+                request.currentDepartment,
+                targetDepartment,
+                user?.id || '',
+                user?.name || '',
+                'CONFIRMED' as any,
+                notes
+            );
+
+            success(t('reception.requestTransferredToDepartment', { department: targetDepartment }));
+        } catch (err) {
+            console.error('Error transferring to department:', err);
+            error(t('reception.requestTransferFailed'));
+        } finally {
+            setIsTransferring(false);
+        }
+    }, [user, tenantId, t, success, error]);
 
     const handleCreateRequest = useCallback(async (data: {
         roomNumber: string;
@@ -390,7 +452,8 @@ export const useReceptionActions = ({
                 requestData.scheduledAt = Timestamp.fromDate(data.scheduledAt);
             }
 
-            await addDoc(collection(db, 'requests'), requestData);
+            // ✅ Use tenant-scoped collection
+            await addDoc(collection(db, `tenants/${tenantId}/requests`), requestData);
 
             // ✅ Auto-check daily attendance
             if (tenantId && user?.id) {
@@ -433,6 +496,7 @@ export const useReceptionActions = ({
         handleConfirmCompletion,
         handleDeleteRequest,
         handleTransferRequest,
+        handleTransferToDepartment, // ✅ Department Transfer
         handleCreateRequest,
         isTransferring,
         deleteConfirmation,

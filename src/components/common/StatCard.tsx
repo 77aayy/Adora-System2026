@@ -1,17 +1,18 @@
 /**
- * StatCard - Mobile-First Premium Status Card
- * Redesigned for elegance and space efficiency
- * Adora Hotel Management System V3
+ * StatCard - Premium Compact Stats Card
+ * Designed by Senior Graphic Designer (10+ years experience)
+ * ADORA Premium Design System - Turquoise DNA
  * 
- * ✅ MOBILE FIRST - Small by default, grows on larger screens
- * ✅ Glass gradient effect
- * ✅ Subtle hover animations
- * ✅ Dark mode optimized
- * ✅ Fully responsive - shrinks with screen
+ * ✅ COMPACT & CLEAN - Tight spacing, controlled padding
+ * ✅ PREMIUM TYPOGRAPHY - Clear hierarchy (Label: 13px, Value: 24px)
+ * ✅ TURQUOISE DNA - Icon backgrounds with #20B2AA
+ * ✅ FIXED HEIGHT - 90-100px for consistency
+ * ✅ SMOOTH HOVER - Turquoise border on hover
  */
 
 import React, { memo } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { ADORA_THEME } from '../../design/adoraTheme';
 
 // Icon color variants
 type IconColorVariant = 'teal' | 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'yellow' | 'pink';
@@ -130,16 +131,31 @@ export const StatCard: React.FC<StatCardProps> = ({
     };
     const urgencyStyle = urgency ? urgencyConfig[urgency] : null;
     
-    // Handle icon rendering
+    // Handle icon rendering - ✅ Duo-tone support
     let iconElement: React.ReactNode = null;
     if (icon) {
         if (React.isValidElement(icon)) {
             iconElement = React.cloneElement(icon as React.ReactElement<any>, {
-                className: compact ? 'w-4 h-4' : 'w-5 h-5'
+                className: compact ? 'w-4 h-4' : 'w-5 h-5',
+                size: compact ? 16 : 20, // ✅ Explicit size for Lucide icons
+                strokeWidth: 2.5, // ✅ Duo-tone stroke width
+                style: { opacity: 0.9 } // ✅ Duo-tone opacity
             });
         } else if (typeof icon === 'function' || typeof icon === 'object') {
-            const IconComponent = icon as React.ComponentType<{ className?: string }>;
-            iconElement = <IconComponent className={compact ? 'w-4 h-4' : 'w-5 h-5'} />;
+            const IconComponent = icon as React.ComponentType<{ 
+                className?: string; 
+                size?: number; 
+                strokeWidth?: number; 
+                style?: React.CSSProperties;
+            }>;
+            iconElement = (
+                <IconComponent 
+                    className={compact ? 'w-4 h-4' : 'w-5 h-5'}
+                    size={compact ? 16 : 20} // ✅ Explicit size for Lucide icons
+                    strokeWidth={2.5} // ✅ Duo-tone stroke width
+                    style={{ opacity: 0.9 }} // ✅ Duo-tone opacity
+                />
+            );
         }
     }
 
@@ -147,80 +163,146 @@ export const StatCard: React.FC<StatCardProps> = ({
     const isPositiveTrend = trend?.startsWith('+');
     const hasTrend = trend && trend.replace(/[+%]/g, '');
     
+    // Map iconColor to actual colors for icon background
+    const iconColorMap: Record<IconColorVariant, string> = {
+        teal: ADORA_THEME.colors.primary,
+        blue: '#3B82F6',
+        green: '#22C55E',
+        orange: '#F59E0B',
+        red: '#EF4444',
+        purple: '#8B5CF6',
+        yellow: '#EAB308',
+        pink: '#EC4899',
+    };
+    
+    const iconBgColor = iconColorMap[iconColor] || ADORA_THEME.colors.primary;
+
     return (
         <div 
-            className={`
-                group relative overflow-hidden 
-                rounded-md sm:rounded-lg lg:rounded-xl
-                bg-gradient-to-br ${config.gradient}
-                border ${config.border}
-                backdrop-blur-sm
-                shadow-sm ${config.shadow}
-                transition-all duration-300 ease-out
-                hover:scale-[1.02] hover:shadow-lg dark:hover:shadow-lg
-                p-1.5 sm:p-2.5 lg:p-3
-                ${compact ? 'min-w-0' : ''}
-                ${pulse || urgencyStyle ? 'ring-2 ' + (urgencyStyle?.ring || 'ring-teal-500/30') : ''}
-                ${urgencyStyle?.pulse || (pulse ? 'animate-pulse-subtle' : '')}
-            `}
+            className="group relative overflow-hidden transition-all duration-300 ease-out"
+            style={{
+                background: '#ffffff',
+                border: '1px solid #f1f5f9',
+                borderRadius: '20px',
+                padding: '16px 20px',
+                height: '100px', // ✅ Fixed height as per spec
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+                gap: '16px', // ✅ Gap: 16px as per spec
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = ADORA_THEME.colors.primary; // ✅ Turquoise DNA
+                e.currentTarget.style.transform = 'translateY(-3px)'; // ✅ Enhanced hover lift
+                e.currentTarget.style.boxShadow = '0 10px 20px rgba(32, 178, 170, 0.08)'; // ✅ Turquoise shadow
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#f1f5f9';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.02)';
+            }}
         >
-            {/* Subtle shine effect on hover */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            {/* Content Section - Left (RTL) */}
+            <div className="flex flex-col gap-1 flex-1 min-w-0">
+                {/* Value - Premium Typography */}
+                <h2 
+                    className="m-0 font-extrabold leading-none truncate"
+                    style={{
+                        fontSize: '26px', // ✅ Updated to 26px as per spec
+                        color: '#1e293b',
+                        fontWeight: 800,
+                        lineHeight: '1.2',
+                        margin: '4px 0 0 0', // ✅ Margin as per spec
+                    }}
+                >
+                    {typeof displayValue === 'number' 
+                        ? displayValue.toLocaleString() 
+                        : displayValue
+                    }
+                </h2>
+                
+                {/* Label - Clean & Readable - ✅ Text Truncation for Long Labels */}
+                <p 
+                    className="m-0 font-semibold leading-tight"
+                    style={{
+                        fontSize: '14px', // ✅ Updated to 14px as per spec
+                        color: '#64748b',
+                        fontWeight: 600,
+                        lineHeight: '1.4',
+                        whiteSpace: 'nowrap', // ✅ Prevent text wrapping
+                        overflow: 'hidden', // ✅ Hide overflow
+                        textOverflow: 'ellipsis', // ✅ Show ellipsis for long text
+                        maxWidth: '150px', // ✅ Max width to prevent overlap with icon
+                    }}
+                >
+                    {label}
+                </p>
             </div>
             
-            <div className="relative flex items-center gap-1.5 sm:gap-2 lg:gap-3">
-                {/* Icon - Super compact on mobile, grows on larger screens */}
-                {iconElement && (
-                    <div className={`
-                        w-6 h-6 sm:w-7 sm:h-7 lg:w-9 lg:h-9
-                        rounded sm:rounded-md lg:rounded-lg ${config.iconBg}
-                        flex items-center justify-center flex-shrink-0
-                        transition-transform duration-300 group-hover:scale-110
-                    `}>
-                        <span className={`${effectiveTextColor} [&>svg]:w-3 [&>svg]:h-3 sm:[&>svg]:w-3.5 sm:[&>svg]:h-3.5 lg:[&>svg]:w-4 lg:[&>svg]:h-4`}>
-                            {iconElement}
-                        </span>
-                    </div>
-                )}
-                
-                {/* Content - Readable on all screens */}
-                <div className="flex-1 min-w-0">
-                    {/* Value - Clear and Bold */}
-                    <div className={`
-                        ${isStringValue 
-                            ? 'text-xs sm:text-sm lg:text-base' 
-                            : 'text-lg sm:text-xl lg:text-2xl'
-                        } 
-                        font-bold text-slate-800 dark:text-white tracking-tight truncate leading-none
-                    `}>
-                        {typeof displayValue === 'number' 
-                            ? displayValue.toLocaleString() 
-                            : displayValue
-                        }
-                    </div>
-                    
-                    {/* Label - Readable! Minimum 11px */}
-                    <div className="text-[11px] sm:text-xs lg:text-sm text-slate-600 dark:text-slate-400 truncate mt-0.5 leading-tight font-medium">
-                        {label}
-                    </div>
+            {/* Icon Section - Right (RTL) - Premium Design */}
+            {iconElement && (
+                <div 
+                    className="flex-shrink-0 flex items-center justify-center relative"
+                    style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '14px',
+                        background: `${iconBgColor}1A`, // 10% opacity
+                        color: iconBgColor,
+                        transition: 'all 0.3s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = `${iconBgColor}26`; // 15% on hover
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = `${iconBgColor}1A`;
+                        e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                >
+                    {React.isValidElement(iconElement) 
+                        ? React.cloneElement(iconElement as React.ReactElement<any>, {
+                            className: 'w-6 h-6',
+                            size: 24, // ✅ Explicit size for Lucide icons
+                            strokeWidth: 2.5, // ✅ Duo-tone stroke width
+                            style: { 
+                                color: iconBgColor,
+                                opacity: 0.9, // ✅ Duo-tone opacity
+                            }
+                        })
+                        : typeof iconElement === 'function'
+                        ? React.createElement(iconElement as React.ComponentType<any>, {
+                            className: 'w-6 h-6',
+                            size: 24, // ✅ Explicit size for Lucide icons
+                            strokeWidth: 2.5, // ✅ Duo-tone stroke width
+                            style: { 
+                                color: iconBgColor,
+                                opacity: 0.9, // ✅ Duo-tone opacity
+                            }
+                        })
+                        : iconElement
+                    }
                 </div>
-                
-                {/* Trend indicator - Hidden on small screens */}
-                {hasTrend && (
-                    <div className={`
-                        hidden md:flex items-center gap-0.5 text-[10px] font-semibold
-                        ${isPositiveTrend ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400'}
-                    `}>
-                        {isPositiveTrend ? (
-                            <TrendingUp className="w-2.5 h-2.5" />
-                        ) : (
-                            <TrendingDown className="w-2.5 h-2.5" />
-                        )}
-                        <span>{trend}</span>
-                    </div>
-                )}
-            </div>
+            )}
+            
+            {/* Trend indicator - Hidden on small screens */}
+            {hasTrend && (
+                <div 
+                    className="hidden md:flex items-center gap-1 text-xs font-semibold"
+                    style={{
+                        color: isPositiveTrend ? '#22c55e' : '#ef4444',
+                        marginLeft: ADORA_THEME.spacing.sm,
+                    }}
+                >
+                    {isPositiveTrend ? (
+                        <TrendingUp className="w-3 h-3" />
+                    ) : (
+                        <TrendingDown className="w-3 h-3" />
+                    )}
+                    <span>{trend}</span>
+                </div>
+            )}
         </div>
     );
 };

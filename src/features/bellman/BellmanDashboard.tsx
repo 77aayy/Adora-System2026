@@ -66,7 +66,7 @@ import { StatCard } from '../../components/common/StatCard';
 import { UnifiedRequestTabs } from '../../components/shared/UnifiedRequestTabs'; // ✅ Unified tabs
 import { AdoraLoader } from '../../components/common/AdoraLoader';
 import { awardPoints, awardPerformancePoints } from '../../services/pointsService';
-import { markAsViewed } from '../../services/requestService';
+import { markAsViewed, completeRequest } from '../../services/requestService';
 import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboarding tour
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
 // DeveloperSignature is now in GlobalFooter (App.tsx)
@@ -819,6 +819,10 @@ export const BellmanDashboard: React.FC = () => {
         }
 
         try {
+            if (!tenantId) {
+                error(t('bellman.tenantIdRequired') || 'Tenant ID is required');
+                return;
+            }
             await checkIn({
                 roomNumber: data.roomNumber,
                 guestName: data.guestName || t('bellman.guestNamePlaceholder', { room: data.roomNumber }),
@@ -882,15 +886,19 @@ export const BellmanDashboard: React.FC = () => {
     };
 
     const handleCheckout = async (roomCard: RoomCard) => {
+        if (!tenantId) {
+            error(t('bellman.tenantIdRequired') || 'Tenant ID is required');
+            return;
+        }
         try {
             // CheckOut now creates inspection request automatically
             const inspectionId = await checkOut(
                 roomCard.id,
                 roomCard.roomNumber,
+                tenantId, // ✅ Pass tenantId as 3rd parameter (required)
                 user?.id,
                 user?.name,
-                undefined, // options
-                tenantId // ✅ Pass tenantId
+                undefined // options
             );
 
             if (inspectionId) {
@@ -921,14 +929,19 @@ export const BellmanDashboard: React.FC = () => {
     };
 
     const handleStartRequest = async (requestId: string) => {
+        if (!tenantId) {
+            error(t('bellman.tenantIdRequired') || 'Tenant ID is required');
+            return;
+        }
         try {
-            // Get the request data first
-            const requestsRef = collection(db, 'requests');
+            // ✅ Use tenant-scoped collection
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
             const requestSnapshot = await getDocs(query(requestsRef, where('__name__', '==', requestId)));
             const requestData = requestSnapshot.empty ? null : requestSnapshot.docs[0].data();
 
             // Update request status to IN_PROGRESS
-            await updateDoc(doc(db, 'requests', requestId), {
+            // ✅ Use tenant-scoped collection
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, requestId), {
                 status: 'IN_PROGRESS',
                 startedAt: Timestamp.now(),
                 startedBy: { id: user?.id, name: user?.name }
@@ -938,7 +951,8 @@ export const BellmanDashboard: React.FC = () => {
             if (requestData?.requestType === 'luggage_down' && requestData?.roomNumber) {
                 try {
                     // Create inspection request for housekeeping
-                    await addDoc(collection(db, 'requests'), {
+                    // ✅ Use tenant-scoped collection
+                    await addDoc(requestsRef, {
                         type: 'cleaning',
                         serviceType: 'inspection',
                         requestType: 'inspection',
@@ -988,33 +1002,23 @@ export const BellmanDashboard: React.FC = () => {
     const handleCompleteRequest = async (request: BellmanRequest) => {
         try {
             const completedAt = Timestamp.now();
-            await updateDoc(doc(db, 'requests', request.id), {
-                status: 'COMPLETED',
-                completedAt,
-                completedBy: { id: user?.id, name: user?.name },
-                currentDepartment: 'reception' // Return to reception
-            });
-
-            // Calculate duration (minutes)
-            const startTime = request.startedAt || request.createdAt;
-            const startMs = startTime?.toDate ? startTime.toDate().getTime() : new Date(startTime).getTime();
-            const durationMinutes = Math.floor((completedAt.toDate().getTime() - startMs) / (1000 * 60));
-
-            // Award points (Dynamic based on time)
-            if (user?.id) {
-                try {
-                    const tenantId = (user as any)?.tenantId || 'default';
-                    await awardPerformancePoints(
-                        tenantId,
-                        user.id,
-                        'bellman',
-                        'complete',
-                        durationMinutes
-                    );
-                } catch (e) {
-                    console.warn('Failed to award bellman points:', e);
-                }
+            // ✅ FIX: Get tenantId from user context or auth context
+            const tenantIdForComplete = tenantId || (user as any)?.tenantId || localStorage.getItem('adora_tenant_id') || 'default';
+            
+            if (!user?.id || !user?.name || !tenantIdForComplete || tenantIdForComplete === 'default') {
+                error(t('bellman.completeRequestFailedNoUser'));
+                return;
             }
+
+            // ✅ FIX: Use completeRequest from requestService (includes Quality Check)
+            await completeRequest(
+                request.id,
+                tenantIdForComplete,
+                user.id,
+                user.name,
+                undefined, // rating (optional)
+                undefined  // feedback (optional)
+            );
 
             success(t('bellman.requestCompleted'));
         } catch (err: any) {
@@ -1058,14 +1062,14 @@ export const BellmanDashboard: React.FC = () => {
             <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
             
             <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
-            {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
-            <FlexibleHeader
-                title={t('bellman.title')}
-                titleIcon={<Bell className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 flex-shrink-0" />}
-                showGreeting={false}
-                brandName={brandName}
-                subtitle={undefined}
-                actions={[
+                {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
+                <FlexibleHeader
+                    title={t('bellman.title')}
+                    titleIcon={<Bell className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 flex-shrink-0" />}
+                    showGreeting={false}
+                    brandName={brandName}
+                    subtitle={undefined}
+                    actions={[
                     {
                         id: 'history',
                         icon: <History className="w-5 h-5" />,
@@ -1098,8 +1102,8 @@ export const BellmanDashboard: React.FC = () => {
                         label: t('bellman.technicalSupport'),
                         onClick: () => setShowSupportTicket(true)
                     }
-                ]}
-            />
+                    ]}
+                />
             
             {/* Golden Alert - Broadcast Messages */}
             <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
@@ -1118,10 +1122,19 @@ export const BellmanDashboard: React.FC = () => {
                 <ChallengeTimeline />
             </div>
 
-            {/* Stats - Unified Style - ✅ Mobile-First Compact */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                <div className="stat-card-pro-compact">
+            {/* Stats - Unified Style - ✅ ADORA PREMIUM COMPACT DESIGN */}
+            <div 
+                className="max-w-7xl mx-auto mb-4"
+                style={{ padding: '24px' }}
+            >
+                <div 
+                    className="grid"
+                    style={{
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                        gap: '24px',
+                    }}
+                >
+                    <div className="stat-card-pro-compact">
                     <StatCard
                         count={occupiedRoomNumbers.length}
                         label={t('bellman.occupiedRooms')}
@@ -1150,6 +1163,7 @@ export const BellmanDashboard: React.FC = () => {
                         status={luggage.filter(l => l.status !== 'delivered').length > 5 ? 'warning' : 'normal'}
                         lastUpdate={t('bellman.lastUpdate')}
                     />
+                    </div>
                 </div>
             </div>
 
@@ -1437,7 +1451,7 @@ export const BellmanDashboard: React.FC = () => {
 
             {/* 📝 Developer Signature */}
             {/* Developer Signature is in GlobalFooter (App.tsx) */}
-        </div>
+            </div>
         </PageTransition>
     );
 };

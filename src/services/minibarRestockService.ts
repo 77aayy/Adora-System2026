@@ -183,14 +183,49 @@ export const updateRoomMinibar = async (
 
 /**
  * Record minibar consumption
+ * ⚠️ DEPRECATED: Use consumeMinibarItems from minibarService.ts instead (uses runTransaction)
+ * This function is kept for backward compatibility but should be migrated
  */
 export const recordConsumption = async (
     roomNumber: string,
     branch: string,
     items: { itemId: string; itemName: string; quantity: number; price: number }[],
     recordedBy: string,
-    recordedByName: string
+    recordedByName: string,
+    tenantId?: string,
+    roomCardId?: string
 ): Promise<string> => {
+    // ✅ FIX: If tenantId and roomCardId provided, use the new atomic method
+    if (tenantId && roomCardId) {
+        try {
+            const { consumeMinibarItems } = await import('./minibarService');
+            const { loadMinibarProducts } = await import('./minibarService');
+            const products = await loadMinibarProducts(tenantId);
+            
+            const consumption: Record<string, number> = {};
+            items.forEach(item => {
+                consumption[item.itemId] = item.quantity;
+            });
+
+            const result = await consumeMinibarItems(
+                tenantId,
+                branch,
+                roomNumber,
+                roomCardId,
+                consumption,
+                products,
+                recordedBy,
+                recordedByName
+            );
+
+            return result.consumptionRecordId;
+        } catch (error) {
+            logger.error('Failed to use atomic minibar consumption, falling back to legacy method', error, 'minibarRestockService');
+            // Fall through to legacy method
+        }
+    }
+
+    // ⚠️ LEGACY METHOD: Non-atomic (kept for backward compatibility)
     const total = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
 
     const record: Omit<ConsumptionRecord, 'id'> = {
@@ -200,12 +235,15 @@ export const recordConsumption = async (
         total,
         recordedAt: Timestamp.now(),
         recordedBy,
-        recordedByName
+        recordedByName,
+        tenantId,
+        roomCardId
     };
 
-    const docRef = await addDoc(collection(db, 'minibarConsumption'), record);
+    const docRef = await addDoc(collection(db, tenantId ? `tenants/${tenantId}/minibar_consumption` : 'minibarConsumption'), record);
 
-    // Update inventory
+    // ⚠️ WARNING: This is NOT atomic - may cause Race Conditions
+    // TODO: Migrate all callers to use consumeMinibarItems instead
     for (const item of items) {
         const itemDoc = doc(db, 'minibarItems', item.itemId);
         const itemData = await getDocs(query(collection(db, 'minibarItems'), where('id', '==', item.itemId)));
@@ -214,6 +252,8 @@ export const recordConsumption = async (
             await updateDoc(itemDoc, { stock: Math.max(0, (current.stock || 0) - item.quantity) });
         }
     }
+
+    logger.warn('⚠️ Using legacy non-atomic recordConsumption method. Consider migrating to consumeMinibarItems', undefined, 'minibarRestockService');
 
     return docRef.id;
 };

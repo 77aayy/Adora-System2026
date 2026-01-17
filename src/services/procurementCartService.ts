@@ -283,7 +283,8 @@ export const clearCart = (): void => {
 // ============================================================
 
 /**
- * Submit cart to Firestore
+ * Submit cart to Firestore as Procurement Request
+ * ✅ FIX: Now uses procurementService.createProcurementRequest instead of saving to requests collection
  * 🔐 SECURITY: tenantId is required for SaaS tenant isolation
  */
 export const submitCart = async (
@@ -304,55 +305,41 @@ export const submitCart = async (
     }
 
     try {
-        const batch = writeBatch(db);
+        // ✅ FIX: Use procurementService.createProcurementRequest instead of direct Firestore write
+        const { createProcurementRequest } = await import('./procurementService');
+        
+        // Map cart items to procurement items format
+        const procurementItems = items.map(item => ({
+            itemName: item.itemName,
+            quantity: item.quantity,
+            notes: item.notes || undefined,
+            priority: item.priority === 'urgent' ? 'urgent' as const : item.priority === 'scheduled' ? 'normal' as const : 'normal' as const,
+            photoUrl: item.photoUrl || undefined,
+            scheduledDate: item.priority === 'scheduled' && item.scheduledDate ? item.scheduledDate : undefined,
+            category: undefined, // Can be auto-detected from itemName if needed
+            unit: undefined // Can be auto-detected if needed
+        }));
 
-        // Manager sends directly as CONFIRMED, others need approval
-        const orderStatus = (source === 'dashboard' || source === 'manager')
-            ? 'CONFIRMED'
-            : 'PENDING_APPROVAL';
+        // Determine department from source
+        const department = employeeData.department || source || 'reception';
 
-        // Generate order ID for batch
-        const orderId = `ORD_${Date.now()}`;
+        // Manager/dashboard sends directly as APPROVED, others need approval
+        const bypassApproval = (source === 'dashboard' || source === 'manager');
 
-        items.forEach(item => {
-            const requestRef = doc(collection(db, 'requests'));
-            const requestData: Record<string, any> = {
-                branch: employeeData.branchId,
-                tenantId: tenantId, // 🔐 SaaS: Critical for tenant isolation
-                serviceType: 'procurement',
-                source: source,
-                orderId: orderId,
-                itemName: item.itemName,
-                quantity: item.quantity,
-                description: item.notes || null,
-                photoUrl: item.photoUrl || null,
-                priority: item.priority,
-                isUrgent: item.priority === 'urgent',
-                scheduledDate: item.priority === 'scheduled' && item.scheduledDate ? item.scheduledDate : null,
-                status: orderStatus,
-                createdBy: {
-                    id: employeeData.employeeId,
-                    name: employeeData.employeeName
-                },
-                createdAt: serverTimestamp(),
-                timeline: {
-                    created: serverTimestamp()
-                }
-            };
-
-            // If from manager, add approvedBy
-            if (orderStatus === 'CONFIRMED') {
-                requestData.approvedBy = {
-                    id: employeeData.employeeId,
-                    name: employeeData.employeeName
-                };
-                requestData.timeline.approved = serverTimestamp();
+        // ✅ Create procurement request using procurementService
+        await createProcurementRequest(
+            procurementItems,
+            department,
+            {
+                id: employeeData.employeeId,
+                name: employeeData.employeeName
+            },
+            employeeData.branchId,
+            tenantId,
+            {
+                bypassApproval
             }
-
-            batch.set(requestRef, requestData);
-        });
-
-        await batch.commit();
+        );
 
         const count = items.length;
         clearCart();

@@ -6,6 +6,7 @@
 
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { autoTranslateNewText } from './dynamicTranslationService'; // ✅ Auto-translation
 
 // ============================================================
 // TYPES
@@ -134,6 +135,32 @@ export const createAnnouncement = async (
 
         const docRef = doc(collection(db, 'announcements'));
         await setDoc(docRef, announcementData);
+
+        // ✅ AUTO-TRANSLATE: Translate Arabic text to all languages automatically
+        const tenantId = (announcement as any).tenantId;
+        if (tenantId && (announcement.titleAr || announcement.contentAr)) {
+            try {
+                // Translate title
+                if (announcement.titleAr) {
+                    await autoTranslateNewText(
+                        tenantId,
+                        `announcement_${docRef.id}_title`,
+                        announcement.titleAr
+                    );
+                }
+                // Translate content
+                if (announcement.contentAr) {
+                    await autoTranslateNewText(
+                        tenantId,
+                        `announcement_${docRef.id}_content`,
+                        announcement.contentAr
+                    );
+                }
+            } catch (translationError) {
+                // Don't fail the announcement creation if translation fails
+                console.warn('Auto-translation failed for announcement:', translationError);
+            }
+        }
 
         return docRef.id;
     } catch (error) {

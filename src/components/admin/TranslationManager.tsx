@@ -261,7 +261,7 @@ const TranslationManager: React.FC<TranslationManagerProps> = ({
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-white">🌍 مدير الترجمات الديناميكية</h2>
-                                <p className="text-white/70 text-sm">ترجمة تلقائية مع مزامنة Firebase</p>
+                                <p className="text-white/70 text-sm">مراجعة وتعديل الترجمات التلقائية</p>
                             </div>
                         </div>
                         {onClose && (
@@ -320,15 +320,16 @@ const TranslationManager: React.FC<TranslationManagerProps> = ({
                     <button
                         onClick={handleSync}
                         disabled={isSyncing}
-                        className="px-4 py-2 rounded-lg bg-teal-500 text-white flex items-center gap-2 hover:bg-teal-600 disabled:opacity-50 transition-colors"
+                        className="px-4 py-2 rounded-lg bg-slate-400 text-white flex items-center gap-2 hover:bg-slate-500 disabled:opacity-50 transition-colors text-sm"
+                        title="مزامنة الترجمات القديمة (الترجمة التلقائية مفعلة للنصوص الجديدة)"
                     >
                         <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                        مزامنة
+                        <span className="hidden sm:inline">مزامنة قديمة</span>
                     </button>
                     
                     <button
                         onClick={handleExport}
-                        className="px-4 py-2 rounded-lg bg-slate-500 text-white flex items-center gap-2 hover:bg-slate-600 transition-colors"
+                        className="px-4 py-2 rounded-lg bg-teal-500 text-white flex items-center gap-2 hover:bg-teal-600 transition-colors"
                     >
                         <Download className="w-4 h-4" />
                         تصدير
@@ -538,9 +539,14 @@ const TranslationManager: React.FC<TranslationManagerProps> = ({
                 
                 {/* Footer */}
                 <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center text-sm text-slate-500">
-                    <div className="flex items-center justify-center gap-2">
-                        <Zap className="w-4 h-4 text-yellow-500" />
-                        <span>الترجمة التلقائية عبر: MyMemory API (مجاني) + Lingva (Google Mirror) + LibreTranslate</span>
+                    <div className="flex flex-col items-center justify-center gap-2">
+                        <div className="flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-green-500" />
+                            <span className="font-semibold text-green-600 dark:text-green-400">✅ الترجمة التلقائية مفعلة للنصوص الجديدة</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                            <span>الترجمة التلقائية عبر: MyMemory API (مجاني) + Lingva (Google Mirror) + LibreTranslate</span>
+                        </div>
                     </div>
                 </div>
             </div>

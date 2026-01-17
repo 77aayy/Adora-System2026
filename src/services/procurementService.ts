@@ -86,12 +86,116 @@ export interface ProcurementRequest {
 }
 
 // ============================================================
+// PROCUREMENT REQUEST CREATION
+// ============================================================
+
+/**
+ * Create a new procurement request from cart items
+ * ✅ SaaS: Uses tenant-scoped collection
+ * ✅ Uses Atomic Transaction for data integrity
+ */
+export const createProcurementRequest = async (
+    items: Array<{
+        itemName: string;
+        quantity: number;
+        notes?: string;
+        priority?: 'normal' | 'urgent' | 'scheduled';
+        photoUrl?: string | null;
+        scheduledDate?: string | null;
+        category?: string;
+        unit?: string;
+    }>,
+    department: string,
+    requestedBy: { id: string; name: string },
+    branchId: string,
+    tenantId: string,
+    options?: {
+        bypassApproval?: boolean; // If true, status becomes 'APPROVED' immediately (for managers)
+    }
+): Promise<string> => {
+    if (!db) throw new Error('Firebase not initialized');
+    if (!tenantId) throw new Error('tenantId is required for SaaS isolation');
+
+    if (!items || items.length === 0) {
+        throw new Error('No items provided for procurement request');
+    }
+
+    try {
+        // ✅ Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
+        
+        // Determine initial status
+        const status: ProcurementStatus = options?.bypassApproval 
+            ? 'APPROVED' 
+            : 'PENDING_APPROVAL';
+
+        // Convert cart items to ProcurementItem format
+        const procurementItems: ProcurementItem[] = items.map(item => ({
+            itemName: item.itemName,
+            quantity: item.quantity,
+            notes: item.notes,
+            priority: item.priority || 'normal',
+            category: item.category,
+            unit: item.unit
+        }));
+
+        // Create procurement request
+        const requestData: Omit<ProcurementRequest, 'id'> = {
+            items: procurementItems,
+            department,
+            requestedBy,
+            branch: branchId,
+            tenantId,
+            status,
+            createdAt: serverTimestamp(),
+            ...(options?.bypassApproval && {
+                approvedAt: serverTimestamp(),
+                approvedBy: requestedBy
+            })
+        };
+
+        const docRef = await addDoc(requestsRef, requestData);
+
+        // ✅ Send notification and log (non-blocking)
+        try {
+            const { sendProcurementNotification, logProcurementStage } = await import('./procurementNotificationService');
+            const context = { tenantId, branchId, department };
+            const actor = { id: requestedBy.id, name: requestedBy.name, role: 'staff' };
+            
+            await Promise.all([
+                sendProcurementNotification(
+                    status === 'APPROVED' ? 'APPROVED' : 'PENDING_APPROVAL',
+                    docRef.id,
+                    context,
+                    actor,
+                    { items: procurementItems.map(i => ({ name: i.itemName, quantity: i.quantity })) }
+                ).catch(() => {}),
+                logProcurementStage(
+                    status === 'APPROVED' ? 'APPROVED' : 'PENDING_APPROVAL',
+                    docRef.id,
+                    context,
+                    actor,
+                    { items: procurementItems }
+                ).catch(() => {})
+            ]);
+        } catch (notifError) {
+            console.warn('Failed to send procurement notification/log (non-critical)', notifError);
+        }
+
+        return docRef.id;
+    } catch (error: any) {
+        console.error('Error creating procurement request:', error);
+        throw new Error(`فشل إنشاء طلب الشراء: ${error.message || 'خطأ غير معروف'}`);
+    }
+};
+
+// ============================================================
 // MANAGER ACTIONS
 // ============================================================
 
 /**
  * Manager approves a procurement request
- * ✅ SaaS: Requires tenantId for security validation
+ * ✅ SaaS: Uses tenant-scoped collection
  * ✅ Enhanced: Sends notification and logs the action
  */
 export const approveProcurement = async (
@@ -102,14 +206,11 @@ export const approveProcurement = async (
 ): Promise<void> => {
     if (!tenantId) throw new Error('tenantId is required for SaaS isolation');
     
-    const requestRef = doc(db, 'procurementRequests', requestId);
+    // ✅ Use tenant-scoped collection
+    const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
     
     // ✅ Verify tenantId matches before approving
-    const requestSnap = await getDocs(query(
-        collection(db, 'procurementRequests'),
-        where('__name__', '==', requestId),
-        where('tenantId', '==', tenantId)
-    ));
+    const requestSnap = await getDoc(requestRef);
     
     if (requestSnap.empty) {
         throw new Error('Request not found or tenant mismatch');
@@ -163,20 +264,17 @@ export const rejectProcurement = async (
 ): Promise<void> => {
     if (!tenantId) throw new Error('tenantId is required for SaaS isolation');
     
-    const requestRef = doc(db, 'procurementRequests', requestId);
+    // ✅ Use tenant-scoped collection
+    const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
     
     // ✅ Verify tenantId matches before rejecting
-    const requestSnap = await getDocs(query(
-        collection(db, 'procurementRequests'),
-        where('__name__', '==', requestId),
-        where('tenantId', '==', tenantId)
-    ));
+    const requestSnap = await getDoc(requestRef);
     
-    if (requestSnap.empty) {
+    if (!requestSnap.exists()) {
         throw new Error('Request not found or tenant mismatch');
     }
     
-    const requestData = requestSnap.docs[0].data();
+    const requestData = requestSnap.data();
     
     await updateDoc(requestRef, {
         status: 'REJECTED',
@@ -227,11 +325,12 @@ export const startPurchasing = async (
     repName: string,
     tenantId?: string
 ): Promise<void> => {
-    const requestRef = doc(db, 'procurementRequests', requestId);
+    // ✅ Use tenant-scoped collection
+    const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
     
     // Get request data for notification
     const requestSnap = await getDocs(query(
-        collection(db, 'procurementRequests'),
+        collection(db, `tenants/${tenantId}/procurementRequests`),
         where('__name__', '==', requestId)
     ));
     
@@ -280,11 +379,12 @@ export const completePurchase = async (
     totalCost: number,
     notes?: string
 ): Promise<string | null> => {
-    const requestRef = doc(db, 'procurementRequests', requestId);
+    // ✅ Use tenant-scoped collection
+    const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
 
     // Get current request to update items
     const requestSnap = await getDocs(query(
-        collection(db, 'procurementRequests'),
+        collection(db, `tenants/${tenantId}/procurementRequests`),
         where('__name__', '==', requestId)
     ));
 
@@ -382,11 +482,12 @@ export const deliverItems = async (
     repName: string,
     tenantId?: string
 ): Promise<void> => {
-    const requestRef = doc(db, 'procurementRequests', requestId);
+    // ✅ Use tenant-scoped collection
+    const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
     
     // Get request data for notification
     const requestSnap = await getDocs(query(
-        collection(db, 'procurementRequests'),
+        collection(db, `tenants/${tenantId}/procurementRequests`),
         where('__name__', '==', requestId)
     ));
     
@@ -451,11 +552,12 @@ export const confirmReceipt = async (
 ): Promise<string | null> => {
     if (!tenantId) throw new Error('tenantId is required for SaaS isolation');
 
-    const requestRef = doc(db, 'procurementRequests', requestId);
+    // ✅ Use tenant-scoped collection
+    const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
 
     // ✅ Verify tenant match
     const requestSnap = await getDocs(query(
-        collection(db, 'procurementRequests'),
+        collection(db, `tenants/${tenantId}/procurementRequests`),
         where('__name__', '==', requestId),
         where('tenantId', '==', tenantId)
     ));
@@ -668,7 +770,8 @@ export const confirmReceipt = async (
  * Close the procurement request
  */
 export const closeProcurement = async (requestId: string): Promise<void> => {
-    const requestRef = doc(db, 'procurementRequests', requestId);
+    // ✅ Use tenant-scoped collection
+    const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
     await updateDoc(requestRef, {
         status: 'COMPLETED'
     });

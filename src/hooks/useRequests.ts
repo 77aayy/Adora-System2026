@@ -20,6 +20,7 @@ import {
 } from '../services/requestService';
 import { playNewRequestAlert } from '../utils/soundService';
 import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../context/TenantContext';
 
 interface UseRequestsReturn {
     requests: Request[];
@@ -53,6 +54,7 @@ const getUserBranches = (user: any): string[] => {
  */
 export const useRequests = (): UseRequestsReturn => {
     const { user } = useAuth();
+    const { tenantId } = useTenant();
     const [requests, setRequests] = useState<Request[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,7 @@ export const useRequests = (): UseRequestsReturn => {
 
     // Subscribe to requests on mount
     useEffect(() => {
-        if (!user) return;
+        if (!user || !tenantId) return;
 
         setLoading(true);
         setError(null);
@@ -69,7 +71,7 @@ export const useRequests = (): UseRequestsReturn => {
         const branches = getUserBranches(user);
 
         // ✅ Use multi-branch subscription if needed
-        const unsubscribe = subscribeToMultipleBranches(branches, (updatedRequests) => {
+        const unsubscribe = subscribeToMultipleBranches(branches, tenantId, (updatedRequests) => {
             // Check for new requests and play sound
             const newCount = updatedRequests.length;
             if (previousCountRef.current > 0 && newCount > previousCountRef.current) {
@@ -96,22 +98,22 @@ export const useRequests = (): UseRequestsReturn => {
 
         // Cleanup subscription on unmount
         return () => unsubscribe();
-    }, [user]);
+    }, [user, tenantId]);
 
     /**
      * Confirm a request
      */
     const handleConfirm = useCallback(
         async (id: string): Promise<void> => {
-            if (!user) return;
+            if (!user || !tenantId) return;
             try {
-                await confirmRequest(id, user.id, user.name || 'User');
+                await confirmRequest(id, tenantId, user.id, user.name || 'User');
             } catch (err) {
                 setError('فشل في تأكيد الطلب');
                 console.error('Confirm error:', err);
             }
         },
-        [user]
+        [user, tenantId]
     );
 
     /**
@@ -119,15 +121,15 @@ export const useRequests = (): UseRequestsReturn => {
      */
     const handleStart = useCallback(
         async (id: string): Promise<void> => {
-            if (!user) return;
+            if (!user || !tenantId) return;
             try {
-                await startRequest(id, user.id, user.name || 'User');
+                await startRequest(id, tenantId, user.id, user.name || 'User');
             } catch (err) {
                 setError('فشل في بدء العمل');
-                console.error('St work error:', err);
+                console.error('Start work error:', err);
             }
         },
-        [user]
+        [user, tenantId]
     );
 
     /**
@@ -135,15 +137,15 @@ export const useRequests = (): UseRequestsReturn => {
      */
     const handleComplete = useCallback(
         async (id: string, rating?: number, feedback?: string): Promise<void> => {
-            if (!user) return;
+            if (!user || !tenantId) return;
             try {
-                await completeRequest(id, user.id, user.name || 'User', rating, feedback);
+                await completeRequest(id, tenantId, user.id, user.name || 'User', rating, feedback);
             } catch (err) {
                 setError('فشل في إتمام الطلب');
                 console.error('Complete error:', err);
             }
         },
-        [user]
+        [user, tenantId]
     );
 
     /**

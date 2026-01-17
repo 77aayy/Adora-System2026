@@ -82,29 +82,28 @@ export const LanguageSwitcher: React.FC<{ className?: string }> = ({ className =
                 />
             </button>
 
-            {/* Dropdown Menu */}
+            {/* Dropdown Menu - WITHOUT Backdrop, using click outside only */}
             {isOpen && (
-                <>
-                    {/* Backdrop */}
-                    <div 
-                        className="fixed inset-0 z-40"
-                        onClick={() => setIsOpen(false)}
-                    />
-                    
-                    {/* Dropdown */}
-                    <div 
-                        className={`
-                            absolute top-full mt-2 right-0 z-50
-                            w-56 rounded-xl overflow-hidden
-                            animate-in fade-in slide-in-from-top-2 duration-200
-                            bg-white dark:bg-slate-800
-                            border border-slate-200 dark:border-slate-700
-                            shadow-xl
-                        `}
-                        style={{ 
-                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-                        }}
-                    >
+                <div 
+                    className={`
+                        absolute top-full mt-2 right-0
+                        w-56 rounded-xl overflow-hidden
+                        animate-in fade-in slide-in-from-top-2 duration-200
+                        bg-white dark:bg-slate-800
+                        border border-slate-200 dark:border-slate-700
+                        shadow-xl
+                    `}
+                    style={{ 
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        zIndex: 1000,
+                        background: 'white',
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                    }}
+                >
                         <div className="p-2">
                             {LANGUAGES.map((lang) => {
                                 const isActive = lang.code === i18n.language;
@@ -132,7 +131,6 @@ export const LanguageSwitcher: React.FC<{ className?: string }> = ({ className =
                             })}
                         </div>
                     </div>
-                </>
             )}
         </div>
     );

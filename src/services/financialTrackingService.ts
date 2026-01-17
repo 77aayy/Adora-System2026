@@ -24,8 +24,11 @@ import {
     orderBy,
     Timestamp,
     serverTimestamp,
-    increment
+    increment,
+    runTransaction
 } from 'firebase/firestore';
+import { validateTenantId, validateTenantAccess } from './tenantSecurityService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -227,6 +230,7 @@ export async function cancelTransaction(
 
 /**
  * Update room bill summary
+ * ✅ ATOMIC: Uses runTransaction to prevent Race Conditions
  */
 async function updateRoomBillSummary(
     tenantId: string,
@@ -235,48 +239,59 @@ async function updateRoomBillSummary(
     amount: number,
     statusType: 'pending' | 'confirmed' | 'paid'
 ): Promise<void> {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot update room bill summary', undefined, 'financialTrackingService');
+        return;
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
     const summaryRef = doc(
         db,
-        `tenants/${tenantId}/branches/${branchId}/room_bills/${roomNumber}`
+        `tenants/${validatedTenantId}/branches/${branchId}/room_bills/${roomNumber}`
     );
 
-    const updates: any = {
-        roomNumber,
-        lastUpdated: serverTimestamp()
-    };
+    // ✅ ATOMIC TRANSACTION: Update room bill summary
+    await runTransaction(db, async (transaction) => {
+        const summarySnap = await transaction.get(summaryRef);
 
-    if (statusType === 'pending') {
-        updates.pendingAmount = increment(amount);
-        updates.totalAmount = increment(amount);
-    } else if (statusType === 'confirmed') {
-        updates.pendingAmount = increment(-amount);
-        updates.confirmedAmount = increment(amount);
-    } else if (statusType === 'paid') {
-        updates.confirmedAmount = increment(-amount);
-        updates.paidAmount = increment(amount);
-    }
+        if (summarySnap.exists()) {
+            const currentData = summarySnap.data();
+            const updates: any = {
+                roomNumber,
+                lastUpdated: serverTimestamp()
+            };
 
-    const summarySnap = await getDoc(summaryRef);
-    if (summarySnap.exists()) {
-        await updateDoc(summaryRef, updates);
-    } else {
-        await updateDoc(summaryRef, {
-            ...updates,
-            totalAmount: amount,
-            pendingAmount: statusType === 'pending' ? amount : 0,
-            confirmedAmount: statusType === 'confirmed' ? amount : 0,
-            paidAmount: statusType === 'paid' ? amount : 0
-        }).catch(() => {
-            // Document doesn't exist, create it
-            return addDoc(collection(db, `tenants/${tenantId}/branches/${branchId}/room_bills`), {
-                ...updates,
-                totalAmount: amount,
+            if (statusType === 'pending') {
+                updates.pendingAmount = increment(amount);
+                updates.totalAmount = increment(amount);
+            } else if (statusType === 'confirmed') {
+                const currentPending = currentData.pendingAmount || 0;
+                const currentConfirmed = currentData.confirmedAmount || 0;
+                updates.pendingAmount = currentPending - amount; // Use set instead of increment for atomicity
+                updates.confirmedAmount = currentConfirmed + amount;
+            } else if (statusType === 'paid') {
+                const currentConfirmed = currentData.confirmedAmount || 0;
+                const currentPaid = currentData.paidAmount || 0;
+                updates.confirmedAmount = currentConfirmed - amount;
+                updates.paidAmount = currentPaid + amount;
+            }
+
+            transaction.update(summaryRef, updates);
+        } else {
+            // Create new summary
+            const newSummary = {
+                roomNumber,
+                totalAmount: statusType === 'pending' ? amount : 0,
                 pendingAmount: statusType === 'pending' ? amount : 0,
                 confirmedAmount: statusType === 'confirmed' ? amount : 0,
-                paidAmount: statusType === 'paid' ? amount : 0
-            });
-        });
-    }
+                paidAmount: statusType === 'paid' ? amount : 0,
+                lastUpdated: serverTimestamp()
+            };
+            transaction.set(summaryRef, newSummary);
+        }
+    });
 }
 
 /**

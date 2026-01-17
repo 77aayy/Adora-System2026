@@ -442,6 +442,7 @@ export const AdminDashboard: React.FC = () => {
     const isOwner = user?.role === 'owner';
     const navigate = useNavigate();
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     // ✅ Listen for mobile menu toggle from header
     useEffect(() => {
@@ -514,7 +515,10 @@ export const AdminDashboard: React.FC = () => {
                     }
                 `}</style>
                 <aside id="admin-sidebar">
-                    <AdminSidebar isOwner={isOwner} />
+                    <AdminSidebar 
+                        isOwner={isOwner} 
+                        onCollapseChange={setIsSidebarCollapsed}
+                    />
                 </aside>
             </div>
 

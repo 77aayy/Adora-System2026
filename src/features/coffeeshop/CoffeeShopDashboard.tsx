@@ -220,7 +220,7 @@ export const CoffeeShopDashboard: React.FC = () => {
             <div className="h-[88px] sm:h-[96px] lg:h-[92px]" />
             
             <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
-                {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
+            {/* Flexible Header - Actions Only (Greeting in UnifiedManagerHeader) */}
                 <FlexibleHeader
                     title={t('coffeeshop.title') || 'كوفي شوب'}
                     showGreeting={false}
@@ -257,8 +257,17 @@ export const CoffeeShopDashboard: React.FC = () => {
                 </div>
 
                 {/* Stats - الكروت الإحصائية */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div 
+                    className="max-w-7xl mx-auto mb-4"
+                    style={{ padding: '24px' }}
+                >
+                    <div 
+                        className="grid"
+                        style={{
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                            gap: '24px',
+                        }}
+                    >
                     <StatCard
                         count={groupedOrders.new.length}
                         label="🆕 جديد"
@@ -286,6 +295,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                         lastUpdate={t('coffeeshop.lastUpdate')}
                         trend="—"
                     />
+                    </div>
                 </div>
 
                 {/* ✅ تايم لاين الالتزام - تصميم H Rewards */}
@@ -422,8 +432,8 @@ export const CoffeeShopDashboard: React.FC = () => {
                     onComplete={completeTour}
                 />
 
-                {/* 📝 Developer Signature */}
-                {/* Developer Signature is in GlobalFooter (App.tsx) */}
+            {/* 📝 Developer Signature */}
+            {/* Developer Signature is in GlobalFooter (App.tsx) */}
             </div>
         </PageTransition>
     );

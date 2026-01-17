@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Send } from 'lucide-react';
-import { addRequest } from '../../services/requestService';
+import { createRequest } from '../../services/requestService';
 import { Request } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { 
@@ -41,8 +41,8 @@ export const RequestModal: React.FC<RequestModalProps> = ({
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
-            // Using addRequest (deprecated alias for createRequest)
-            await addRequest({
+            // ✅ Use createRequest with tenantId
+            await createRequest({
                 type: serviceType as any, // Cast to avoid old/new enum mismatch
                 roomNumber,
                 guestName: 'ضيف الغرفة ' + roomNumber,
