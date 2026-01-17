@@ -4,7 +4,7 @@
  * Adora Hotel Management System V2
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -25,7 +25,9 @@ import {
     ChevronDown,
     ShoppingCart, // 🛒 Procurement
     Headphones, // 🆘 Support
-    History // 📊 Daily Insight
+    History, // 📊 Daily Insight
+    Wrench,
+    CheckCircle2
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
@@ -148,7 +150,88 @@ const OverviewPage: React.FC = () => {
 
     const totalRooms = rooms.length;
     const occupiedRooms = activeCards.length;
+    const underMaintenance = rooms.filter(r => r.status === 'maintenance' || r.status === 'MAINTENANCE').length;
+    const availableRooms = rooms.filter(r => r.status === 'available' || r.status === 'AVAILABLE').length;
     const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+
+    // Physics Worker Refs for Floor Load Efficiency
+    const workerRef = useRef<Worker | null>(null);
+    const positionsRef = useRef<Float32Array | null>(null);
+    const [floorLoadData, setFloorLoadData] = useState<Array<{ floorNumber: number; loadPercentage: number; maxCapacity: number; currentLoad: number }>>([]);
+
+    // Initialize Physics Worker for Floor Load Efficiency
+    useEffect(() => {
+        if (!tenantId || !branchId || rooms.length === 0) return;
+
+        try {
+            const objectCount = Math.max(rooms.length || 100, 100);
+            const sharedPositions = new SharedArrayBuffer(Float32Array.BYTES_PER_ELEMENT * 2 * objectCount);
+            const sharedVelocities = new SharedArrayBuffer(Float32Array.BYTES_PER_ELEMENT * 2 * objectCount);
+            const positions = new Float32Array(sharedPositions);
+            const velocities = new Float32Array(sharedVelocities);
+
+            for (let i = 0; i < objectCount * 2; i += 2) {
+                positions[i] = Math.random() * 100;
+                positions[i + 1] = Math.random() * 100;
+                velocities[i] = (Math.random() - 0.5) * 2;
+                velocities[i + 1] = (Math.random() - 0.5) * 2;
+            }
+
+            positionsRef.current = positions;
+            workerRef.current = new Worker(
+                new URL('../../workers/physics.worker.ts', import.meta.url),
+                { type: 'module' }
+            );
+
+            workerRef.current.postMessage({
+                type: 'INIT',
+                sharedPositions,
+                sharedVelocities,
+                count: objectCount
+            });
+
+            const calculateFloorLoad = () => {
+                const floorMap = new Map<number, Room[]>();
+                rooms.forEach(room => {
+                    const floor = room.floor || 1;
+                    if (!floorMap.has(floor)) floorMap.set(floor, []);
+                    floorMap.get(floor)!.push(room);
+                });
+
+                const floorData: Array<{ floorNumber: number; loadPercentage: number; maxCapacity: number; currentLoad: number }> = [];
+                floorMap.forEach((floorRooms, floorNumber) => {
+                    const totalRoomsOnFloor = floorRooms.length;
+                    const occupiedOnFloor = floorRooms.filter(r => r.status === 'occupied' || r.status === 'OCCUPIED').length;
+                    const loadPercentage = totalRoomsOnFloor > 0 ? Math.round((occupiedOnFloor / totalRoomsOnFloor) * 100) : 0;
+                    
+                    floorData.push({
+                        floorNumber,
+                        loadPercentage,
+                        maxCapacity: totalRoomsOnFloor,
+                        currentLoad: occupiedOnFloor
+                    });
+                });
+
+                setFloorLoadData(floorData.sort((a, b) => a.floorNumber - b.floorNumber));
+            };
+
+            const interval = setInterval(calculateFloorLoad, 2000);
+            calculateFloorLoad();
+
+            return () => {
+                clearInterval(interval);
+                workerRef.current?.terminate();
+            };
+        } catch (error) {
+            console.error('Failed to initialize physics worker:', error);
+        }
+    }, [tenantId, branchId, rooms]);
+
+    const avgFloorLoadEfficiency = useMemo(() => {
+        if (floorLoadData.length === 0) return 0;
+        const sum = floorLoadData.reduce((acc, floor) => acc + floor.loadPercentage, 0);
+        return Math.round(sum / floorLoadData.length);
+    }, [floorLoadData]);
 
     // 🔮 THE ORACLE: Predictive Staffing Logic
     const oracleForecast = React.useMemo(() => {
@@ -349,6 +432,154 @@ const OverviewPage: React.FC = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* 🏨 Hotel Stats Cards - Turquoise Theme (#40E0D0) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        {/* Total Rooms */}
+                        <div 
+                            className="p-6 rounded-xl transition-all hover:scale-105"
+                            style={{
+                                background: 'rgba(64, 224, 208, 0.1)',
+                                border: '1px solid rgba(64, 224, 208, 0.2)',
+                                boxShadow: '0 4px 16px rgba(64, 224, 208, 0.15)'
+                            }}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-sm opacity-75">
+                                    إجمالي الغرف
+                                </div>
+                                <DoorOpen className="w-5 h-5" style={{ color: '#40E0D0' }} />
+                            </div>
+                            <div className="text-3xl font-bold" style={{ color: '#40E0D0' }}>
+                                {totalRooms}
+                            </div>
+                        </div>
+
+                        {/* Occupied Rooms */}
+                        <div 
+                            className="p-6 rounded-xl transition-all hover:scale-105"
+                            style={{
+                                background: 'rgba(34, 197, 94, 0.1)',
+                                border: '1px solid rgba(34, 197, 94, 0.2)',
+                                boxShadow: '0 4px 16px rgba(34, 197, 94, 0.15)'
+                            }}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-sm opacity-75">
+                                    مشغولة
+                                </div>
+                                <CheckCircle2 className="w-5 h-5 text-green-500" />
+                            </div>
+                            <div className="text-3xl font-bold text-green-500">
+                                {occupiedRooms}
+                            </div>
+                        </div>
+
+                        {/* Under Maintenance */}
+                        <div 
+                            className="p-6 rounded-xl transition-all hover:scale-105"
+                            style={{
+                                background: 'rgba(251, 146, 60, 0.1)',
+                                border: '1px solid rgba(251, 146, 60, 0.2)',
+                                boxShadow: '0 4px 16px rgba(251, 146, 60, 0.15)'
+                            }}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-sm opacity-75">
+                                    قيد الصيانة
+                                </div>
+                                <Wrench className="w-5 h-5 text-orange-500" />
+                            </div>
+                            <div className="text-3xl font-bold text-orange-500">
+                                {underMaintenance}
+                            </div>
+                        </div>
+
+                        {/* Available Rooms */}
+                        <div 
+                            className="p-6 rounded-xl transition-all hover:scale-105"
+                            style={{
+                                background: 'rgba(59, 130, 246, 0.1)',
+                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                boxShadow: '0 4px 16px rgba(59, 130, 246, 0.15)'
+                            }}
+                        >
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-sm opacity-75">
+                                    متاحة
+                                </div>
+                                <CheckCircle2 className="w-5 h-5 text-blue-500" />
+                            </div>
+                            <div className="text-3xl font-bold text-blue-500">
+                                {availableRooms}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 📊 Floor Load Efficiency - Turquoise Theme */}
+                    {floorLoadData.length > 0 && (
+                        <div 
+                            className="p-6 rounded-xl animate-in fade-in slide-in-from-bottom-4 duration-700"
+                            style={{
+                                background: 'rgba(64, 224, 208, 0.1)',
+                                border: '1px solid rgba(64, 224, 208, 0.2)',
+                                boxShadow: '0 8px 32px rgba(64, 224, 208, 0.15)'
+                            }}
+                        >
+                            <div className="flex items-center gap-3 mb-4">
+                                <BarChart3 className="w-6 h-6" style={{ color: '#40E0D0' }} />
+                                <h2 className="text-xl font-bold" style={{ color: '#40E0D0' }}>
+                                    كفاءة تحميل الأدوار
+                                </h2>
+                            </div>
+
+                            {/* Average Efficiency */}
+                            <div className="text-center p-4 rounded-lg mb-4" style={{ background: 'rgba(64, 224, 208, 0.1)' }}>
+                                <div className="text-sm opacity-75 mb-1">
+                                    متوسط الكفاءة
+                                </div>
+                                <div className="text-4xl font-bold" style={{ color: '#40E0D0' }}>
+                                    {avgFloorLoadEfficiency}%
+                                </div>
+                            </div>
+
+                            {/* Floor Details */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {floorLoadData.map((floor) => (
+                                    <div
+                                        key={floor.floorNumber}
+                                        className="p-4 rounded-lg"
+                                        style={{
+                                            background: 'rgba(255, 255, 255, 0.05)',
+                                            border: '1px solid rgba(64, 224, 208, 0.2)'
+                                        }}
+                                    >
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="font-semibold">
+                                                الدور {floor.floorNumber}
+                                            </span>
+                                            <span className="text-sm opacity-75">
+                                                {floor.currentLoad}/{floor.maxCapacity}
+                                            </span>
+                                        </div>
+                                        <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: 'rgba(64, 224, 208, 0.2)' }}>
+                                            <div
+                                                className="h-full transition-all duration-500"
+                                                style={{
+                                                    width: `${floor.loadPercentage}%`,
+                                                    background: 'linear-gradient(90deg, #40E0D0 0%, #14b8a6 100%)',
+                                                    boxShadow: '0 0 12px rgba(64, 224, 208, 0.5)'
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="text-xs mt-1 opacity-75">
+                                            {floor.loadPercentage.toFixed(1)}% محمّل
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* 🔮 Oracle InsightWidget */}
                     {oracleForecast && (

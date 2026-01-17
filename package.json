@@ -15,7 +15,8 @@
         "format:check": "prettier --check \"src/**/*.{ts,tsx,json,css}\"",
         "test": "vitest",
         "test:run": "vitest run",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "deploy-fb": "npm run build && firebase deploy --only hosting"
     },
     "dependencies": {
         "@google/generative-ai": "^0.24.1",
