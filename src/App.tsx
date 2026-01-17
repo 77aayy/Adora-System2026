@@ -36,6 +36,7 @@ import { ProviderComposer } from './components/providers/ProviderComposer';
 import { UXProvider, useUX } from './context/UXContext';
 import { AIProvider } from './context/AIContext';
 import { VoiceInputButton } from './components/shared/VoiceInputButton';
+import { I18nProvider } from './i18n/i18nContext';
 import { useFeatureGate } from './hooks/useFeatureGate';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { ToastContainer } from './components/common/EnhancedToast';
@@ -944,7 +945,8 @@ const App: React.FC = () => {
     // CRITICAL: TenantProvider MUST be first to identify which tenant before loading anything else
     const providers = [
         { Component: TenantProvider },      // 1️⃣ Tenant identification (SaaS context)
-        // ✅ i18n is initialized globally in main.tsx (react-i18next)
+        { Component: I18nProvider },        // 1.5️⃣ Custom i18n provider (for usei18n hook)
+        // ✅ react-i18next is initialized globally in main.tsx (I18nextProvider)
         { Component: ThemeProvider },        // 2️⃣ Visual theme
         { Component: AuthProvider },         // 3️⃣ User authentication
         { Component: GlobalServicesProvider }, // 4️⃣ Global background services
