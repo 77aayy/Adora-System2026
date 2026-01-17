@@ -107,10 +107,15 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const usei18n = (): i18nContextType => {
     const context = useContext(i18nContext);
     if (!context) {
-        // ✅ CRITICAL: This error means usei18n is being called outside I18nProvider
-        // Check that I18nProvider wraps your component tree in main.tsx
-        // Consider using useTranslation from react-i18next instead (recommended)
-        throw new Error('usei18n must be used within i18nProvider. Use useTranslation from react-i18next instead.');
+        // ✅ CRITICAL: Production-safe fallback to prevent white screen
+        // This should never happen if I18nProvider is properly set up in main.tsx
+        // Return fallback instead of throwing to prevent app crash
+        console.error('⚠️ usei18n called outside I18nProvider. Using fallback. Use useTranslation from react-i18next instead.');
+        return {
+            language: 'ar' as const,
+            t: (key: string) => key, // Fallback: return key if no translation
+            changeLanguage: () => {} // No-op fallback
+        };
     }
     return context;
 };
