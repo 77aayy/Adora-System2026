@@ -78,10 +78,8 @@ const checkOwnership = () => {
 // Execute on load
 checkOwnership();
 
-// ✅ CRITICAL: Pre-import Chart.js to ensure vendor-chartjs is in dependency graph
-// This ensures it's added to modulepreload automatically by Vite
-import 'chart.js';
-import 'react-chartjs-2';
+// ✅ CRITICAL: Chart.js is already pre-imported in main.tsx
+// No need to import again here - it causes initialization order issues
 
 // ⚡ Performance: Route preloading
 import { useRoutePreload, preloadAdjacentRoutes } from './hooks/useRoutePreload';
