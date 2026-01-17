@@ -7,7 +7,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { QrCode, AlertTriangle } from 'lucide-react';
-import { logger } from '../services/loggerService';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // ROOM CONTEXT

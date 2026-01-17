@@ -267,8 +267,7 @@ export const PremiumHeader: React.FC = () => {
                                     alt="Adora"
                                     className="h-9 sm:h-10 lg:h-11 w-auto object-contain transition-all duration-300"
                                     style={{ 
-                                        filter: 'var(--logo-filter, none)',
-                                        filter: 'drop-shadow(0 2px 8px rgba(20, 184, 166, 0.2))',
+                                        filter: 'var(--logo-filter, none) drop-shadow(0 2px 8px rgba(20, 184, 166, 0.2))',
                                     }}
                                 />
                             </Link>
