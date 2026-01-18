@@ -252,11 +252,12 @@ export default defineConfig({
                         if (id.includes('xlsx') || id.includes('jspdf')) {
                             return 'vendor-export';
                         }
-                        // ✅ i18n libraries - MUST be separate and load BEFORE vendor chunk
-                        // This prevents circular dependency with App/Context
-                        if (id.includes('i18next') || id.includes('react-i18next')) {
-                            return 'vendor-i18n';
-                        }
+                        // ✅ i18n libraries - MOVE to vendor-react to ensure proper initialization
+                        // This prevents 'Cannot access U before initialization' error
+                        // i18n depends on React, so it should be in the same chunk
+                        // if (id.includes('i18next') || id.includes('react-i18next')) {
+                        //     return 'vendor-i18n';
+                        // }
                         // Lucide icons - large but frequently used
                         if (id.includes('lucide-react')) {
                             return 'vendor-icons';
