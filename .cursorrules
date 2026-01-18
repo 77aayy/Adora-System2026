@@ -22,3 +22,110 @@ We are migrating a legacy Vanilla JS/Firebase project to a modern React + TypeSc
     - Analyze logic in `@OLD_REFERENCE` when requested.
     - EXTRACT the logic, do not just copy-paste.
     - Refactor into clean, type-safe React code.
+
+# 🛡️ Architectural Integrity Rules (CRITICAL - Backbone Protection)
+
+## Core Architecture Knowledge
+
+**High Coupling Awareness:**
+- `AuthContext`, `TenantContext`, and `I18nContext` are the backbone of the entire system
+- **CRITICAL**: Any change in `src/context/` affects ALL features (Reception, Bellman, Coffee Shop, Admin, Owner)
+- Before modifying any Context or Global State, you MUST analyze the dependency tree:
+  - Check which components import from `src/context/`
+  - Verify all features (Reception, Bellman, Housekeeping, Maintenance, Admin, Owner, Guest)
+  - Test downstream effects on Services and Hooks
+
+**Fragile Initialization (We JUST fixed this):**
+- We recently resolved `Cannot access 'U' before initialization` error
+- **STRICT RULE**: `import './i18n'` must ALWAYS be at the top of `main.tsx` (after CSS imports)
+- **NEVER** re-split `vendor-core` chunks in `vite.config.ts` without checking `fixModulePreloadOrder`
+- React + i18next MUST remain in the same `vendor-core` chunk to prevent circular dependencies
+- Do NOT modify `manualChunks` without analyzing potential circular dependency impact
+
+**Performance Bottlenecks:**
+- `SimulationCanvas` (Physics Engine) is HEAVY - real-time calculations require memory efficiency
+- Avoid unnecessary state re-renders in backbone Contexts
+- Use `React.memo` or `useMemo` for any shared logic that feeds multiple features
+- Physics listeners and Firebase real-time subscriptions MUST be cleaned up in `useEffect` returns
+
+**Firebase Strategy:**
+- We use Offline Persistence (multi-tab cache, unlimited)
+- Ensure any data modification considers local cache synchronization
+- Do NOT create new Firestore collections without updating `firestore.rules`
+- Reference `dataDoctorService.ts` and `tenantSeedingService.ts` for collection naming patterns
+
+## Strategic Weak Points (Watch Closely)
+
+**1. Permissions (Firebase Rules):**
+- The "Data Doctor" logs showed we had weak Firebase Rules (recently fixed)
+- **ALWAYS** suggest Secure Rules when creating new collections
+- Check existing rules in `firestore.rules` before adding new collections
+- Support anonymous auth for seeding operations (see `audit_logs` rule pattern)
+
+**2. Memory Leaks:**
+- Physics listeners (SimulationCanvas) MUST be cleaned up
+- Firebase real-time subscriptions (`onSnapshot`) MUST be unsubscribed in `useEffect` return
+- Timers and intervals MUST be cleared in cleanup functions
+- Check all `useEffect` hooks have proper cleanup: `return () => { cleanup() }`
+
+**3. Type Safety:**
+- **NO `any` type allowed** - use predefined interfaces from `src/types/`
+- Common types: `Room`, `Guest`, `Tenant`, `User`, `Request`, `RoomCard`
+- If a type is missing, define it in `src/types/` before using it
+
+**4. Service Layer Isolation:**
+- Firebase/Database operations MUST live in `src/services/`
+- Direct Firestore calls in Components are **STRICTLY PROHIBITED**
+- Use hooks to bridge services → components (pattern: `useXXXService` hook)
+
+## Action Protocol (MANDATORY Before Any Backbone Change)
+
+**If suggesting a change in `src/context/` or `src/services/`:**
+
+1. ✅ **Dependency Analysis FIRST:**
+   ```bash
+   # Check what depends on the file you're changing
+   grep -r "from './context/AuthContext'" src/
+   grep -r "from './services/firebase'" src/
+   ```
+
+2. ✅ **Impact Assessment:**
+   - List all components that import the modified Context/Service
+   - Check all features (Reception, Bellman, Coffee Shop, Admin, Owner, Guest)
+   - Verify no circular dependencies will be introduced
+
+3. ✅ **Build Verification:**
+   - Run `npm run build` after changes
+   - Check for "Circular chunk" warnings
+   - Verify no "Cannot access 'X' before initialization" errors
+
+4. ✅ **Type Safety Check:**
+   - Ensure all types are defined in `src/types/`
+   - No `any` types introduced
+   - Interfaces match Firebase schema (check `FIRESTORE_SCHEMA.md`)
+
+5. ✅ **Firebase Rules Update:**
+   - If creating new collections, update `firestore.rules`
+   - Follow existing patterns (see `audit_logs`, `settings`, `users` rules)
+   - Test with anonymous auth if needed for seeding
+
+**Do NOT guess Firebase collection names** - refer to:
+- `src/services/tenantSeedingService.ts` (seeding logic)
+- `src/services/dataDoctorService.ts` (health check collections)
+- `FIRESTORE_SCHEMA.md` (complete schema reference)
+
+## Zero Guessing Policy
+
+- **If a dependency or logic is unclear** → ASK before changing
+- **If Firebase collection name is unknown** → Check `FIRESTORE_SCHEMA.md` or `tenantSeedingService.ts`
+- **If Context dependency is unclear** → Analyze with `grep` first, then ASK
+- **If build fails after change** → Revert immediately and analyze BEFORE retry
+
+## Success Criteria
+
+After any backbone change, verify:
+- ✅ `npm run build` succeeds without errors
+- ✅ No circular dependency warnings in console
+- ✅ All features (Reception, Bellman, Admin, etc.) still load correctly
+- ✅ No memory leaks (check React DevTools Profiler)
+- ✅ Firebase Rules updated if new collections added
