@@ -251,7 +251,8 @@ export default defineConfig({
                         if (id.includes('xlsx') || id.includes('jspdf')) {
                             return 'vendor-export';
                         }
-                        // i18n libraries
+                        // ✅ i18n libraries - MUST be separate and load BEFORE vendor chunk
+                        // This prevents circular dependency with App/Context
                         if (id.includes('i18next') || id.includes('react-i18next')) {
                             return 'vendor-i18n';
                         }
