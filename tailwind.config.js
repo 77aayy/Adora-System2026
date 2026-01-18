@@ -69,8 +69,9 @@ export default {
                 },
             },
             fontFamily: {
-                sans: ['Inter', 'Tajawal', 'system-ui', 'sans-serif'],
-                arabic: ['Tajawal', 'Arial', 'sans-serif'],
+                sans: ['Inter', 'Tajawal', 'Cairo', 'system-ui', 'sans-serif'],
+                arabic: ['Tajawal', 'Cairo', 'Arial', 'sans-serif'],
+                cairo: ['Cairo', 'Tajawal', 'Arial', 'sans-serif'],
             },
             backdropBlur: {
                 xs: '2px',

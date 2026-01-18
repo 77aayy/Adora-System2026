@@ -1,7 +1,7 @@
 /* ============================================================
    CSS IMPORTS - Must come first (before @tailwind)
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
 @import './styles/design-system.css';
 @import './styles/theme-system.css';
 @import './styles/adora-components.css';
@@ -41,12 +41,12 @@
   /* RTL/LTR direction from html attribute */
   html[dir="rtl"] body {
     direction: rtl;
-    font-family: 'Tajawal', 'Inter', sans-serif;
+    font-family: 'Cairo', 'Tajawal', 'Inter', sans-serif;
   }
 
   html[dir="ltr"] body {
     direction: ltr;
-    font-family: 'Inter', 'Tajawal', sans-serif;
+    font-family: 'Inter', 'Tajawal', 'Cairo', sans-serif;
   }
 
   /* ✅ THEME-AWARE BODY STYLES */
