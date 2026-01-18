@@ -36,16 +36,17 @@ const fixModulePreloadOrder = () => {
             
             if (preloads.length === 0) return;
             
-            // ✅ Sort preloads: vendor-react first, then vendor-i18n (depends on React), then others
+            // ✅ Sort preloads: vendor-core first (contains React + i18n + charts), then others
             const sortOrder = (link: string): number => {
-                if (link.includes('vendor-react')) return 0; // React MUST be first
-                if (link.includes('vendor-i18n')) return 1; // i18n MUST load after React, before other vendors
-                if (link.includes('vendor-charts')) return 2; // Charts depend on React
-                if (link.includes('/vendor-') && !link.includes('vendor-firebase')) return 3;
-                if (link.includes('vendor-firebase')) return 4;
-                if (link.includes('service-')) return 5;
-                if (link.includes('feature-')) return 6;
-                return 7;
+                if (link.includes('vendor-core')) return 0; // Core MUST be first (React + i18n + charts)
+                if (link.includes('app-core')) return 1; // App core (contexts) loads after vendor-core
+                if (link.includes('vendor-react')) return 2; // Legacy name, but load early if exists
+                if (link.includes('vendor-i18n')) return 3; // Legacy name, but load early if exists
+                if (link.includes('/vendor-') && !link.includes('vendor-firebase')) return 4;
+                if (link.includes('vendor-firebase')) return 5;
+                if (link.includes('service-')) return 6;
+                if (link.includes('feature-')) return 7;
+                return 8;
             };
             
             const sortedPreloads = [...preloads].sort((a, b) => sortOrder(a) - sortOrder(b));
@@ -256,12 +257,10 @@ export default defineConfig({
                         if (id.includes('lucide-react')) {
                             return 'vendor-icons';
                         }
-                        // Chart libraries - keep in separate chunk to prevent 'S' initialization errors
-                        if (id.includes('chart.js') || id.includes('react-chartjs-2') || id.includes('recharts')) {
-                            return 'vendor-charts';
-                        }
-                        // ✅ CRITICAL: All other node_modules go to vendor-core to prevent circular dependency
-                        // This prevents "Circular chunk: vendor-core -> vendor -> vendor-core"
+                        // ✅ CRITICAL: Chart libraries MUST be in vendor-core to prevent circular dependency
+                        // Moving charts from vendor-charts to vendor-core prevents "vendor-core -> vendor-charts -> vendor-core" circular dep
+                        // All other node_modules (including chart.js, react-chartjs-2, recharts) go to vendor-core
+                        // This prevents "Circular chunk: vendor-core -> vendor-charts -> vendor-core"
                         return 'vendor-core';
                     }
                     // 2️⃣ الـ Contexts الخاصة بينا (عشان مشكلة الـ U)
