@@ -36,18 +36,17 @@ const fixModulePreloadOrder = () => {
             
             if (preloads.length === 0) return;
             
-            // ✅ Sort preloads: vendor-core first (contains React + i18n + charts), then others
-            const sortOrder = (link: string): number => {
-                if (link.includes('vendor-core')) return 0; // Core MUST be first (React + i18n + charts)
-                if (link.includes('app-core')) return 1; // App core (contexts) loads after vendor-core
-                if (link.includes('vendor-react')) return 2; // Legacy name, but load early if exists
-                if (link.includes('vendor-i18n')) return 3; // Legacy name, but load early if exists
-                if (link.includes('/vendor-') && !link.includes('vendor-firebase')) return 4;
-                if (link.includes('vendor-firebase')) return 5;
-                if (link.includes('service-')) return 6;
-                if (link.includes('feature-')) return 7;
-                return 8;
-            };
+                // ✅ Sort preloads: vendor-core first (contains React + i18n + charts), then others
+                // ✅ OPTIMIZED: Simplified sorting - vendor-core is already merged (React + i18next together)
+                const sortOrder = (link: string): number => {
+                    if (link.includes('vendor-core')) return 0; // Core MUST be first (React + i18n merged together)
+                    if (link.includes('app-core')) return 1; // App core (contexts) loads after vendor-core
+                    if (link.includes('vendor-firebase')) return 2;
+                    if (link.includes('/vendor-')) return 3; // Other vendor chunks (export, icons, etc.)
+                    if (link.includes('service-')) return 4;
+                    if (link.includes('feature-')) return 5;
+                    return 6;
+                };
             
             const sortedPreloads = [...preloads].sort((a, b) => sortOrder(a) - sortOrder(b));
             
@@ -236,31 +235,25 @@ export default defineConfig({
             output: {
                 // ✅ PERFORMANCE: Manual chunks for better code splitting and caching
                 manualChunks: (id) => {
-                    // Vendor chunks - separate by library
+                    // ✅ OPTIMIZED: Simplified chunking - React + i18next merged to prevent "U before initialization" error
                     if (id.includes('node_modules')) {
-                        // 1️⃣ أهم حاجة: الـ Core Libraries لازم تكون مع بعضها في chunk واحد
-                        if (id.includes('node_modules/react/') || 
-                            id.includes('node_modules/react-dom/') ||
-                            id.includes('node_modules/react-i18next/') || // ضيف دي هنا
-                            id.includes('node_modules/i18next/')) {    // وضيف دي هنا
-                            return 'vendor-core';
+                        // 1️⃣ Core Libraries (React + i18next) - MUST be together in same chunk to prevent initialization errors
+                        if (id.includes('react') || id.includes('i18next')) {
+                            return 'vendor-core'; // ✅ Merged together - prevents circular dependency and initialization errors
                         }
-                        // Firebase - large library, separate chunk (loaded after React)
+                        // Firebase - large library, separate chunk
                         if (id.includes('firebase')) {
                             return 'vendor-firebase';
                         }
-                        // Other large vendors (loaded after React and Firebase)
+                        // Other vendors - separate chunks for better caching
                         if (id.includes('xlsx') || id.includes('jspdf')) {
                             return 'vendor-export';
                         }
-                        // Lucide icons - large but frequently used (loaded after React)
                         if (id.includes('lucide-react')) {
                             return 'vendor-icons';
                         }
-                        // ✅ CRITICAL: Chart libraries MUST be in vendor-core to prevent circular dependency
-                        // Moving charts from vendor-charts to vendor-core prevents "vendor-core -> vendor-charts -> vendor-core" circular dep
-                        // All other node_modules (including chart.js, react-chartjs-2, recharts) go to vendor-core
-                        // This prevents "Circular chunk: vendor-core -> vendor-charts -> vendor-core"
+                        // All other node_modules (including chart.js, react-chartjs-2, recharts) - goes to vendor-core
+                        // This prevents circular dependencies and ensures proper initialization order
                         return 'vendor-core';
                     }
                     // 2️⃣ الـ Contexts الخاصة بينا (عشان مشكلة الـ U)
