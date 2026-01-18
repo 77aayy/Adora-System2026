@@ -1,46 +1,50 @@
 /**
  * Chart Components for Analytics
  * Using Chart.js for interactive charts
- * ✅ Fixed: Lazy registration to avoid initialization order issues
+ * ✅ CRITICAL FIX: Lazy import to prevent "Cannot access X before initialization" error
  */
 
-import React, { useEffect, useMemo } from 'react';
-import {
-    Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    BarElement,
-    ArcElement,
-    Title,
-    Tooltip,
-    Legend,
-    Filler
-} from 'chart.js';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import React, { useMemo, lazy, Suspense } from 'react';
 
-// ✅ Lazy registration flag to prevent multiple registrations
-let chartRegistered = false;
+// ✅ SOLUTION: Lazy import chart.js components to break circular dependency
+// Registration happens inside the lazy component to ensure proper initialization order
+const Chart = lazy(async () => {
+    const chartjs = await import('chart.js');
+    const reactChartjs2 = await import('react-chartjs-2');
+    
+    // Register Chart.js components
+    chartjs.Chart.register(
+        chartjs.CategoryScale,
+        chartjs.LinearScale,
+        chartjs.PointElement,
+        chartjs.LineElement,
+        chartjs.BarElement,
+        chartjs.ArcElement,
+        chartjs.Title,
+        chartjs.Tooltip,
+        chartjs.Legend,
+        chartjs.Filler
+    );
+    
+    return { default: reactChartjs2.Line };
+});
 
-// ✅ Register Chart.js components lazily (only once)
-const registerChartJS = () => {
-    if (!chartRegistered) {
-        ChartJS.register(
-            CategoryScale,
-            LinearScale,
-            PointElement,
-            LineElement,
-            BarElement,
-            ArcElement,
-            Title,
-            Tooltip,
-            Legend,
-            Filler
-        );
-        chartRegistered = true;
-    }
-};
+const BarChartComponent = lazy(async () => {
+    const reactChartjs2 = await import('react-chartjs-2');
+    return { default: reactChartjs2.Bar };
+});
+
+const DoughnutChartComponent = lazy(async () => {
+    const reactChartjs2 = await import('react-chartjs-2');
+    return { default: reactChartjs2.Doughnut };
+});
+
+// ✅ Loading fallback for lazy-loaded charts
+const ChartLoader = () => (
+    <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
+    </div>
+);
 
 // ============================================================
 // CHART OPTIONS
@@ -107,11 +111,6 @@ interface LineChartProps {
 }
 
 export const LineChart: React.FC<LineChartProps> = ({ data, title, height = '300px' }) => {
-    // ✅ Ensure Chart.js is registered before rendering
-    useEffect(() => {
-        registerChartJS();
-    }, []);
-
     // ✅ Performance: Memoize chart data to avoid recalculation on every render
     const chartData = useMemo(() => ({
         labels: data.labels,
@@ -129,7 +128,9 @@ export const LineChart: React.FC<LineChartProps> = ({ data, title, height = '300
             {title && (
                 <h3 className="text-lg font-bold text-white mb-4">{title}</h3>
             )}
-            <Line data={chartData} options={defaultOptions} />
+            <Suspense fallback={<ChartLoader />}>
+                <Chart data={chartData} options={defaultOptions} />
+            </Suspense>
         </div>
     );
 };
@@ -152,11 +153,6 @@ interface BarChartProps {
 }
 
 export const BarChart: React.FC<BarChartProps> = ({ data, title, height = '300px' }) => {
-    // ✅ Ensure Chart.js is registered before rendering
-    useEffect(() => {
-        registerChartJS();
-    }, []);
-
     // ✅ Performance: Memoize chart data to avoid recalculation on every render
     const chartData = useMemo(() => ({
         labels: data.labels,
@@ -177,7 +173,9 @@ export const BarChart: React.FC<BarChartProps> = ({ data, title, height = '300px
             {title && (
                 <h3 className="text-lg font-bold text-white mb-4">{title}</h3>
             )}
-            <Bar data={chartData} options={defaultOptions} />
+            <Suspense fallback={<ChartLoader />}>
+                <BarChartComponent data={chartData} options={defaultOptions} />
+            </Suspense>
         </div>
     );
 };
@@ -199,11 +197,6 @@ interface DoughnutChartProps {
 }
 
 export const DoughnutChart: React.FC<DoughnutChartProps> = ({ data, title, height = '300px' }) => {
-    // ✅ Ensure Chart.js is registered before rendering
-    useEffect(() => {
-        registerChartJS();
-    }, []);
-
     // ✅ Performance: Memoize chart data to avoid recalculation on every render
     const chartData = useMemo(() => ({
         labels: data.labels,
@@ -224,7 +217,9 @@ export const DoughnutChart: React.FC<DoughnutChartProps> = ({ data, title, heigh
             {title && (
                 <h3 className="text-lg font-bold text-white mb-4">{title}</h3>
             )}
-            <Doughnut data={chartData} options={defaultOptions} />
+            <Suspense fallback={<ChartLoader />}>
+                <DoughnutChartComponent data={chartData} options={defaultOptions} />
+            </Suspense>
         </div>
     );
 };
