@@ -244,12 +244,9 @@ export default defineConfig({
                         if (id.includes('firebase')) {
                             return 'vendor-firebase';
                         }
-                        // Chart libraries - heavy, separate chunk
-                        // ✅ Note: Keep chart.js and react-chartjs-2 together
-                        // modulepreload order will ensure vendor-react loads first
-                        if (id.includes('chart.js') || id.includes('recharts') || id.includes('react-chartjs')) {
-                            return 'vendor-charts';
-                        }
+                        // ✅ CRITICAL FIX: Don't separate ANY chart library
+                        // Both recharts and chart.js cause "Cannot access 'S' before initialization"
+                        // Keep ALL chart libraries in the main vendor chunk
                         // Other large vendors
                         if (id.includes('xlsx') || id.includes('jspdf')) {
                             return 'vendor-export';
@@ -262,7 +259,7 @@ export default defineConfig({
                         if (id.includes('lucide-react')) {
                             return 'vendor-icons';
                         }
-                        // All other node_modules
+                        // All other node_modules (including recharts AND chart.js now)
                         return 'vendor';
                     }
                     // Feature chunks - split large dashboards
