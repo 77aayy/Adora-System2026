@@ -102,7 +102,14 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 };
 
-// ✅ REMOVED: usei18n hook was deprecated and unused
-// All components now use useTranslation from react-i18next instead
+// ✅ usei18n hook - for backward compatibility
+// All new components should use useTranslation from react-i18next instead
+export const usei18n = (): i18nContextType => {
+    const context = useContext(i18nContext);
+    if (!context) {
+        throw new Error('usei18n must be used within i18nProvider');
+    }
+    return context;
+};
 
 export default I18nProvider;
