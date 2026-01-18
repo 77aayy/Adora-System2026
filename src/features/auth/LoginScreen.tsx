@@ -169,9 +169,29 @@ const LoginScreen: React.FC = () => {
   const greeting = useMemo(() => getDynamicGreeting(t), [t]);
   const GreetingIcon = greeting.icon;
 
-  // Animation on mount
+  // ✅ Animation on mount - Delay to wait for splash/initial loader to disappear
+  const [showLogin, setShowLogin] = useState(false);
+  
   useEffect(() => {
-    setTimeout(() => setMounted(true), 50);
+    // ✅ Wait for splash screen and initial loader to disappear before showing login
+    const checkAndShow = () => {
+      const initialLoader = document.getElementById('initial-loader');
+      const isLoaderHidden = !initialLoader || initialLoader.style.display === 'none' || initialLoader.style.opacity === '0';
+      
+      // Check if splash is shown (via localStorage)
+      const hasShownSplash = localStorage.getItem('adora_splash_shown');
+      
+      // Wait 800ms after initial loader disappears (or 3000ms if splash is showing)
+      // 3000ms = 2500ms splash duration + 300ms fade + 200ms delay for smooth transition
+      const delay = hasShownSplash ? 800 : 3000;
+      
+      setTimeout(() => {
+        setShowLogin(true);
+        setTimeout(() => setMounted(true), 150);
+      }, delay);
+    };
+    
+    checkAndShow();
   }, []);
 
   // 🔐 Check if Firebase is configured - redirect to setup if not
@@ -550,9 +570,12 @@ const LoginScreen: React.FC = () => {
 
 
       <div 
-        className={`w-full max-w-xs sm:max-w-sm relative z-10 transition-all duration-700 px-2 sm:px-0 ${
-          mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        className={`w-full max-w-xs sm:max-w-sm relative z-10 transition-all duration-1000 ease-out px-2 sm:px-0 ${
+          mounted ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-12 scale-95'
         }`}
+        style={{
+          animation: mounted ? 'loginEntrance 0.8s ease-out forwards' : 'none'
+        }}
       >
         {/* Logo & Dynamic Greeting - Compact for Mobile */}
         <div className="text-center mb-4 sm:mb-6">
@@ -1326,6 +1349,22 @@ const LoginScreen: React.FC = () => {
         }
         .animate-spin-very-slow {
           animation: spinVerySlow 30s linear infinite;
+        }
+        
+        /* ✅ Beautiful login entrance animation */
+        @keyframes loginEntrance {
+          0% {
+            opacity: 0;
+            transform: translateY(40px) scale(0.95);
+          }
+          60% {
+            opacity: 0.8;
+            transform: translateY(-5px) scale(1.02);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
       `}</style>
       </div>
