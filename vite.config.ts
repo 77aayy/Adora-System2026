@@ -237,33 +237,30 @@ export default defineConfig({
                 manualChunks: (id) => {
                     // Vendor chunks - separate by library
                     if (id.includes('node_modules')) {
-                        // React core - MUST be first to avoid circular dependencies
-                        if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+                        // React core + i18n - MUST be first to avoid circular dependencies
+                        // ✅ i18n MUST be with React to prevent 'Cannot access U before initialization'
+                        if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') 
+                            || id.includes('i18next') || id.includes('react-i18next')) {
                             return 'vendor-react';
                         }
-                        // Firebase - large library, separate chunk
+                        // Firebase - large library, separate chunk (loaded after React)
                         if (id.includes('firebase')) {
                             return 'vendor-firebase';
                         }
-                        // ✅ CRITICAL FIX: Don't separate ANY chart library
-                        // Both recharts and chart.js cause "Cannot access 'S' before initialization"
-                        // Keep ALL chart libraries in the main vendor chunk
-                        // Other large vendors
+                        // Other large vendors (loaded after React and Firebase)
                         if (id.includes('xlsx') || id.includes('jspdf')) {
                             return 'vendor-export';
                         }
-                        // ✅ i18n libraries - MOVE to vendor-react to ensure proper initialization
-                        // This prevents 'Cannot access U before initialization' error
-                        // i18n depends on React, so it should be in the same chunk
-                        // if (id.includes('i18next') || id.includes('react-i18next')) {
-                        //     return 'vendor-i18n';
-                        // }
-                        // Lucide icons - large but frequently used
+                        // Lucide icons - large but frequently used (loaded after React)
                         if (id.includes('lucide-react')) {
                             return 'vendor-icons';
                         }
-                        // All other node_modules (including recharts AND chart.js now)
-                        return 'vendor';
+                        // ✅ CRITICAL FIX: Don't separate ANY chart library or i18n
+                        // Both recharts and chart.js cause "Cannot access 'S' before initialization"
+                        // Keep ALL chart libraries in vendor-react to avoid circular deps
+                        // All other node_modules (including recharts, chart.js) go to vendor-react
+                        // This prevents "Circular chunk: vendor-react -> vendor -> vendor-react"
+                        return 'vendor-react'; // ✅ Merge with vendor-react to prevent circular dependency
                     }
                     // Feature chunks - split large dashboards
                     if (id.includes('/features/reception/')) {
