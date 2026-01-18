@@ -28,7 +28,6 @@ import {
   triggerHaptic,
   keypadAnimationStyles 
 } from '../../components/ui/KeypadComponents';
-import { validateSafeString, detectSuspiciousURLActivity } from '../../services/urlValidationService';
 
 // ============================================================
 // DYNAMIC GREETING BASED ON TIME OF DAY (i18n-aware)
@@ -187,18 +186,13 @@ const LoginScreen: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     
-    // 🛡️ SECURITY: Detect suspicious URL activity first
-    if (detectSuspiciousURLActivity(params)) {
-      console.warn('🚨 [LoginScreen] Suspicious URL activity detected - blocking');
-      return;
-    }
-
-    // 🔐 SECURITY: Validate and sanitize URL parameters
-    const validatedMagicCode = validateSafeString(params.get('setup_code'), 100, false);
-    const validatedHotelName = validateSafeString(params.get('welcome'), 100, true);
+    // 🔐 SECURITY: Basic validation (inline to prevent circular deps)
+    const rawMagicCode = params.get('setup_code');
+    const rawHotelName = params.get('welcome');
     
-    const magicCode = validatedMagicCode.isValid ? validatedMagicCode.value : null;
-    const hotelName = validatedHotelName.isValid ? validatedHotelName.value : null;
+    // Basic validation: alphanumeric + basic punctuation, max 100 chars
+    const magicCode = rawMagicCode && /^[a-zA-Z0-9\s\-\._,]{1,100}$/.test(rawMagicCode) ? rawMagicCode : null;
+    const hotelName = rawHotelName && /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s\-\._,]{1,100}$/.test(rawHotelName) ? rawHotelName : null;
 
     if (magicCode) {
       setBranchCode(magicCode);

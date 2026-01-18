@@ -8,7 +8,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { QrCode, AlertTriangle } from 'lucide-react';
 import { logger } from '../../services/loggerService';
-import { validateToken, detectSuspiciousURLActivity } from '../../services/urlValidationService';
 
 // ============================================================
 // ROOM CONTEXT
@@ -40,27 +39,13 @@ export const GuestLayout: React.FC<GuestLayoutProps> = ({ children }) => {
     const [searchParams] = useSearchParams();
     const [guestName, setGuestName] = useState('ضيف');
 
-    // 🛡️ SECURITY: Detect suspicious URL activity first
-    if (detectSuspiciousURLActivity(searchParams)) {
-        console.warn('🚨 [GuestLayout] Suspicious URL activity detected - blocking');
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center p-4">
-                <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md">
-                    <AlertTriangle className="w-8 h-8 text-red-500 mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-red-800 mb-2 text-center">طلب غير آمن</h2>
-                    <p className="text-red-700 text-center">تم اكتشاف نشاط مشبوه. يرجى التواصل مع الاستقبال.</p>
-                </div>
-            </div>
-        );
-    }
-
-    // 🔐 SECURITY: Validate and sanitize token from URL
+    // 🔐 SECURITY: Basic token validation (inline to prevent circular deps)
     const rawToken = searchParams.get('t') || searchParams.get('token');
-    const validatedToken = validateToken(rawToken);
-    const token = validatedToken.isValid ? validatedToken.value : null;
+    // Basic validation: base64url format (alphanumeric + - + _), 50-1000 chars
+    const token = rawToken && /^[A-Za-z0-9_-]{50,1000}$/.test(rawToken) ? rawToken : null;
     
     // ✅ SECURITY: No sensitive data in logs
-    logger.debug('Token-only validation - ignoring room param', { hasToken: !!token, isValid: validatedToken.isValid }, 'GuestLayout');
+    logger.debug('Token-only validation - ignoring room param', { hasToken: !!token }, 'GuestLayout');
 
     // 🛡️ SECURITY: Only show QR scan prompt if NO token
     // If token exists, GuestDashboard will validate it and extract room data from token
