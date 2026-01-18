@@ -16,11 +16,6 @@ import {
     validateDemoKey,
     DEMO_CONSTANTS 
 } from '../../services/demoFactory';
-import { 
-    validateDemoKey as validateDemoKeyParam,
-    validateDocumentID,
-    detectSuspiciousURLActivity 
-} from '../../services/urlValidationService';
 import { useTranslation } from 'react-i18next';
 
 export const DemoEntry: React.FC = () => {
@@ -34,50 +29,19 @@ export const DemoEntry: React.FC = () => {
     useEffect(() => {
         const initializeDemo = async () => {
             try {
-                // 🛡️ SECURITY: Detect suspicious URL activity first
-                if (detectSuspiciousURLActivity(searchParams)) {
-                    console.warn('🚨 [DemoEntry] Suspicious URL activity detected - blocking');
-                    setError(t('demo.securityError') || 'Invalid request detected');
-                    setStatus('error');
-                    setTimeout(() => navigate('/login'), 3000);
-                    return;
-                }
+                // 🔐 SECURITY: Basic validation (inline to prevent circular deps)
+                const rawKey = searchParams.get('key');
+                const rawTenantId = searchParams.get('tenantId');
+                const rawBranchId = searchParams.get('branchId');
+                
+                // Basic validation: alphanumeric + hyphen for IDs, 20-50 chars for key
+                const key = rawKey && /^[a-zA-Z0-9-]{20,50}$/.test(rawKey) ? rawKey : null;
+                const tenantId = rawTenantId && /^[a-zA-Z0-9_-]{1,1500}$/.test(rawTenantId) ? rawTenantId : null;
+                const branchId = rawBranchId && /^[a-zA-Z0-9_-]{1,1500}$/.test(rawBranchId) ? rawBranchId : null;
 
-                // 🔐 SECURITY: Validate and sanitize all URL parameters
-                const validatedKey = validateDemoKeyParam(searchParams.get('key'));
-                const validatedTenantId = validateDocumentID(searchParams.get('tenantId'), 'Tenant ID');
-                const validatedBranchId = validateDocumentID(searchParams.get('branchId'), 'Branch ID');
-
-                // 1. Get validated parameters from URL
-                const key = validatedKey.isValid ? validatedKey.value : null;
-                const tenantId = validatedTenantId.isValid ? validatedTenantId.value : null;
-                const branchId = validatedBranchId.isValid ? validatedBranchId.value : null;
-
-                // 2. Validate demo key (if provided)
+                // Validate demo key (if provided)
                 if (key && !validateDemoKey(key)) {
                     setError(t('demo.invalidKey') || 'Invalid demo key');
-                    setStatus('error');
-                    setTimeout(() => navigate('/login'), 3000);
-                    return;
-                }
-
-                // 3. Report validation errors if any
-                if (!validatedKey.isValid && searchParams.get('key')) {
-                    setError(validatedKey.error || t('demo.invalidKey') || 'Invalid demo key');
-                    setStatus('error');
-                    setTimeout(() => navigate('/login'), 3000);
-                    return;
-                }
-
-                if (!validatedTenantId.isValid && searchParams.get('tenantId')) {
-                    setError(validatedTenantId.error || 'Invalid tenant ID');
-                    setStatus('error');
-                    setTimeout(() => navigate('/login'), 3000);
-                    return;
-                }
-
-                if (!validatedBranchId.isValid && searchParams.get('branchId')) {
-                    setError(validatedBranchId.error || 'Invalid branch ID');
                     setStatus('error');
                     setTimeout(() => navigate('/login'), 3000);
                     return;
