@@ -36,15 +36,16 @@ const fixModulePreloadOrder = () => {
             
             if (preloads.length === 0) return;
             
-            // ✅ Sort preloads: vendor-react first, then vendor-charts (depends on React), then others
+            // ✅ Sort preloads: vendor-react first, then vendor-i18n (depends on React), then others
             const sortOrder = (link: string): number => {
                 if (link.includes('vendor-react')) return 0; // React MUST be first
-                if (link.includes('vendor-charts')) return 1; // Charts depend on React
-                if (link.includes('/vendor-') && !link.includes('vendor-firebase')) return 2;
-                if (link.includes('vendor-firebase')) return 3;
-                if (link.includes('service-')) return 4;
-                if (link.includes('feature-')) return 5;
-                return 6;
+                if (link.includes('vendor-i18n')) return 1; // i18n MUST load after React, before other vendors
+                if (link.includes('vendor-charts')) return 2; // Charts depend on React
+                if (link.includes('/vendor-') && !link.includes('vendor-firebase')) return 3;
+                if (link.includes('vendor-firebase')) return 4;
+                if (link.includes('service-')) return 5;
+                if (link.includes('feature-')) return 6;
+                return 7;
             };
             
             const sortedPreloads = [...preloads].sort((a, b) => sortOrder(a) - sortOrder(b));
