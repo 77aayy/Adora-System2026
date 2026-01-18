@@ -237,11 +237,12 @@ export default defineConfig({
                 manualChunks: (id) => {
                     // Vendor chunks - separate by library
                     if (id.includes('node_modules')) {
-                        // React core + i18n - MUST be first to avoid circular dependencies
-                        // ✅ i18n MUST be with React to prevent 'Cannot access U before initialization'
-                        if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') 
-                            || id.includes('i18next') || id.includes('react-i18next')) {
-                            return 'vendor-react';
+                        // 1️⃣ أهم حاجة: الـ Core Libraries لازم تكون مع بعضها في chunk واحد
+                        if (id.includes('node_modules/react/') || 
+                            id.includes('node_modules/react-dom/') ||
+                            id.includes('node_modules/react-i18next/') || // ضيف دي هنا
+                            id.includes('node_modules/i18next/')) {    // وضيف دي هنا
+                            return 'vendor-core';
                         }
                         // Firebase - large library, separate chunk (loaded after React)
                         if (id.includes('firebase')) {
@@ -255,12 +256,17 @@ export default defineConfig({
                         if (id.includes('lucide-react')) {
                             return 'vendor-icons';
                         }
-                        // ✅ CRITICAL FIX: Don't separate ANY chart library or i18n
-                        // Both recharts and chart.js cause "Cannot access 'S' before initialization"
-                        // Keep ALL chart libraries in vendor-react to avoid circular deps
-                        // All other node_modules (including recharts, chart.js) go to vendor-react
-                        // This prevents "Circular chunk: vendor-react -> vendor -> vendor-react"
-                        return 'vendor-react'; // ✅ Merge with vendor-react to prevent circular dependency
+                        // Chart libraries - keep in separate chunk to prevent 'S' initialization errors
+                        if (id.includes('chart.js') || id.includes('react-chartjs-2') || id.includes('recharts')) {
+                            return 'vendor-charts';
+                        }
+                        // ✅ CRITICAL: All other node_modules go to vendor-core to prevent circular dependency
+                        // This prevents "Circular chunk: vendor-core -> vendor -> vendor-core"
+                        return 'vendor-core';
+                    }
+                    // 2️⃣ الـ Contexts الخاصة بينا (عشان مشكلة الـ U)
+                    if (id.includes('/src/context/') || id.includes('/src/i18n/')) {
+                        return 'app-core'; // افصل الـ contexts في chunk لوحدها تتحمل بدري
                     }
                     // Feature chunks - split large dashboards
                     if (id.includes('/features/reception/')) {

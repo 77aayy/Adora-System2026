@@ -1,20 +1,21 @@
 // main.tsx
-// 1. ✅ CSS أولاً (MUST load before any component)
-import './index.css';
-import './styles/animations.css';
-import './styles/design-system.css';
-import './styles/guest-unified.css';
+// 1. ✅ استيراد ملف الإعدادات الأول تمااااااماً (يُحمّل side effects ويأخذ instance)
+import './i18n';
 
 // 2. ✅ React الأساسيات
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
-// 3. ✅ i18n config (يُحمّل side effects ويأخذ instance)
-import i18n from './i18n'; // This loads i18n.init() AND exports the instance
+// 3. ✅ استيراد الـ Providers
+import { I18nProvider } from './context/I18nContext';
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n'; // تأكد إن المسار ده صح
 
-// 4. ✅ الـ Providers (من الأقل اعتمادية للأكثر)
-import { I18nProvider } from './context/I18nContext'; // Custom I18nProvider (نظيف - لا dependencies)
-import { I18nextProvider } from 'react-i18next'; // react-i18next Provider
+// 4. ✅ CSS (يمكن تحميله بعد React)
+import './index.css';
+import './styles/animations.css';
+import './styles/design-system.css';
+import './styles/guest-unified.css';
 
 // 5. ✅ التطبيق نفسه (آخر شيء)
 import App from './App';
