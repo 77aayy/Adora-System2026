@@ -39,7 +39,7 @@ import {
 // ============================================================
 
 const MIN_CLEANING_TIME_MS = 10 * 60 * 1000; // 10 minutes minimum for "quality" cleaning
-const AUDIT_LOG_COLLECTION = 'data_doctor_logs';
+const AUDIT_LOG_COLLECTION = 'audit_logs'; // ✅ Use audit_logs (has rules) instead of data_doctor_logs
 
 export interface AuditLog {
     id?: string;

@@ -164,6 +164,13 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     
+    // 🏥 Data Doctor logs (for seeding and health checks)
+    match /data_doctor_logs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null; // Allow any authenticated user (includes anonymous auth for seeding)
+      allow update, delete: if false;
+    }
+    
     // 🧾 Receipts & Invoices
     match /receiptVouchers/{id} {
       allow read, write: if request.auth != null && (
