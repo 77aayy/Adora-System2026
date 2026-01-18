@@ -1,57 +1,17 @@
-/**
- * @license Property of Ayman Ahmed - Adora Hotels Management System
- * Application Entry Point
- * Adora Hotel Management System V2
- */
-
+// main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { I18nextProvider } from 'react-i18next';
-import { I18nProvider } from './i18n/i18nContext';
 import App from './App';
-import './index.css';
-import './styles/animations.css';
-import './styles/design-system.css';
-import './styles/guest-unified.css';
+import { I18nProvider } from './context/I18nContext'; 
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n'; // تأكد إن ده ملف الإعدادات الأصلي (i18n.ts/js)
 
-// Initialize i18n (Arabic/English)
-import i18n from './i18n';
-
-// ✅ REMOVED: Chart.js pre-import causes circular dependency issues in development
-// Chart.js will be loaded on-demand when needed in components that use it
-
-// ✅ Force unregister Service Workers in development to prevent caching issues
-if (import.meta.env.DEV) {
-    // Unregister all service workers
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-            for (const registration of registrations) {
-                registration.unregister();
-                console.log('🔄 Service Worker unregistered for fresh development');
-            }
-        });
-    }
-    
-    // Clear all caches
-    if ('caches' in window) {
-        caches.keys().then((names) => {
-            for (const name of names) {
-                caches.delete(name);
-                console.log(`🧹 Cache "${name}" cleared`);
-            }
-        });
-    }
-}
-
-// ✅ CRITICAL: I18nProvider MUST be the absolute top parent
-// It must wrap EVERYTHING, including StrictMode, to ensure usei18n hook is available everywhere
 ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
     <I18nProvider>
-        <React.StrictMode>
-            <I18nextProvider i18n={i18n}>
-                <App />
-            </I18nextProvider>
-        </React.StrictMode>
+      <I18nextProvider i18n={i18n}>
+        <App />
+      </I18nextProvider>
     </I18nProvider>
+  </React.StrictMode>
 );
-

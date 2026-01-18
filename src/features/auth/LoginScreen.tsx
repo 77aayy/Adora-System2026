@@ -28,6 +28,7 @@ import {
   triggerHaptic,
   keypadAnimationStyles 
 } from '../../components/ui/KeypadComponents';
+import { validateSafeString, detectSuspiciousURLActivity } from '../../services/urlValidationService';
 
 // ============================================================
 // DYNAMIC GREETING BASED ON TIME OF DAY (i18n-aware)
@@ -185,8 +186,19 @@ const LoginScreen: React.FC = () => {
   // Magic link handling
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const magicCode = params.get('setup_code');
-    const hotelName = params.get('welcome');
+    
+    // 🛡️ SECURITY: Detect suspicious URL activity first
+    if (detectSuspiciousURLActivity(params)) {
+      console.warn('🚨 [LoginScreen] Suspicious URL activity detected - blocking');
+      return;
+    }
+
+    // 🔐 SECURITY: Validate and sanitize URL parameters
+    const validatedMagicCode = validateSafeString(params.get('setup_code'), 100, false);
+    const validatedHotelName = validateSafeString(params.get('welcome'), 100, true);
+    
+    const magicCode = validatedMagicCode.isValid ? validatedMagicCode.value : null;
+    const hotelName = validatedHotelName.isValid ? validatedHotelName.value : null;
 
     if (magicCode) {
       setBranchCode(magicCode);
@@ -194,7 +206,7 @@ const LoginScreen: React.FC = () => {
       showInfo(hotelName ? (t('auth.welcomeToHotel', { hotel: hotelName }) || `مرحباً بك في ${hotelName}!`) : (t('auth.welcomeToAdora') || 'مرحباً بك في Adora!'));
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, [showInfo]);
+  }, [showInfo, t]);
 
   // Check biometric support
   useEffect(() => {

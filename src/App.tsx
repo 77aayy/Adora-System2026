@@ -47,6 +47,7 @@ import { BroadcastMessages } from './components/system/BroadcastMessages';
 import { UpdateNotifications } from './components/system/UpdateNotifications';
 import { PremiumHeader } from './components/layout/PremiumHeader';
 import { useTranslation } from 'react-i18next';
+import { validateTab, detectSuspiciousURLActivity } from './services/urlValidationService';
 import './index.css';
 
 // ============================================================
@@ -136,7 +137,10 @@ const NavigationBar: React.FC<{
     
     // ✅ OWNER TABS - useSearchParams MUST be called before any conditional returns
     const [searchParams, setSearchParams] = useSearchParams();
-    const currentTab = searchParams.get('tab') || 'overview';
+    
+    // 🛡️ SECURITY: Validate tab parameter from URL
+    const validatedTab = validateTab(searchParams.get('tab'));
+    const currentTab = validatedTab.isValid ? (validatedTab.value || 'overview') : 'overview';
 
     // ✅ Load branch name
     React.useEffect(() => {
