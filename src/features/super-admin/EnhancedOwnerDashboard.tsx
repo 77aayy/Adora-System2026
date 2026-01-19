@@ -996,15 +996,8 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         <div className="flex items-center gap-2 sm:gap-3 w-full">
                             {/* ✅ Sidebar is always visible - No hamburger menu needed */}
 
-                            {/* 📱 MOBILE: Show current tab name with menu button */}
+                            {/* 📱 MOBILE: Show current tab name only (hamburger button is in header) */}
                             <div className="flex md:hidden items-center gap-2 flex-1 min-w-0">
-                                <button
-                                    onClick={() => setShowMobileMenu(true)}
-                                    className="w-9 h-9 rounded-lg bg-primary-500/20 hover:bg-primary-500/30 text-primary-500 border border-primary-500/30 flex items-center justify-center transition-all flex-shrink-0 shadow-md"
-                                    aria-label="فتح القائمة"
-                                >
-                                    <Menu className="w-5 h-5" />
-                                </button>
                                 {(() => {
                                     const tabs = [
                                         { id: 'overview', label: t('admin.overview'), icon: LayoutDashboard, key: 'overview' },
