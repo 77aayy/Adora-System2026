@@ -257,31 +257,41 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
     const loadData = async () => {
         setLoading(true);
         try {
+            console.log('🔄 [BillingDashboard] Starting to load data...');
+            
             // ✅ REAL DATA: Load all subscriptions directly
             const allSubs = await getAllSubscriptions();
+            console.log(`✅ [BillingDashboard] Loaded ${allSubs.length} subscriptions`);
             setSubscriptions(allSubs);
 
             // ✅ Load receipt vouchers (سندات القبض)
             const vouchers = await getAllReceiptVouchers();
+            console.log(`✅ [BillingDashboard] Loaded ${vouchers.length} receipt vouchers`, vouchers);
             setReceiptVouchers(vouchers);
 
             // ✅ Load expense vouchers (سندات الصرف)
             const expenseVouchersData = await getAllExpenseVouchers();
+            console.log(`✅ [BillingDashboard] Loaded ${expenseVouchersData.length} expense vouchers`, expenseVouchersData);
             setExpenseVouchers(expenseVouchersData);
 
             // ✅ Load all invoices
             const allInvs = await getAllInvoices();
+            console.log(`✅ [BillingDashboard] Loaded ${allInvs.length} invoices`, allInvs);
             setInvoices(allInvs);
 
             // Load expiring subscriptions
             const expiringSubs = await getExpiringSubscriptions(7);
+            console.log(`✅ [BillingDashboard] Loaded ${expiringSubs.length} expiring subscriptions`);
             setExpiring(expiringSubs);
 
             // Load overdue invoices
             const overdueInvs = await getOverdueInvoices();
+            console.log(`✅ [BillingDashboard] Loaded ${overdueInvs.length} overdue invoices`);
             setOverdue(overdueInvs);
+            
+            console.log('✅ [BillingDashboard] Data loading completed successfully');
         } catch (error) {
-            console.error('Error loading billing data:', error);
+            console.error('❌ [BillingDashboard] Error loading billing data:', error);
         } finally {
             setLoading(false);
         }

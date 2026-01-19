@@ -268,27 +268,63 @@ export const createReceiptVoucher = async (voucher: Omit<ReceiptVoucher, 'id' | 
 
 /**
  * Get all receipt vouchers (for owner dashboard)
+ * ✅ FIX: Filter deleted vouchers and add null check
+ * ✅ FIX: Use fallback to avoid composite index requirement
  */
 export const getAllReceiptVouchers = async (): Promise<ReceiptVoucher[]> => {
     try {
-        const q = query(
-            collection(db, 'receiptVouchers'),
-            orderBy('createdAt', 'desc')
-        );
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                voucherNumber: data.voucherNumber || null,
-                createdAt: data.createdAt?.toDate() || new Date(),
-                deletedAt: data.deletedAt?.toDate(),
-                isDeleted: data.isDeleted || false
-            } as ReceiptVoucher;
-        });
+        if (!db) {
+            console.error('Database not initialized');
+            return [];
+        }
+        
+        // ✅ Try with filter first (requires composite index)
+        try {
+            const q = query(
+                collection(db, 'receiptVouchers'),
+                where('isDeleted', '==', false),
+                orderBy('createdAt', 'desc')
+            );
+            const snapshot = await getDocs(q);
+            const results = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    voucherNumber: data.voucherNumber || null,
+                    createdAt: data.createdAt?.toDate() || new Date(),
+                    deletedAt: data.deletedAt?.toDate(),
+                    isDeleted: data.isDeleted || false
+                } as ReceiptVoucher;
+            });
+            console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (with filter)`);
+            return results;
+        } catch (indexError: any) {
+            // ✅ Fallback: Load all and filter in code (no index required)
+            console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
+            const q = query(
+                collection(db, 'receiptVouchers'),
+                orderBy('createdAt', 'desc')
+            );
+            const snapshot = await getDocs(q);
+            const results = snapshot.docs
+                .map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data,
+                        voucherNumber: data.voucherNumber || null,
+                        createdAt: data.createdAt?.toDate() || new Date(),
+                        deletedAt: data.deletedAt?.toDate(),
+                        isDeleted: data.isDeleted || false
+                    } as ReceiptVoucher;
+                })
+                .filter(v => !v.isDeleted); // Filter in code as fallback
+            console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (fallback, filtered)`);
+            return results;
+        }
     } catch (error) {
-        console.error('Error getting receipt vouchers:', error);
+        console.error('❌ [billingService] Error getting receipt vouchers:', error);
         return [];
     }
 };
@@ -648,29 +684,67 @@ export const getInvoices = async (tenantId: string): Promise<Invoice[]> => {
 
 /**
  * Get all invoices (for owner/admin)
+ * ✅ FIX: Filter deleted invoices and add null check
+ * ✅ FIX: Use fallback to avoid composite index requirement
  */
 export const getAllInvoices = async (): Promise<Invoice[]> => {
     try {
-        const q = query(
-            collection(db, 'invoices'),
-            orderBy('issueDate', 'desc')
-        );
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                invoiceNumber: data.invoiceNumber || null,
-                issueDate: data.issueDate?.toDate() || new Date(),
-                dueDate: data.dueDate?.toDate() || new Date(),
-                paidDate: data.paidDate?.toDate(),
-                deletedAt: data.deletedAt?.toDate(),
-                isDeleted: data.isDeleted || false
-            } as Invoice;
-        });
+        if (!db) {
+            console.error('Database not initialized');
+            return [];
+        }
+        
+        // ✅ Try with filter first (requires composite index)
+        try {
+            const q = query(
+                collection(db, 'invoices'),
+                where('isDeleted', '==', false),
+                orderBy('issueDate', 'desc')
+            );
+            const snapshot = await getDocs(q);
+            const results = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    invoiceNumber: data.invoiceNumber || null,
+                    issueDate: data.issueDate?.toDate() || new Date(),
+                    dueDate: data.dueDate?.toDate() || new Date(),
+                    paidDate: data.paidDate?.toDate(),
+                    deletedAt: data.deletedAt?.toDate(),
+                    isDeleted: data.isDeleted || false
+                } as Invoice;
+            });
+            console.log(`✅ [billingService] Loaded ${results.length} invoices (with filter)`);
+            return results;
+        } catch (indexError: any) {
+            // ✅ Fallback: Load all and filter in code (no index required)
+            console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
+            const q = query(
+                collection(db, 'invoices'),
+                orderBy('issueDate', 'desc')
+            );
+            const snapshot = await getDocs(q);
+            const results = snapshot.docs
+                .map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data,
+                        invoiceNumber: data.invoiceNumber || null,
+                        issueDate: data.issueDate?.toDate() || new Date(),
+                        dueDate: data.dueDate?.toDate() || new Date(),
+                        paidDate: data.paidDate?.toDate(),
+                        deletedAt: data.deletedAt?.toDate(),
+                        isDeleted: data.isDeleted || false
+                    } as Invoice;
+                })
+                .filter(inv => !inv.isDeleted); // Filter in code as fallback
+            console.log(`✅ [billingService] Loaded ${results.length} invoices (fallback, filtered)`);
+            return results;
+        }
     } catch (error) {
-        console.error('Error getting all invoices:', error);
+        console.error('❌ [billingService] Error getting all invoices:', error);
         return [];
     }
 };
@@ -806,27 +880,63 @@ export const createExpenseVoucher = async (
 
 /**
  * Get all expense vouchers (for owner/admin)
+ * ✅ FIX: Filter deleted vouchers and add null check
+ * ✅ FIX: Use fallback to avoid composite index requirement
  */
 export const getAllExpenseVouchers = async (): Promise<ExpenseVoucher[]> => {
     try {
-        const q = query(
-            collection(db, 'expenseVouchers'),
-            orderBy('createdAt', 'desc')
-        );
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                voucherNumber: data.voucherNumber || null,
-                createdAt: data.createdAt?.toDate() || new Date(),
-                deletedAt: data.deletedAt?.toDate(),
-                isDeleted: data.isDeleted || false
-            } as ExpenseVoucher;
-        });
+        if (!db) {
+            console.error('Database not initialized');
+            return [];
+        }
+        
+        // ✅ Try with filter first (requires composite index)
+        try {
+            const q = query(
+                collection(db, 'expenseVouchers'),
+                where('isDeleted', '==', false),
+                orderBy('createdAt', 'desc')
+            );
+            const snapshot = await getDocs(q);
+            const results = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    voucherNumber: data.voucherNumber || null,
+                    createdAt: data.createdAt?.toDate() || new Date(),
+                    deletedAt: data.deletedAt?.toDate(),
+                    isDeleted: data.isDeleted || false
+                } as ExpenseVoucher;
+            });
+            console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (with filter)`);
+            return results;
+        } catch (indexError: any) {
+            // ✅ Fallback: Load all and filter in code (no index required)
+            console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
+            const q = query(
+                collection(db, 'expenseVouchers'),
+                orderBy('createdAt', 'desc')
+            );
+            const snapshot = await getDocs(q);
+            const results = snapshot.docs
+                .map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data,
+                        voucherNumber: data.voucherNumber || null,
+                        createdAt: data.createdAt?.toDate() || new Date(),
+                        deletedAt: data.deletedAt?.toDate(),
+                        isDeleted: data.isDeleted || false
+                    } as ExpenseVoucher;
+                })
+                .filter(v => !v.isDeleted); // Filter in code as fallback
+            console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (fallback, filtered)`);
+            return results;
+        }
     } catch (error) {
-        console.error('Error getting all expense vouchers:', error);
+        console.error('❌ [billingService] Error getting all expense vouchers:', error);
         return [];
     }
 };
