@@ -9,10 +9,16 @@ service cloud.firestore {
     // ============================================
     
     // Helper function to check if user is owner
+    // ✅ FIX: Work with both Anonymous Auth (Spark) and Custom Claims (Blaze)
     function isOwner() {
       return request.auth != null && (
+        // ✅ Blaze Plan: Check Custom Claims (set by Cloud Functions)
         request.auth.token.role == 'owner' || 
-        request.auth.token.super_admin == true
+        request.auth.token.super_admin == true ||
+        // ✅ Spark Plan Fallback: Check userBindings collection for owner role
+        // This works even if Custom Claims are not set (Anonymous Auth only)
+        (exists(/databases/$(database)/documents/userBindings/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/userBindings/$(request.auth.uid)).data.role == 'owner')
       );
     }
     
