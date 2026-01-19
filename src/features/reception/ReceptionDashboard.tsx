@@ -818,8 +818,8 @@ export const ReceptionDashboard: React.FC = () => {
     }, [rooms, activeRoomCards, t]);
 
     if (loading) return (
-        <div className="min-h-screen theme-page p-4 sm:p-6">
-            <div className="max-w-7xl mx-auto">
+        <div className="min-h-screen theme-page p-3 sm:p-4 lg:p-6">
+            <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
                 {/* Stats Skeleton */}
                 <LoadingSkeleton type="stats" count={3} />
                 <div className="mt-6 mb-6">
@@ -857,7 +857,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             {/* 🔄 Overflow Alert - تنبيه ضغط العمل */}
             {tenantId && branchId && (
-                <div className="px-4 pt-2 sm:pt-3 sm:px-6 max-w-7xl mx-auto">
+                <div className="px-3 sm:px-4 lg:px-6 pt-2 sm:pt-3 max-w-7xl mx-auto">
                     <OverflowAlert
                         tenantId={tenantId}
                         branchId={branchId}
@@ -967,7 +967,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             {/* ⚠️ Bottleneck Alert (تنبيه التراكم) */}
             {tenantId && branchId && (
-                <div className="px-4 sm:px-6 mb-4 max-w-7xl mx-auto">
+                <div className="px-3 sm:px-4 lg:px-6 mb-3 sm:mb-4 max-w-7xl mx-auto">
                     <BottleneckAlert
                         tenantId={tenantId}
                         branchId={branchId}
@@ -981,7 +981,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             {/* ☕ Pending Coffee Orders (طلبات الكوفي المعلقة) */}
             {tenantId && branchId && (
-                <div className="px-4 sm:px-6 mb-4 max-w-7xl mx-auto">
+                <div className="px-3 sm:px-4 lg:px-6 mb-3 sm:mb-4 max-w-7xl mx-auto">
                     <PendingCoffeeOrders
                         tenantId={tenantId}
                         branchId={branchId}
@@ -1026,7 +1026,7 @@ export const ReceptionDashboard: React.FC = () => {
             />
 
             {/* Room Search Filter - Theme-Aware */}
-            <div className="mb-3 sm:mb-4">
+            <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                 <div className="relative" data-tour="search-box">
                     <input
                         type="text"
@@ -1174,7 +1174,7 @@ export const ReceptionDashboard: React.FC = () => {
             {
                 deleteConfirmationFromHook && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200" style={{ backdropFilter: 'none' }}>
-                        <div className="bg-gray-900/90 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+                        <div className="bg-gray-900/90 border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 max-w-sm w-full shadow-2xl scale-100 animate-in zoom-in-95 duration-200 mx-2 sm:mx-0">
                             <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mb-4 mx-auto">
                                 <Trash2 className="w-6 h-6 text-red-400" />
                             </div>

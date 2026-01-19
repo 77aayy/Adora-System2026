@@ -1007,7 +1007,7 @@ export const MaintenanceDashboard: React.FC = () => {
     };
 
     const renderMaintenanceCard = (request: MaintenanceRequest) => (
-        <div key={request.id} className="adora-card p-4 mb-3" onClick={() => handleCardClick(request.id)}>
+        <div key={request.id} className="adora-card p-3 sm:p-4 mb-2 sm:mb-3" onClick={() => handleCardClick(request.id)}>
             <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -1142,7 +1142,7 @@ export const MaintenanceDashboard: React.FC = () => {
             
             <div className="min-h-screen pb-4 sm:pb-0 relative overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
                 {/* ✅ Unified Responsive Action Bar - Same Order as Reception */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <ResponsiveActionBar
                     actions={[
                         {
@@ -1180,17 +1180,17 @@ export const MaintenanceDashboard: React.FC = () => {
                 </div>
 
                 {/* ✅ Challenge Timeline - شريط الالتزام */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <ChallengeTimeline />
                 </div>
 
                 {/* Golden Alert - Broadcast Messages */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <GoldenAlertDisplay department="maintenance" />
                 </div>
 
                 {/* ✅ Room Transfer Notifications */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <div className="flex justify-end">
                         <TransferNotificationBadge department="maintenance" />
                     </div>
@@ -1208,17 +1208,12 @@ export const MaintenanceDashboard: React.FC = () => {
                     />
                 )}
 
-                {/* Stats Cards - Unified Style - ✅ ADORA PREMIUM COMPACT DESIGN */}
+                {/* Stats Cards - Unified Style - ✅ ADORA PREMIUM COMPACT DESIGN - Mobile Responsive */}
                 <div 
-                    className="max-w-7xl mx-auto mb-4"
-                    style={{ padding: '24px' }}
+                    className="max-w-7xl mx-auto mb-3 sm:mb-4 px-3 sm:px-4 lg:px-6"
                 >
                     <div 
-                        className="grid"
-                        style={{
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                            gap: '24px',
-                        }}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-6"
                     >
                         <div className="stat-card-pro-compact">
                     <StatCard
@@ -1264,7 +1259,7 @@ export const MaintenanceDashboard: React.FC = () => {
             </div>
 
                 {/* Progress Tracker */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                 <TaskProgress
                     completed={completedRequests.length}
                     total={activeRequests.length + completedRequests.length}
@@ -1274,7 +1269,7 @@ export const MaintenanceDashboard: React.FC = () => {
                 </div>
 
                 {/* ✅ Unified Tabs - Same as Reception */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <UnifiedRequestTabs
                         currentTab={currentTab}
                         onTabChange={(tab) => switchTab(tab)}
@@ -1285,7 +1280,7 @@ export const MaintenanceDashboard: React.FC = () => {
                 </div>
 
                 {/* Issue Type Filter */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -webkit-overflow-scrolling-touch">
                         <span className="adora-text-tertiary text-sm flex-shrink-0">{t('maintenance.issueType')}:</span>
                 {[
@@ -1301,7 +1296,7 @@ export const MaintenanceDashboard: React.FC = () => {
                             setIssueTypeFilter(type.key);
                             haptic('light');
                         }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0 flex items-center gap-1.5 ${issueTypeFilter === type.key
+                        className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all flex-shrink-0 flex items-center gap-1.5 ${issueTypeFilter === type.key
                             ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/25'
                             : 'adora-card adora-text-secondary hover:opacity-80'
                             }`}
@@ -1320,13 +1315,13 @@ export const MaintenanceDashboard: React.FC = () => {
                     {currentTab === 'completed' && filteredCompletedRequests.map(renderMaintenanceCard)}
 
                     {currentTab === 'new' && filteredNewRequests.length === 0 && (
-                        <div className="text-center py-12 adora-text-tertiary">{t('maintenance.noNewRequests')}</div>
+                        <div className="text-center py-6 sm:py-8 lg:py-12 adora-text-tertiary text-sm sm:text-base">{t('maintenance.noNewRequests')}</div>
                     )}
                     {currentTab === 'in_progress' && filteredInProgressRequests.length === 0 && (
-                        <div className="text-center py-12 adora-text-tertiary">{t('maintenance.noInProgressRequests')}</div>
+                        <div className="text-center py-6 sm:py-8 lg:py-12 adora-text-tertiary text-sm sm:text-base">{t('maintenance.noInProgressRequests')}</div>
                     )}
                     {currentTab === 'completed' && filteredCompletedRequests.length === 0 && (
-                        <div className="text-center py-12 adora-text-tertiary">{t('maintenance.noCompletedRequests')}</div>
+                        <div className="text-center py-6 sm:py-8 lg:py-12 adora-text-tertiary text-sm sm:text-base">{t('maintenance.noCompletedRequests')}</div>
                     )}
                 </div>
 

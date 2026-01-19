@@ -465,17 +465,17 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     } catch (error: any) {
         // ✅ Fallback to old method if Functions not available
         console.warn('Cloud Function failed, using fallback:', error);
-        
-        // Fallback: Direct Firestore lookup (old method)
-        const codeDocRef = doc(db, 'globalCodes', pin);
-        let codeDocSnap;
+    }
 
-        try {
-            codeDocSnap = await getDoc(codeDocRef);
-            
-            if (codeDocSnap.exists()) {
-                const codeData = codeDocSnap.data();
-                console.log(`✅ Found PIN ${pin} in globalCodes:`, {
+    // Fallback: Direct Firestore lookup (old method)
+    let codeDocSnap;
+    try {
+        const codeDocRef = doc(db, 'globalCodes', pin);
+        codeDocSnap = await getDoc(codeDocRef);
+        
+        if (codeDocSnap.exists()) {
+            const codeData = codeDocSnap.data();
+            console.log(`✅ Found PIN ${pin} in globalCodes:`, {
                 type: codeData?.type,
                 status: codeData?.status,
                 licenseStatus: codeData?.licenseStatus
@@ -654,13 +654,13 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
             currentPoints: userData.points || 0, // Default for compatibility
             lifetimePoints: userData.points || 0, // Default for compatibility
 
-                // ✅ Manager fields
-                hotelName: userData.hotelName,
-                maxBranches: userData.maxBranches,
-                branchNames: userData.branchNames,
-                // ✅ Store branchCodes for access control (SaaS isolation)
-                branchCodes: userData.branchCodes || codeData.branchCodes || []
-            };
+            // ✅ Manager fields
+            hotelName: userData.hotelName,
+            maxBranches: userData.maxBranches,
+            branchNames: userData.branchNames,
+            // ✅ Store branchCodes for access control (SaaS isolation)
+            branchCodes: userData.branchCodes || codeData.branchCodes || []
+        };
 
         // Save tenantId to localStorage for TenantContext
         if (tenantId) {
@@ -1164,4 +1164,5 @@ export const seedInitialUsers = async (): Promise<void> => {
 };
 
 // ✅ Re-export types for backward compatibility
-export type { User, Department };
+// Note: Department is an enum, exported from ../types/index.ts
+export type { User };

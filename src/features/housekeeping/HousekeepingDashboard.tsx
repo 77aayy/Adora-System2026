@@ -1767,17 +1767,17 @@ export const HousekeepingDashboard: React.FC = () => {
                 />
 
                 {/* Challenge Timeline */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <ChallengeTimeline />
                 </div>
 
                 {/* Golden Alert - Broadcast Messages */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <GoldenAlertDisplay department="housekeeping" />
                 </div>
 
                 {/* ✅ Room Transfer Notifications */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <div className="flex justify-end">
                         <TransferNotificationBadge department="housekeeping" />
                     </div>
@@ -1795,17 +1795,12 @@ export const HousekeepingDashboard: React.FC = () => {
                     />
                 )}
 
-                {/* Stats - Unified Style - ✅ ADORA PREMIUM COMPACT DESIGN */}
+                {/* Stats - Unified Style - ✅ ADORA PREMIUM COMPACT DESIGN - Mobile Responsive */}
                 <div 
-                    className="max-w-7xl mx-auto mb-4"
-                    style={{ padding: '24px' }}
+                    className="max-w-7xl mx-auto mb-3 sm:mb-4 px-3 sm:px-4 lg:px-6"
                 >
                     <div 
-                        className="grid"
-                        style={{
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                            gap: '24px',
-                        }}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-6"
                     >
                         <div className="stat-card-pro-compact">
                     <StatCard
@@ -1841,8 +1836,8 @@ export const HousekeepingDashboard: React.FC = () => {
                 </div>
 
                 {/* Room Type Filter - Segmented Control Style */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
-                    <div className="adora-card p-1 rounded-2xl flex relative z-0">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <div className="adora-card p-1 rounded-xl sm:rounded-2xl flex relative z-0">
                         {[
                     { key: 'all', label: t('housekeeping.filterAll'), icon: <DoorOpen className="w-4 h-4" /> },
                     { key: 'occupied', label: t('housekeeping.filterOccupied'), icon: <span>🏠</span> },
@@ -1906,7 +1901,7 @@ export const HousekeepingDashboard: React.FC = () => {
                 <div className="px-4 sm:px-6 max-w-7xl mx-auto pb-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                         {currentTasks.length === 0 ? (
-                    <div className="col-span-full adora-card p-8 text-center">
+                    <div className="col-span-full adora-card p-4 sm:p-6 lg:p-8 text-center">
                         <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 adora-bg-tertiary">
                             <Sparkles className="w-6 h-6 adora-text-disabled" />
                         </div>

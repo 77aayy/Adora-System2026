@@ -1106,33 +1106,28 @@ export const BellmanDashboard: React.FC = () => {
                 />
             
             {/* Golden Alert - Broadcast Messages */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+            <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                 <GoldenAlertDisplay department="bellman" />
             </div>
 
             {/* ✅ Room Transfer Notifications */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+            <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                 <div className="flex justify-end">
                     <TransferNotificationBadge department="bellman" />
                 </div>
             </div>
 
             {/* Challenge Timeline */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+            <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                 <ChallengeTimeline />
             </div>
 
-            {/* Stats - Unified Style - ✅ ADORA PREMIUM COMPACT DESIGN */}
+            {/* Stats - Unified Style - ✅ ADORA PREMIUM COMPACT DESIGN - Mobile Responsive */}
             <div 
-                className="max-w-7xl mx-auto mb-4"
-                style={{ padding: '24px' }}
+                className="max-w-7xl mx-auto mb-3 sm:mb-4 px-3 sm:px-4 lg:px-6"
             >
                 <div 
-                    className="grid"
-                    style={{
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                        gap: '24px',
-                    }}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 lg:gap-6"
                 >
                     <div className="stat-card-pro-compact">
                     <StatCard
@@ -1168,10 +1163,10 @@ export const BellmanDashboard: React.FC = () => {
             </div>
 
             {/* Quick Actions - Premium Hero Button */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-6">
+            <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-4 sm:mb-6">
                 <button
                     onClick={() => setShowCheckinModal(true)}
-                    className="w-full relative group overflow-hidden p-[1px] rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
+                    className="w-full relative group overflow-hidden p-[1px] rounded-xl sm:rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
                 >
                     <div className="absolute inset-0 bg-gradient-to-r from-primary-500 via-green-500 to-teal-500 opacity-70 group-hover:opacity-100 transition-opacity duration-300" />
                     <div className="relative bg-white dark:bg-gray-900/90 rounded-xl p-4 sm:p-5 flex items-center justify-between h-full shadow-lg border border-slate-200 dark:border-white/10">
@@ -1203,7 +1198,7 @@ export const BellmanDashboard: React.FC = () => {
             </div>
 
             {/* ✅ Content - Unified Tabs (جديد / قيد التنفيذ / مكتمل) */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto space-y-3">
+            <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto space-y-2 sm:space-y-3">
                 {/* Render requests based on current tab */}
                 {(() => {
                     const currentRequests = groupedRequests[currentTab] || [];
@@ -1310,9 +1305,9 @@ export const BellmanDashboard: React.FC = () => {
                             <DoorOpen className="w-4 h-4" />
                             الغرف المشغولة ({roomCards.filter(r => r.status === 'active').length})
                         </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
                             {roomCards.filter(r => r.status === 'active').slice(0, 8).map(room => (
-                                <div key={room.id} className="adora-card p-3 text-center">
+                                <div key={room.id} className="adora-card p-2.5 sm:p-3 text-center">
                                     <span className="text-lg font-bold adora-text-primary">{room.roomNumber}</span>
                                             <p className="text-[10px] adora-text-tertiary truncate">{room.guestName || t('bellman.guestDefault')}</p>
                                     <div className="flex gap-1 mt-2">

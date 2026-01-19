@@ -770,8 +770,8 @@ export const AdminDashboard: React.FC = () => {
         <div className="flex min-h-screen transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
             <ScheduledTaskRunner />
             
-            {/* ✅ ALWAYS VISIBLE SIDEBAR - Premium Professional Design */}
-            <div className="desktop-sidebar-container flex-shrink-0 fixed top-0 right-0 h-screen z-30">
+            {/* ✅ DESKTOP SIDEBAR - Hidden on mobile */}
+            <div className="hidden lg:block desktop-sidebar-container flex-shrink-0 fixed top-0 right-0 h-screen z-30">
                 <aside id="admin-sidebar" className="h-full">
                     <AdminSidebar 
                         isOwner={isOwner} 
@@ -815,8 +815,8 @@ export const AdminDashboard: React.FC = () => {
             {/* Owner Announcement Banner */}
             <OwnerAnnouncementBanner />
 
-            {/* Main Content Area - Adjusted for fixed sidebar */}
-            <main className="flex-1 p-4 pb-24 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col" style={{ marginRight: '280px' }}>
+            {/* Main Content Area - Responsive margin for sidebar */}
+            <main className="flex-1 p-3 sm:p-4 pb-24 lg:pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col lg:mr-[280px]">
                 <div className="flex-1">
                     <Routes>
                         <Route index element={<OverviewPage />} />

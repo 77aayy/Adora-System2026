@@ -479,6 +479,13 @@ export {
     NewRoomType
 };
 
+// Re-export employee types (including Department enum)
+export {
+    Department,
+    EmployeeRole,
+    EmployeeStatus
+} from './employee';
+
 // Re-export auth types
 export type {
     LoginResult,

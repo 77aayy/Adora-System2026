@@ -250,23 +250,18 @@ export const CoffeeShopDashboard: React.FC = () => {
                 />
 
                 {/* ✅ Room Transfer Notifications */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto">
-                    <div className="flex justify-end mb-3">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                    <div className="flex justify-end">
                         <TransferNotificationBadge department="coffee_shop" />
                     </div>
                 </div>
 
-                {/* Stats - الكروت الإحصائية */}
+                {/* Stats - الكروت الإحصائية - Mobile Responsive */}
                 <div 
-                    className="max-w-7xl mx-auto mb-4"
-                    style={{ padding: '24px' }}
+                    className="max-w-7xl mx-auto mb-3 sm:mb-4 px-3 sm:px-4 lg:px-6"
                 >
                     <div 
-                        className="grid"
-                        style={{
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                            gap: '24px',
-                        }}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 lg:gap-6"
                     >
                     <StatCard
                         count={groupedOrders.new.length}
@@ -299,12 +294,12 @@ export const CoffeeShopDashboard: React.FC = () => {
                 </div>
 
                 {/* ✅ تايم لاين الالتزام - تصميم H Rewards */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <ChallengeTimeline />
                 </div>
 
                 {/* Search */}
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <div className="relative">
                         <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 adora-text-tertiary" />
                         <input
@@ -336,9 +331,9 @@ export const CoffeeShopDashboard: React.FC = () => {
                             <p className="adora-text-tertiary">{t('coffeeshop.noOrdersInList')}</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 lg:gap-4">
                         {currentOrders.map(order => (
-                            <div key={order.id} className="p-3 rounded-xl adora-card border adora-border shadow-sm hover:scale-[1.01] transition-all">
+                            <div key={order.id} className="p-2.5 sm:p-3 rounded-lg sm:rounded-xl adora-card border adora-border shadow-sm hover:scale-[1.01] transition-all">
                                 {/* Row 1: Room + Items Count + Status */}
                                 <div className="flex items-center gap-2 mb-2">
                                     <div className="w-10 h-10 rounded-lg flex-shrink-0 bg-amber-500/20 flex items-center justify-center">

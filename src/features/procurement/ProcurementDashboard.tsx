@@ -571,7 +571,7 @@ export const ProcurementDashboard: React.FC = () => {
             {/* Manager Announcement Banner */}
             <ManagerAnnouncementBanner department="procurement" />
             
-            <div className="min-h-screen p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
+            <div className="min-h-screen p-3 sm:p-4 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
                 {/* Flexible Header */}
                 <FlexibleHeader
                 title="المشتريات"
@@ -614,17 +614,12 @@ export const ProcurementDashboard: React.FC = () => {
                 onResetErrors={resetErrors}
             />
 
-            {/* Stats - ✅ ADORA PREMIUM COMPACT DESIGN */}
+            {/* Stats - ✅ ADORA PREMIUM COMPACT DESIGN - Mobile Responsive */}
             <div 
-                className="max-w-7xl mx-auto mb-3 sm:mb-4"
-                style={{ padding: '24px' }}
+                className="max-w-7xl mx-auto mb-3 sm:mb-4 px-3 sm:px-4 lg:px-6"
             >
                 <div 
-                    className="grid"
-                    style={{
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                        gap: '24px',
-                    }}
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 lg:gap-6"
                 >
                 <StatCard
                     count={pendingApproval.length}
@@ -659,13 +654,13 @@ export const ProcurementDashboard: React.FC = () => {
             </div>
 
             {/* Golden Alert - Broadcast Messages */}
-            <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+            <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                 <GoldenAlertDisplay department="procurement" />
             </div>
 
             {/* ✅ Points Notification - Show for active APPROVED or PENDING_APPROVAL requests */}
             {notificationRequest && tenantId && (
-                <div className="px-4 sm:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
                     <PointsNotification
                         requestId={notificationRequest.id}
                         requestType="procurement"
@@ -678,19 +673,22 @@ export const ProcurementDashboard: React.FC = () => {
             )}
 
             {/* ✅ Unified Tabs - Same as Reception */}
-            <UnifiedRequestTabs
-                currentTab={currentTab}
-                onTabChange={(tab) => setCurrentTab(tab)}
-                newCount={groupedRequests.new.length}
-                inProgressCount={groupedRequests.in_progress.length}
-                completedCount={groupedRequests.completed.length}
-            />
+            <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto mb-3 sm:mb-4">
+                <UnifiedRequestTabs
+                    currentTab={currentTab}
+                    onTabChange={(tab) => setCurrentTab(tab)}
+                    newCount={groupedRequests.new.length}
+                    inProgressCount={groupedRequests.in_progress.length}
+                    completedCount={groupedRequests.completed.length}
+                />
+            </div>
 
             {/* Requests List - Grid for Mobile */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className="px-3 sm:px-4 lg:px-6 max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
                 {currentRequests.length === 0 ? (
                     <div 
-                        className="p-12 text-center rounded-2xl shadow-lg"
+                        className="p-6 sm:p-8 lg:p-12 text-center rounded-xl sm:rounded-2xl shadow-lg"
                         style={{ 
                             background: 'var(--theme-bg-secondary)', 
                             border: '1px solid var(--theme-border-primary)',
