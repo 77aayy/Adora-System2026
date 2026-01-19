@@ -714,9 +714,8 @@ export const ProcurementDashboard: React.FC = () => {
                         />
                     ))
                 )}
+                </div>
             </div>
-
-
 
             {/* History Modal */}
             <UnifiedHistoryModal isOpen={showHistory} onClose={() => setShowHistory(false)} defaultDepartment="procurement" />
