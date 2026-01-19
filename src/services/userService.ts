@@ -925,7 +925,6 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
  * @throws Error if PIN is already in use
  * 
  * @example
- * ```typescript
  * const employeeId = await createEmployee({
  *   name: 'محمد أحمد',
  *   code: '1234',
@@ -934,7 +933,6 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
  *   createdBy: managerId,
  *   tenantId: tenantId
  * });
- * ```
  */
 export const createEmployee = async (data: {
     name: string;
