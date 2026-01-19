@@ -144,6 +144,46 @@ service cloud.firestore {
     }
     
     // ============================================
+    // 💰 BILLING & FINANCIAL COLLECTIONS
+    // ============================================
+    
+    // Receipt vouchers (سندات القبض) - Owner can read all, authenticated users can read
+    match /receiptVouchers/{voucherId} {
+      allow read: if request.auth != null;
+      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+    }
+    
+    // Expense vouchers (سندات الصرف) - Owner can read all, authenticated users can read
+    match /expenseVouchers/{voucherId} {
+      allow read: if request.auth != null;
+      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+    }
+    
+    // Invoices - Owner can read all, authenticated users can read
+    match /invoices/{invoiceId} {
+      allow read: if request.auth != null;
+      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+    }
+    
+    // Subscriptions - Owner can read all, authenticated users can read
+    match /subscriptions/{subscriptionId} {
+      allow read: if request.auth != null;
+      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+    }
+    
+    // Payments - Owner can read all, authenticated users can read
+    match /payments/{paymentId} {
+      allow read: if request.auth != null;
+      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+    }
+    
+    // Deleted billing records - Owner only
+    match /deleted_billing_records/{recordId} {
+      allow read: if request.auth != null && isOwner();
+      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+    }
+    
+    // ============================================
     // 📊 LOGS & AUDIT (Read-only)
     // ============================================
     
@@ -165,6 +205,15 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if false;
+    }
+    
+    // ============================================
+    // 🗑️ DELETED MANAGERS (Owner only)
+    // ============================================
+    
+    match /deleted_managers/{managerId} {
+      allow read: if request.auth != null && isOwner();
+      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
     }
     
     // ============================================
