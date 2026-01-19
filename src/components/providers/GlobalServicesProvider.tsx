@@ -6,6 +6,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { WifiOff, Wifi, Cloud } from 'lucide-react';
 
 // Import services
 import { initOfflineSync, cleanupOfflineSync, useOfflineSync } from '../../services/offlineSyncService';
@@ -97,6 +98,29 @@ export const GlobalServicesProvider: React.FC<GlobalServicesProviderProps> = ({ 
 
     // Initialize services on mount
     useEffect(() => {
+        // ✅ CRITICAL: Ensure Anonymous Auth FIRST before any Firestore operations
+        // This is required for systemSettings and other public collections to work
+        const ensureAuth = async () => {
+            try {
+                const { auth } = await import('../../services/firebase');
+                if (auth && !auth.currentUser) {
+                    try {
+                        const { signInAnonymously } = await import('firebase/auth');
+                        await signInAnonymously(auth);
+                        console.log('✅ Anonymous auth initialized at app startup');
+                    } catch (authError: any) {
+                        // Don't block app initialization if Anonymous Auth fails
+                        // It will be retried during login
+                        console.warn('⚠️ Anonymous auth failed at startup (non-critical):', authError?.message);
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to ensure Anonymous Auth at startup:', error);
+            }
+        };
+        
+        ensureAuth();
+
         // Initialize offline sync
         initOfflineSync();
 
@@ -179,8 +203,8 @@ export const GlobalServicesProvider: React.FC<GlobalServicesProviderProps> = ({ 
             <BackupScheduler />
             <LicenseNotificationScheduler />
 
-            {/* Offline indicator */}
-            {!online && <OfflineIndicator pendingCount={pendingOps} />}
+            {/* ✅ Enhanced Offline indicator - Shows both offline AND pending operations */}
+            {(!online || pendingOps > 0) && <OfflineIndicator online={online} pendingCount={pendingOps} />}
 
             {/* Global CSS for animations */}
             <style>{globalStyles}</style>
@@ -189,38 +213,77 @@ export const GlobalServicesProvider: React.FC<GlobalServicesProviderProps> = ({ 
 };
 
 // ============================================================
-// OFFLINE INDICATOR
+// ✅ ENHANCED OFFLINE INDICATOR
 // ============================================================
 
-const OfflineIndicator: React.FC<{ pendingCount: number }> = ({ pendingCount }) => (
-    <div
-        style={{
-            position: 'fixed',
-            bottom: '20px',
-            left: '20px',
-            padding: '12px 20px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #EF4444, #DC2626)',
-            color: 'white',
-            fontWeight: 500,
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            boxShadow: '0 4px 20px rgba(239, 68, 68, 0.3)',
-        }}
-    >
-        <span style={{ fontSize: '1.2rem' }}>📴</span>
-        <div>
-            <div>غير متصل</div>
-            {pendingCount > 0 && (
-                <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>
-                    {pendingCount} عملية معلقة
+const OfflineIndicator: React.FC<{ online: boolean; pendingCount: number }> = ({ online, pendingCount }) => {
+    // Don't show if online and no pending operations
+    if (online && pendingCount === 0) return null;
+
+    const isOffline = !online;
+    const hasPending = pendingCount > 0;
+
+    return (
+        <div
+            className={`
+                fixed bottom-4 left-4 z-[9999] px-4 py-3 rounded-xl 
+                flex items-center gap-3 shadow-2xl backdrop-blur-xl
+                border-2 animate-fade-in-up transition-all duration-300
+                ${isOffline
+                    ? 'bg-gradient-to-r from-red-500/90 to-red-600/90 border-red-400/50 text-white'
+                    : hasPending
+                        ? 'bg-gradient-to-r from-yellow-500/90 to-amber-600/90 border-yellow-400/50 text-white'
+                        : 'hidden'
+                }
+            `}
+            style={{
+                animation: 'slideInUp 0.3s ease-out',
+            }}
+        >
+            {/* Icon */}
+            <div className="relative">
+                {isOffline ? (
+                    <WifiOff className="w-5 h-5 animate-pulse" />
+                ) : (
+                    <Cloud className="w-5 h-5 animate-pulse text-yellow-300" />
+                )}
+            </div>
+
+            {/* Content */}
+            <div className="flex flex-col">
+                <div className="text-sm font-semibold">
+                    {isOffline ? 'غير متصل بالإنترنت' : 'مزامنة البيانات...'}
+                </div>
+                {hasPending && (
+                    <div className="text-xs opacity-90 mt-0.5">
+                        {pendingCount} {pendingCount === 1 ? 'عملية معلقة' : 'عمليات معلقة'}
+                    </div>
+                )}
+            </div>
+
+            {/* Pending Badge */}
+            {hasPending && (
+                <div className={`
+                    px-2.5 py-1 rounded-full text-xs font-bold
+                    ${isOffline
+                        ? 'bg-white/20 text-white'
+                        : 'bg-white/30 text-yellow-900'
+                    }
+                    animate-pulse
+                `}>
+                    {pendingCount}
+                </div>
+            )}
+
+            {/* Connection Status Icon */}
+            {!isOffline && hasPending && (
+                <div className="ml-auto">
+                    <Wifi className="w-4 h-4 text-green-300" />
                 </div>
             )}
         </div>
-    </div>
-);
+    );
+};
 
 // ============================================================
 // GLOBAL CSS

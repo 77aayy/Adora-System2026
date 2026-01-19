@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
+import { useGlobalServices } from '../providers/GlobalServicesProvider';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { PointsTracker } from '../shared/PointsTracker';
@@ -46,6 +47,7 @@ export const UnifiedManagerHeader: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
     const { user, logout, branchId, setBranch } = useAuth();
+    const { isOnline } = useGlobalServices(); // ✅ Get online status from GlobalServicesProvider
     const { branches } = useTenantBranches();
     const { isEnabled: isProcurementEnabled } = useFeatureGate('procurementSystem');
     
@@ -210,14 +212,32 @@ export const UnifiedManagerHeader: React.FC = () => {
                             />
                         </button>
 
-                        <Link to="/admin" className="flex items-center flex-shrink-0">
-                            <img
-                                src="/adora-logo.png"
-                                alt="Adora"
-                                className="h-7 w-auto sm:h-8 object-contain"
-                                style={{ filter: 'var(--logo-filter, none)' }}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <Link to="/admin" className="flex items-center flex-shrink-0">
+                                <img
+                                    src="/adora-logo.png"
+                                    alt="Adora"
+                                    className="h-7 w-auto sm:h-8 object-contain"
+                                    style={{ filter: 'var(--logo-filter, none)' }}
+                                />
+                            </Link>
+                            {/* ✅ Header Offline Indicator - Simple dot (green/red) next to logo */}
+                            <div
+                                className="w-2.5 h-2.5 rounded-full transition-all duration-300 animate-pulse"
+                                style={{
+                                    background: isOnline 
+                                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                                        : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                    boxShadow: isOnline 
+                                        ? '0 0 8px rgba(16, 185, 129, 0.5)' 
+                                        : '0 0 8px rgba(239, 68, 68, 0.5)',
+                                    flexShrink: 0,
+                                }}
+                                title={isOnline ? 'متصل بالإنترنت' : 'غير متصل بالإنترنت'}
+                                aria-label={isOnline ? 'متصل' : 'غير متصل'}
                             />
-                        </Link>
+                        </div>
 
                         {/* Branch Selector - ✅ MOBILE-FIRST */}
                         {branches.length > 0 && (

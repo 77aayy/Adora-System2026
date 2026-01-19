@@ -11,7 +11,7 @@ import {
     Bell, AlertTriangle, CheckCircle, MessageSquare, DollarSign,
     Activity, Shield, Database, RefreshCw, Save, Plus, X,
     Play, Pause, Eye, Edit2, Trash2, Upload, ChevronDown, Check, DoorOpen, Search, Calendar, Clock,
-    LayoutDashboard, CreditCard, BarChart3, Menu, ChevronLeft, ChevronRight, LogOut, Globe
+    LayoutDashboard, CreditCard, BarChart3, Menu, ChevronLeft, ChevronRight, LogOut, Globe, Server, Info
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
@@ -33,7 +33,7 @@ import {
     getTenantAnalytics,
     TenantAnalytics
 } from '../../services/analyticsService';
-import { getAllManagers, createManager, isPinAvailable, toggleLicenseStatus, renewLicense, softDeleteManager, restoreManager, getDeletedManagers, getDemoStats } from '../../services/ownerService';
+import { getAllManagers, createManager, isPinAvailable, suggestUniquePin, toggleLicenseStatus, renewLicense, softDeleteManager, restoreManager, getDeletedManagers, getDemoStats } from '../../services/ownerService';
 import { getAllTrialRequests, markTrialRequestAsContacted, addFollowUpToTrialRequest, type TrialRequest } from '../../services/trialRequestService';
 import type { SystemSettings } from '../../services/systemSettingsService';
 import { PageTransition } from '../../components/common/PageTransition';
@@ -55,13 +55,8 @@ import {
     renewSubscription,
     createInvoice,
     recordPayment,
-    createReceiptVoucher,
-    getAllReceiptVouchers,
-    getAllInvoices,
     getDeletedBillingCount,
-    calculateTotalRevenue,
-    type ReceiptVoucher,
-    type Invoice
+    calculateTotalRevenue
 } from '../../services/billingService';
 import { collection, query, where, getCountFromServer, getDocs, getDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
@@ -91,6 +86,9 @@ import { CreateManagerHelp } from '../../components/common/ContextualHelp'; // �
 import { Sparkles, Share2 } from 'lucide-react';
 // ✅ Demo Link Manager
 import { DemoLinkManager } from '../../components/owner/DemoLinkManager';
+// ✅ Onboarding Tour
+import { useOnboardingTour } from '../../hooks/useOnboardingTour';
+import { TourGuide } from '../../components/shared/TourGuide';
 
 // ============================================================
 // TYPES
@@ -283,6 +281,9 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
     // Sidebar
     const [showSidebar, setShowSidebar] = useState(false);
+
+    // ✅ Onboarding Tour for Owner Dashboard
+    const { showTour, steps: tourSteps, closeTour, completeTour } = useOnboardingTour('owner');
 
     const loadDataRef = useRef(false); // ✅ Prevent multiple simultaneous loads
     const loadDataCalledRef = useRef(false); // ✅ Track if loadData was called
@@ -973,7 +974,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 <div className="w-px h-8 bg-white/10"></div>
 
                                 {/* Tabs */}
-                                <div className="flex gap-1 sm:gap-2">
+                                <div className="flex gap-1 sm:gap-2" data-tour="owner-tabs">
                                     {[
                                         { id: 'overview' as TabType, label: t('admin.overview'), icon: LayoutDashboard, key: 'overview' },
                                         { id: 'tenants' as TabType, label: t('admin.createManager'), icon: Users, key: 'tenants' },
@@ -1406,7 +1407,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                                     <h1>${t('admin.adoraSubscriptionReport')}</h1>
                                                     <p><strong>${selectedManager.tenantName}</strong></p>
                                                     <p>${t('admin.managerCode')}: ${selectedManager.managerCode || t('admin.notSpecified')}</p>
-                                                    <p>${t('admin.reportDate')}: ${new Date().toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                                    <p>${t('admin.reportDate')}: ${new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                                                 </div>
                                                 
                                                 <div class="section">
@@ -1858,7 +1859,7 @@ const OverviewTab: React.FC<{
                     {/* Collapsible Content */}
                     <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isStatsExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
                         <div className="p-3 sm:p-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" data-tour="owner-overview-stats">
                                 <StatCard
                                     icon={Building2}
                                     iconColor="teal"
@@ -1906,13 +1907,13 @@ const OverviewTab: React.FC<{
                                     {demoStats.nearestExpiry && (
                                         <div className="flex items-center gap-2">
                                             <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                                            <span>{t('admin.nearestExpiry')}: {demoStats.nearestExpiry.toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                            <span>{t('admin.nearestExpiry')}: {demoStats.nearestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                         </div>
                                     )}
                                     {demoStats.farthestExpiry && demoStats.farthestExpiry.getTime() !== demoStats.nearestExpiry?.getTime() && (
                                         <div className="flex items-center gap-2">
                                             <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                                            <span>{t('admin.farthestExpiry')}: {demoStats.farthestExpiry.toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                            <span>{t('admin.farthestExpiry')}: {demoStats.farthestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                         </div>
                                     )}
                                 </div>
@@ -2223,7 +2224,7 @@ const OverviewTab: React.FC<{
                     <div className={`transition-all duration-300 ease-in-out border-t ${isActivityExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}
                         style={{ borderColor: 'var(--theme-border-primary)', background: 'var(--theme-bg-tertiary)' }}>
                         <div className="p-4 sm:p-6">
-                            {activityLogs.length === 0 ? (
+                            {(!activityLogs || activityLogs.length === 0) ? (
                                 <div className="text-center py-8">
                                     <Activity className="w-12 h-12 mx-auto mb-3 opacity-20" style={{ color: 'var(--theme-text-primary)' }} />
                                     <p style={{ color: 'var(--theme-text-secondary)' }}>لا يوجد نشاط حديث</p>
@@ -2233,7 +2234,7 @@ const OverviewTab: React.FC<{
                                 </div>
                             ) : (
                                 <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
-                                    {activityLogs.map((log, index) => (
+                                    {(activityLogs || []).map((log, index) => (
                                         <div
                                             key={log.id || index}
                                             className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:bg-white/5"
@@ -2309,7 +2310,7 @@ const OverviewTab: React.FC<{
                                         </p>
                                     )}
                                     <p className="text-xs font-medium" style={{ color: 'var(--theme-text-secondary)' }}>
-                                        {activityLogs.length} {t('admin.logs')}
+                                        {activityLogs?.length || 0} {t('admin.logs')}
                                     </p>
                                 </div>
                             </div>
@@ -2635,26 +2636,30 @@ const TenantsTab: React.FC<{
                     <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{t('admin.tenantList')}</h3>
                     <button
                         onClick={onAddManager}
-                        className="w-full sm:w-auto px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm font-medium"
+                        className="group relative w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2.5 text-sm sm:text-base font-semibold overflow-hidden"
                         style={{
-                            background: 'rgba(30, 41, 59, 0.8)',
-                            border: '1px solid rgba(32, 178, 170, 0.3)',
-                            color: 'rgba(255, 255, 255, 0.9)',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+                            background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.95) 0%, rgba(14, 165, 233, 0.95) 100%)',
+                            border: '2px solid rgba(20, 184, 166, 0.4)',
+                            color: '#ffffff',
+                            boxShadow: '0 4px 16px rgba(20, 184, 166, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15)',
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(30, 41, 59, 1)';
-                            e.currentTarget.style.borderColor = 'rgba(32, 178, 170, 0.5)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(32, 178, 170, 0.2)';
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(20, 184, 166, 1) 0%, rgba(14, 165, 233, 1) 100%)';
+                            e.currentTarget.style.borderColor = 'rgba(20, 184, 166, 0.6)';
+                            e.currentTarget.style.boxShadow = '0 8px 24px rgba(20, 184, 166, 0.4), 0 4px 12px rgba(0, 0, 0, 0.2)';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
                         }}
                         onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)';
-                            e.currentTarget.style.borderColor = 'rgba(32, 178, 170, 0.3)';
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(20, 184, 166, 0.95) 0%, rgba(14, 165, 233, 0.95) 100%)';
+                            e.currentTarget.style.borderColor = 'rgba(20, 184, 166, 0.4)';
+                            e.currentTarget.style.boxShadow = '0 4px 16px rgba(20, 184, 166, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15)';
+                            e.currentTarget.style.transform = 'translateY(0)';
                         }}
                     >
-                        <Plus className="w-4 h-4 flex-shrink-0" />
-                        <span>{t('admin.addNewManager')}</span>
+                        {/* Shine effect */}
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+                        <Plus className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0 relative z-10" style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))' }} />
+                        <span className="relative z-10">{t('admin.addNewManager')}</span>
                     </button>
                 </div>
 
@@ -3284,16 +3289,30 @@ const SettingsTab: React.FC<{
         }
         return systemSettings.defaultTaxRate ?? 15;
     });
+    const [localTwoYearDiscount, setLocalTwoYearDiscount] = useState<number>(() => {
+        const localData = localStorage.getItem('adora_system_settings');
+        if (localData) {
+            try {
+                const parsed = JSON.parse(localData);
+                if (parsed.twoYearDiscountRate !== undefined) {
+                    return parsed.twoYearDiscountRate;
+                }
+            } catch { }
+        }
+        return systemSettings.twoYearDiscountRate ?? 0;
+    });
 
     // ✅ Display values are now directly from local state
     const displayPrice = localPrice;
     const displayTax = localTax;
+    const displayTwoYearDiscount = localTwoYearDiscount;
 
     // ✅ Sync from systemSettings if it gets updated externally (but don't overwrite user edits)
-    const prevSettingsRef = useRef({ price: systemSettings.defaultSubscriptionPrice, tax: systemSettings.defaultTaxRate });
+    const prevSettingsRef = useRef({ price: systemSettings.defaultSubscriptionPrice, tax: systemSettings.defaultTaxRate, discount: systemSettings.twoYearDiscountRate });
     useEffect(() => {
         const prevPrice = prevSettingsRef.current.price;
         const prevTax = prevSettingsRef.current.tax;
+        const prevDiscount = prevSettingsRef.current.discount;
 
         // Only update if systemSettings actually changed (not on initial mount)
         if (systemSettings.defaultSubscriptionPrice !== prevPrice && systemSettings.defaultSubscriptionPrice !== undefined) {
@@ -3302,9 +3321,12 @@ const SettingsTab: React.FC<{
         if (systemSettings.defaultTaxRate !== prevTax && systemSettings.defaultTaxRate !== undefined) {
             setLocalTax(systemSettings.defaultTaxRate);
         }
+        if (systemSettings.twoYearDiscountRate !== prevDiscount && systemSettings.twoYearDiscountRate !== undefined) {
+            setLocalTwoYearDiscount(systemSettings.twoYearDiscountRate);
+        }
 
-        prevSettingsRef.current = { price: systemSettings.defaultSubscriptionPrice, tax: systemSettings.defaultTaxRate };
-    }, [systemSettings.defaultSubscriptionPrice, systemSettings.defaultTaxRate]);
+        prevSettingsRef.current = { price: systemSettings.defaultSubscriptionPrice, tax: systemSettings.defaultTaxRate, discount: systemSettings.twoYearDiscountRate };
+    }, [systemSettings.defaultSubscriptionPrice, systemSettings.defaultTaxRate, systemSettings.twoYearDiscountRate]);
 
     // ✅ Local state for company information
     const [localCompanyName, setLocalCompanyName] = useState(systemSettings.companyName ?? '');
@@ -3380,8 +3402,8 @@ const SettingsTab: React.FC<{
                             <p className="text-xs text-white/50 mb-3 leading-relaxed">
                                 {t('admin.subscriptionPriceNote')}
                             </p>
-                            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
-                                <div className="w-full sm:flex-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-end">
+                                <div className="w-full">
                                     <label className="block text-xs font-medium text-white/70 mb-1.5">
                                         سعر الاشتراك (ر.س)
                                     </label>
@@ -3403,7 +3425,7 @@ const SettingsTab: React.FC<{
                                     />
                                 </div>
 
-                                <div className="w-full sm:flex-1">
+                                <div className="w-full">
                                     <label className="block text-xs font-medium text-white/70 mb-1.5">
                                         نسبة الضريبة (%)
                                     </label>
@@ -3421,13 +3443,42 @@ const SettingsTab: React.FC<{
                                     />
                                 </div>
 
+                                <div className="w-full">
+                                    <label className="block text-xs font-medium text-white/70 mb-1.5">
+                                        خصم السنتين (%)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={displayTwoYearDiscount}
+                                        onChange={(e) => {
+                                            const newDiscount = parseFloat(e.target.value);
+                                            setLocalTwoYearDiscount(isNaN(newDiscount) ? 0 : newDiscount);
+                                        }}
+                                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                        placeholder="5"
+                                    />
+                                </div>
+                            </div>
+                            
+                            {/* Helper text for discount */}
+                            {displayTwoYearDiscount > 0 && (
+                                <p className="text-xs text-white/50 mt-2 flex items-center gap-1.5">
+                                    <span className="text-teal-400">ℹ️</span>
+                                    سيتم تطبيق خصم {displayTwoYearDiscount}% تلقائياً عند اختيار اشتراك سنتين
+                                </p>
+                            )}
+
+                            <div className="flex justify-end mt-4">
                                 <button
                                     type="button"
                                     disabled={saving}
                                     onClick={() => {
                                         onSave({
                                             defaultSubscriptionPrice: displayPrice,
-                                            defaultTaxRate: displayTax
+                                            defaultTaxRate: displayTax,
+                                            twoYearDiscountRate: displayTwoYearDiscount
                                         });
                                     }}
                                     className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors whitespace-nowrap flex items-center justify-center gap-2 disabled:opacity-50"
@@ -3443,28 +3494,66 @@ const SettingsTab: React.FC<{
 
                             {/* Calculated summary */}
                             {displayPrice > 0 && (
-                                <div className="mt-3 text-xs text-white/60 space-y-1 bg-white/5 rounded-xl p-3 border border-white/10">
+                                <div className="mt-3 text-xs text-white/60 space-y-1 bg-gradient-to-br from-blue-500/10 via-teal-500/10 to-purple-500/10 rounded-xl p-4 border-2 border-teal-500/30 shadow-lg shadow-teal-500/20 backdrop-blur-sm">
                                     {(() => {
                                         const total = displayPrice;
                                         const taxRate = displayTax / 100;
                                         // نفترض أن السعر شامل الضريبة
                                         const basePrice = taxRate > 0 ? total / (1 + taxRate) : total;
                                         const taxAmount = total - basePrice;
+                                        
+                                        // ✅ Calculate 2-year price with discount and tax
+                                        const twoYearBase = total * 2;
+                                        const twoYearDiscountAmount = displayTwoYearDiscount > 0 ? (twoYearBase * displayTwoYearDiscount) / 100 : 0;
+                                        const twoYearAfterDiscount = twoYearBase - twoYearDiscountAmount;
+                                        
+                                        // Calculate tax on discounted price
+                                        const twoYearBaseBeforeTax = taxRate > 0 ? twoYearAfterDiscount / (1 + taxRate) : twoYearAfterDiscount;
+                                        const twoYearTaxAmount = twoYearAfterDiscount - twoYearBaseBeforeTax;
+                                        
                                         return (
                                             <>
-                                                <p>
-                                                    السعر قبل الضريبة: <span className="text-white">{Math.round(basePrice).toLocaleString()} ر.س</span>
+                                                <p className="text-[11px]">
+                                                    السعر قبل الضريبة: <span className="text-white/90">{Math.round(basePrice).toLocaleString()} ر.س</span>
                                                 </p>
-                                                <p>
+                                                <p className="text-[11px]">
                                                     قيمة الضريبة ({systemSettings.defaultTaxRate ?? 15}%):{' '}
-                                                    <span className="text-white">{Math.round(taxAmount).toLocaleString()} ر.س</span>
+                                                    <span className="text-white/90">{Math.round(taxAmount).toLocaleString()} ر.س</span>
                                                 </p>
-                                                <p>
+                                                <p className="text-[11px]">
                                                     إجمالي الاشتراك بعد الضريبة:{' '}
-                                                    <span className="text-primary-300 font-semibold">
+                                                    <span className="text-primary-500 font-semibold">
                                                         {Math.round(total).toLocaleString()} ر.س
                                                     </span>
                                                 </p>
+                                                {displayTwoYearDiscount > 0 && (
+                                                    <>
+                                                        <div className="border-t-2 border-primary-500/30 my-3 pt-3 mt-3 bg-primary-500/5 rounded-lg p-3 -mx-1">
+                                                            <p className="text-primary-500 font-semibold mb-2 text-xs flex items-center gap-2">
+                                                                <span className="text-base">✨</span>
+                                                                الاشتراك لسنتين (بعد الخصم):
+                                                            </p>
+                                                            <p className="text-[11px]">
+                                                                السعر الأصلي (سنتين): <span className="text-white/90">{Math.round(twoYearBase).toLocaleString()} ر.س</span>
+                                                            </p>
+                                                            <p className="text-[11px]">
+                                                                خصم {displayTwoYearDiscount}%: <span className="text-red-400">-{Math.round(twoYearDiscountAmount).toLocaleString()} ر.س</span>
+                                                            </p>
+                                                            <p className="text-[11px]">
+                                                                السعر بعد الخصم (قبل الضريبة): <span className="text-white/90">{Math.round(twoYearBaseBeforeTax).toLocaleString()} ر.س</span>
+                                                            </p>
+                                                            <p className="text-[11px]">
+                                                                قيمة الضريبة ({systemSettings.defaultTaxRate ?? 15}%): <span className="text-white/90">{Math.round(twoYearTaxAmount).toLocaleString()} ر.س</span>
+                                                            </p>
+                                                            <p className="text-[11px]">
+                                                                الإجمالي النهائي (بعد الخصم + الضريبة):{' '}
+                                                                <span className="text-primary-500 font-semibold">
+                                                                    {Math.round(twoYearAfterDiscount).toLocaleString()} ر.س
+                                                                </span>
+                                                            </p>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </>
                                         );
                                     })()}
@@ -4017,34 +4106,62 @@ const DeveloperBrandingSection: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     // ✅ Load from Firebase on mount (with localStorage as fallback)
+    // ✅ CRITICAL: Only load on mount, never reload after save
     useEffect(() => {
         const loadDeveloperSettings = async () => {
             try {
-                const settings = await getSystemSettings();
+                // ✅ CRITICAL: Force refresh to get latest data from Firebase
+                const settings = await getSystemSettings(true); // forceRefresh = true
                 if (settings?.developerBranding) {
                     const branding = settings.developerBranding;
-                    if (branding.devPhoneSA) setDevPhoneSA(branding.devPhoneSA);
-                    if (branding.devPhoneEG) setDevPhoneEG(branding.devPhoneEG);
-                    if (branding.devEmail) setDevEmail(branding.devEmail);
-                    if (branding.devName) setDevName(branding.devName);
-                    if (branding.devSignature) setDevSignature(branding.devSignature);
+                    // ✅ Always update state, even if value is empty (to clear old values)
+                    setDevPhoneSA(branding.devPhoneSA || '');
+                    setDevPhoneEG(branding.devPhoneEG || '');
+                    setDevEmail(branding.devEmail || '');
+                    setDevName(branding.devName || '');
+                    setDevSignature(branding.devSignature || '');
                     
-                    // ✅ Sync to localStorage for backward compatibility
-                    localStorage.setItem('adora_dev_phone_sa', branding.devPhoneSA || devPhoneSA);
-                    localStorage.setItem('adora_dev_phone_eg', branding.devPhoneEG || devPhoneEG);
-                    localStorage.setItem('adora_dev_email', branding.devEmail || devEmail);
-                    localStorage.setItem('adora_dev_name', branding.devName || devName);
-                    localStorage.setItem('adora_dev_signature', branding.devSignature || devSignature);
+                    // ✅ CRITICAL: Sync to localStorage for backward compatibility (always, even if empty)
+                    localStorage.setItem('adora_dev_phone_sa', branding.devPhoneSA || '');
+                    localStorage.setItem('adora_dev_phone_eg', branding.devPhoneEG || '');
+                    localStorage.setItem('adora_dev_email', branding.devEmail || '');
+                    localStorage.setItem('adora_dev_name', branding.devName || '');
+                    localStorage.setItem('adora_dev_signature', branding.devSignature || '');
+                } else {
+                    // ✅ If no Firebase data, use localStorage as fallback
+                    const localName = localStorage.getItem('adora_dev_name');
+                    const localPhoneSA = localStorage.getItem('adora_dev_phone_sa');
+                    const localPhoneEG = localStorage.getItem('adora_dev_phone_eg');
+                    const localEmail = localStorage.getItem('adora_dev_email');
+                    const localSignature = localStorage.getItem('adora_dev_signature');
+                    
+                    if (localName) setDevName(localName);
+                    if (localPhoneSA) setDevPhoneSA(localPhoneSA);
+                    if (localPhoneEG) setDevPhoneEG(localPhoneEG);
+                    if (localEmail) setDevEmail(localEmail);
+                    if (localSignature) setDevSignature(localSignature);
                 }
             } catch (err) {
                 console.warn('Failed to load developer settings from Firebase, using localStorage:', err);
+                // ✅ Fallback to localStorage
+                const localName = localStorage.getItem('adora_dev_name');
+                const localPhoneSA = localStorage.getItem('adora_dev_phone_sa');
+                const localPhoneEG = localStorage.getItem('adora_dev_phone_eg');
+                const localEmail = localStorage.getItem('adora_dev_email');
+                const localSignature = localStorage.getItem('adora_dev_signature');
+                
+                if (localName) setDevName(localName);
+                if (localPhoneSA) setDevPhoneSA(localPhoneSA);
+                if (localPhoneEG) setDevPhoneEG(localPhoneEG);
+                if (localEmail) setDevEmail(localEmail);
+                if (localSignature) setDevSignature(localSignature);
             } finally {
                 setLoading(false);
             }
         };
         
         loadDeveloperSettings();
-    }, []);
+    }, []); // ✅ Empty dependency array - only runs on mount, NEVER reloads after save
 
     const handleSave = async () => {
         setSaving(true);
@@ -4067,19 +4184,62 @@ const DeveloperBrandingSection: React.FC = () => {
                 }
             }, user?.id || 'system');
             
-            // ✅ Dispatch custom event to notify all components (Footer, LoginScreen, etc.)
-            window.dispatchEvent(new CustomEvent('adora_dev_settings_updated', {
-                detail: {
-                    devName,
-                    phoneSA: devPhoneSA,
-                    phoneEG: devPhoneEG,
-                    email: devEmail,
-                    signature: devSignature
-                }
-            }));
+            // ✅ CRITICAL: Invalidate cache to force refresh on next load
+            try {
+                const { invalidateCache } = await import('../../utils/requestCache');
+                invalidateCache('settings:system');
+            } catch (err) {
+                console.warn('Could not invalidate cache:', err);
+            }
+            
+            // ✅ CRITICAL: Also update localStorage system_settings to ensure consistency
+            try {
+                const localKey = 'adora_system_settings';
+                const existing = localStorage.getItem(localKey);
+                const currentLocal = existing ? JSON.parse(existing) : {};
+                const updated = {
+                    ...currentLocal,
+                    developerBranding: {
+                        devPhoneSA,
+                        devPhoneEG,
+                        devEmail,
+                        devName,
+                        devSignature
+                    },
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user?.id || 'system'
+                };
+                localStorage.setItem(localKey, JSON.stringify(updated));
+            } catch (err) {
+                console.warn('Could not update localStorage system_settings:', err);
+            }
+            
+            // ✅ CRITICAL: Update individual localStorage keys for backward compatibility
+            localStorage.setItem('adora_dev_name', devName);
+            localStorage.setItem('adora_dev_phone_sa', devPhoneSA);
+            localStorage.setItem('adora_dev_phone_eg', devPhoneEG);
+            localStorage.setItem('adora_dev_email', devEmail);
+            localStorage.setItem('adora_dev_signature', devSignature);
+            
+            // ✅ CRITICAL: Dispatch event to update all components immediately (LoginScreen, DeveloperSignature, DeveloperFooter, etc.)
+            const configData = {
+                devName,
+                phoneSA: devPhoneSA,
+                phoneEG: devPhoneEG,
+                email: devEmail,
+                signature: devSignature
+            };
+            
+            // Dispatch custom event for real-time updates
+            window.dispatchEvent(new CustomEvent('adora_dev_settings_updated', { detail: configData }));
             
             setSaved(true);
-            success(t('admin.saveSuccess'));
+            success(t('admin.saveSuccess') || 'تم حفظ الإعدادات بنجاح');
+            
+            // ✅ CRITICAL: Don't reload from Firebase immediately - use saved values
+            // Firebase write may have delay, so we keep the current state values
+            // The state is already updated with the saved values, no need to reload
+            
             setTimeout(() => setSaved(false), 2000);
         } catch (err: any) {
             console.error('Error saving developer settings:', err);
@@ -4455,6 +4615,45 @@ const StatusItem: React.FC<{
         </div>
     );
 };
+
+// ============================================================
+// FIREBASE AUTO-SETUP HELPERS
+// ============================================================
+
+/**
+ * Get default Firestore Rules for new tenant
+ */
+function getDefaultFirestoreRules(): string {
+    return `
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ✅ Allow authenticated users to read/write their own data
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // ✅ Public read-only access for certain collections (adjust as needed)
+    match /public/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
+    `.trim();
+}
+
+/**
+ * Get default Firestore Indexes for new tenant
+ */
+function getDefaultFirestoreIndexes(): string {
+    return `
+{
+  "indexes": [],
+  "fieldOverrides": []
+}
+    `.trim();
+}
 
 // ============================================================
 // MODALS
@@ -4921,6 +5120,7 @@ const AddManagerModal: React.FC<{
     const { success: showSuccess, error: showError } = useUX();
     const [conflictingCodes, setConflictingCodes] = useState<Set<string>>(new Set());
     const [checkingCodes, setCheckingCodes] = useState(false);
+    const [generatingCode, setGeneratingCode] = useState(false);
 
     // ✅ Wizard Navigation
     const canGoNext = () => {
@@ -4929,8 +5129,12 @@ const AddManagerModal: React.FC<{
                 return name.trim().length >= 2 && phone.length >= 9 && code.length === 4 && /^\d+$/.test(code) && !conflictingCodes.has(code);
             case 2: // Branches
                 return branchCodes.length > 0;
-            case 3: // Subscription
-                return true; // Always valid
+            case 3: // Subscription & Firebase (إجباري)
+                // ✅ Firebase Config is now REQUIRED
+                return firebaseConfig.apiKey.trim().length > 0 && 
+                       firebaseConfig.projectId.trim().length > 0 && 
+                       firebaseConfig.authDomain.trim().length > 0 &&
+                       firebaseConfig.storageBucket.trim().length > 0;
             case 4: // Review
                 return true;
             default:
@@ -4982,6 +5186,20 @@ const AddManagerModal: React.FC<{
             } finally {
                 setCheckingCodes(false);
             }
+        }
+    };
+
+    // ✅ Generate unique manager code (4 digits)
+    const handleGenerateCode = async () => {
+        setGeneratingCode(true);
+        setError('');
+        try {
+            const newCode = await suggestUniquePin();
+            await handleCodeChange(newCode);
+        } catch (err: any) {
+            setError(err.message || 'فشل توليد الكود. حاول مرة أخرى.');
+        } finally {
+            setGeneratingCode(false);
         }
     };
 
@@ -5099,581 +5317,141 @@ const AddManagerModal: React.FC<{
                 branchNamesMap[b.code] = b.name;
             });
 
-            // ✅ Create manager with optional isolated Firebase config
-            const hasCustomFirebase = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+            // ✅ Firebase Config is now REQUIRED
+            if (!firebaseConfig.apiKey || !firebaseConfig.projectId || !firebaseConfig.authDomain || !firebaseConfig.storageBucket) {
+                setError('يجب إدخال جميع بيانات Firebase المطلوبة (apiKey, projectId, authDomain, storageBucket)');
+                setLoading(false);
+                return;
+            }
 
-            // ✅ FIX: Build clean firebaseConfig object without undefined values
-            // Firebase WriteBatch.set() doesn't accept undefined values!
-            const cleanFirebaseConfig = hasCustomFirebase ? (() => {
-                const config: Record<string, string> = {
-                    apiKey: firebaseConfig.apiKey,
-                    authDomain: firebaseConfig.authDomain,
-                    projectId: firebaseConfig.projectId,
-                    storageBucket: firebaseConfig.storageBucket,
-                };
-                // Only add optional fields if they have actual values
-                if (firebaseConfig.messagingSenderId?.trim()) {
-                    config.messagingSenderId = firebaseConfig.messagingSenderId.trim();
-                }
-                if (firebaseConfig.appId?.trim()) {
-                    config.appId = firebaseConfig.appId.trim();
-                }
-                return config;
-            })() : undefined;
+            // ✅ Build clean firebaseConfig object without undefined values
+            const cleanFirebaseConfig: Record<string, string> = {
+                apiKey: firebaseConfig.apiKey.trim(),
+                authDomain: firebaseConfig.authDomain.trim(),
+                projectId: firebaseConfig.projectId.trim(),
+                storageBucket: firebaseConfig.storageBucket.trim(),
+            };
+            // Only add optional fields if they have actual values
+            if (firebaseConfig.messagingSenderId?.trim()) {
+                cleanFirebaseConfig.messagingSenderId = firebaseConfig.messagingSenderId.trim();
+            }
+            if (firebaseConfig.appId?.trim()) {
+                cleanFirebaseConfig.appId = firebaseConfig.appId.trim();
+            }
+            
+            // ✅ Get Service Account JSON if provided (for auto-setup)
+            const serviceAccountJson = (firebaseConfig as any).serviceAccountJson;
 
-            const managerResult = await createManager({
-                name: name.trim() || 'مدير جديد',
-                phone: phone.trim(), // ✅ رقم هاتف المدير (إجباري)
-                phoneBackup: phoneBackup.trim() || undefined, // ✅ سيتم تنظيفه في ownerService (تحويل undefined إلى null)
-                code,
-                hotelName: hotelName.trim() || undefined,
-                maxBranches: branchCodes.length,
-                branchCodes: branchCodes.map(b => b.code),
-                branchNames: branchNamesMap,
-                // ✅ SaaS: Store Firebase config if provided (Isolated Multi-Tenancy)
-                firebaseConfig: cleanFirebaseConfig,
-            });
-
-            // ✅ Get tenantId from manager result
-            const tenantId = managerResult.tenantId;
-
-            // ✅ Create receipt vouchers for each branch
-            const createdVoucherIds: string[] = [];
-            if (tenantId && systemSettings) {
-                const subscriptionPrice = systemSettings.defaultSubscriptionPrice || 0;
-                const taxRate = systemSettings.defaultTaxRate || 15;
-
-                // ✅ المبلغ للفرع الواحد × مدة الاشتراك (سنة واحدة = 1x، سنتين = 2x)
-                const pricePerBranch = subscriptionPrice * subscriptionDuration;
-
-                // إنشاء سند قبض لكل فرع
-                for (const branch of branchCodes) {
-                    const voucherId = await createReceiptVoucher({
-                        tenantId,
-                        managerName: name.trim() || 'مدير جديد',
-                        managerCode: code,
-                        branchCode: branch.code,
-                        branchName: branch.name,
-                        totalAmount: pricePerBranch, // ✅ المبلغ للفرع الواحد مضروب في مدة الاشتراك
-                        subscriptionPrice: subscriptionPrice, // سعر الاشتراك للفرع الواحد (شامل الضريبة) - للسنة الواحدة
-                        numberOfBranches: branchCodes.length,
-                        subscriptionDuration,
-                        paymentMethod, // ✅ طريقة الدفع من النافذة
-                        currency: 'SAR',
-                        createdBy: user?.id,
-                        notes: t('admin.receiptVoucherAuto', { duration: subscriptionDuration === 1 ? t('admin.oneYear') : t('admin.twoYears') })
+            // ✅ NEW: Use Cloud Function for manager creation (100% reliable, no Rules issues)
+            let managerResult: { managerId?: string; tenantId?: string; warnings?: string[] } | null = null;
+            
+            try {
+                const { functions, httpsCallable } = await import('../../services/firebase');
+                if (functions) {
+                    const createManagerFunction = httpsCallable(functions, 'createManager');
+                    const result = await createManagerFunction({
+                        name: name.trim() || 'مدير جديد',
+                        phone: phone.trim(),
+                        phoneBackup: phoneBackup.trim() || undefined,
+                        code,
+                        hotelName: hotelName.trim() || undefined,
+                        maxBranches: branchCodes.length,
+                        branchCodes: branchCodes.map(b => b.code),
+                        branchNames: branchNamesMap,
+                        subscriptionDuration: subscriptionDuration,
+                        paymentMethod: paymentMethod,
+                        firebaseConfig: cleanFirebaseConfig,
                     });
-                    createdVoucherIds.push(voucherId);
+                    
+                    const response = result.data as any;
+                    if (response.success) {
+                        managerResult = {
+                            managerId: response.managerId,
+                            tenantId: response.tenantId
+                        };
+                        // ✅ SUCCESS - Everything is automatic!
+                        showSuccess(response.message || `✅ تم إنشاء المدير "${name}" بنجاح!\n\n📋 الكود: ${code}\n✅ جاهز للاستخدام تلقائياً!`);
+                    } else {
+                        throw new Error(response.error || 'فشل إنشاء المدير');
+                    }
+                } else {
+                    throw new Error('Cloud Functions غير متاحة - استخدام طريقة بديلة');
+                }
+            } catch (functionError: any) {
+                // ✅ Fallback: Use client-side createManager (if Functions not available)
+                console.warn('Cloud Function failed, using fallback:', functionError);
+                showError(`⚠️ Cloud Function غير متاحة - استخدام طريقة بديلة...`);
+                
+                const fallbackResult = await createManager({
+                    name: name.trim() || 'مدير جديد',
+                    phone: phone.trim(),
+                    phoneBackup: phoneBackup.trim() || undefined,
+                    code,
+                    hotelName: hotelName.trim() || undefined,
+                    maxBranches: branchCodes.length,
+                    branchCodes: branchCodes.map(b => b.code),
+                    branchNames: branchNamesMap,
+                    subscriptionDuration: subscriptionDuration,
+                    paymentMethod: paymentMethod,
+                    firebaseConfig: cleanFirebaseConfig,
+                });
+                
+                managerResult = fallbackResult;
+                
+                // Show warnings only for fallback method
+                if (fallbackResult.warnings && fallbackResult.warnings.length > 0) {
+                    fallbackResult.warnings.forEach((warning) => {
+                        showError(warning);
+                    });
+                } else {
+                    showSuccess(`✅ تم إنشاء المدير "${name}" بنجاح!\n📋 الكود: ${code}`);
                 }
             }
 
-            showSuccess(t('admin.addManagerSuccess'));
-
-            // ✅ Print vouchers automatically
-            if (createdVoucherIds.length > 0) {
+            // ✅ Auto-setup Firebase (Authentication, Firestore Rules, Storage, Anonymous Auth) if Service Account provided
+            if (serviceAccountJson && managerResult?.tenantId) {
                 try {
-                    // Wait a bit for Firestore to update
-                    await new Promise(resolve => setTimeout(resolve, 500));
-
-                    // Get the created vouchers
-                    const allVouchers = await getAllReceiptVouchers();
-                    const vouchersToPrint = allVouchers.filter((v) => createdVoucherIds.includes(v.id));
-
-                    if (vouchersToPrint.length > 0) {
-                        // Print function (same as in BillingDashboard)
-                        const paymentMethodLabels = {
-                            'cash': 'كاش',
-                            'credit': 'كريديت',
-                            'bank_transfer': 'تحويل بنكي',
-                            'deferred': 'مؤجل الدفع'
-                        };
-
-                        const printContent = vouchersToPrint.map((voucher) => {
-                            const createdAtDate = voucher.createdAt instanceof Date
-                                ? voucher.createdAt
-                                : (voucher.createdAt as Timestamp)?.toDate?.() || new Date();
-                            const formattedDate = createdAtDate.toLocaleDateString('ar-SA', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            });
-
-                            // ✅ Calculate tax and subtotal
-                            const taxRate = 15; // 15% VAT
-                            const subtotal = voucher.totalAmount / (1 + taxRate / 100);
-                            const taxAmount = voucher.totalAmount - subtotal;
-
-                            // ✅ Company Information HTML (from systemSettings)
-                            const companyInfoHTML = systemSettings ? `
-                                <!-- ✅ Enhanced Company Information Section -->
-                                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 2px solid #0ea5e9; box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);">
-                                    <div style="font-size: 10pt; color: #0c4a6e; font-weight: 700; margin-bottom: 10px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">
-                                        معلومات الشركة
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">اسم الشركة:</div>
-                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.companyName || '________________'}</div>
-                                        </div>
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الرقم الضريبي:</div>
-                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.companyTaxNumber || '________________'}</div>
-                                        </div>
-                                    </div>
-                                    ${systemSettings.commercialRegistrationNumber ? `
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">السجل التجاري:</div>
-                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.commercialRegistrationNumber}</div>
-                                        </div>
-                                        ${systemSettings.contactPhone ? `
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الهاتف:</div>
-                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.contactPhone}</div>
-                                        </div>
-                                        ` : '<div></div>'}
-                                    </div>
-                                    ` : ''}
-                                    ${systemSettings.companyAddress ? `
-                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(14, 165, 233, 0.2);">
-                                        <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px; text-align: center;">العنوان:</div>
-                                        <div style="font-size: 10pt; color: #1e293b; font-weight: 500; text-align: center;">${systemSettings.companyAddress}</div>
-                                    </div>
-                                    ` : ''}
-                                    ${systemSettings.contactEmail || systemSettings.contactWebsite ? `
-                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(14, 165, 233, 0.2); display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                        ${systemSettings.contactEmail ? `
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">البريد الإلكتروني:</div>
-                                            <div style="font-size: 10pt; color: #1e293b; font-weight: 500;">${systemSettings.contactEmail}</div>
-                                        </div>
-                                        ` : '<div></div>'}
-                                        ${systemSettings.contactWebsite ? `
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الموقع الإلكتروني:</div>
-                                            <div style="font-size: 10pt; color: #1e293b; font-weight: 500;">${systemSettings.contactWebsite}</div>
-                                        </div>
-                                        ` : ''}
-                                    </div>
-                                    ` : ''}
-                                </div>
-                                
-                                <!-- ✅ Fixed Text: استلمنا من شركة -->
-                                <div style="background: #fff7ed; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 2px solid #fb923c; text-align: center;">
-                                    <div style="font-size: 11pt; color: #9a3412; font-weight: 700; margin-bottom: 5px;">
-                                        استلمنا من شركة: <span style="color: #1f2937; border-bottom: 2px solid #fb923c; padding: 0 8px; display: inline-block; min-width: 200px;">${systemSettings.companyName || '________________'}</span>
-                                    </div>
-                                    <div style="font-size: 10pt; color: #9a3412; font-weight: 600;">
-                                        رقم ضريبي: <span style="color: #1f2937; border-bottom: 2px solid #fb923c; padding: 0 8px; display: inline-block; min-width: 150px;">${systemSettings.companyTaxNumber || '________________'}</span>
-                                    </div>
-                                    ${systemSettings.companyAddress ? `
-                                    <div style="font-size: 9pt; color: #9a3412; margin-top: 5px;">
-                                        العنوان: <span style="color: #1f2937;">${systemSettings.companyAddress}</span>
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            ` : '';
-
-                            return `
-                                <div style="page-break-after: always; padding: 0; margin: 0; max-width: 100%;">
-                                    <!-- Header Section -->
-                                    <div style="background: linear-gradient(135deg, #0D9488 0%, #059669 100%); padding: 20px; text-align: center; color: white;">
-                                        <div style="font-size: 28pt; font-weight: bold; margin-bottom: 5px; letter-spacing: 1px;">سند قبض</div>
-                                        <div style="font-size: 12pt; opacity: 0.95; margin-bottom: 8px;">RECEIPT VOUCHER</div>
-                                        <div style="font-size: 11pt; opacity: 0.9; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.3);">
-                                            رقم السند: <strong>#${voucher.voucherNumber || voucher.id.slice(0, 8)}</strong>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Content Section -->
-                                    <div style="background: #ffffff; padding: 15px; border: 2px solid #e5e7eb; border-top: none;">
-                                        ${companyInfoHTML}
-                                        <!-- Date & Info Row -->
-                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;">
-                                            <div>
-                                                <div style="font-size: 9pt; color: #6b7280; margin-bottom: 3px;">تاريخ ووقت الإنشاء</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${formattedDate}</div>
-                                            </div>
-                                            <div style="text-align: left;">
-                                                <div style="font-size: 9pt; color: #6b7280; margin-bottom: 3px;">طريقة الدفع</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${voucher.paymentMethod ? (paymentMethodLabels[voucher.paymentMethod] || 'غير محدد') : 'غير محدد'}</div>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Information Grid -->
-                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
-                                            <div style="background: #f9fafb; padding: 8px; border-radius: 6px; border-right: 3px solid #0D9488;">
-                                                <div style="font-size: 8pt; color: #6b7280; margin-bottom: 3px;">اسم المدير</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${voucher.managerName}</div>
-                                            </div>
-                                            <div style="background: #f9fafb; padding: 8px; border-radius: 6px; border-right: 3px solid #0D9488;">
-                                                <div style="font-size: 8pt; color: #6b7280; margin-bottom: 3px;">كود المدير</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${voucher.managerCode}</div>
-                                            </div>
-                                            <div style="background: #f9fafb; padding: 8px; border-radius: 6px; border-right: 3px solid #0D9488;">
-                                                <div style="font-size: 8pt; color: #6b7280; margin-bottom: 3px;">رقم الفرع</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${voucher.branchCode}</div>
-                                            </div>
-                                            <div style="background: #f9fafb; padding: 8px; border-radius: 6px; border-right: 3px solid #0D9488;">
-                                                <div style="font-size: 8pt; color: #6b7280; margin-bottom: 3px;">اسم الفرع</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${voucher.branchName}</div>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Calculation Details -->
-                                        <div style="background: #f9fafb; padding: 10px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #e5e7eb;">
-                                            <div style="font-size: 9pt; color: #6b7280; margin-bottom: 6px; font-weight: 600;">تفاصيل الحساب:</div>
-                                            <table style="width: 100%; border-collapse: collapse; font-size: 8.5pt;">
-                                                <tr>
-                                                    <td style="padding: 3px 0; color: #4b5563;">سعر الاشتراك للفرع الواحد (شامل الضريبة):</td>
-                                                    <td style="padding: 3px 0; text-align: left; color: #1f2937; font-weight: 600;">${voucher.subscriptionPrice.toLocaleString()} ر.س</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="padding: 3px 0; color: #4b5563;">عدد الفروع:</td>
-                                                    <td style="padding: 3px 0; text-align: left; color: #1f2937; font-weight: 600;">${voucher.numberOfBranches} فرع</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="padding: 3px 0; color: #4b5563;">مدة الاشتراك:</td>
-                                                    <td style="padding: 3px 0; text-align: left; color: #1f2937; font-weight: 600;">${voucher.subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'}</td>
-                                                </tr>
-                                                <tr style="border-top: 1px solid #e5e7eb; margin-top: 4px;">
-                                                    <td style="padding: 5px 0 3px 0; color: #4b5563; font-weight: 500;">المجموع قبل الضريبة:</td>
-                                                    <td style="padding: 5px 0 3px 0; text-align: left; color: #1f2937; font-weight: 600;">${subtotal.toFixed(2)} ر.س</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="padding: 3px 0; color: #4b5563;">ضريبة القيمة المضافة (15%):</td>
-                                                    <td style="padding: 3px 0; text-align: left; color: #1f2937; font-weight: 600;">${taxAmount.toFixed(2)} ر.س</td>
-                                                </tr>
-                                            </table>
-                                        </div>
-                                        
-                                        <!-- Total Amount Section -->
-                                        <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 12px; border-radius: 8px; border: 2px solid #10b981; text-align: center; margin-bottom: 10px;">
-                                            <div style="font-size: 9pt; color: #059669; margin-bottom: 4px; font-weight: 500;">المبلغ الإجمالي (شامل الضريبة)</div>
-                                            <div style="font-size: 24pt; color: #047857; font-weight: bold; letter-spacing: 1px;">
-                                                ${voucher.totalAmount.toLocaleString()} <span style="font-size: 14pt;">ر.س</span>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Footer -->
-                                        <div style="padding-top: 8px; border-top: 1px dashed #e5e7eb; text-align: center;">
-                                            <div style="font-size: 8pt; color: #9ca3af; margin-bottom: 2px;">شكراً لاستخدامكم</div>
-                                            <div style="font-size: 9pt; color: #0D9488; font-weight: 600;">نظام إدارة أدورا</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('');
-
-                        // ✅ FIX: Prevent double printing - use unique window name
-                        const printWindow = window.open('', `voucher-print-${Date.now()}`, 'noopener,noreferrer');
-                        if (printWindow) {
-                            printWindow.document.write(`
-                                <!DOCTYPE html>
-                                <html dir="rtl" lang="ar">
-                                <head>
-                                    <meta charset="UTF-8">
-                                    <title>طباعة سندات القبض</title>
-                                    <style>
-                                        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800&display=swap');
-                                        * { margin: 0; padding: 0; box-sizing: border-box; }
-                                        body {
-                                            font-family: 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
-                                            padding: 20mm;
-                                            direction: rtl;
-                                            background: #f9fafb;
-                                        }
-                                        @page { 
-                                            size: A4; 
-                                            margin: 10mm;
-                                        }
-                                        @media print {
-                                            body { 
-                                                padding: 0;
-                                                background: white;
-                                            }
-                                            div[style*="page-break"] {
-                                                page-break-after: always;
-                                                margin-bottom: 0;
-                                            }
-                                        }
-                                    </style>
-                                    <script>
-                                        // ✅ FIX: Prevent double print - flag to ensure single print
-                                        (function() {
-                                            let hasPrinted = false;
-                                            window.addEventListener('beforeprint', function(e) {
-                                                if (hasPrinted) {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    return false;
-                                                }
-                                                hasPrinted = true;
-                                            }, { once: true });
-                                        })();
-                                    </script>
-                                </head>
-                                <body>
-                                    ${printContent}
-                                </body>
-                                </html>
-                            `);
-                            printWindow.document.close();
-                            // ✅ FIX: Single print call - wait for document ready
-                            let hasPrinted = false;
-                            const doPrint = () => {
-                                if (!hasPrinted && !printWindow.closed) {
-                                    hasPrinted = true;
-                                    printWindow.print();
-                                }
-                            };
-                            
-                            // Wait for document to be ready
-                            if (printWindow.document.readyState === 'complete') {
-                                setTimeout(doPrint, 500);
-                            } else {
-                                printWindow.onload = () => setTimeout(doPrint, 500);
-                            }
-                        }
-                    }
-                    // ✅ AUTO-PRINT INVOICES AFTER VOUCHERS
-                    // Wait for invoices to be created
-                    await new Promise(resolve => setTimeout(resolve, 800));
-
-                    // Get the invoices linked to these vouchers
-                    const allInvoices = await getAllInvoices();
-                    const invoicesToPrint = allInvoices.filter((inv: Invoice) =>
-                        createdVoucherIds.includes(inv.receiptVoucherId || '')
+                    // Import Firebase Functions
+                    const { getFunctions, httpsCallable } = await import('firebase/functions');
+                    const functions = getFunctions();
+                    const deployTenantFirebase = httpsCallable(functions, 'deployTenantFirebase');
+                    
+                    // Call deployment function with timeout
+                    const deployPromise = deployTenantFirebase({
+                        tenantId: managerResult?.tenantId || '',
+                        serviceAccountJson: serviceAccountJson,
+                        firestoreRules: getDefaultFirestoreRules(),
+                        firestoreIndexes: getDefaultFirestoreIndexes(),
+                    });
+                    
+                    // Add timeout (60 seconds)
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('انتهت مهلة الإعداد التلقائي (60 ثانية)')), 60000)
                     );
-
-                    if (invoicesToPrint.length > 0) {
-                        const paymentMethodLabels = {
-                            'cash': 'كاش',
-                            'credit': 'كريديت',
-                            'bank_transfer': 'تحويل بنكي',
-                            'deferred': 'مؤجل الدفع'
-                        };
-
-                        const invoicePrintContent = invoicesToPrint.map((invoice: Invoice) => {
-                            const issueDateObj = invoice.issueDate instanceof Date
-                                ? invoice.issueDate
-                                : (invoice.issueDate as any)?.toDate?.() || new Date();
-                            const formattedDate = issueDateObj.toLocaleDateString('ar-SA', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            });
-
-                            const taxRate = 15;
-                            const subtotal = invoice.amount / (1 + taxRate / 100);
-                            const taxAmount = invoice.amount - subtotal;
-
-                            // ✅ Company Information HTML (from systemSettings)
-                            const companyInfoHTML = systemSettings ? `
-                                <!-- ✅ Enhanced Company Information Section -->
-                                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 2px solid #0ea5e9; box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);">
-                                    <div style="font-size: 10pt; color: #0c4a6e; font-weight: 700; margin-bottom: 10px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">
-                                        معلومات الشركة
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">اسم الشركة:</div>
-                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.companyName || '________________'}</div>
-                                        </div>
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الرقم الضريبي:</div>
-                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.companyTaxNumber || '________________'}</div>
-                                        </div>
-                                    </div>
-                                    ${systemSettings.commercialRegistrationNumber ? `
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">السجل التجاري:</div>
-                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.commercialRegistrationNumber}</div>
-                                        </div>
-                                        ${systemSettings.contactPhone ? `
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الهاتف:</div>
-                                            <div style="font-size: 11pt; color: #1e293b; font-weight: 600;">${systemSettings.contactPhone}</div>
-                                        </div>
-                                        ` : '<div></div>'}
-                                    </div>
-                                    ` : ''}
-                                    ${systemSettings.companyAddress ? `
-                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(14, 165, 233, 0.2);">
-                                        <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px; text-align: center;">العنوان:</div>
-                                        <div style="font-size: 10pt; color: #1e293b; font-weight: 500; text-align: center;">${systemSettings.companyAddress}</div>
-                                    </div>
-                                    ` : ''}
-                                    ${systemSettings.contactEmail || systemSettings.contactWebsite ? `
-                                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(14, 165, 233, 0.2); display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                        ${systemSettings.contactEmail ? `
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">البريد الإلكتروني:</div>
-                                            <div style="font-size: 10pt; color: #1e293b; font-weight: 500;">${systemSettings.contactEmail}</div>
-                                        </div>
-                                        ` : '<div></div>'}
-                                        ${systemSettings.contactWebsite ? `
-                                        <div style="text-align: right;">
-                                            <div style="font-size: 9pt; color: #64748b; margin-bottom: 3px;">الموقع الإلكتروني:</div>
-                                            <div style="font-size: 10pt; color: #1e293b; font-weight: 500;">${systemSettings.contactWebsite}</div>
-                                        </div>
-                                        ` : ''}
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            ` : '';
-
-                            return `
-                                <div style="page-break-after: always; padding: 0; margin: 0; max-width: 100%;">
-                                    <!-- Header Section - Invoice Style -->
-                                    <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 20px; text-align: center; color: white;">
-                                        <div style="font-size: 28pt; font-weight: bold; margin-bottom: 5px; letter-spacing: 1px;">فاتورة ضريبية</div>
-                                        <div style="font-size: 12pt; opacity: 0.95; margin-bottom: 8px;">TAX INVOICE</div>
-                                        <div style="font-size: 11pt; opacity: 0.9; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.3);">
-                                            رقم الفاتورة: <strong>#${invoice.invoiceNumber || invoice.id.slice(0, 8)}</strong>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Content Section -->
-                                    <div style="background: #ffffff; padding: 15px; border: 2px solid #e5e7eb; border-top: none;">
-                                        ${companyInfoHTML}
-                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;">
-                                            <div>
-                                                <div style="font-size: 9pt; color: #6b7280; margin-bottom: 3px;">تاريخ الفاتورة</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${formattedDate}</div>
-                                            </div>
-                                            <div style="text-align: left;">
-                                                <div style="font-size: 9pt; color: #6b7280; margin-bottom: 3px;">${t('admin.paymentStatus')}</div>
-                                                <div style="font-size: 10pt; color: #22c55e; font-weight: 600;">${t('admin.paid')}</div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
-                                            <div style="background: #f9fafb; padding: 8px; border-radius: 6px; border-right: 3px solid #3b82f6;">
-                                                <div style="font-size: 8pt; color: #6b7280; margin-bottom: 3px;">اسم العميل</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${(invoice as any).managerName || '-'}</div>
-                                            </div>
-                                            <div style="background: #f9fafb; padding: 8px; border-radius: 6px; border-right: 3px solid #3b82f6;">
-                                                <div style="font-size: 8pt; color: #6b7280; margin-bottom: 3px;">كود العميل</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${(invoice as any).managerCode || '-'}</div>
-                                            </div>
-                                            <div style="background: #f9fafb; padding: 8px; border-radius: 6px; border-right: 3px solid #3b82f6;">
-                                                <div style="font-size: 8pt; color: #6b7280; margin-bottom: 3px;">الفرع</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${(invoice as any).branchName || '-'} (${(invoice as any).branchCode || '-'})</div>
-                                            </div>
-                                            <div style="background: #f9fafb; padding: 8px; border-radius: 6px; border-right: 3px solid #3b82f6;">
-                                                <div style="font-size: 8pt; color: #6b7280; margin-bottom: 3px;">طريقة الدفع</div>
-                                                <div style="font-size: 10pt; color: #1f2937; font-weight: 600;">${paymentMethodLabels[invoice.paymentMethod as keyof typeof paymentMethodLabels] || 'غير محدد'}</div>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Items Table -->
-                                        <div style="background: #f9fafb; padding: 10px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #e5e7eb;">
-                                            <div style="font-size: 9pt; color: #6b7280; margin-bottom: 6px; font-weight: 600;">تفاصيل الفاتورة:</div>
-                                            <table style="width: 100%; border-collapse: collapse; font-size: 8.5pt;">
-                                                ${invoice.items?.map((item: any) => `
-                                                    <tr>
-                                                        <td style="padding: 3px 0; color: #4b5563;">${item.description}</td>
-                                                        <td style="padding: 3px 0; text-align: left; color: #1f2937; font-weight: 600;">${item.price?.toLocaleString()} ر.س</td>
-                                                    </tr>
-                                                `).join('') || ''}
-                                                <tr style="border-top: 1px solid #e5e7eb; margin-top: 4px;">
-                                                    <td style="padding: 5px 0 3px 0; color: #4b5563; font-weight: 500;">المجموع قبل الضريبة:</td>
-                                                    <td style="padding: 5px 0 3px 0; text-align: left; color: #1f2937; font-weight: 600;">${subtotal.toFixed(2)} ر.س</td>
-                                                </tr>
-                                                <tr>
-                                                    <td style="padding: 3px 0; color: #4b5563;">ضريبة القيمة المضافة (15%):</td>
-                                                    <td style="padding: 3px 0; text-align: left; color: #1f2937; font-weight: 600;">${taxAmount.toFixed(2)} ر.س</td>
-                                                </tr>
-                                            </table>
-                                        </div>
-                                        
-                                        <!-- Total Amount -->
-                                        <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 12px; border-radius: 8px; border: 2px solid #3b82f6; text-align: center; margin-bottom: 10px;">
-                                            <div style="font-size: 9pt; color: #2563eb; margin-bottom: 4px; font-weight: 500;">الإجمالي (شامل الضريبة)</div>
-                                            <div style="font-size: 24pt; color: #1e40af; font-weight: bold; letter-spacing: 1px;">
-                                                ${invoice.amount.toLocaleString()} <span style="font-size: 14pt;">ر.س</span>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Footer -->
-                                        <div style="padding-top: 8px; border-top: 1px dashed #e5e7eb; text-align: center;">
-                                            <div style="font-size: 8pt; color: #9ca3af; margin-bottom: 2px;">شكراً لثقتكم</div>
-                                            <div style="font-size: 9pt; color: #3b82f6; font-weight: 600;">نظام إدارة أدورا</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('');
-
-                        // ✅ FIX: Prevent double printing - use unique window name
-                        const invoicePrintWindow = window.open('', `invoice-print-${Date.now()}`, 'noopener,noreferrer');
-                        if (invoicePrintWindow) {
-                            invoicePrintWindow.document.write(`
-                                <!DOCTYPE html>
-                                <html dir="rtl" lang="ar">
-                                <head>
-                                    <meta charset="UTF-8">
-                                    <title>${t('common.print')} ${t('admin.invoice')}</title>
-                                    <style>
-                                        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800&display=swap');
-                                        * { margin: 0; padding: 0; box-sizing: border-box; }
-                                        body {
-                                            font-family: 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
-                                            padding: 20mm;
-                                            direction: rtl;
-                                            background: #f9fafb;
-                                        }
-                                        @page { size: A4; margin: 10mm; }
-                                        @media print {
-                                            body { padding: 0; background: white; }
-                                        }
-                                    </style>
-                                    <script>
-                                        // ✅ FIX: Prevent double print - flag to ensure single print
-                                        (function() {
-                                            let hasPrinted = false;
-                                            window.addEventListener('beforeprint', function(e) {
-                                                if (hasPrinted) {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    return false;
-                                                }
-                                                hasPrinted = true;
-                                            }, { once: true });
-                                        })();
-                                    </script>
-                                </head>
-                                <body>${invoicePrintContent}</body>
-                                </html>
-                            `);
-                            invoicePrintWindow.document.close();
-                            // ✅ FIX: Single print call - wait for document ready
-                            let hasPrinted = false;
-                            const doPrint = () => {
-                                if (!hasPrinted && !invoicePrintWindow.closed) {
-                                    hasPrinted = true;
-                                    invoicePrintWindow.print();
-                                }
-                            };
-                            
-                            // Wait for document to be ready
-                            if (invoicePrintWindow.document.readyState === 'complete') {
-                                setTimeout(doPrint, 500);
-                            } else {
-                                invoicePrintWindow.onload = () => setTimeout(doPrint, 500);
-                            }
-                        }
+                    
+                    const deployResult = await Promise.race([deployPromise, timeoutPromise]) as any;
+                    const result = deployResult.data as any;
+                    
+                    if (result && result.success) {
+                        showSuccess('✅ تم إعداد Firebase تلقائياً بنجاح! (Authentication, Firestore Rules, Storage)');
+                    } else {
+                        const errorMsg = result?.message || 'خطأ غير معروف';
+                        console.warn('Firebase auto-setup partial failure:', errorMsg);
+                        showError(`⚠️ تم إنشاء المدير بنجاح، لكن فشل الإعداد التلقائي: ${errorMsg}. يمكنك إعداد Firebase يدوياً من Firebase Console.`);
                     }
-                } catch (printError) {
-                    console.error('Error printing vouchers/invoices:', printError);
+                } catch (setupError: any) {
+                    console.error('Firebase auto-setup error:', setupError);
+                    const errorMessage = setupError.message || setupError.code || 'خطأ غير معروف';
+                    // Don't fail manager creation - it's already created successfully
+                    showError(`⚠️ تم إنشاء المدير بنجاح، لكن فشل الإعداد التلقائي لـ Firebase: ${errorMessage}. يمكنك إعداد Firebase يدوياً من Firebase Console.`);
                 }
+            } else if (!serviceAccountJson) {
+                // If no Service Account provided, show info message
+                showSuccess('✅ تم إنشاء المدير بنجاح! ملاحظة: لم يتم إدخال Service Account، يمكنك إعداد Firebase يدوياً من Firebase Console.');
             }
+
+            // ✅ Financial documents are created automatically in createManager (Single Source of Truth)
+            showSuccess(t('admin.addManagerSuccess'));
 
             onSuccess();
         } catch (err: any) {
@@ -5686,8 +5464,8 @@ const AddManagerModal: React.FC<{
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm">
-            {/* Main Card - بدون سكرول: ارتفاع ثابت ومضمون، خانات مضمومة */}
-            <div className="glass-card relative w-full max-w-lg h-[85vh] max-h-[720px] flex flex-col rounded-2xl overflow-hidden !p-0">
+            {/* Main Card - محسّن: ارتفاع ديناميكي بدون مساحة بيضاء فارغة */}
+            <div className="glass-card relative w-full max-w-lg flex flex-col rounded-2xl overflow-hidden !p-0" style={{ maxHeight: '90vh' }}>
 
                 {/* Header - مضموم */}
                 <div className="px-4 py-2.5 flex items-center justify-between border-b border-theme flex-shrink-0">
@@ -5720,18 +5498,18 @@ const AddManagerModal: React.FC<{
                     ))}
                 </div>
 
-                {/* Step Content - بدون overflow: محتوى مضموم ليتسع بدون سكرول */}
-                <div className="p-3 overflow-hidden flex-1 min-h-0 flex flex-col">
+                {/* Step Content - محسّن: محتوى مضموم بدون مساحة فارغة */}
+                <div className="p-4 overflow-y-auto flex-1 min-h-0">
                     {/* ==================== STEP 1: Basic Info ==================== */}
                     {currentStep === 1 && (
-                        <div className="space-y-2 flex-1">
+                        <div className="space-y-3">
                             {/* الصف الأول: اسم المشترك + اسم الفندق */}
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="flex items-center gap-1.5 text-xs mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
                                         <Users className="w-3.5 h-3.5 text-teal-500" />اسم المشترك <span className="text-red-500">*</span>
                                     </label>
-                                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="input py-2 text-sm" placeholder="محمد أحمد" required />
+                                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="input py-2 text-sm" placeholder="أيمن أبو ورده" required />
                                 </div>
                                 <div>
                                     <label className="flex items-center gap-1.5 text-xs mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
@@ -5770,17 +5548,35 @@ const AddManagerModal: React.FC<{
                                 <label className="flex items-center gap-1.5 text-xs mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
                                     <Shield className="w-3.5 h-3.5 text-yellow-500" />كود المدير <span className="text-red-500">*</span> <span className="opacity-70">(4 أرقام)</span>
                                 </label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={code}
-                                        onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                        className={`input py-2 text-center text-xl font-mono tracking-[0.3em] ${conflictingCodes.has(code) ? '!border-red-500 !bg-red-500/10' : code.length === 4 ? '!border-green-500 !bg-green-500/10' : ''}`}
-                                        placeholder="• • • •"
-                                        maxLength={4}
-                                    />
-                                    {checkingCodes && <div className="absolute left-2 top-1/2 -translate-y-1/2"><AdoraLoaderInline size={16} /></div>}
-                                    {!checkingCodes && code.length === 4 && !conflictingCodes.has(code) && <div className="absolute left-2 top-1/2 -translate-y-1/2"><CheckCircle className="w-4 h-4 text-green-500" /></div>}
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <input
+                                            type="text"
+                                            value={code}
+                                            onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                            className={`input py-2 text-center text-xl font-mono tracking-[0.3em] ${conflictingCodes.has(code) ? '!border-red-500 !bg-red-500/10' : code.length === 4 ? '!border-green-500 !bg-green-500/10' : ''}`}
+                                            placeholder="• • • •"
+                                            maxLength={4}
+                                        />
+                                        {checkingCodes && <div className="absolute left-2 top-1/2 -translate-y-1/2"><AdoraLoaderInline size={16} /></div>}
+                                        {!checkingCodes && code.length === 4 && !conflictingCodes.has(code) && <div className="absolute left-2 top-1/2 -translate-y-1/2"><CheckCircle className="w-4 h-4 text-green-500" /></div>}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleGenerateCode}
+                                        disabled={generatingCode}
+                                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                        title="توليد كود عشوائي فريد (4 أرقام)"
+                                    >
+                                        {generatingCode ? (
+                                            <AdoraLoaderInline size={16} />
+                                        ) : (
+                                            <>
+                                                <RefreshCw className="w-4 h-4" />
+                                                توليد
+                                            </>
+                                        )}
+                                    </button>
                                 </div>
                                 {error && (error.includes(code) || error.includes('المدير')) && (
                                     <div className="mt-1.5 p-2 rounded-lg bg-red-500/10 border border-red-500/30">
@@ -5793,7 +5589,7 @@ const AddManagerModal: React.FC<{
 
                     {/* ==================== STEP 2: Branches ==================== */}
                     {currentStep === 2 && (
-                        <div className="space-y-2 flex-1">
+                        <div className="space-y-3">
                             <div className="p-2 rounded-lg flex items-center gap-2 bg-blue-500/10 border border-blue-500/30">
                                 <Building className="w-4 h-4 text-blue-500 flex-shrink-0" />
                                 <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>كل فرع: <strong>كود رقمي فريد</strong> 1–4 أرقام.</p>
@@ -5829,7 +5625,7 @@ const AddManagerModal: React.FC<{
 
                     {/* ==================== STEP 3: Subscription & Payment ==================== */}
                     {currentStep === 3 && (
-                        <div className="space-y-2 flex-1">
+                        <div className="space-y-3">
                             <div>
                                 <label className="flex items-center gap-1.5 text-xs mb-1.5" style={{ color: 'var(--theme-text-secondary)' }}><CreditCard className="w-3.5 h-3.5 text-green-500" />طريقة الدفع</label>
                                 <div className="grid grid-cols-4 gap-1.5">
@@ -5845,26 +5641,187 @@ const AddManagerModal: React.FC<{
                                     <button type="button" onClick={() => setSubscriptionDuration(2)} className={`py-2.5 rounded-xl flex items-center justify-center gap-2 border text-sm relative ${subscriptionDuration === 2 ? 'border-yellow-500 bg-yellow-500/10' : 'border-theme glass'}`} style={{ color: 'var(--theme-text-primary)' }}><span className="absolute top-0.5 left-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-500 text-white">توفير</span>📅📅 سنتين</button>
                                 </div>
                             </div>
-                            {systemSettings && (
-                                <div className="glass rounded-xl p-2.5">
-                                    <div className="flex justify-between items-center text-xs"><span style={{ color: 'var(--theme-text-secondary)' }}>الفرع/سنة:</span><span>{systemSettings.defaultSubscriptionPrice?.toLocaleString() || 0} ر.س</span></div>
-                                    <div className="flex justify-between items-center text-xs mt-1"><span style={{ color: 'var(--theme-text-secondary)' }}>الإجمالي:</span><span className="font-bold text-teal-500">{((systemSettings.defaultSubscriptionPrice || 0) * branchCodes.length * subscriptionDuration).toLocaleString()} ر.س</span></div>
+                            {systemSettings && (() => {
+                                const pricePerBranch = systemSettings.defaultSubscriptionPrice || 0;
+                                const numberOfBranches = branchCodes.length;
+                                const taxRate = (systemSettings.defaultTaxRate || 15) / 100;
+                                
+                                // ✅ Calculate base amount (same logic as ownerService.ts)
+                                // pricePerBranch is already including tax
+                                const baseAmount = pricePerBranch * subscriptionDuration * numberOfBranches;
+                                
+                                // ✅ Apply 2-year discount if applicable
+                                let discountAmount = 0;
+                                let discountRate = 0;
+                                if (subscriptionDuration === 2 && systemSettings.twoYearDiscountRate) {
+                                    discountRate = systemSettings.twoYearDiscountRate;
+                                    discountAmount = (baseAmount * discountRate) / 100;
+                                }
+                                
+                                // ✅ Final total after discount (same as ownerService.ts: totalAmount = baseAmount - discountAmount)
+                                const finalTotal = baseAmount - discountAmount;
+                                
+                                // ✅ Extract tax breakdown for display (pricePerBranch includes tax, so we reverse calculate)
+                                // If pricePerBranch includes tax: priceBeforeTax = pricePerBranch / (1 + taxRate)
+                                const priceBeforeTaxPerBranch = pricePerBranch / (1 + taxRate);
+                                const baseAmountBeforeTax = priceBeforeTaxPerBranch * subscriptionDuration * numberOfBranches;
+                                const discountAmountBeforeTax = discountAmount / (1 + taxRate);
+                                const amountAfterDiscountBeforeTax = baseAmountBeforeTax - discountAmountBeforeTax;
+                                const taxAmount = finalTotal - amountAfterDiscountBeforeTax;
+                                
+                                return (
+                                    <div className="glass rounded-xl p-3 space-y-2">
+                                        {/* Basic Info */}
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span style={{ color: 'var(--theme-text-secondary)' }}>الفرع / سنة:</span>
+                                            <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{pricePerBranch.toLocaleString()} ر.س</span>
+                                        </div>
+                                        
+                                        {/* Subscription Duration Info */}
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span style={{ color: 'var(--theme-text-secondary)' }}>عدد الفروع:</span>
+                                            <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{numberOfBranches} {numberOfBranches === 1 ? 'فرع' : 'فروع'}</span>
+                                        </div>
+                                        
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span style={{ color: 'var(--theme-text-secondary)' }}>مدة الاشتراك:</span>
+                                            <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'}</span>
+                                        </div>
+                                        
+                                        {/* Original Price (2 years) */}
+                                        {subscriptionDuration === 2 && (
+                                            <div className="flex justify-between items-center text-xs pt-1 border-t border-white/10">
+                                                <span style={{ color: 'var(--theme-text-secondary)' }}>السعر الأصلي ({subscriptionDuration} سنوات):</span>
+                                                <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{baseAmount.toLocaleString()} ر.س</span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Discount Info (only if 2 years and discount exists) */}
+                                        {subscriptionDuration === 2 && discountAmount > 0 && (
+                                            <>
+                                                <div className="flex justify-between items-center text-xs bg-primary-500/10 rounded-lg p-2 border border-primary-500/30">
+                                                    <span className="flex items-center gap-1.5">
+                                                        <span className="text-[10px]">✨</span>
+                                                        <span style={{ color: 'var(--theme-text-secondary)' }}>خصم {discountRate}%:</span>
+                                                    </span>
+                                                    <span className="font-bold text-red-400">-{Math.round(discountAmount).toLocaleString()} ر.س</span>
+                                                </div>
+                                                
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span style={{ color: 'var(--theme-text-secondary)' }}>السعر بعد الخصم (قبل الضريبة):</span>
+                                                    <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{Math.round(amountAfterDiscountBeforeTax).toLocaleString()} ر.س</span>
+                                                </div>
+                                                
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span style={{ color: 'var(--theme-text-secondary)' }}>قيمة الضريبة ({systemSettings.defaultTaxRate || 15}%):</span>
+                                                    <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{Math.round(taxAmount).toLocaleString()} ر.س</span>
+                                                </div>
+                                            </>
+                                        )}
+                                        
+                                        {/* Final Total */}
+                                        <div className="flex justify-between items-center text-sm pt-2 border-t-2 border-primary-500/30 mt-1">
+                                            <span className="font-semibold" style={{ color: 'var(--theme-text-primary)' }}>الإجمالي النهائي:</span>
+                                            <span className="font-bold text-primary-500">{Math.round(finalTotal).toLocaleString()} ر.س</span>
+                                        </div>
+                                        
+                                        {/* Info Message for 2-year discount */}
+                                        {subscriptionDuration === 2 && discountAmount > 0 && (
+                                            <div className="mt-2 p-2 rounded-lg bg-primary-500/10 border border-primary-500/30">
+                                                <p className="text-[10px] flex items-center gap-1.5 text-primary-500">
+                                                    <span>ℹ️</span>
+                                                    <span>سيتم تطبيق خصم {discountRate}% تلقائياً عند الحفظ</span>
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                            {/* ✅ Firebase Config - REQUIRED with Step-by-Step Guide */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--theme-text-primary)' }}>
+                                        <Server className="w-3.5 h-3.5 text-primary-500" />
+                                        إعدادات Firebase <span className="text-red-500">*</span> <span className="text-[10px] font-normal opacity-70">(إجباري)</span>
+                                    </label>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowFirebaseConfig(s => !s)} 
+                                        className="text-[10px] px-2 py-1 rounded-lg border border-primary-500/30 bg-primary-500/10 text-primary-500 hover:bg-primary-500/20 transition-colors"
+                                    >
+                                        {showFirebaseConfig ? '▲ إخفاء' : '▼ عرض'}
+                                    </button>
                                 </div>
-                            )}
-                            {/* Firebase: طيّ اختياري لتوفير المساحة */}
-                            <div>
-                                <button type="button" onClick={() => setShowFirebaseConfig(s => !s)} className="w-full py-2 px-3 rounded-lg flex items-center justify-between text-xs border border-theme glass" style={{ color: 'var(--theme-text-secondary)' }}>
-                                    <span>Firebase منفصل (اختياري)</span>
-                                    <span className="text-[10px]">{showFirebaseConfig ? '▲ إخفاء' : '▼ عرض'}</span>
-                                </button>
-                                {showFirebaseConfig && <div className="mt-2"><TenantFirebaseConfig config={firebaseConfig} onChange={setFirebaseConfig} disabled={loading} compact={true} showTestButton={true} onTestResult={(s) => setFirebaseTestPassed(s)} /></div>}
+                                
+                                {/* Step-by-Step Guide */}
+                                {!showFirebaseConfig && (
+                                    <div className="glass rounded-xl p-3 space-y-2 border-2 border-primary-500/30 bg-primary-500/5">
+                                        <div className="flex items-start gap-2">
+                                            <span className="text-primary-500 font-bold text-xs mt-0.5">1️⃣</span>
+                                            <div className="flex-1">
+                                                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>افتح Firebase Console</p>
+                                                <p className="text-[10px] opacity-80" style={{ color: 'var(--theme-text-secondary)' }}>
+                                                    اذهب إلى <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" className="text-primary-500 underline">console.firebase.google.com</a> وأنشئ مشروع جديد
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-2">
+                                            <span className="text-primary-500 font-bold text-xs mt-0.5">2️⃣</span>
+                                            <div className="flex-1">
+                                                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>احصل على Firebase Config</p>
+                                                <p className="text-[10px] opacity-80" style={{ color: 'var(--theme-text-secondary)' }}>
+                                                    Project Settings → General → Your apps → Web app → Copy config
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-2">
+                                            <span className="text-primary-500 font-bold text-xs mt-0.5">3️⃣</span>
+                                            <div className="flex-1">
+                                                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>احصل على Service Account Key</p>
+                                                <p className="text-[10px] opacity-80" style={{ color: 'var(--theme-text-secondary)' }}>
+                                                    Project Settings → Service Accounts → Generate new private key → Download JSON
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="pt-2 border-t border-primary-500/20">
+                                            <p className="text-[10px] text-primary-500 flex items-center gap-1.5">
+                                                <Info className="w-3 h-3" />
+                                                <span>سيقوم النظام بإعداد Authentication و Firestore Rules و Storage تلقائياً</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {showFirebaseConfig && (
+                                    <div className="space-y-3">
+                                        <TenantFirebaseConfig 
+                                            config={firebaseConfig} 
+                                            onChange={setFirebaseConfig} 
+                                            disabled={loading} 
+                                            compact={true} 
+                                            showTestButton={true}
+                                            showServiceAccount={true}
+                                            onTestResult={(s) => setFirebaseTestPassed(s)} 
+                                        />
+                                        
+                                        {/* Validation Message */}
+                                        {(!firebaseConfig.apiKey || !firebaseConfig.projectId || !firebaseConfig.authDomain || !firebaseConfig.storageBucket) && (
+                                            <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/30">
+                                                <p className="text-[10px] text-red-400 flex items-center gap-1.5">
+                                                    <AlertTriangle className="w-3 h-3" />
+                                                    <span>يجب إدخال جميع الحقول المطلوبة: apiKey, projectId, authDomain, storageBucket</span>
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
 
                     {/* ==================== STEP 4: Review & Save ==================== */}
                     {currentStep === 4 && (
-                        <div className="space-y-2 flex-1">
+                        <div className="space-y-3">
                             <div className="p-2 rounded-lg flex items-center gap-2 bg-green-500/10 border border-green-500/30">
                                 <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                                 <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }} dangerouslySetInnerHTML={{ __html: t('admin.reviewDataBeforeFinalSave') }} />
@@ -5879,10 +5836,60 @@ const AddManagerModal: React.FC<{
                                     <div className="flex flex-wrap gap-1">{branchCodes.map((b,i)=><span key={b.code} className="px-1.5 py-0.5 rounded text-[10px] bg-teal-500/10 border border-teal-500/20">{b.name}</span>)}</div>
                                 </div>
                             </div>
-                            <div className="glass rounded-xl p-2 flex justify-between items-center">
-                                <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>{subscriptionDuration===1?'سنة':'سنتين'} • {paymentMethod==='cash'?'كاش':paymentMethod==='credit'?'كريديت':paymentMethod==='bank_transfer'?'بنكي':'مؤجل'}</span>
-                                <span className="font-bold text-teal-500">{((systemSettings?.defaultSubscriptionPrice||0)*branchCodes.length*subscriptionDuration).toLocaleString()} ر.س</span>
-                            </div>
+                            {systemSettings && (() => {
+                                const pricePerBranch = systemSettings.defaultSubscriptionPrice || 0;
+                                const numberOfBranches = branchCodes.length;
+                                const taxRate = (systemSettings.defaultTaxRate || 15) / 100;
+                                
+                                // ✅ Calculate base amount (same logic as ownerService.ts)
+                                // pricePerBranch is already including tax
+                                const baseAmount = pricePerBranch * subscriptionDuration * numberOfBranches;
+                                
+                                // ✅ Apply 2-year discount if applicable
+                                let discountAmount = 0;
+                                let discountRate = 0;
+                                if (subscriptionDuration === 2 && systemSettings.twoYearDiscountRate) {
+                                    discountRate = systemSettings.twoYearDiscountRate;
+                                    discountAmount = (baseAmount * discountRate) / 100;
+                                }
+                                
+                                // ✅ Final total after discount (same as ownerService.ts: totalAmount = baseAmount - discountAmount)
+                                const finalTotal = baseAmount - discountAmount;
+                                
+                                // ✅ Extract tax breakdown for display (pricePerBranch includes tax, so we reverse calculate)
+                                const priceBeforeTaxPerBranch = pricePerBranch / (1 + taxRate);
+                                const baseAmountBeforeTax = priceBeforeTaxPerBranch * subscriptionDuration * numberOfBranches;
+                                const discountAmountBeforeTax = discountAmount / (1 + taxRate);
+                                const amountAfterDiscountBeforeTax = baseAmountBeforeTax - discountAmountBeforeTax;
+                                const taxAmount = finalTotal - amountAfterDiscountBeforeTax;
+                                
+                                return (
+                                    <div className="glass rounded-xl p-3 space-y-2">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span style={{ color: 'var(--theme-text-secondary)' }}>{subscriptionDuration===1?'سنة':'سنتين'} • {paymentMethod==='cash'?'كاش':paymentMethod==='credit'?'كريديت':paymentMethod==='bank_transfer'?'بنكي':'مؤجل'}</span>
+                                            <span className="font-bold text-primary-500">{Math.round(finalTotal).toLocaleString()} ر.س</span>
+                                        </div>
+                                        
+                                        {/* Show discount details if applicable */}
+                                        {subscriptionDuration === 2 && discountAmount > 0 && (
+                                            <div className="pt-2 border-t border-white/10 space-y-1">
+                                                <div className="flex justify-between items-center text-[10px]">
+                                                    <span style={{ color: 'var(--theme-text-secondary)' }}>السعر الأصلي:</span>
+                                                    <span style={{ color: 'var(--theme-text-primary)' }}>{baseAmount.toLocaleString()} ر.س</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-[10px]">
+                                                    <span style={{ color: 'var(--theme-text-secondary)' }}>خصم {discountRate}%:</span>
+                                                    <span className="text-red-400">-{Math.round(discountAmount).toLocaleString()} ر.س</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-[10px]">
+                                                    <span style={{ color: 'var(--theme-text-secondary)' }}>قيمة الضريبة ({systemSettings.defaultTaxRate || 15}%):</span>
+                                                    <span style={{ color: 'var(--theme-text-primary)' }}>{Math.round(taxAmount).toLocaleString()} ر.س</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                             {firebaseConfig.apiKey && <div className="text-[10px] flex items-center gap-1 text-green-600"><CheckCircle className="w-3 h-3" />Firebase منفصل</div>}
                             {error && <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/30"><p className="text-xs flex items-center gap-1.5 text-red-500"><AlertTriangle className="w-3.5 h-3.5" />{error}</p></div>}
                         </div>
@@ -6351,6 +6358,11 @@ const SubscriptionRequestsTab: React.FC = () => {
 
     // Filter and sort requests
     const filteredRequests = useMemo(() => {
+        // ✅ FIX: Null safety check
+        if (!requests || !Array.isArray(requests)) {
+            return [];
+        }
+        
         let result = [...requests];
         
         // Apply filter
@@ -6457,6 +6469,12 @@ const SubscriptionRequestsTab: React.FC = () => {
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
 
+        // ✅ FIX: Format dates before template string to avoid closure issues
+        const requestCreatedDate = formatDate(request.createdAt);
+        const requestContactedDate = request.contactedAt ? formatDate(request.contactedAt) : '';
+        // ✅ FIX: Format print date before template string
+        const printDate = formatDualDate(new Date(), { showGregorian: true, showHijri: true, dateStyle: 'long' });
+
         const contactResultText = {
             'demo': 'طلب ديمو',
             'thinking': 'طلب مهلة تفكير',
@@ -6464,6 +6482,7 @@ const SubscriptionRequestsTab: React.FC = () => {
             'other': 'طلب آخر'
         }[request.contactResult || 'other'] || 'غير محدد';
 
+        // ✅ FIX: Format follow-up dates before template string to avoid closure issues
         const followUpsHtml = request.followUps && request.followUps.length > 0
             ? request.followUps.map((followUp, index) => {
                 const followUpDate = followUp.createdAt?.toDate 
@@ -6471,10 +6490,12 @@ const SubscriptionRequestsTab: React.FC = () => {
                     : followUp.createdAt instanceof Date 
                         ? followUp.createdAt 
                         : new Date(followUp.createdAt || Date.now());
+                // ✅ Format date before template string
+                const formattedFollowUpDate = formatDualDate(followUpDate, { showGregorian: true, showHijri: true, dateStyle: 'long' });
                 return `
                     <tr>
                         <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${index + 1}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatDualDate(followUpDate, { showGregorian: true, showHijri: true, dateStyle: 'long' })}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formattedFollowUpDate}</td>
                         <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${followUp.note || 'لا توجد ملاحظات'}</td>
                     </tr>
                 `;
@@ -6575,7 +6596,7 @@ const SubscriptionRequestsTab: React.FC = () => {
                 <div class="header">
                     <h1>تفاصيل طلب الاشتراك</h1>
                     <p>نظام Adora لإدارة الفنادق</p>
-                    <p>تاريخ الطباعة: ${formatDualDate(new Date(), { showGregorian: true, showHijri: true, dateStyle: 'long' })}</p>
+                    <p>تاريخ الطباعة: ${printDate}</p>
                 </div>
 
                 <table>
@@ -6600,7 +6621,7 @@ const SubscriptionRequestsTab: React.FC = () => {
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">تاريخ الطلب</td>
-                        <td>${formatDate(request.createdAt)}</td>
+                        <td>${requestCreatedDate}</td>
                     </tr>
                 </table>
 
@@ -6615,7 +6636,7 @@ const SubscriptionRequestsTab: React.FC = () => {
                     ${request.contactedAt ? `
                     <tr>
                         <td style="font-weight: bold;">تاريخ الاتصال</td>
-                        <td>${formatDate(request.contactedAt)}</td>
+                        <td>${requestContactedDate}</td>
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">نوع الطلب</td>
@@ -6726,18 +6747,18 @@ const SubscriptionRequestsTab: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-white/5 rounded-xl p-4 border border-white/10">
                     <div className="text-white/60 text-sm mb-1">{t('common.total')}</div>
-                    <div className="text-2xl font-bold text-white">{requests.length}</div>
+                    <div className="text-2xl font-bold text-white">{requests?.length || 0}</div>
                 </div>
                 <div className="bg-red-500/10 rounded-xl p-4 border border-red-500/20">
                     <div className="text-red-400/80 text-sm mb-1">لم يتم التواصل</div>
                     <div className="text-2xl font-bold text-red-400">
-                        {requests.filter(r => !r.contactedAt).length}
+                        {requests?.filter(r => !r.contactedAt).length || 0}
                     </div>
                 </div>
                 <div className="bg-green-500/10 rounded-xl p-4 border border-green-500/20">
                     <div className="text-green-400/80 text-sm mb-1">تم التواصل</div>
                     <div className="text-2xl font-bold text-green-400">
-                        {requests.filter(r => r.contactedAt).length}
+                        {requests?.filter(r => r.contactedAt).length || 0}
                     </div>
                 </div>
             </div>
@@ -6783,7 +6804,7 @@ const SubscriptionRequestsTab: React.FC = () => {
 
             {/* Requests List */}
             <div className="space-y-4">
-                {filteredRequests.length === 0 ? (
+                {!filteredRequests || filteredRequests.length === 0 ? (
                     <div className="text-center py-12 bg-white/5 rounded-xl border border-white/10">
                         <MessageSquare className="w-16 h-16 text-white/20 mx-auto mb-4" />
                         <p className="text-white/60">
@@ -7102,6 +7123,7 @@ const SubscriptionRequestsTab: React.FC = () => {
                     confirmVariant="primary"
                 />
             </UnifiedModal>
+
         </div>
     );
 };

@@ -5,6 +5,7 @@
 
 import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, increment, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -62,17 +63,32 @@ export const generateAPIKey = (): string => {
 };
 
 /**
- * Hash API key (simple hash for demo - use proper hashing in production)
+ * Hash API key using crypto.subtle (SHA-256) - SECURE for production
+ * 🔐 SECURITY: Uses Web Crypto API for proper hashing
  */
-const hashAPIKey = (key: string): string => {
-    // Simple hash - use crypto.subtle in production
-    let hash = 0;
-    for (let i = 0; i < key.length; i++) {
-        const char = key.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
+const hashAPIKey = async (key: string): Promise<string> => {
+    try {
+        // ✅ SECURITY: Use crypto.subtle.digest for proper SHA-256 hashing
+        const encoder = new TextEncoder();
+        const data = encoder.encode(key);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        
+        // Convert ArrayBuffer to hex string
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        return hashHex;
+    } catch (error) {
+        // Fallback to simple hash only if crypto.subtle is not available (shouldn't happen in modern browsers)
+        logger.error('crypto.subtle not available, using fallback hash', error, 'apiManagementService');
+        let hash = 0;
+        for (let i = 0; i < key.length; i++) {
+            const char = key.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return hash.toString(36);
     }
-    return hash.toString(36);
 };
 
 /**
@@ -86,7 +102,7 @@ export const createAPIKey = async (
 ): Promise<{ key: string; id: string }> => {
     try {
         const key = generateAPIKey();
-        const hashedKey = hashAPIKey(key);
+        const hashedKey = await hashAPIKey(key); // ✅ Now async - uses crypto.subtle
         
         const keyRef = doc(collection(db, 'apiKeys'));
         await setDoc(keyRef, {
@@ -102,7 +118,7 @@ export const createAPIKey = async (
         
         return { key, id: keyRef.id };
     } catch (error) {
-        console.error('Error creating API key:', error);
+        logger.error('Error creating API key', error, 'apiManagementService');
         throw error;
     }
 };

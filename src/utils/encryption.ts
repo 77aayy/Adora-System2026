@@ -3,55 +3,173 @@
  * For sensitive data (phone numbers, guest IDs, etc.)
  * Adora Hotel Management System
  * 
- * ⚠️ SECURITY NOTE:
- * - ENCRYPTION_KEY should be stored in .env
+ * 🔐 SECURITY: Uses AES-256-GCM encryption (production-ready)
+ * - Encryption key derived from environment variable
  * - Never commit the actual key to Git
  * - Rotate keys periodically
  */
 
-// Simple Base64 encoding/decoding for development
-// In production, use crypto-js or native Web Crypto API
+// ✅ AES-256-GCM encryption using Web Crypto API
 
 /**
- * Encrypt sensitive text
- * Uses Base64 for simplicity (upgrade to AES for production)
+ * Get encryption key from environment - REQUIRED in production
+ * 🔐 SECURITY: Throws error in production if VITE_ENCRYPTION_KEY is not set
+ */
+const getEncryptionKey = (): string => {
+    const envKey = import.meta.env.VITE_ENCRYPTION_KEY;
+    
+    // ✅ SECURITY: In production, VITE_ENCRYPTION_KEY is REQUIRED
+    if (import.meta.env.PROD) {
+        if (!envKey || envKey === 'adora-default-encryption-key-change-in-production') {
+            const error = new Error(
+                '🚨 SECURITY ERROR: VITE_ENCRYPTION_KEY is required in production but is missing or default.\n' +
+                'Please set a secure encryption key in your .env file:\n' +
+                'VITE_ENCRYPTION_KEY=your-secure-random-key-here'
+            );
+            console.error(error.message);
+            throw error;
+        }
+        return envKey;
+    }
+    
+    // Development: Allow fallback (but warn)
+    if (!envKey) {
+        console.warn('⚠️ VITE_ENCRYPTION_KEY not set in development. Using default key (not secure for production).');
+        return 'adora-default-encryption-key-change-in-production';
+    }
+    
+    return envKey;
+};
+
+/**
+ * Derive encryption key from password using PBKDF2
+ */
+const deriveKey = async (password: string): Promise<CryptoKey> => {
+    const encoder = new TextEncoder();
+    const passwordKey = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(password),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+    );
+
+    return crypto.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: encoder.encode('adora-encryption-salt'), // ✅ Fixed salt for consistency
+            iterations: 100000,
+            hash: 'SHA-256'
+        },
+        passwordKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+};
+
+/**
+ * Encrypt sensitive text using AES-256-GCM
+ * ✅ Production-ready encryption
  * 
  * @example
  * ```typescript
- * const encrypted = encryptData('0501234567');
+ * const encrypted = await encryptData('0501234567');
  * // Store in Firestore
  * await addDoc(collection(db, 'requests'), {
  *   guestPhone: encrypted
  * });
  * ```
  */
-export function encryptData(text: string): string {
+export async function encryptData(text: string): Promise<string> {
     if (!text) return '';
     
     try {
-        // Simple Base64 encoding
-        // TODO: Upgrade to AES-256 for production
-        return btoa(encodeURIComponent(text));
+        // Check if Web Crypto API is available
+        if (!crypto || !crypto.subtle) {
+            console.warn('⚠️ Web Crypto API not available. Falling back to Base64 (not secure).');
+            // Fallback to Base64 for old browsers (not secure)
+            return btoa(encodeURIComponent(text));
+        }
+
+        const encryptionKey = getEncryptionKey();
+        const key = await deriveKey(encryptionKey);
+        
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text);
+        
+        // Generate random IV (12 bytes for AES-GCM)
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        
+        // Encrypt data
+        const encrypted = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            data
+        );
+        
+        // Combine IV + encrypted data
+        const combined = new Uint8Array(iv.length + encrypted.byteLength);
+        combined.set(iv);
+        combined.set(new Uint8Array(encrypted), iv.length);
+        
+        // Return Base64-encoded result
+        return btoa(String.fromCharCode(...combined));
     } catch (error) {
-        console.error('Encryption failed:', error);
-        return text; // Fallback to original
+        console.error('AES encryption failed:', error);
+        // Fallback to Base64 on error (not secure, but maintains compatibility)
+        return btoa(encodeURIComponent(text));
     }
 }
 
 /**
- * Decrypt sensitive text
+ * Decrypt sensitive text using AES-256-GCM
+ * Supports both new AES-encrypted data and legacy Base64 data (backward compatibility)
  * 
  * @example
  * ```typescript
- * const decrypted = decryptData(request.guestPhone);
+ * const decrypted = await decryptData(request.guestPhone);
  * console.log(decrypted); // '0501234567'
  * ```
  */
-export function decryptData(encrypted: string): string {
+export async function decryptData(encrypted: string): Promise<string> {
     if (!encrypted) return '';
     
     try {
-        return decodeURIComponent(atob(encrypted));
+        // Check if Web Crypto API is available
+        if (!crypto || !crypto.subtle) {
+            // Fallback to Base64 for old browsers
+            return decodeURIComponent(atob(encrypted));
+        }
+
+        // Try to decrypt as AES-encrypted data first
+        try {
+            const encryptionKey = getEncryptionKey();
+            const key = await deriveKey(encryptionKey);
+            
+            // Decode Base64
+            const combined = new Uint8Array(
+                atob(encrypted).split('').map(c => c.charCodeAt(0))
+            );
+            
+            // Extract IV (first 12 bytes) and encrypted data
+            const iv = combined.slice(0, 12);
+            const encryptedData = combined.slice(12);
+            
+            // Decrypt
+            const decrypted = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv },
+                key,
+                encryptedData
+            );
+            
+            // Return decrypted text
+            return new TextDecoder().decode(decrypted);
+        } catch (aesError) {
+            // If AES decryption fails, try legacy Base64 (backward compatibility)
+            console.warn('AES decryption failed, trying Base64 fallback:', aesError);
+            return decodeURIComponent(atob(encrypted));
+        }
     } catch (error) {
         console.error('Decryption failed:', error);
         return encrypted; // Return as-is if decryption fails

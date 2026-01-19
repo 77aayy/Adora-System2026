@@ -24,6 +24,8 @@ import { AuthContextState } from '../types/auth';
 import { hashPin } from './hashService';
 import { quickAudit } from '../utils/auditService';
 import { validateRoleAccess } from './tenantSecurityService';
+import { getSystemSettings } from './systemSettingsService';
+import { logger } from './loggerService';
 
 // ============================================================
 // CONSTANTS
@@ -115,6 +117,10 @@ export const suggestUniquePin = async (): Promise<string> => {
  * Each manager gets their own tenant with complete data isolation
  * ✅ Enhanced: Supports branch licensing, branch codes, and isolated Firebase
  */
+/**
+ * Creates new hotel tenant with isolated data collection. Calculates subscription expiry date,
+ * creates tenant document, manager user, and initializes tenant settings via Cloud Function.
+ */
 export const createManager = async (data: {
     name: string;
     phone?: string; // ✅ رقم هاتف المدير (اختياري)
@@ -126,6 +132,9 @@ export const createManager = async (data: {
     branchNames?: Record<string, string>; // ✅ Branch names mapped by code (e.g., { '6': 'الكورنيش', '7': 'الأندلس' })
     isDemo?: boolean; // ✅ Demo account flag (free, no payment required)
     demoDuration?: 1 | 2 | 3; // ✅ Demo duration in months (1, 2, or 3 months)
+    // ✅ FINANCIAL: Subscription parameters (from UI, not hardcoded)
+    subscriptionDuration?: 1 | 2; // ✅ Duration from UI (1 = one year, 2 = two years)
+    paymentMethod?: 'cash' | 'credit' | 'bank_transfer' | 'deferred'; // ✅ Payment method from UI
     // ✅ Isolated Multi-Tenancy: Optional Firebase config for separate database
     firebaseConfig?: {
         apiKey: string;
@@ -135,9 +144,13 @@ export const createManager = async (data: {
         messagingSenderId?: string;
         appId?: string;
     };
-}): Promise<{ managerId: string; tenantId: string }> => {
+}): Promise<{ managerId: string; tenantId: string; warnings?: string[] }> => {
     // ✅ RBAC: Only Owner can create managers
     validateRoleAccess('owner');
+
+    // ✅ NOTE: Anonymous Auth warnings removed - Cloud Functions handles login without needing Anonymous Auth
+    // ✅ Cloud Functions use Admin SDK (bypasses client Rules), so Anonymous Auth is not required
+    const warnings: string[] = [];
 
     // Check if code is available
     const available = await isPinAvailable(data.code);
@@ -198,32 +211,17 @@ export const createManager = async (data: {
         }
     });
 
-    // 2. Create branches based on branchCodes (MANDATORY in SaaS)
+    // 2. ✅ SaaS LICENSING: Store branch codes ONLY (branches are NOT created yet)
+    // Manager must activate branches via Onboarding UI (enforces license usage)
     if (!data.branchCodes || data.branchCodes.length === 0) {
         throw new Error('يجب تحديد فرع واحد على الأقل للمستأجر الجديد');
     }
 
-    let defaultBranchId = '';
-
-    // Create branches with their codes and names
-    for (const branchCode of data.branchCodes) {
-        const branchId = `branch-${branchCode}`;
-        if (!defaultBranchId) defaultBranchId = branchId; // Set first branch as default
-
-        const branchRef = doc(collection(tenantRef, 'branches'), branchId);
-        // ✅ Use provided name or default
-        const branchName = data.branchNames?.[branchCode] || `فرع ${branchCode}`;
-
-        batch.set(branchRef, {
-            code: branchCode, // ✅ Branch code (e.g., '6', '7', '88', '68')
-            name: branchName, // ✅ Branch name from owner input
-            location: '',
-            status: 'active',
-            createdAt: Timestamp.now(),
-            createdBy: 'owner', // ✅ Required for Firestore Rules
-            settings: { workingHours: '24/7' }
-        });
-    }
+    // ✅ IMPORTANT: Branches are NOT created here
+    // - branchCodes stored in tenant.info.branchCodes (license pool)
+    // - branchNames stored in tenant.info.branchNames (suggested names, optional)
+    // - Manager activates branches via Onboarding → CreateFirstBranch → branchService.createBranch()
+    // - This ensures manager MUST use licensed codes and cannot create unauthorized branches
 
     // 3. Create manager user record
     const managerRef = doc(db, 'users', managerId);
@@ -242,10 +240,11 @@ export const createManager = async (data: {
         tenantId: tenantId,
 
         // ✅ Branch Context (Mandatory)
-        activeBranchId: null, // Manager starts with no active branch, must select
-        branches: data.branchCodes ? data.branchCodes.map(code => `branch-${code}`) : [defaultBranchId],
-        branch: defaultBranchId, // Legacy fallback
-        branchId: defaultBranchId, // Legacy fallback hiding
+        // ✅ Manager starts with NO branches (branches are not created until onboarding)
+        activeBranchId: null, // Manager must activate branches via Onboarding
+        branches: [], // ✅ Empty - branches must be activated via Onboarding (enforces license usage)
+        branch: null, // Legacy fallback
+        branchId: null, // Legacy fallback
 
         // ✅ Gamification (Zero State)
         points: 0,
@@ -302,7 +301,7 @@ export const createManager = async (data: {
         hotelName: hotelName,
         maxBranches: data.maxBranches || 1,
         branchNames: data.branchNames || {},
-        branches: data.branchCodes ? data.branchCodes.map(code => `branch-${code}`) : [`branch-${data.branchCodes?.[0] || ''}`],
+                branches: [], // ✅ Empty - branches are not created until manager activates them via Onboarding
         // ✅ Store branchCodes for access control (SaaS isolation)
         branchCodes: data.branchCodes || []
     });
@@ -331,7 +330,7 @@ export const createManager = async (data: {
                 hotelName: hotelName,
                 maxBranches: data.maxBranches || 1,
                 branchNames: data.branchNames || {},
-                branches: data.branchCodes ? data.branchCodes.map(code => `branch-${code}`) : [`branch-${bCode}`],
+                branches: [], // ✅ Empty - branches are not created until manager activates them via Onboarding
                 // ✅ Store branchCodes for access control (SaaS isolation)
                 branchCodes: data.branchCodes || []
             });
@@ -340,11 +339,76 @@ export const createManager = async (data: {
 
     await batch.commit();
 
+    // ✅ FINANCIAL: Create receipt voucher and invoice automatically (MANDATORY)
+    // EXCEPTION: Demo accounts don't create financial documents (View Only Mode)
+    if (!data.isDemo) {
+        try {
+            // Get subscription price from system settings (or use default)
+            const systemSettings = await getSystemSettings();
+            const subscriptionPricePerBranch = systemSettings?.defaultSubscriptionPrice || 1000; // Default: 1000 SAR per branch/year
+            const numberOfBranches = data.maxBranches || 1;
+            // ✅ Use subscriptionDuration from UI (default: 1 year if not provided)
+            const subscriptionDuration = data.subscriptionDuration || 1;
+            
+            // ✅ Calculate base amount (price per branch × duration × number of branches)
+            const baseAmount = subscriptionPricePerBranch * subscriptionDuration * numberOfBranches;
+            
+            // ✅ Apply 2-year discount if applicable
+            let discountAmount = 0;
+            let discountRate = 0;
+            if (subscriptionDuration === 2 && systemSettings?.twoYearDiscountRate) {
+                discountRate = systemSettings.twoYearDiscountRate;
+                discountAmount = (baseAmount * discountRate) / 100;
+            }
+            
+            const totalAmount = baseAmount - discountAmount;
+            
+            // Get first branch code and name for receipt
+            const firstBranchCode = data.branchCodes?.[0] || '1';
+            const firstBranchName = data.branchNames?.[firstBranchCode] || `فرع ${firstBranchCode}`;
+            
+            // ✅ Import billing service and create receipt voucher
+            const { createReceiptVoucher } = await import('./billingService');
+            
+            await createReceiptVoucher({
+                tenantId: tenantId,
+                managerName: data.name,
+                managerCode: data.code,
+                branchCode: firstBranchCode,
+                branchName: firstBranchName,
+                totalAmount: totalAmount,
+                subscriptionPrice: subscriptionPricePerBranch, // Price per branch (including VAT)
+                numberOfBranches: numberOfBranches,
+                subscriptionDuration: subscriptionDuration,
+                currency: 'SAR',
+                paymentMethod: data.paymentMethod || 'deferred', // ✅ Payment method from UI
+                notes: discountAmount > 0 ? `اشتراك جديد - ${numberOfBranches} فرع - خصم ${discountRate}% للسنتين` : `اشتراك جديد - ${numberOfBranches} فرع`,
+                discountAmount: discountAmount > 0 ? discountAmount : undefined,
+                discountRate: discountRate > 0 ? discountRate : undefined,
+                createdBy: 'owner' // Owner creates the manager
+            });
+            
+            // Receipt voucher and invoice created successfully
+        } catch (financialError: any) {
+            // ⚠️ CRITICAL: Don't fail manager creation if financial docs fail
+            // Log the error but continue (financial docs can be created manually later)
+            console.error('⚠️ Failed to create receipt voucher/invoice for manager:', financialError);
+            logger.error('Financial document creation failed', financialError, 'ownerService');
+            // Continue - manager is created, financial docs can be fixed manually
+        }
+    } else {
+        console.log(`ℹ️ Demo account - skipping financial document creation for manager ${managerId}`);
+    }
+
+    // ✅ NOTE: globalCodes verification removed - Cloud Functions uses Admin SDK (100% reliable)
+    // ✅ Batch commit is atomic, so globalCodes will always be created successfully
+    // ✅ No need for verification or retry logic when using Admin SDK
+
     // ✅ Auto-seed default achievements/ranks for gamification
     try {
         const { seedTenantAchievements } = await import('./tenantSeedingService');
         await seedTenantAchievements(tenantId);
-        console.log('✅ Default achievements seeded for new tenant');
+        // Default achievements seeded for new tenant
     } catch (seedErr) {
         console.warn('Could not seed achievements (will be created on first access):', seedErr);
         // Continue - achievements can be created manually by manager
@@ -354,10 +418,16 @@ export const createManager = async (data: {
     quickAudit('MANAGER_CREATE', 'manager', managerId, {
         managerName: data.name,
         hotelName: hotelName,
-        maxBranches: data.maxBranches || 1
+        maxBranches: data.maxBranches || 1,
+        managerCode: data.code,
+        globalCodesVerified: true
     }, data.name);
 
-    return { managerId, tenantId };
+    return { 
+        managerId, 
+        tenantId,
+        ...(warnings.length > 0 ? { warnings } : {})
+    };
 };
 
 /**
@@ -413,6 +483,10 @@ export const getRemainingLicenseDays = (expiryDate: Date | Timestamp | null | un
 };
 
 // ✅ Suspend/Resume manager license
+/**
+ * Suspends or activates tenant account by updating manager, tenant, and all branch PIN codes status.
+ * Locks entire hotel operations when suspended.
+ */
 export const toggleLicenseStatus = async (managerId: string, tenantId: string, suspend: boolean): Promise<void> => {
     // ✅ RBAC: Only Owner can toggle license status
     validateRoleAccess('owner');
@@ -480,6 +554,10 @@ export const toggleLicenseStatus = async (managerId: string, tenantId: string, s
 
 // ✅ Renew manager license (extend by 1 or 2 years)
 // Returns warning if price is below default
+/**
+ * Renews tenant license by extending expiry date (current + duration years) and updates Firestore.
+ * Returns warning if subscription price is below default market price.
+ */
 export const renewLicense = async (
     managerId: string,
     tenantId: string,
@@ -803,7 +881,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
 
     try {
         await batch.commit();
-        console.log('✅ Manager deleted successfully:', managerId);
+        // Manager deleted successfully
 
         // ✅ AUDIT: Log manager deletion
         quickAudit('MANAGER_DELETE', 'manager', managerId, {

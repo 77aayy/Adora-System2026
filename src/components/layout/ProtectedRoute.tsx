@@ -10,6 +10,7 @@ import { AdoraLoader } from '../../components/common/AdoraLoader';
 import { useAuth } from '../../context/AuthContext';
 import { BranchStatusGuard } from '../auth/BranchStatusGuard';
 import { HierarchyGuard } from '../auth/HierarchyGuard';
+import { OnboardingGuard } from '../auth/OnboardingGuard';
 import { isFirebaseConfigured } from '../../services/firebase';
 
 interface ProtectedRouteProps {
@@ -89,11 +90,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
 
     return (
-        <HierarchyGuard>
-            <BranchStatusGuard>
-                {children}
-            </BranchStatusGuard>
-        </HierarchyGuard>
+        <OnboardingGuard>
+            <HierarchyGuard>
+                <BranchStatusGuard>
+                    {children}
+                </BranchStatusGuard>
+            </HierarchyGuard>
+        </OnboardingGuard>
     );
 };
 

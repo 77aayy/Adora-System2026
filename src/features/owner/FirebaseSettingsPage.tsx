@@ -212,8 +212,9 @@ export const FirebaseSettingsPage: React.FC = () => {
             setHasExistingConfig(hasTenantConfig());
 
             if (isFirebaseConfigured()) {
-                // Check for missing collections
-                const missing = await checkMissingCollections();
+                // ✅ SaaS: Check for missing collections with tenantId
+                const tenantId = user?.tenantId;
+                const missing = await checkMissingCollections(tenantId || undefined);
                 setMissingCollections(missing);
 
                 // Load health report
@@ -315,12 +316,18 @@ export const FirebaseSettingsPage: React.FC = () => {
         setSeedingMessage('🌱 جاري تأسيس البيانات الأساسية...');
 
         try {
-            const result = await seedTenantDatabase({ includeDemoRoom: true, forceReseed: false });
+            // ✅ SaaS: Get tenantId for data isolation
+            const tenantId = user?.tenantId;
+            if (!tenantId) {
+                setSeedingMessage('❌ يجب تسجيل الدخول كمدير أولاً');
+                return;
+            }
+            const result = await seedTenantDatabase(tenantId, { includeDemoRoom: true, forceReseed: false });
 
             if (result.success) {
                 setSeedingMessage(`✅ تم إنشاء ${result.totalDocuments} سجل في ${result.collectionsCreated.length} جدول`);
                 // Refresh missing collections
-                const missing = await checkMissingCollections();
+                const missing = await checkMissingCollections(tenantId);
                 setMissingCollections(missing);
             } else {
                 setSeedingMessage(`⚠️ تم التأسيس مع ${result.errors.length} أخطاء`);

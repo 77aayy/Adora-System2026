@@ -57,6 +57,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
     showLeaderboard = false,
     inline = false
 }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const { haptic, playSound } = useUX();
     
@@ -251,10 +252,10 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
     };
 
     const getLifetimeBadge = (lp: number) => {
-        if (lp >= 5000) return { label: 'أسطورة Adora', icon: '👑', color: 'text-indigo-400' };
-        if (lp >= 2000) return { label: 'نجم ذهبي', icon: '⭐', color: 'text-yellow-400' };
-        if (lp >= 500) return { label: 'موظف متميز', icon: '🚀', color: 'text-blue-400' };
-        return { label: 'طموح', icon: '🌱', color: 'text-green-400' };
+        if (lp >= 5000) return { label: t('pointsTracker.lifetimeBadges.legend'), icon: '👑', color: 'text-indigo-400' };
+        if (lp >= 2000) return { label: t('pointsTracker.lifetimeBadges.goldenStar'), icon: '⭐', color: 'text-yellow-400' };
+        if (lp >= 500) return { label: t('pointsTracker.lifetimeBadges.distinguished'), icon: '🚀', color: 'text-blue-400' };
+        return { label: t('pointsTracker.lifetimeBadges.ambitious'), icon: '🌱', color: 'text-green-400' };
     };
 
     // ✅ تصنيف النقاط حسب المصدر
@@ -334,7 +335,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                 playSound?.('success');
                 loadHistory(); // Refresh
             } else {
-                alert(res.error || 'فشل طلب الصرف');
+                alert(res.error || t('pointsTracker.redeemFailed'));
             }
         } catch (e) {
             console.error(e);
@@ -352,7 +353,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
         // ✅ If feature disabled, show disabled state
         if (featureDisabled) {
             return (
-                <div className="flex items-center gap-2 relative opacity-50 cursor-not-allowed" title="نظام النقاط غير مفعل">
+                <div className="flex items-center gap-2 relative opacity-50 cursor-not-allowed" title={t('pointsTracker.pointsSystemDisabled')}>
                     <Trophy className="w-5 h-5 text-white/50" />
                     <span className="font-black text-white/50 text-sm tracking-tighter">-</span>
                 </div>
@@ -377,7 +378,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                     </div>
                                     <div className="mt-2 flex items-center gap-2 bg-slate-800/90 px-6 py-2 rounded-full border border-yellow-500/30">
                                         <span className="text-3xl font-black text-yellow-400">+{flyingDelta}</span>
-                                        <span className="text-sm font-bold text-white/80">نقطة</span>
+                                        <span className="text-sm font-bold text-white/80">{t('pointsTracker.point')}</span>
                                     </div>
                                     {/* Multiplier Badge if huge delta */}
                                     {flyingDelta > 5 && (
@@ -395,7 +396,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
 
                 <button
                     onClick={handleShowHistory}
-                    aria-label="سجل النقاط"
+                    aria-label={t('pointsTracker.pointsHistory')}
                     className={`flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 px-3 py-2 rounded-xl shadow-lg shadow-amber-500/30 cursor-pointer transition-all duration-300 ${pulseStyle} ${flyingDelta ? 'animate-shake-cup' : ''}`}
                 >
                     <Trophy className={`w-5 h-5 text-white drop-shadow-md ${flyingDelta ? 'animate-shake-cup' : ''}`} />
@@ -459,10 +460,10 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                     </div>
                                     <div>
                                         <h3 className="text-2xl font-black bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                                            سجل النقاط
+                                            {t('pointsTracker.pointsHistory')}
                                         </h3>
                                         <p className="text-sm mt-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                            كل نقطة موضحة بالتفصيل والوقت
+                                            {t('pointsTracker.transparencyHistoryDescription')}
                                         </p>
                                     </div>
                                 </div>
@@ -490,36 +491,36 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                 const displayConfig = {
                                     all: {
                                         icon: '🏆',
-                                        title: 'إجمالي نقاطك',
+                                        title: t('pointsTracker.totalPoints'),
                                         value: points ?? 0,
-                                        subtitle: 'نقطة متاحة للصرف',
+                                        subtitle: t('pointsTracker.pointsAvailable'),
                                         gradient: 'linear-gradient(135deg, #20B2AA 0%, #14B8A6 50%, #0D9488 100%)',
                                         glow: 'rgba(20, 178, 170, 0.3)',
                                         count: history.length
                                     },
                                     performance: {
                                         icon: '⚡',
-                                        title: 'نقاط سرعة الأداء',
+                                        title: t('pointsTracker.performancePoints'),
                                         value: categoryStats.performance.total,
-                                        subtitle: `من ${categoryStats.performance.count} عملية`,
+                                        subtitle: t('pointsTracker.fromOperations', { count: categoryStats.performance.count }),
                                         gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)',
                                         glow: 'rgba(59, 130, 246, 0.3)',
                                         count: categoryStats.performance.count
                                     },
                                     attendance: {
                                         icon: '📅',
-                                        title: 'نقاط الالتزام',
+                                        title: t('pointsTracker.attendancePoints'),
                                         value: categoryStats.attendance.total,
-                                        subtitle: `من ${categoryStats.attendance.count} عملية`,
+                                        subtitle: t('pointsTracker.fromOperations', { count: categoryStats.attendance.count }),
                                         gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%)',
                                         glow: 'rgba(34, 197, 94, 0.3)',
                                         count: categoryStats.attendance.count
                                     },
                                     achievements: {
                                         icon: '🏅',
-                                        title: 'نقاط الأوسمة والرتب',
+                                        title: t('pointsTracker.achievementPoints'),
                                         value: categoryStats.achievements.total,
-                                        subtitle: `من ${categoryStats.achievements.count} إنجاز`,
+                                        subtitle: t('pointsTracker.fromAchievements', { count: categoryStats.achievements.count }),
                                         gradient: 'linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%)',
                                         glow: 'rgba(255, 215, 0, 0.4)',
                                         count: categoryStats.achievements.count
@@ -555,12 +556,12 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                 <div className="mt-4 pt-4 border-t border-white/20 flex justify-center gap-8">
                                                     <div className="text-center">
                                                         <div className="text-xl font-bold text-white drop-shadow-md">{lifetimePoints}</div>
-                                                        <div className="text-xs text-white/70 mt-1">الإجمالي التاريخي</div>
+                                                        <div className="text-xs text-white/70 mt-1">{t('pointsTracker.historicalTotal')}</div>
                                                     </div>
                                                     <div className="w-px h-12 bg-white/20" />
                                                     <div className="text-center">
                                                         <div className="text-xl font-bold text-white drop-shadow-md">{history.length}</div>
-                                                        <div className="text-xs text-white/70 mt-1">عدد العمليات</div>
+                                                        <div className="text-xs text-white/70 mt-1">{t('pointsTracker.operationsCount')}</div>
                                                     </div>
                                                 </div>
                                             )}
@@ -587,7 +588,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                         }`}
                                     >
                                         <span>📊</span>
-                                        <span>الكل</span>
+                                        <span>{t('pointsTracker.all')}</span>
                                         <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-200 dark:bg-slate-600">{history.length}</span>
                                     </button>
                                     <button
@@ -599,7 +600,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                         }`}
                                     >
                                         <span>⚡</span>
-                                        <span className="hidden sm:inline">أداء</span>
+                                        <span className="hidden sm:inline">{t('pointsTracker.performance')}</span>
                                         <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activityFilter === 'performance' ? 'bg-blue-600' : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'}`}>
                                             {categoryStats.performance.total > 0 ? '+' : ''}{categoryStats.performance.total}
                                         </span>
@@ -627,7 +628,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                         }`}
                                     >
                                         <span>🏅</span>
-                                        <span className="hidden sm:inline">أوسمة</span>
+                                        <span className="hidden sm:inline">{t('pointsTracker.achievements')}</span>
                                         <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activityFilter === 'achievements' ? 'bg-yellow-600' : 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600'}`}>
                                             {categoryStats.achievements.total > 0 ? '+' : ''}{categoryStats.achievements.total}
                                         </span>
@@ -646,14 +647,14 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                         </div>
                                         <p className="adora-text-tertiary font-medium">
                                             {activityFilter === 'all' 
-                                                ? 'لا يوجد سجل عمليات بعد' 
-                                                : `لا توجد نقاط من فئة "${
-                                                    activityFilter === 'performance' ? 'سرعة الأداء' :
-                                                    activityFilter === 'attendance' ? 'الالتزام' : 'الأوسمة'
-                                                }"`
+                                                ? t('pointsTracker.noHistoryYet')
+                                                : t('pointsTracker.noPointsFromCategory', {
+                                                    category: activityFilter === 'performance' ? t('pointsTracker.performance') :
+                                                    activityFilter === 'attendance' ? t('pointsTracker.attendance') : t('pointsTracker.achievements')
+                                                })
                                             }
                                         </p>
-                                        <p className="text-xs adora-text-tertiary mt-1">ابدأ بإكمال المهام لكسب النقاط!</p>
+                                        <p className="text-xs adora-text-tertiary mt-1">{t('pointsTracker.startCompletingTasks')}</p>
                                     </div>
                                 ) : (
                                     filteredHistory.map((item) => {
@@ -687,7 +688,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                     <span className={`text-lg font-black ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
                                                         {isPositive ? '+' : ''}{item.points}
                                                     </span>
-                                                    <p className="text-xs adora-text-tertiary">{t('points.point') || 'point'}</p>
+                                                    <p className="text-xs adora-text-tertiary">{t('pointsTracker.point')}</p>
                                                 </div>
                                             </div>
                                         );
@@ -712,8 +713,8 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                         <Trophy className="w-8 h-8 text-gray-400" />
                     </div>
                     <div>
-                        <h3 className="text-xs font-bold text-white/50 uppercase tracking-widest mb-1">نظام النقاط</h3>
-                        <p className="text-sm text-white/40">غير مفعل حالياً</p>
+                        <h3 className="text-xs font-bold text-white/50 uppercase tracking-widest mb-1">{t('pointsTracker.pointsSystemDisabled')}</h3>
+                        <p className="text-sm text-white/40">{t('common.disabled') || t('pointsConfiguration.disabled')}</p>
                     </div>
                 </div>
             </div>
@@ -741,10 +742,10 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                             <Trophy className="w-8 h-8 text-white drop-shadow-md" />
                         </div>
                         <div>
-                            <h3 className="text-xs font-bold text-white/70 uppercase tracking-widest mb-1">الرصيد الملكي</h3>
+                            <h3 className="text-xs font-bold text-white/70 uppercase tracking-widest mb-1">{t('pointsTracker.royalBalance')}</h3>
                             <div className="flex items-baseline gap-1">
                                 <span className="text-3xl font-black text-white">{points ?? 0}</span>
-                                <span className="text-xs font-bold text-white/70">نقطة</span>
+                                <span className="text-xs font-bold text-white/70">{t('pointsTracker.point')}</span>
                             </div>
                         </div>
                     </div>
@@ -754,7 +755,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                             <button
                                 onClick={handleShowLeaderboard}
                                 className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/70 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all"
-                                title="لوحة المتصدرين"
+                                title={t('pointsTracker.leaderboard')}
                             >
                                 <Users className="w-5 h-5" />
                             </button>
@@ -762,7 +763,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                         <button
                             onClick={handleShowHistory}
                             className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/70 hover:text-blue-400 hover:bg-blue-500/10 transition-all"
-                            title="سجل الشفافية"
+                            title={t('pointsTracker.transparencyHistory')}
                         >
                             <History className="w-5 h-5" />
                         </button>
@@ -776,7 +777,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                             <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                                 <Users className="w-4 h-4 text-blue-400" />
                             </div>
-                            <span className="text-xs font-bold text-white/70">فريق {teamName}</span>
+                            <span className="text-xs font-bold text-white/70">{t('common.team')} {teamName}</span>
                         </div>
                         <span className="text-blue-400 font-black text-sm">{teamPoints}</span>
                     </div>
@@ -794,8 +795,8 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                     <History className="w-6 h-6 text-blue-400" />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black text-white tracking-tight">سجل الشفافية</h3>
-                                    <p className="text-xs text-white/70">كل نقطة موضحة بالتفصيل والوقت</p>
+                                    <h3 className="text-xl font-black text-white tracking-tight">{t('pointsTracker.transparencyHistory')}</h3>
+                                    <p className="text-xs text-white/70">{t('pointsTracker.transparencyHistoryDescription')}</p>
                                 </div>
                             </div>
                             <button
@@ -814,7 +815,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                     }`}
                             >
                                 <Zap className="w-4 h-4" />
-                                نشاطي
+                                {t('pointsTracker.myActivity')}
                             </button>
                             <button
                                 onClick={() => setActiveTab('wallet')}
@@ -822,7 +823,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                     }`}
                             >
                                 <DollarSign className="w-4 h-4" />
-                                محفظتي
+                                {t('pointsTracker.myWallet')}
                             </button>
                         </div>
 
@@ -841,7 +842,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                             }`}
                                         >
                                             <div className="text-lg">📊</div>
-                                            <span className="text-[10px] font-bold text-white/70">الكل</span>
+                                            <span className="text-[10px] font-bold text-white/70">{t('pointsTracker.all')}</span>
                                             <span className="text-xs font-black text-white">{history.length}</span>
                                         </button>
                                         <button
@@ -853,7 +854,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                             }`}
                                         >
                                             <div className="text-lg">⚡</div>
-                                            <span className="text-[10px] font-bold text-blue-400">سرعة الأداء</span>
+                                            <span className="text-[10px] font-bold text-blue-400">{t('pointsTracker.performance')}</span>
                                             <span className={`text-xs font-black ${categoryStats.performance.total >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                 {categoryStats.performance.total > 0 ? '+' : ''}{categoryStats.performance.total}
                                             </span>
@@ -867,7 +868,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                             }`}
                                         >
                                             <div className="text-lg">📅</div>
-                                            <span className="text-[10px] font-bold text-green-400">الالتزام</span>
+                                            <span className="text-[10px] font-bold text-green-400">{t('pointsTracker.attendance')}</span>
                                             <span className={`text-xs font-black ${categoryStats.attendance.total >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                 {categoryStats.attendance.total > 0 ? '+' : ''}{categoryStats.attendance.total}
                                             </span>
@@ -881,7 +882,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                             }`}
                                         >
                                             <div className="text-lg">🏅</div>
-                                            <span className="text-[10px] font-bold text-yellow-400">الأوسمة</span>
+                                            <span className="text-[10px] font-bold text-yellow-400">{t('pointsTracker.achievements')}</span>
                                             <span className={`text-xs font-black ${categoryStats.achievements.total >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                 {categoryStats.achievements.total > 0 ? '+' : ''}{categoryStats.achievements.total}
                                             </span>
@@ -896,14 +897,14 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                             </div>
                                             <p className="text-white/70 font-bold">
                                                 {activityFilter === 'all' 
-                                                    ? 'لا يوجد سجل عمليات بعد' 
-                                                    : `لا توجد نقاط من فئة "${
-                                                        activityFilter === 'performance' ? 'سرعة الأداء' :
-                                                        activityFilter === 'attendance' ? 'الالتزام' : 'الأوسمة'
-                                                    }"`
+                                                    ? t('pointsTracker.noHistoryYet')
+                                                    : t('pointsTracker.noPointsFromCategory', {
+                                                        category: activityFilter === 'performance' ? t('pointsTracker.performance') :
+                                                        activityFilter === 'attendance' ? t('pointsTracker.attendance') : t('pointsTracker.achievements')
+                                                    })
                                                 }
                                             </p>
-                                            <p className="text-xs text-white/40 mt-2">ابدأ بإكمال المهام لكسب النقاط!</p>
+                                            <p className="text-xs text-white/40 mt-2">{t('pointsTracker.startCompletingTasks')}</p>
                                         </div>
                                     ) : (
                                         filteredHistory.map((item) => {
@@ -937,7 +938,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                             <span className={`text-2xl font-black ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
                                                                 {isPositive ? '+' : ''}{item.points}
                                                             </span>
-                                                            <p className="text-xs text-white/70 font-bold">نقطة</p>
+                                                            <p className="text-xs text-white/70 font-bold">{t('pointsTracker.point')}</p>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -971,12 +972,12 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                     }`}
                                             >
                                                 {redeeming ? <AdoraLoaderInline size={20} /> : <DollarSign className="w-5 h-5" />}
-                                                ترحيل النقاط للصرف
+                                                {t('pointsTracker.transferPointsForRedemption')}
                                             </button>
 
                                             {(points || 0) < minRedemption && (
                                                 <p className="text-xs text-white/70 font-bold">
-                                                    * تحتاج إلى {minRedemption - (points || 0)} نقطة إضافية للتمكن من السحب
+                                                    {t('pointsTracker.needMorePoints', { count: minRedemption - (points || 0) })}
                                                 </p>
                                             )}
                                         </div>
@@ -989,7 +990,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                 <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
                                                     <Trophy className="w-4 h-4 text-orange-400" />
                                                 </div>
-                                                <span className="text-xs font-black text-white/70 uppercase tracking-wider">الإجمالي التاريخي</span>
+                                                <span className="text-xs font-black text-white/70 uppercase tracking-wider">{t('pointsTracker.historicalTotal')}</span>
                                             </div>
                                             <div className="text-2xl font-black text-white">{lifetimePoints}</div>
                                         </div>
@@ -998,7 +999,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
                                                     <Star className="w-4 h-4 text-indigo-400" />
                                                 </div>
-                                                <span className="text-xs font-black text-white/70 uppercase tracking-wider">مستوى الأداء</span>
+                                                <span className="text-xs font-black text-white/70 uppercase tracking-wider">{t('pointsTracker.performanceLevel')}</span>
                                             </div>
                                             <div className={`text-sm font-black ${getLifetimeBadge(lifetimePoints).color}`}>
                                                 {getLifetimeBadge(lifetimePoints).icon} {getLifetimeBadge(lifetimePoints).label}
@@ -1009,12 +1010,12 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                     {/* Payout History */}
                                     <div className="space-y-3 pt-2">
                                         <h4 className="text-xs font-black text-white/70 uppercase tracking-[0.2em] px-2 flex items-center justify-between">
-                                            <span>أحدث طلبات الصرف</span>
+                                            <span>{t('pointsTracker.redemptionRequests')}</span>
                                             <span className="text-indigo-400 lowercase">Last 3 only</span>
                                         </h4>
                                         {payoutHistory.slice(0, 3).length === 0 ? (
                                             <div className="p-8 text-center bg-white/[0.02] border border-white/5 border-dashed rounded-3xl">
-                                                <p className="text-xs text-white/70 font-bold">لم تطلب صرف أي مكافآت بعد</p>
+                                                <p className="text-xs text-white/70 font-bold">{t('pointsTracker.noRedemptionRequestsYet')}</p>
                                             </div>
                                         ) : (
                                             payoutHistory.slice(0, 3).map((req) => (
@@ -1027,7 +1028,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                                 req.status === 'approved' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                                                         </div>
                                                         <div>
-                                                            <p className="text-sm font-bold text-white">{req.pointsAmount} نقطة</p>
+                                                            <p className="text-sm font-bold text-white">{t('pointsTracker.pointsAmount', { points: req.pointsAmount })}</p>
                                                             <p className="text-xs font-bold text-white/70 uppercase tracking-wider">{formatDate(req.createdAt)}</p>
                                                         </div>
                                                     </div>
@@ -1035,7 +1036,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                         <div className={`text-xs font-black px-3 py-1 rounded-full ${req.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400' :
                                                             req.status === 'approved' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
                                                             }`}>
-                                                            {req.status === 'pending' ? 'قيد المراجعة ⌛' : req.status === 'approved' ? 'تم الدفع ✅' : 'مرفوض ❌'}
+                                                            {req.status === 'pending' ? t('pointsTracker.pendingReview') : req.status === 'approved' ? t('pointsTracker.paid') : t('pointsTracker.rejected')}
                                                         </div>
                                                         <p className="text-xs font-bold text-white/70 mt-1 capitalize">{req.monetaryValue} SAR</p>
                                                     </div>
@@ -1059,7 +1060,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
                                     <Trophy className="w-6 h-6 text-white" />
                                 </div>
-                                <h3 className="text-xl font-black text-white">قاعة المشاهير</h3>
+                                <h3 className="text-xl font-black text-white">{t('pointsTracker.leaderboard')}</h3>
                             </div>
                             <button onClick={() => setShowLeaderboardModal(false)} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/70">
                                 <X className="w-5 h-5" />

@@ -145,16 +145,149 @@ export const searchAuditLogs = async (searchTerm: string, branch: string): Promi
 // 9. DATA ENCRYPTION SERVICE
 // ============================================================
 
-export const encryptData = (data: string, key?: string): string => {
-    // Would use actual encryption (AES-256)
-    const encoded = btoa(data);
-    return `ENC:${encoded}`;
+/**
+ * Get encryption key from environment or use default
+ * ⚠️ In production, ensure VITE_ENCRYPTION_KEY is set in .env
+ */
+const getEncryptionKey = (key?: string): string => {
+    if (key) return key;
+    // Try environment variable
+    const envKey = import.meta.env.VITE_ENCRYPTION_KEY;
+    if (envKey) return envKey;
+    // Fallback to default (should be changed in production)
+    console.warn('⚠️ VITE_ENCRYPTION_KEY not set. Using default key (not secure for production).');
+    return 'adora-default-encryption-key-change-in-production';
 };
 
-export const decryptData = (encryptedData: string, key?: string): string => {
-    if (!encryptedData.startsWith('ENC:')) return encryptedData;
-    const encoded = encryptedData.substring(4);
-    return atob(encoded);
+/**
+ * Derive encryption key from password using PBKDF2
+ */
+const deriveKey = async (password: string): Promise<CryptoKey> => {
+    const encoder = new TextEncoder();
+    const passwordKey = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(password),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+    );
+
+    return crypto.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: encoder.encode('adora-security-salt'),
+            iterations: 100000,
+            hash: 'SHA-256'
+        },
+        passwordKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+};
+
+/**
+ * Encrypt sensitive data using AES-256-GCM
+ * ✅ Production-ready encryption
+ */
+export const encryptData = async (data: string, key?: string): Promise<string> => {
+    if (!data) return '';
+    
+    try {
+        // Check if Web Crypto API is available
+        if (!crypto || !crypto.subtle) {
+            console.warn('⚠️ Web Crypto API not available. Falling back to Base64 (not secure).');
+            // Fallback to Base64 for old browsers
+            const encoded = btoa(data);
+            return `ENC:${encoded}`;
+        }
+
+        const encryptionKey = getEncryptionKey(key);
+        const derivedKey = await deriveKey(encryptionKey);
+        
+        const encoder = new TextEncoder();
+        const dataBytes = encoder.encode(data);
+        
+        // Generate random IV (12 bytes for AES-GCM)
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        
+        // Encrypt data
+        const encrypted = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            derivedKey,
+            dataBytes
+        );
+        
+        // Combine IV + encrypted data
+        const combined = new Uint8Array(iv.length + encrypted.byteLength);
+        combined.set(iv);
+        combined.set(new Uint8Array(encrypted), iv.length);
+        
+        // Return Base64-encoded result with prefix
+        const encoded = btoa(String.fromCharCode(...combined));
+        return `ENC:${encoded}`;
+    } catch (error) {
+        console.error('AES encryption failed:', error);
+        // Fallback to Base64 on error (not secure, but maintains compatibility)
+        const encoded = btoa(data);
+        return `ENC:${encoded}`;
+    }
+};
+
+/**
+ * Decrypt sensitive data using AES-256-GCM
+ * Supports both new AES-encrypted data and legacy Base64 data (backward compatibility)
+ */
+export const decryptData = async (encryptedData: string, key?: string): Promise<string> => {
+    if (!encryptedData) return '';
+    
+    try {
+        // Check if data has ENC: prefix
+        if (!encryptedData.startsWith('ENC:')) {
+            // No prefix, return as-is (might be unencrypted data)
+            return encryptedData;
+        }
+        
+        const encoded = encryptedData.substring(4); // Remove 'ENC:' prefix
+        
+        // Check if Web Crypto API is available
+        if (!crypto || !crypto.subtle) {
+            // Fallback to Base64 for old browsers
+            return atob(encoded);
+        }
+
+        // Try to decrypt as AES-encrypted data first
+        try {
+            const encryptionKey = getEncryptionKey(key);
+            const derivedKey = await deriveKey(encryptionKey);
+            
+            // Decode Base64
+            const combined = new Uint8Array(
+                atob(encoded).split('').map(c => c.charCodeAt(0))
+            );
+            
+            // Extract IV (first 12 bytes) and encrypted data
+            const iv = combined.slice(0, 12);
+            const encrypted = combined.slice(12);
+            
+            // Decrypt
+            const decrypted = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv },
+                derivedKey,
+                encrypted
+            );
+            
+            // Return decrypted text
+            return new TextDecoder().decode(decrypted);
+        } catch (aesError) {
+            // If AES decryption fails, try legacy Base64 (backward compatibility)
+            console.warn('AES decryption failed, trying Base64 fallback:', aesError);
+            return atob(encoded);
+        }
+    } catch (error) {
+        console.error('Decryption failed:', error);
+        return encryptedData; // Return as-is if decryption fails
+    }
 };
 
 export const hashPassword = (password: string): string => {

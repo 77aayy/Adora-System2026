@@ -503,6 +503,7 @@ const NavigationBar: React.FC<{
 // Developer Signature Footer - International Professional Style
 const DeveloperFooter: React.FC = () => {
     const location = useLocation();
+    const { t } = useTranslation(); // ✅ Add i18n for WhatsApp messages
     const [isDark, setIsDark] = useState(
         document.documentElement.getAttribute('data-theme') === 'dark'
     );
@@ -528,6 +529,80 @@ const DeveloperFooter: React.FC = () => {
 
     // ✅ FIX: State to force re-render when settings update - MUST be before conditional return
     const [devConfig, setDevConfig] = useState(getConfig());
+
+    // ✅ FIX: Load from Firebase on mount (with localStorage as fallback)
+    useEffect(() => {
+        const loadDeveloperSettings = async () => {
+            // ✅ Wait for Anonymous Auth to complete (required for Firestore access)
+            const waitForAuth = async (maxAttempts = 10) => {
+                for (let i = 0; i < maxAttempts; i++) {
+                    try {
+                        const { auth } = await import('./services/firebase');
+                        if (auth?.currentUser) {
+                            console.log('✅ Auth confirmed before loading systemSettings');
+                            return true;
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    } catch (e) {
+                        // Continue waiting
+                    }
+                }
+                console.warn('⚠️ Auth not ready after waiting, proceeding anyway');
+                return false;
+            };
+            
+            await waitForAuth();
+            
+            try {
+                const { getSystemSettings } = await import('./services/systemSettingsService');
+                const settings = await getSystemSettings();
+                if (settings?.developerBranding) {
+                    const branding = settings.developerBranding;
+                    const newConfig = {
+                        devName: branding.devName || devConfig.devName,
+                        phoneSA: branding.devPhoneSA || devConfig.phoneSA,
+                        phoneEG: branding.devPhoneEG || devConfig.phoneEG,
+                        email: branding.devEmail || devConfig.email,
+                    };
+                    
+                    // Update state
+                    setDevConfig(newConfig);
+                    
+                    // Sync to localStorage for backward compatibility
+                    if (branding.devName) localStorage.setItem('adora_dev_name', branding.devName);
+                    if (branding.devPhoneSA) localStorage.setItem('adora_dev_phone_sa', branding.devPhoneSA);
+                    if (branding.devPhoneEG) localStorage.setItem('adora_dev_phone_eg', branding.devPhoneEG);
+                    if (branding.devEmail) localStorage.setItem('adora_dev_email', branding.devEmail);
+                    if (branding.devSignature) localStorage.setItem('adora_dev_signature', branding.devSignature);
+                }
+            } catch (err) {
+                console.warn('Failed to load developer settings from Firebase, using localStorage:', err);
+            }
+        };
+        
+        loadDeveloperSettings();
+    }, []);
+    
+    // ✅ FIX: Listen for settings updates from owner dashboard
+    useEffect(() => {
+        const handleSettingsUpdate = (event: CustomEvent) => {
+            const newConfig = event.detail;
+            // Update state
+            setDevConfig(newConfig);
+            // Also update localStorage to ensure persistence
+            if (newConfig.devName) localStorage.setItem('adora_dev_name', newConfig.devName);
+            if (newConfig.phoneSA) localStorage.setItem('adora_dev_phone_sa', newConfig.phoneSA);
+            if (newConfig.phoneEG) localStorage.setItem('adora_dev_phone_eg', newConfig.phoneEG);
+            if (newConfig.email) localStorage.setItem('adora_dev_email', newConfig.email);
+            if (newConfig.signature) localStorage.setItem('adora_dev_signature', newConfig.signature);
+        };
+        
+        window.addEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
+        
+        return () => {
+            window.removeEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
+        };
+    }, []);
 
     // Listen for theme changes - MUST be before any conditional return!
     useEffect(() => {
@@ -656,7 +731,7 @@ const DeveloperFooter: React.FC = () => {
 
     const getWhatsAppMessage = () => {
         const hour = new Date().getHours();
-        return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
+        return hour >= 5 && hour < 12 ? t('whatsapp.morning') : t('whatsapp.evening');
     };
 
     // ⚠️ EXACT FORMAT FROM LoginScreen.tsx - DO NOT CHANGE
@@ -755,9 +830,35 @@ const AppContent: React.FC = () => {
     const location = useLocation();
     const { voiceEnabled, toggleVoice, success } = useUX();
     const { user, branchId, setBranch } = useAuth();
+    const { i18n, t } = useTranslation(); // ✅ Add i18n for language listener
     
     // ✅ Enable global keyboard shortcuts (Alt+1-8 navigation)
     useGlobalKeyboardShortcuts();
+    
+    // 🔐 CRITICAL FIX: Language Listener - Update document dir/lang when language changes
+    useEffect(() => {
+        const handleLanguageChanged = (lng: string) => {
+            // Update direction (RTL/LTR) based on language
+            const rtlLanguages = ['ar'];
+            const dir = rtlLanguages.includes(lng) ? 'rtl' : 'ltr';
+            
+            if (typeof document !== 'undefined') {
+                document.documentElement.setAttribute('dir', dir);
+                document.documentElement.setAttribute('lang', lng);
+            }
+        };
+        
+        // Listen to language changes from i18next
+        i18n.on('languageChanged', handleLanguageChanged);
+        
+        // Set initial direction
+        handleLanguageChanged(i18n.language || 'ar');
+        
+        // Cleanup listener on unmount
+        return () => {
+            i18n.off('languageChanged', handleLanguageChanged);
+        };
+    }, [i18n]);
     
     // ⚡ Performance: Preload adjacent routes when page changes
     useEffect(() => {
@@ -786,10 +887,11 @@ const AppContent: React.FC = () => {
                 // Handle branch enter event
                 monitor.onEnter((event) => {
                     if (event.branchId !== branchId) {
-                        // Ask user if they want to switch (using confirm for simplicity)
-                        if (window.confirm(`أنت دخلت نطاق ${event.branchName}.\nهل تريد التبديل إلى هذا الفرع؟`)) {
+                        // ✅ i18n: Ask user if they want to switch (using confirm for simplicity)
+                        const confirmMessage = t('branchSwitch.enterBranchScope', { branchName: event.branchName });
+                        if (window.confirm(confirmMessage)) {
                             setBranch(event.branchId);
-                            success(`تم التبديل إلى ${event.branchName}`);
+                            success(t('branchSwitch.switchedTo', { branchName: event.branchName }));
                         }
                     }
                 });
@@ -813,7 +915,7 @@ const AppContent: React.FC = () => {
         return () => {
             cleanup.then(cleanupFn => cleanupFn?.()).catch(console.error);
         };
-    }, [user?.tenantId, user?.branches, branchId, setBranch, success, location.pathname]);
+    }, [user?.tenantId, user?.branches, branchId, setBranch, success, location.pathname, t]);
 
     // ✅ Determine which header to show
     const isManager = user?.role === 'manager';
@@ -937,6 +1039,32 @@ const App: React.FC = () => {
                 firestore
             };
             console.log('🧠 GENIUS DEBUG TOOLS LOADED: window.debugGenius');
+        
+        // ✅ Firebase Config Debug Helper
+        (window as any).checkFirebaseConfig = () => {
+            const saved = localStorage.getItem('adora_client_config');
+            if (saved) {
+                try {
+                    const config = JSON.parse(saved);
+                    console.log('🔍 Current Firebase Config:', {
+                        projectId: config.projectId,
+                        authDomain: config.authDomain,
+                        hasApiKey: !!config.apiKey,
+                        hasStorageBucket: !!config.storageBucket,
+                        fullConfig: config
+                    });
+                    return config;
+                } catch (e) {
+                    console.error('❌ Failed to parse config:', e);
+                    return null;
+                }
+            } else {
+                console.log('ℹ️ No Firebase config in localStorage - using environment variables');
+                return null;
+            }
+        };
+        
+        console.log('🔧 Firebase Config Helper: window.checkFirebaseConfig()');
         };
         loadGeniusTools();
     }, []);

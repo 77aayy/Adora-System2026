@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Package, Settings, BarChart3, Plus, Edit2, Trash2, Eye, EyeOff,
     Save, X, Filter, Download, TrendingDown, TrendingUp,
@@ -50,6 +51,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
     isOpen = true,
     onClose
 }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const { haptic, playSound, success, error } = useUX();
     const branchId = (user as any)?.branch || 'default';
@@ -59,7 +61,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
 
     // Guard: Redirect if tenantId missing (security hardening)
     if (!tenantId) {
-        error('جلسة غير صالحة. يرجى تسجيل الدخول مرة أخرى.');
+        error(t('laundry.invalidSession'));
         return null;
     }
 
@@ -127,12 +129,12 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             }));
 
             haptic('success');
-            success(`تم تسوية ${settleQuantity} من ${settleItem.name}`);
+            success(t('laundry.settleSuccess', { quantity: settleQuantity, itemName: settleItem.name }));
             setShowSettleModal(false);
             setSettleItem(null);
         } catch (err) {
             console.error(err);
-            error('فشل التسوية');
+            error(t('laundry.settleFailed'));
         }
         setSaving(false);
     };
@@ -185,7 +187,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
     // Add new item
     const handleAddItem = async () => {
         if (!newItemName.trim() || !newItemPrice.trim()) {
-            error('الرجاء إدخال اسم البند والسعر');
+            error(t('laundry.namePriceRequired'));
             return;
         }
         if (!tenantId) return;
@@ -208,10 +210,10 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             setNewItemStock('');
             setShowAddItem(false);
             haptic('success');
-            success('تم إضافة البند بنجاح');
+            success(t('laundry.addSuccess'));
         } catch (err) {
             console.error('Error adding item:', err);
-            error('فشل إضافة البند');
+            error(t('laundry.addError'));
         }
         setSaving(false);
     };
@@ -226,11 +228,11 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                 priceWithTax: updates.priceWithTax
             });
             haptic('success');
-            success('تم تحديث البند');
+            success(t('laundry.updateSuccess'));
             setEditingItem(null);
         } catch (err) {
             console.error('Error updating item:', err);
-            error('فشل تحديث البند');
+            error(t('laundry.updateError'));
         }
         setSaving(false);
     };
@@ -245,26 +247,26 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                 showInCards: showInCards
             } as any);
             haptic('success');
-            success(showInCards ? 'تم تفعيل العرض في الكروت' : 'تم إخفاء البند من الكروت');
+            success(showInCards ? t('laundry.toggleShowSuccess') : t('laundry.toggleHideSuccess'));
         } catch (err) {
             console.error('Error toggling card visibility:', err);
-            error('فشل تحديث حالة العرض');
+            error(t('laundry.toggleError'));
         }
         setSaving(false);
     };
 
     // Delete item
     const handleDeleteItem = async (itemId: string) => {
-        if (!confirm('هل تريد حذف هذا البند؟')) return;
+        if (!confirm(t('laundry.deleteConfirm'))) return;
         if (!tenantId) return;
 
         try {
             await deleteLaundryItem(tenantId, branchId, itemId);
             haptic('medium');
-            success('تم حذف البند');
+            success(t('laundry.deleteSuccess'));
         } catch (err) {
             console.error('Error deleting item:', err);
-            error('فشل حذف البند');
+            error(t('laundry.deleteError'));
         }
     };
 
@@ -275,10 +277,10 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
         try {
             await updateLaundrySettings(tenantId, branchId, settings);
             haptic('success');
-            success('تم حفظ الإعدادات');
+            success(t('laundry.saveSettingsSuccess'));
         } catch (err) {
             console.error('Error saving settings:', err);
-            error('فشل حفظ الإعدادات');
+            error(t('laundry.saveSettingsError'));
         }
         setSaving(false);
     };
@@ -316,7 +318,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
         const sensitiveActions = ['update_stock', 'settle_deficit', 'report_loss'];
 
         if (sensitiveActions.includes(action) && !['manager', 'owner', 'admin'].includes(userRole)) {
-            error('❌ غير مسموح لك بهذا الإجراء. راجع المدير.');
+            error(t('laundry.notAllowed'));
             return;
         }
 
@@ -324,7 +326,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
         const item = items.find(i => i.id === itemId);
 
         if (!item) {
-            error('لم يتم العثور على البند');
+            error(t('laundry.itemNotFound'));
             return;
         }
 
@@ -333,24 +335,24 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
         const qty = parseInt(quantity);
 
         if (isNaN(qty) || qty <= 0) {
-            error('الكمية غير صحيحة');
+            error(t('laundry.invalidQuantity'));
             return;
         }
 
         if (qty > MAX_QUANTITY) {
-            error(`الكمية كبيرة جداً (الحد الأقصى ${MAX_QUANTITY.toLocaleString('ar-EG')})`);
+            error(t('laundry.quantityTooLarge', { max: MAX_QUANTITY.toLocaleString('ar-EG') }));
             return;
         }
 
         // Validate itemId format (alphanumeric, underscore, hyphen only)
         if (!/^[a-zA-Z0-9_-]+$/.test(itemId)) {
-            error('معرف البند غير صالح');
+            error(t('laundry.invalidItemId'));
             return;
         }
 
         // Validate operation enum (only for update_stock)
         if (operation && !['add', 'remove', 'set'].includes(operation)) {
-            error('العملية غير صالحة');
+            error(t('laundry.invalidOperation'));
             return;
         }
 
@@ -364,25 +366,25 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                 await updateLaundryItem(tenantId, branchId, item.id, {
                     stockWarehouse: (item.stockWarehouse || 0) + change
                 });
-                success(`تم تحديث مخزون المستودع: ${item.name}`);
+                success(t('laundry.updateWarehouseSuccess', { itemName: item.name }));
             }
             else if (action === 'settle_deficit') {
                 // Settle Deficit (Fixing/Returning)
                 await import('../../services/laundryInventoryService').then(mod =>
                     mod.settleDeficit(tenantId, branchId, item.id, qty, user?.id || '', user?.name || '')
                 );
-                success(`تم تسوية العجز: ${qty} من ${item.name}`);
+                success(t('laundry.settleDeficitSuccess', { quantity: qty, itemName: item.name }));
             }
             else if (action === 'report_loss') {
                 // Report Laundry Loss (Manual Deficit)
                 await import('../../services/laundryInventoryService').then(mod =>
                     mod.reportLostByLaundry(tenantId, branchId, item.id, qty, user?.id || '', user?.name || '')
                 );
-                error(`تم تسجيل عجز جديد: ${qty} من ${item.name}`); // Red toast for loss
+                error(t('laundry.reportLossSuccess', { quantity: qty, itemName: item.name })); // Red toast for loss
             }
         } catch (err) {
             console.error('Voice Action Error:', err);
-            error('حدث خطأ أثناء تنفيذ الأمر الصوتي');
+            error(t('laundry.voiceActionError'));
         }
     };
 
@@ -454,7 +456,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
         else setReceiptQuantities(newQuantities);
 
         playSound('success');
-        success(`تم تعبئة ${updatedCount} بند تلقائياً ⚡`);
+        success(t('laundry.autoFillSuccess', { count: updatedCount }));
     };
 
     // Prepare simplified data for AI (Token efficiency 📉)
@@ -527,21 +529,21 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                         </div>
 
                         <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
-                            {status === 'listening' ? 'أنا سامعك...' :
-                                status === 'processing' ? 'جاري التحليل...' :
-                                    status === 'speaking' ? 'الرد...' :
-                                        status === 'executing' ? 'جاري التنفيذ...' : ''}
+                            {status === 'listening' ? t('laundry.voiceStatus.listening') :
+                                status === 'processing' ? t('laundry.voiceStatus.processing') :
+                                    status === 'speaking' ? t('laundry.voiceStatus.speaking') :
+                                        status === 'executing' ? t('laundry.voiceStatus.executing') : ''}
                         </h3>
 
                         <p className="text-slate-600 dark:text-white/60 text-lg mb-8 text-center max-w-md">
-                            {transcript || feedback || "قول مثلاً: 'ضفي 50 منشفة كبيرة للمخزون'"}
+                            {transcript || feedback || t('laundry.voiceStatus.example')}
                         </p>
 
                         <button
                             onClick={cancel}
                             className="px-8 py-3 rounded-full bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white font-medium transition-colors"
                         >
-                            إلغاء
+                            {t('common.cancel')}
                         </button>
                     </div>
                 )}
@@ -553,8 +555,8 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                             <Package className="w-5 h-5 text-purple-400" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">إدارة جرد المغسلة</h3>
-                            <p className="text-sm text-slate-600 dark:text-white/60">تحكم كامل بالبنود والتقارير</p>
+                            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">{t('laundry.title')}</h3>
+                            <p className="text-sm text-slate-600 dark:text-white/60">{t('laundry.subtitle')}</p>
                         </div>
                     </div>
 
@@ -575,9 +577,9 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                 {/* Tabs */}
                 <div className="flex border-b border-slate-200 dark:border-white/10 px-4">
                     {[
-                        { id: 'items' as TabType, label: 'البنود', icon: Package },
-                        { id: 'reports' as TabType, label: 'التقارير', icon: BarChart3 },
-                        { id: 'settings' as TabType, label: 'الإعدادات', icon: Settings }
+                        { id: 'items' as TabType, label: t('laundry.itemsTab'), icon: Package },
+                        { id: 'reports' as TabType, label: t('laundry.reportsTab'), icon: BarChart3 },
+                        { id: 'settings' as TabType, label: t('laundry.settingsTab'), icon: Settings }
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -597,7 +599,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                 <div className="flex-1 overflow-y-auto p-4">
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
-                            <AdoraLoader size="md" message="جاري تحميل البيانات..." />
+                            <AdoraLoader size="md" message={t('laundry.loadingData')} />
                         </div>
                     ) : activeTab === 'items' ? (
                         // Items Tab
@@ -610,8 +612,8 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             <ShoppingCart className="w-5 h-5" />
                                         </div>
                                         <div className="flex-1">
-                                            <div className="text-amber-400 font-bold text-sm">تنبيه مشتريات عاجل!</div>
-                                            <div className="text-slate-600 dark:text-white/60 text-xs">يوجد {lowStockItems.length} بنود قاربت على النفاد من المخزون</div>
+                                            <div className="text-amber-400 font-bold text-sm">{t('laundry.urgentProcurementAlert')}</div>
+                                            <div className="text-slate-600 dark:text-white/60 text-xs">{t('laundry.lowStockItems', { count: lowStockItems.length })}</div>
                                         </div>
                                         <button
                                             onClick={() => {
@@ -619,7 +621,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             }}
                                             className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-[10px] font-bold"
                                         >
-                                            جدولة شراء
+                                            {t('laundry.schedulePurchase')}
                                         </button>
                                     </div>
                                 </div>
@@ -629,21 +631,21 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
                                     <div className="text-blue-400 text-2xl font-bold">{items.length}</div>
-                                    <div className="text-white/60 text-sm">إجمالي البنود</div>
+                                    <div className="text-white/60 text-sm">{t('laundry.totalItems')}</div>
                                 </div>
                                 <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
                                     <div className="text-green-400 text-2xl font-bold">
                                         {items.filter(i => i.showInCards).length}
                                     </div>
-                                    <div className="text-white/60 text-sm">تظهر في الكروت</div>
+                                    <div className="text-white/60 text-sm">{t('laundry.showingInCards')}</div>
                                 </div>
                                 <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 col-span-1 md:col-span-3 lg:col-span-1">
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="text-red-400 font-bold flex items-center gap-2">
                                             <TrendingDown className="w-5 h-5" />
-                                            سجل العجز (نشط)
+                                            {t('laundry.deficitRecord')}
                                         </div>
-                                        <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-lg">إجمالي: {totalDeficitValue.toFixed(2)} ر.س</span>
+                                        <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-lg">{t('laundry.total', { value: totalDeficitValue.toFixed(2) })}</span>
                                     </div>
                                     <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
                                         {/* Dynamic List from Context/Items */}
@@ -657,15 +659,15 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                                     <button
                                                         onClick={() => handleSettleClick(item.id, item.name, cumulativeDeficit[item.id])}
                                                         className="opacity-0 group-hover:opacity-100 transition-opacity bg-green-500/20 text-green-400 p-1 rounded hover:bg-green-500/30 text-xs"
-                                                        title="تسوية العجز (استرجاع)"
+                                                        title={t('laundry.settleDeficit')}
                                                     >
-                                                        تسوية
+                                                        {t('laundry.settle')}
                                                     </button>
                                                 </div>
                                             </div>
                                         ))}
                                         {Object.keys(cumulativeDeficit).length === 0 && (
-                                            <div className="text-slate-500 dark:text-white/40 text-sm text-center py-4">لا يوجد عجز مسجل ✨</div>
+                                            <div className="text-slate-500 dark:text-white/40 text-sm text-center py-4">{t('laundry.noDeficit')}</div>
                                         )}
                                     </div>
                                 </div>
@@ -677,7 +679,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                 className="w-full p-3 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 flex items-center justify-center gap-2"
                             >
                                 <Plus className="w-5 h-5" />
-                                إضافة بند جديد
+                                {t('laundry.addNewItem')}
                             </button>
 
                             {/* Add Item Form */}
@@ -686,7 +688,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         <input
                                             type="text"
-                                            placeholder="اسم البند"
+                                            placeholder={t('laundry.itemNamePlaceholder')}
                                             value={newItemName}
                                             onChange={e => setNewItemName(e.target.value)}
                                             style={{
@@ -707,7 +709,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                         <input
                                             type="number"
                                             step="0.01"
-                                            placeholder="السعر"
+                                            placeholder={t('laundry.pricePlaceholder')}
                                             value={newItemPrice}
                                             onChange={e => setNewItemPrice(e.target.value)}
                                             style={{
@@ -720,8 +722,8 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                         <div className="flex gap-2">
                                             <input
                                                 type="number"
-                                                placeholder="المستودع"
-                                                title="الرصيد في المستودع"
+                                                placeholder={t('laundry.warehousePlaceholder')}
+                                                title={t('laundry.warehouseBalance')}
                                                 value={newItemStock} // Reusing this state for Warehouse temporarily or split? Best to be clear.
                                                 onChange={e => setNewItemStock(e.target.value)}
                                                 style={{
@@ -742,13 +744,13 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             className="flex-1 py-2 rounded-xl bg-purple-500 text-white hover:bg-purple-600 flex items-center justify-center gap-2"
                                         >
                                             {saving ? <AdoraLoaderInline size={16} /> : <Save className="w-4 h-4" />}
-                                            حفظ
+                                            {t('common.save')}
                                         </button>
                                         <button
                                             onClick={() => setShowAddItem(false)}
                                             className="px-4 py-2 rounded-xl bg-white/10 text-white/60 hover:bg-white/20"
                                         >
-                                            إلغاء
+                                            {t('common.cancel')}
                                         </button>
                                     </div>
                                 </div>
@@ -766,14 +768,14 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-slate-800 dark:text-white font-medium">{item.name}</span>
                                                     {item.showInCards && (
-                                                        <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">كرت</span>
+                                                        <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">{t('laundry.card')}</span>
                                                     )}
                                                 </div>
 
                                                 {/* 📦 Stock Distribution Visualization */}
                                                 <div className="flex items-center gap-6 mt-3 text-sm">
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">المستودع</span>
+                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">{t('laundry.warehouse')}</span>
                                                         <input
                                                             type="number"
                                                             className="w-16 bg-transparent border-b border-slate-300 dark:border-white/20 text-center text-blue-600 dark:text-blue-300 font-mono focus:border-blue-500 outline-none"
@@ -783,7 +785,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                                     </div>
                                                     <div className="text-slate-400 dark:text-white/20 text-lg">+</div>
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">الغرف</span>
+                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">{t('laundry.rooms')}</span>
                                                         <input
                                                             type="number"
                                                             className="w-16 bg-transparent border-b border-slate-300 dark:border-white/20 text-center text-purple-600 dark:text-purple-300 font-mono focus:border-purple-500 outline-none"
@@ -793,12 +795,12 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                                     </div>
                                                     <div className="text-slate-400 dark:text-white/20 text-lg">+</div>
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">المغسلة</span>
+                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">{t('laundry.laundry')}</span>
                                                         <div className="text-orange-600 dark:text-orange-300 font-mono font-bold">{item.inLaundry || 0}</div>
                                                     </div>
                                                     <div className="text-slate-400 dark:text-white/20 text-lg">=</div>
                                                     <div className="flex flex-col items-center">
-                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">الإجمالي</span>
+                                                        <span className="text-slate-500 dark:text-white/40 text-xs mb-1">{t('laundry.totalStock')}</span>
                                                         <div className="text-slate-800 dark:text-white font-bold">
                                                             {(item.stockWarehouse || 0) + (item.stockRooms || 0) + (item.inLaundry || 0)}
                                                         </div>
@@ -813,7 +815,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                                     onClick={() => handleToggleCard(item.id, !item.showInCards)}
                                                     className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.showInCards ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/40'
                                                         }`}
-                                                    title={item.showInCards ? 'إخفاء من الكروت' : 'إظهار في الكروت'}
+                                                    title={item.showInCards ? t('laundry.hideFromCards') : t('laundry.showInCards')}
                                                 >
                                                     {item.showInCards ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                                                 </button>
@@ -846,13 +848,13 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                             <div className="p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 space-y-4">
                                 <div className="flex items-center gap-2 text-slate-600 dark:text-white/60">
                                     <Filter className="w-4 h-4" />
-                                    <span className="font-medium">فلترة التقارير</span>
+                                    <span className="font-medium">{t('laundry.filterReports')}</span>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                                     {/* Period */}
                                     <div>
-                                        <label className="text-xs text-slate-500 dark:text-white/40 mb-1 block">الفترة</label>
+                                        <label className="text-xs text-slate-500 dark:text-white/40 mb-1 block">{t('laundry.period')}</label>
                                         <select
                                             value={reportPeriod}
                                             onChange={e => setReportPeriod(e.target.value as ReportPeriod)}
@@ -863,16 +865,16 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             }}
                                             className="w-full px-3 py-2 rounded-xl"
                                         >
-                                            <option value="day">يومي</option>
-                                            <option value="week">أسبوعي</option>
-                                            <option value="month">شهري</option>
-                                            <option value="custom">مخصص</option>
+                                            <option value="day">{t('laundry.day')}</option>
+                                            <option value="week">{t('laundry.week')}</option>
+                                            <option value="month">{t('laundry.month')}</option>
+                                            <option value="custom">{t('laundry.custom')}</option>
                                         </select>
                                     </div>
 
                                     {/* Month */}
                                     <div>
-                                        <label className="text-xs text-slate-500 dark:text-white/40 mb-1 block">الشهر</label>
+                                        <label className="text-xs text-slate-500 dark:text-white/40 mb-1 block">{t('laundry.monthLabel')}</label>
                                         <select
                                             value={reportMonth}
                                             onChange={e => setReportMonth(parseInt(e.target.value))}
@@ -893,7 +895,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
 
                                     {/* Year */}
                                     <div>
-                                        <label className="text-xs text-white/40 mb-1 block">السنة</label>
+                                        <label className="text-xs text-white/40 mb-1 block">{t('laundry.yearLabel')}</label>
                                         <select
                                             value={reportYear}
                                             onChange={e => setReportYear(parseInt(e.target.value))}
@@ -907,13 +909,13 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
 
                                     {/* Item Filter */}
                                     <div>
-                                        <label className="text-xs text-white/40 mb-1 block">البند</label>
+                                        <label className="text-xs text-white/40 mb-1 block">{t('laundry.itemLabel')}</label>
                                         <select
                                             value={selectedItemFilter}
                                             onChange={e => setSelectedItemFilter(e.target.value)}
                                             className="w-full px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10"
                                         >
-                                            <option value="all">جميع البنود</option>
+                                            <option value="all">{t('laundry.allItems')}</option>
                                             {items.map(item => (
                                                 <option key={item.id} value={item.id}>{item.name}</option>
                                             ))}
@@ -925,7 +927,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                 {reportPeriod === 'custom' && (
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="text-xs text-white/40 mb-1 block">من تاريخ</label>
+                                            <label className="text-xs text-white/40 mb-1 block">{t('laundry.fromDate')}</label>
                                             <input
                                                 type="date"
                                                 value={customStartDate}
@@ -934,7 +936,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-xs text-white/40 mb-1 block">إلى تاريخ</label>
+                                            <label className="text-xs text-white/40 mb-1 block">{t('laundry.toDate')}</label>
                                             <input
                                                 type="date"
                                                 value={customEndDate}
@@ -951,7 +953,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                     className="w-full py-2 rounded-xl bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 flex items-center justify-center gap-2"
                                 >
                                     <RefreshCw className="w-4 h-4" />
-                                    تحديث التقرير
+                                    {t('laundry.refreshReport')}
                                 </button>
                             </div>
 
@@ -963,21 +965,21 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             <div className="text-blue-400 text-2xl font-bold">
                                                 {accountingReport.grandTotal.toFixed(2)}
                                             </div>
-                                            <div className="text-white/60 text-sm">إجمالي التكلفة (ر.س)</div>
+                                            <div className="text-white/60 text-sm">{t('laundry.totalCost')}</div>
                                         </div>
                                         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
                                             <div className="text-red-400 text-2xl font-bold flex items-center gap-1">
                                                 <TrendingDown className="w-5 h-5" />
                                                 {accountingReport.totalDeficitValue.toFixed(2)}
                                             </div>
-                                            <div className="text-white/60 text-sm">قيمة العجز (ر.س)</div>
+                                            <div className="text-white/60 text-sm">{t('laundry.deficitValue')}</div>
                                         </div>
                                         <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
                                             <div className="text-green-400 text-2xl font-bold flex items-center gap-1">
                                                 <TrendingUp className="w-5 h-5" />
                                                 {accountingReport.totalSurplusValue.toFixed(2)}
                                             </div>
-                                            <div className="text-white/60 text-sm">قيمة الزيادة (ر.س)</div>
+                                            <div className="text-white/60 text-sm">{t('laundry.surplusValue')}</div>
                                         </div>
                                     </div>
 
@@ -986,14 +988,14 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                         <table className="w-full">
                                             <thead>
                                                 <tr className="border-b border-white/10">
-                                                    <th className="p-3 text-right text-white/60 text-sm">البند</th>
-                                                    <th className="p-3 text-center text-white/60 text-sm">مسلم</th>
-                                                    <th className="p-3 text-center text-white/60 text-sm">مستلم</th>
-                                                    <th className="p-3 text-center text-white/60 text-sm">عجز</th>
-                                                    <th className="p-3 text-center text-white/60 text-sm">زيادة</th>
-                                                    <th className="p-3 text-center text-white/60 text-sm">السعر</th>
-                                                    <th className="p-3 text-center text-white/60 text-sm">التكلفة</th>
-                                                    <th className="p-3 text-center text-white/60 text-sm">قيمة العجز</th>
+                                                    <th className="p-3 text-right text-white/60 text-sm">{t('laundry.item')}</th>
+                                                    <th className="p-3 text-center text-white/60 text-sm">{t('laundry.delivered')}</th>
+                                                    <th className="p-3 text-center text-white/60 text-sm">{t('laundry.received')}</th>
+                                                    <th className="p-3 text-center text-white/60 text-sm">{t('laundry.deficit')}</th>
+                                                    <th className="p-3 text-center text-white/60 text-sm">{t('laundry.surplus')}</th>
+                                                    <th className="p-3 text-center text-white/60 text-sm">{t('laundry.price')}</th>
+                                                    <th className="p-3 text-center text-white/60 text-sm">{t('laundry.cost')}</th>
+                                                    <th className="p-3 text-center text-white/60 text-sm">{t('laundry.deficitCost')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1029,7 +1031,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             className="flex-1 py-3 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 flex items-center justify-center gap-2"
                                         >
                                             <span className="text-xl">🖨️</span>
-                                            طباعة PDF
+                                            {t('laundry.printPDF')}
                                         </button>
                                         <button
                                             onClick={async () => {
@@ -1046,7 +1048,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                             className="flex-1 py-3 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30 flex items-center justify-center gap-2"
                                         >
                                             <Download className="w-5 h-5" />
-                                            تصدير Excel
+                                            {t('laundry.exportExcel')}
                                         </button>
                                     </div>
                                 </>
@@ -1058,12 +1060,12 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                             <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
                                 <h4 className="text-white font-medium flex items-center gap-2">
                                     <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                                    إعدادات التنبيهات
+                                    {t('laundry.alertSettings')}
                                 </h4>
 
                                 <div>
                                     <label className="text-sm text-white/60 mb-2 block">
-                                        حد تنبيه العجز (عدد القطع)
+                                        {t('laundry.deficitThreshold')}
                                     </label>
                                     <input
                                         type="number"
@@ -1075,14 +1077,14 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                         className="w-full px-4 py-3 rounded-xl bg-white/10 text-white border border-white/10"
                                     />
                                     <p className="text-xs text-white/40 mt-1">
-                                        سيتم إرسال تنبيه عند وصول العجز لهذا الحد
+                                        {t('laundry.deficitThresholdHint')}
                                     </p>
                                 </div>
 
                                 <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 group">
                                     <div>
-                                        <div className="text-white font-medium">تنبيهات المشتريات</div>
-                                        <div className="text-sm text-white/40">تنبيه عند وجود مشتريات لبنود المغسلة</div>
+                                        <div className="text-white font-medium">{t('laundry.purchaseAlerts')}</div>
+                                        <div className="text-sm text-white/40">{t('laundry.purchaseAlertsDescription')}</div>
                                     </div>
                                     <Switch
                                         checked={settings.enablePurchaseAlerts}
@@ -1097,7 +1099,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                 className="w-full py-3 rounded-xl bg-purple-500 text-white hover:bg-purple-600 flex items-center justify-center gap-2"
                             >
                                 {saving ? <AdoraLoaderInline size={20} /> : <Save className="w-5 h-5" />}
-                                حفظ الإعدادات
+                                {t('laundry.saveSettings')}
                             </button>
                         </div>
                     )}
@@ -1107,11 +1109,11 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             {showSettleModal && settleItem && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4" style={{ backdropFilter: 'none' }}>
                     <div className="glass-card w-full max-w-sm p-6 space-y-4">
-                        <h3 className="text-lg font-bold text-white">تسوية عجز: {settleItem.name}</h3>
-                        <p className="text-white/60 text-sm">أدخل الكمية التي تم استردادها/إصلاحها من المغسلة.</p>
+                        <h3 className="text-lg font-bold text-white">{t('laundry.settleDeficitTitle', { itemName: settleItem.name })}</h3>
+                        <p className="text-white/60 text-sm">{t('laundry.settleDeficitDescription')}</p>
 
                         <div>
-                            <label className="block text-sm text-white/60 mb-2">الكمية المستردة</label>
+                            <label className="block text-sm text-white/60 mb-2">{t('laundry.quantityReturned')}</label>
                             <input
                                 type="number"
                                 value={settleQuantity}
@@ -1120,7 +1122,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                 min={1}
                                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white text-center text-xl font-bold border border-white/10 focus:border-green-500"
                             />
-                            <p className="text-xs text-right mt-1 text-white/40">الحد الأقصى: {settleItem.max}</p>
+                            <p className="text-xs text-right mt-1 text-white/40">{t('laundry.maxQuantity', { max: settleItem.max })}</p>
                         </div>
 
                         <div className="flex gap-2 pt-2">
@@ -1128,7 +1130,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                 onClick={() => setShowSettleModal(false)}
                                 className="flex-1 py-3 rounded-xl bg-white/10 text-white hover:bg-white/20"
                             >
-                                إلغاء
+                                {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleSettleSubmit}
@@ -1136,7 +1138,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                                 className="flex-1 py-3 rounded-xl bg-green-500 text-white font-bold hover:bg-green-600 flex items-center justify-center gap-2"
                             >
                                 {saving ? <AdoraLoaderInline size={16} /> : <Check className="w-4 h-4" />}
-                                تأكيد التسوية
+                                {t('laundry.confirmSettlement')}
                             </button>
                         </div>
                     </div>

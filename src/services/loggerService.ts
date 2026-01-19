@@ -78,10 +78,46 @@ const log = (level: LogLevel, message: string, data?: any, context?: string): vo
         consoleMethod(`[${level.toUpperCase()}] ${context ? `[${context}] ` : ''}${message}`);
     }
 
-    // TODO: In production, send errors to error tracking service (e.g., Sentry)
+    // ✅ ERROR TRACKING: Send errors to Sentry in production (optional, doesn't fail if not configured)
+    // ✅ NOTE: Sentry integration is disabled by default. To enable:
+    // 1. Install: npm install @sentry/react
+    // 2. Configure VITE_SENTRY_DSN in .env
+    // 3. Initialize Sentry in main.tsx
+    // This logger will automatically use Sentry if it's available via window.Sentry
     if (level === 'error' && import.meta.env.PROD) {
-        // Send to error tracking service
-        // Example: Sentry.captureException(new Error(message), { extra: data });
+        try {
+            // ✅ Check if Sentry DSN is configured
+            const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+            
+            if (sentryDsn) {
+                // ✅ Use global Sentry if available (initialized in main.tsx)
+                // This avoids dynamic import issues when @sentry/react is not installed
+                const Sentry = (window as any).Sentry;
+                
+                if (Sentry) {
+                    // ✅ Send error to Sentry
+                    if (data instanceof Error) {
+                        Sentry.captureException(data, {
+                            tags: { context: context || 'unknown' },
+                            extra: { message }
+                        });
+                    } else {
+                        Sentry.captureMessage(message, {
+                            level: 'error',
+                            tags: { context: context || 'unknown' },
+                            extra: data ? { data } : undefined
+                        });
+                    }
+                }
+                // ✅ If Sentry is not available, silently skip (expected if not installed)
+            }
+        } catch (sentryError) {
+            // ✅ Error tracking is optional - don't break logging if Sentry fails
+            // This can happen if:
+            // - @sentry/react not installed
+            // - VITE_SENTRY_DSN not configured
+            // - Sentry initialization failed
+        }
     }
 };
 

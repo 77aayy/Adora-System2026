@@ -10,6 +10,7 @@ import {
     doc,
     addDoc,
     updateDoc,
+    getDoc,
     query,
     where,
     getDocs,
@@ -21,6 +22,7 @@ import {
     runTransaction,
     serverTimestamp,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from './firebase';
 import { RoomCard, CheckInData, RoomCardStatus } from '../types';
 import { RoomStatus } from '../types/room';
@@ -60,6 +62,158 @@ const mapDocToRoomCard = (doc: any): RoomCard => {
 };
 
 // ============================================================
+// ROOM AVAILABILITY CHECK (CENTRALIZED)
+// ============================================================
+
+/**
+ * ✅ CENTRALIZED: Check room availability and reserve it atomically
+ * 
+ * 🚀 MASTER KEY PATTERN: Uses Cloud Function for validation
+ * 
+ * This function is the SINGLE SOURCE OF TRUTH for room availability checks.
+ * It now uses Cloud Function for validation (Master Key pattern).
+ * 
+ * Benefits:
+ * - ✅ No race conditions (all checks inside transaction)
+ * - ✅ Simpler Firebase Rules (just read-only, no complex validation)
+ * - ✅ Centralized logic (change once, applies everywhere)
+ * - ✅ Better security (Admin SDK bypasses Rules)
+ * - ✅ Fallback to client-side if Function fails
+ * 
+ * @param roomNumber - Room number to check
+ * @param tenantId - Tenant ID
+ * @returns Room data if available, throws error if not
+ */
+export const checkRoomAvailability = async (
+    roomNumber: string,
+    tenantId: string
+): Promise<{
+    roomRef: any; // DocumentReference
+    roomData: any; // Room data
+    branchId: string;
+}> => {
+    // ✅ STEP 1: Try Cloud Function first (Master Key pattern)
+    try {
+        const functions = getFunctions();
+        const checkAvailabilityFunction = httpsCallable(functions, 'checkRoomAvailability');
+        
+        const result = await checkAvailabilityFunction({
+            roomNumber,
+            tenantId
+        });
+        
+        const data = result.data as { available: boolean; roomData?: any; branchId?: string; error?: string };
+        
+        if (data.available && data.roomData && data.branchId) {
+            // ✅ Function succeeded - get room reference for client-side operations
+            const validatedTenantId = validateTenantId(tenantId);
+            const roomDocId = `${data.branchId}_${roomNumber}`;
+            const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, roomDocId);
+            
+            return {
+                roomRef,
+                roomData: data.roomData,
+                branchId: data.branchId
+            };
+        } else {
+            // Function returned unavailable
+            throw new Error(data.error || 'الغرفة غير متاحة');
+        }
+    } catch (error: any) {
+        // ⚠️ Fallback: If Function fails, use client-side check (for backward compatibility)
+        console.warn('Cloud Function checkRoomAvailability failed, falling back to client-side:', error);
+        
+        // Fallback to original client-side implementation
+        return await checkRoomAvailabilityClientSide(roomNumber, tenantId);
+    }
+};
+
+/**
+ * ⚠️ FALLBACK: Client-side room availability check
+ * This will be removed once Cloud Function is fully tested and deployed
+ */
+const checkRoomAvailabilityClientSide = async (
+    roomNumber: string,
+    tenantId: string
+): Promise<{
+    roomRef: any; // DocumentReference
+    roomData: any; // Room data
+    branchId: string;
+}> => {
+    if (!db) {
+        logger.error('Firebase not initialized - cannot check room availability', undefined, 'roomCardService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+
+    const roomsRef = collection(db, `tenants/${validatedTenantId}/rooms`);
+    const roomCardsRef = collection(db, `tenants/${validatedTenantId}/roomCards`);
+
+    // ✅ STEP 1: Find room by number and check for active room cards (outside transaction)
+    const roomQuery = query(roomsRef, where('number', '==', roomNumber));
+    const roomSnapshot = await getDocs(roomQuery);
+
+    if (roomSnapshot.empty) {
+        throw new Error(`الغرفة رقم ${roomNumber} غير موجودة في النظام`);
+    }
+
+    const roomDoc = roomSnapshot.docs[0];
+    const roomData = roomDoc.data();
+    const branchId = roomData.branchId || roomData.branch || 'default';
+    const roomDocId = `${branchId}_${roomNumber}`;
+    const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, roomDocId);
+
+    // ✅ STEP 1.5: Check for existing active room card (outside transaction - early validation)
+    const activeCardQuery = query(
+        roomCardsRef,
+        where('roomNumber', '==', roomNumber),
+        where('status', '==', 'active')
+    );
+    const activeCardSnapshot = await getDocs(activeCardQuery);
+
+    if (!activeCardSnapshot.empty) {
+        const existingCard = activeCardSnapshot.docs[0].data();
+        throw new Error(
+            `الغرفة رقم ${roomNumber} مشغولة بالفعل من قبل: ${existingCard.guestName}\n` +
+            `تاريخ الدخول: ${existingCard.checkInTime?.toDate().toLocaleDateString('ar-SA')}`
+        );
+    }
+
+    // ✅ STEP 2: ATOMIC TRANSACTION - Final validation and room status check inside transaction
+    return await runTransaction(db, async (transaction) => {
+        // 1. Get current room status INSIDE transaction (prevents race condition)
+        const roomSnap = await transaction.get(roomRef);
+        if (!roomSnap.exists()) {
+            throw new Error(`الغرفة رقم ${roomNumber} غير موجودة`);
+        }
+
+        const currentRoomData = roomSnap.data();
+
+        // 2. Check room status (final validation inside transaction)
+        if (currentRoomData.status === 'occupied') {
+            throw new Error(`الغرفة رقم ${roomNumber} مشغولة بالفعل`);
+        }
+
+        if (currentRoomData.status === 'maintenance') {
+            throw new Error(`الغرفة رقم ${roomNumber} تحت الصيانة ولا يمكن حجزها`);
+        }
+
+        if (currentRoomData.status === 'dirty' || currentRoomData.status === 'cleaning') {
+            throw new Error(`الغرفة رقم ${roomNumber} قيد التنظيف. يرجى الانتظار حتى تصبح جاهزة`);
+        }
+
+        // ✅ All checks passed - room is available
+        return {
+            roomRef,
+            roomData: currentRoomData,
+            branchId
+        };
+    });
+};
+
+// ============================================================
 // CHECK-IN / CHECK-OUT
 // ============================================================
 
@@ -67,6 +221,13 @@ const mapDocToRoomCard = (doc: any): RoomCard => {
  * Check-in a guest
  * Creates room card and updates room status
  * 🔐 SECURITY: Validates tenant access and prevents double check-in
+ * 🚀 MASTER KEY: Uses Cloud Function processCheckIn (with fallback to client-side)
+ * 
+ * This function now uses the Cloud Function for check-in operations:
+ * - ✅ Better security (Admin SDK bypasses Rules)
+ * - ✅ Atomic transactions (all steps in one transaction)
+ * - ✅ Centralized logic (change once, applies everywhere)
+ * - ✅ Fallback to client-side for backward compatibility
  */
 export const checkIn = async (data: CheckInData, tenantId: string): Promise<string> => {
     if (!db) {
@@ -77,39 +238,94 @@ export const checkIn = async (data: CheckInData, tenantId: string): Promise<stri
     const validatedTenantId = validateTenantId(tenantId);
     validateTenantAccess(validatedTenantId);
 
+    // ✅ STEP 1: Try Cloud Function first (Master Key pattern)
+    try {
+        const functions = getFunctions();
+        const processCheckInFunction = httpsCallable(functions, 'processCheckIn');
+        
+        const result = await processCheckInFunction({
+            roomNumber: data.roomNumber,
+            guestData: {
+                guestName: data.guestName,
+                guestIdentity: data.guestIdentity || undefined,
+                guestPhone: data.guestPhone || undefined,
+                adults: data.adults,
+                children: data.children,
+                expectedCheckOut: data.expectedCheckOut ? data.expectedCheckOut.toISOString() : undefined,
+                needsCart: data.needsCart || false,
+                notes: data.notes || undefined
+            },
+            tenantId: validatedTenantId
+        });
+        
+        const functionResult = result.data as { success: boolean; roomCardId?: string; error?: string };
+        
+        if (functionResult.success && functionResult.roomCardId) {
+            // ✅ Function succeeded - generate QR token and award points
+            const roomCardId = functionResult.roomCardId;
+            
+            // Generate QR token (non-critical, can fail)
+            try {
+                const { generateSecureAccessToken } = await import('./secureAccessService');
+                const roomData = await getDoc(doc(db, `tenants/${validatedTenantId}/roomCards/${roomCardId}`));
+                const roomCardData = roomData.data();
+                const branchId = roomCardData?.branch || 'default';
+                
+                const { token } = await generateSecureAccessToken(
+                    data.roomNumber,
+                    branchId,
+                    validatedTenantId,
+                    data.createdBy || 'system',
+                    {
+                        expiresInHours: null,
+                        maxDevices: 3,
+                        roomCardId: roomCardId
+                    }
+                );
+                
+                await updateDoc(doc(db, `tenants/${validatedTenantId}/roomCards/${roomCardId}`), {
+                    qrToken: token,
+                    qrGeneratedAt: Timestamp.now()
+                });
+            } catch (qrError) {
+                logger.warn('Failed to generate QR token (non-critical)', qrError, 'roomCardService');
+            }
+            
+            // Award bellman points (non-critical)
+            if (data.createdBy) {
+                try {
+                    const { awardBellmanPoints } = await import('./pointsService');
+                    await awardBellmanPoints(data.createdBy, 'checkin', validatedTenantId);
+                } catch (pointsError) {
+                    logger.warn('Failed to award points (non-critical)', pointsError, 'roomCardService');
+                }
+            }
+            
+            return roomCardId;
+        } else {
+            throw new Error(functionResult.error || 'فشل تسجيل الدخول');
+        }
+    } catch (error: any) {
+        // ⚠️ Fallback: If Function fails, use client-side check-in (for backward compatibility)
+        console.warn('Cloud Function processCheckIn failed, falling back to client-side:', error);
+        
+        // Fallback to original client-side implementation
+        return await checkInClientSide(data, validatedTenantId);
+    }
+};
+
+/**
+ * ⚠️ FALLBACK: Client-side check-in implementation
+ * This will be removed once Cloud Function is fully tested and deployed
+ */
+const checkInClientSide = async (data: CheckInData, validatedTenantId: string): Promise<string> => {
     try {
         const now = Timestamp.now();
 
-        // ✅ STEP 1: Validate that room exists and is available
-        // ✅ Use tenant-scoped collection
-        const roomsRef = collection(db, `tenants/${validatedTenantId}/rooms`);
-        const constraints: any[] = [where('number', '==', data.roomNumber)];
+        // ✅ STEP 1: Use centralized availability check (atomic, prevents race conditions)
+        const { roomRef, roomData, branchId } = await checkRoomAvailability(data.roomNumber, validatedTenantId);
 
-        const roomQuery = query(roomsRef, ...constraints);
-        const roomSnapshot = await getDocs(roomQuery);
-
-        if (roomSnapshot.empty) {
-            throw new Error(`الغرفة رقم ${data.roomNumber} غير موجودة في النظام`);
-        }
-
-        const roomDoc = roomSnapshot.docs[0];
-        const roomData = roomDoc.data();
-
-        // Check if room is available
-        if (roomData.status === 'occupied') {
-            throw new Error(`الغرفة رقم ${data.roomNumber} مشغولة بالفعل`);
-        }
-
-        if (roomData.status === 'maintenance') {
-            throw new Error(`الغرفة رقم ${data.roomNumber} تحت الصيانة ولا يمكن حجزها`);
-        }
-
-        if (roomData.status === 'dirty' || roomData.status === 'cleaning') {
-            throw new Error(`الغرفة رقم ${data.roomNumber} قيد التنظيف. يرجى الانتظار حتى تصبح جاهزة`);
-        }
-
-        // ✅ STEP 2, 3 & 4: ATOMIC TRANSACTION - Check duplicate + Create room card + Update room status (ALL-IN-ONE)
-        // ✅ FIX: Combine duplicate check + room card creation + room status update in SINGLE transaction to prevent ALL race conditions
+        // ✅ STEP 2: Create room card and update room status in atomic transaction
         const roomCardsRef = collection(db, `tenants/${validatedTenantId}/roomCards`);
         const roomCardDocRef = doc(roomCardsRef); // Pre-generate ID for transaction
         
@@ -129,32 +345,12 @@ export const checkIn = async (data: CheckInData, tenantId: string): Promise<stri
             notes: data.notes || null,
             tenantId: validatedTenantId, // ✅ Save tenantId
             qrActive: true, // ✅ Enable QR access when room is checked in
-            branch: roomData.branchId || roomData.branch || 'default' // ✅ Save branch for QR checks
+            branch: branchId // ✅ Save branch for QR checks
         };
 
-        const branchId = roomData.branchId || roomData.branch || 'default';
-        const roomDocId = `${branchId}_${data.roomNumber}`;
-        const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, roomDocId);
-
-        // ✅ ATOMIC TRANSACTION: All operations in single transaction (prevents ALL race conditions)
+        // ✅ ATOMIC TRANSACTION: Create room card + Update room status (room availability already checked)
         const docRef = await runTransaction(db, async (transaction) => {
-            // 1. Check for existing active room card INSIDE transaction (prevents double booking)
-            const activeCardQuery = query(
-                roomCardsRef,
-                where('roomNumber', '==', data.roomNumber),
-                where('status', '==', 'active')
-            );
-            const activeCardSnapshot = await getDocs(activeCardQuery);
-            
-            if (!activeCardSnapshot.empty) {
-                const existingCard = activeCardSnapshot.docs[0].data();
-                throw new Error(
-                    `الغرفة رقم ${data.roomNumber} مشغولة بالفعل من قبل: ${existingCard.guestName}\n` +
-                    `تاريخ الدخول: ${existingCard.checkInTime?.toDate().toLocaleDateString('ar-SA')}`
-                );
-            }
-            
-            // 2. Check room status INSIDE transaction (prevents race condition)
+            // 1. Double-check room is still available (defense in depth)
             const roomSnap = await transaction.get(roomRef);
             if (!roomSnap.exists()) {
                 throw new Error(`الغرفة رقم ${data.roomNumber} غير موجودة`);
@@ -165,10 +361,10 @@ export const checkIn = async (data: CheckInData, tenantId: string): Promise<stri
                 throw new Error(`الغرفة رقم ${data.roomNumber} مشغولة بالفعل`);
             }
             
-            // 3. Create room card INSIDE same transaction (atomic operation)
+            // 2. Create room card INSIDE transaction (atomic operation)
             transaction.set(roomCardDocRef, roomCard);
             
-            // 4. Update room status + link guest ID INSIDE same transaction (atomic operation)
+            // 3. Update room status + link guest ID INSIDE same transaction (atomic operation)
             transaction.update(roomRef, {
                 status: 'occupied' as RoomStatus,
                 currentGuestId: roomCardDocRef.id,
@@ -178,10 +374,9 @@ export const checkIn = async (data: CheckInData, tenantId: string): Promise<stri
             return roomCardDocRef; // Return doc reference
         });
 
-        // ✅ STEP 5: Generate secure QR token automatically on check-in
+        // ✅ STEP 3: Generate secure QR token automatically on check-in
         try {
             const { generateSecureAccessToken } = await import('./secureAccessService');
-            const branchId = roomData.branchId || roomData.branch || 'default';
             
             // Generate QR token for this room (linked to room card)
             const { token } = await generateSecureAccessToken(
@@ -208,7 +403,7 @@ export const checkIn = async (data: CheckInData, tenantId: string): Promise<stri
             logger.warn('Failed to generate QR token on check-in (non-critical)', qrError, 'roomCardService');
         }
 
-        // ✅ STEP 6: Award bellman points for check-in (ATOMIC: Uses runTransaction to prevent Race Condition)
+        // ✅ STEP 4: Award bellman points for check-in (ATOMIC: Uses runTransaction to prevent Race Condition)
         if (data.createdBy) {
             try {
                 const points = calculateBellmanPoints('check-in');
@@ -245,7 +440,6 @@ export const checkIn = async (data: CheckInData, tenantId: string): Promise<stri
         try {
             const storedUser = localStorage.getItem('adora_user');
             const userData = storedUser ? JSON.parse(storedUser) : {};
-            const branchId = roomData.branchId || roomData.branch || 'default';
             await logAction(
                 'GUEST_CHECKIN' as LogAction,
                 {

@@ -4,7 +4,8 @@
  * Adora Hotel Management System V2
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Users,
     Plus,
@@ -38,14 +39,14 @@ import { useUX } from '../../hooks/useUX'; // ✅ Added useUX
 import { EmployeesManagerHelp } from '../../components/common/ContextualHelp'; // ✅ Contextual Help
 import { logger } from '../../services/loggerService';
 
-// Department config
-const DEPARTMENTS: Array<{ value: string; label: string; icon: React.ReactNode; color: string }> = [
-    { value: 'reception', label: 'الاستقبال', icon: <Phone className="w-5 h-5" />, color: 'bg-blue-500' },
-    { value: 'housekeeping', label: 'هاوس كيبنج', icon: <Sparkles className="w-5 h-5" />, color: 'bg-purple-500' },
-    { value: 'bellman', label: 'البيلمان', icon: <BellRing className="w-5 h-5" />, color: 'bg-yellow-500' },
-    { value: 'maintenance', label: 'الصيانة', icon: <Wrench className="w-5 h-5" />, color: 'bg-orange-500' },
-    { value: 'procurement', label: 'المشتريات', icon: <ShoppingCart className="w-5 h-5" />, color: 'bg-indigo-500' }, // ✅ Added Procurement
-    { value: 'admin', label: 'الإدارة', icon: <Shield className="w-5 h-5" />, color: 'bg-primary-500' },
+// Department config - i18n-aware function
+const getDepartments = (t: (key: string) => string): Array<{ value: string; label: string; icon: React.ReactNode; color: string }> => [
+    { value: 'reception', label: t('departments.reception'), icon: <Phone className="w-5 h-5" />, color: 'bg-blue-500' },
+    { value: 'housekeeping', label: t('departments.housekeeping'), icon: <Sparkles className="w-5 h-5" />, color: 'bg-purple-500' },
+    { value: 'bellman', label: t('departments.bellman'), icon: <BellRing className="w-5 h-5" />, color: 'bg-yellow-500' },
+    { value: 'maintenance', label: t('departments.maintenance'), icon: <Wrench className="w-5 h-5" />, color: 'bg-orange-500' },
+    { value: 'procurement', label: t('departments.procurement'), icon: <ShoppingCart className="w-5 h-5" />, color: 'bg-indigo-500' },
+    { value: 'admin', label: t('departments.admin'), icon: <Shield className="w-5 h-5" />, color: 'bg-primary-500' },
 ];
 
 // ============================================================
@@ -58,9 +59,13 @@ interface AddEmployeeModalProps {
 }
 
 const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) => {
+    const { t } = useTranslation();
     const { user } = useAuth(); // ✅ Get user context
     const { branches: availableBranches } = useTenantBranches();
     const { showSuccess, showError } = useUX(); // ✅ UX Hook
+    
+    // ✅ i18n: Get departments with translated labels
+    const DEPARTMENTS = useMemo(() => getDepartments(t), [t]);
     const [formData, setFormData] = useState({
         name: '',
         department: 'reception', // Primary department (for backward compatibility)
@@ -139,7 +144,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
                 });
 
                 if (!available) {
-                    setCodeError('⚠️ هذا الكود مستخدم بالفعل من قبل موظف آخر');
+                    setCodeError(t('employees.codeInUse'));
                     // Generate suggested code
                     const suggested = await suggestUniquePin();
                     setSuggestedCode(suggested);
@@ -175,19 +180,19 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
     const handleSubmit = async () => {
         // Validation with Toasts
         if (!formData.name || !formData.code) {
-            showError('يرجى إدخال الاسم ورمز الدخول');
+            showError(t('employees.namePinRequired'));
             return;
         }
 
         // ✅ FIX: Enforce 4-digit PIN
         if (formData.code.length < 4) {
-            showError('⚠️ رمز الدخول يجب أن يتكون من 4 أرقام على الأقل');
+            showError(t('employees.pinMinLength'));
             return;
         }
 
         // ✅ Final check: Verify code is not duplicate
         if (codeError) {
-            showError('يرجى استخدام كود مختلف. تم اقتراح كود متاح أسفل');
+            showError(t('employees.codeError'));
             return;
         }
 
@@ -198,19 +203,19 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
         });
 
         if (!available) {
-            showError('⚠️ هذا الكود مستخدم بالفعل. يرجى استخدام الكود المقترح أو إدخال كود آخر');
+            showError(t('employees.codeDuplicate'));
             const suggested = await suggestUniquePin();
             setSuggestedCode(suggested);
             return;
         }
 
         if (selectedBranches.length === 0) {
-            showError('يرجى اختيار فرع واحد على الأقل');
+            showError(t('employees.selectOneBranch'));
             return;
         }
 
         if (selectedDepartments.length === 0) {
-            showError('يرجى اختيار قسم واحد على الأقل');
+            showError(t('employees.selectOneDept'));
             return;
         }
 
@@ -241,14 +246,14 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
                 }
             } as any);
 
-            showSuccess('تم إضافة الموظف بنجاح');
+            showSuccess(t('employees.addSuccess'));
             setFormData({ name: '', department: 'reception', role: 'staff', code: '', allowedOffDays: 1 } as any);
             setSelectedBranches([]);
             setSelectedDepartments(['reception']); // ✅ Reset departments
             onClose();
         } catch (err) {
             logger.error('Error adding employee', err, 'EmployeesManager');
-            showError('حدث خطأ في إضافة الموظف');
+            showError(t('employees.addError'));
         } finally {
             setIsSubmitting(false);
         }
@@ -262,24 +267,24 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
                     <X className="w-5 h-5" />
                 </button>
 
-                <h2 className="text-xl font-bold text-white mb-6">إضافة موظف</h2>
+                <h2 className="text-xl font-bold text-white mb-6">{t('employees.addEmployee')}</h2>
 
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm text-white/70 mb-1">الاسم *</label>
+                        <label className="block text-sm text-white/70 mb-1">{t('employees.nameLabel')}</label>
                         <input
                             type="text"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             className="input"
-                            placeholder="أحمد محمد"
+                            placeholder={t('employees.namePlaceholder')}
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm text-white/70 mb-2">الأقسام * <span className="text-xs text-white/40">(يمكن تحديد أكثر من قسم)</span></label>
+                        <label className="block text-sm text-white/70 mb-2">{t('employees.departmentsLabel')} <span className="text-xs text-white/40">({t('employees.departmentsHint')})</span></label>
                         <p className="text-xs text-white/40 mb-2">
-                            💡 الموظف يرى فقط الأقسام المحددة له. يمكنه التنقل بينها إذا تم تحديد أكثر من قسم.
+                            {t('employees.departmentsDescription')}
                         </p>
                         <div className="grid grid-cols-2 gap-2">
                             {DEPARTMENTS.map((dept) => {
@@ -322,7 +327,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
                                         setFormData({ ...formData, code: value });
                                     }}
                                     className={`input w-full ${codeError ? 'border-red-500 focus:border-red-500' : ''}`}
-                                    placeholder="1234"
+                                    placeholder={t('employees.pinPlaceholder')}
                                     maxLength={4}
                                 />
                                 {isCheckingCode && (
@@ -372,7 +377,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
 
                     {/* Attendance Exception Allowance */}
                     <div>
-                        <label className="block text-sm text-white/70 mb-2">إعفاء أيام الغياب (أسبوعياً) *</label>
+                        <label className="block text-sm text-white/70 mb-2">{t('employees.offDaysLabel')}</label>
                         <div className="flex gap-2">
                             {[1, 2, 4].map((days) => (
                                 <button
@@ -384,26 +389,26 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
                                         : 'border-white/20 text-white/60 hover:border-white/40'
                                         }`}
                                 >
-                                    {days} {days === 1 ? 'يوم' : 'أيام'}
+                                    {days} {days === 1 ? t('employees.day') : t('employees.days')}
                                 </button>
                             ))}
                         </div>
                         <p className="text-[10px] text-white/40 mt-1.5 leading-relaxed">
-                            💡 عدد الأيام المسموح بغيابها أسبوعياً دون كسر "سلسلة الالتزام".
+                            {t('employees.offDaysDescription')}
                         </p>
                     </div>
 
                     {/* ✅ Multiple Branches Selection - Manager CAN select branches */}
                     <div>
-                        <label className="block text-sm text-white/70 mb-2">الفروع المسؤول عنها *</label>
+                        <label className="block text-sm text-white/70 mb-2">{t('employees.branchesLabel')}</label>
                         {availableBranches.length === 0 ? (
                             <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm">
-                                ⚠️ لا توجد فروع متاحة. يرجى إضافة فروع أولاً من صفحة إدارة الفروع.
+                                {t('employees.branchesNoAvailable')}
                             </div>
                         ) : (
                             <>
                                 <p className="text-xs text-white/40 mb-2">
-                                    💡 يمكنك تحديد فرع واحد أو أكثر للموظف. الموظف متعدد الفروع يستطيع التبديل بينها.
+                                    {t('employees.branchesHint')}
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-white/5 rounded-xl border border-white/10">
                                     {availableBranches.map((branch) => {
@@ -432,7 +437,10 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
                         )}
                         {selectedBranches.length > 0 && (
                             <p className="text-xs text-primary-400 mt-2">
-                                ✓ تم اختيار {selectedBranches.length} فرع {selectedBranches.length > 1 ? '(متعدد الفروع)' : ''}
+                                {selectedBranches.length > 1 
+                                    ? t('employees.selectedBranchMultiple', { count: selectedBranches.length })
+                                    : t('employees.selectedBranchSingle', { count: selectedBranches.length })
+                                }
                             </p>
                         )}
                     </div>
@@ -447,7 +455,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose }) 
                         ) : (
                             <>
                                 <Plus className="w-5 h-5" />
-                                إضافة الموظف
+                                {t('employees.addEmployee')}
                             </>
                         )}
                     </button>
@@ -488,7 +496,9 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
     currentUserId,
     currentUserRole
 }) => {
+    const { t } = useTranslation();
     const { branches: availableBranches } = useTenantBranches();
+    const DEPARTMENTS = useMemo(() => getDepartments(t), [t]);
     const dept = DEPARTMENTS.find(d => d.value === employee.department);
     const isInactive = employee.status !== 'active';
     
@@ -537,14 +547,14 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
                     <button
                         onClick={(e) => { e.stopPropagation(); onEdit(); }}
                         className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-600 dark:text-white flex items-center justify-center transition-colors"
-                        title="تعديل"
+                        title={t('employees.edit')}
                     >
                         <Wrench className="w-3.5 h-3.5" />
                     </button>
                     <button
                         onClick={(e) => { e.stopPropagation(); onDelete(); }}
                         className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-500/20 hover:bg-red-200 dark:hover:bg-red-500/40 text-red-500 dark:text-red-400 flex items-center justify-center transition-colors"
-                        title="حذف"
+                        title={t('common.delete')}
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -554,7 +564,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
             {/* ✅ Badge: Manager account (only owner can edit) */}
             {isManager && currentUserRole === 'manager' && isSelf && (
                 <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold z-10">
-                    حسابك
+                    {t('employees.accountBadge')}
                 </div>
             )}
 
@@ -593,12 +603,12 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
                     </span>
                     {isInactive && (
                         <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-red-500/10 border border-red-500/20 text-red-400">
-                            موقوف
+                            {t('employees.inactive')}
                         </span>
                     )}
                     {(employee.challengeProgress?.allowedWeeklyOffDays ?? 1) > 0 && (
-                        <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-500/10 border border-blue-500/20 text-blue-400" title="إعفاء غياب">
-                            إعفاء: {employee.challengeProgress?.allowedWeeklyOffDays ?? 1} ي
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-500/10 border border-blue-500/20 text-blue-400" title={t('employees.exemption')}>
+                            {t('employees.exemption')}: {employee.challengeProgress?.allowedWeeklyOffDays ?? 1} {t('employees.day')}
                         </span>
                     )}
                 </div>
@@ -606,7 +616,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
                 {/* Info Grid - Compact */}
                 <div className="grid grid-cols-2 gap-2 w-full mt-1">
                     <div className="bg-white/5 rounded-lg p-1.5 flex flex-col items-center justify-center">
-                        <span className="text-[9px] text-white/40">النقاط</span>
+                        <span className="text-[9px] text-white/40">{t('employees.points')}</span>
                         <div className="flex items-center gap-1 text-yellow-400 font-bold text-xs">
                             <Star className="w-3 h-3 fill-yellow-400" />
                             {employee.points}
@@ -629,10 +639,10 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
                             onClick={(e) => { e.stopPropagation(); onToggleStatus(); }}
                             className={`text-[10px] font-medium transition-colors ${isInactive ? 'text-green-400 hover:text-green-300' : 'text-orange-400 hover:text-orange-300'}`}
                         >
-                            {isInactive ? 'تفعيل' : 'إيقاف'}
+                            {isInactive ? t('employees.activate') : t('employees.deactivate')}
                         </button>
                     ) : (
-                        <span className="text-[10px] text-white/30">غير متاح</span>
+                        <span className="text-[10px] text-white/30">{t('employees.notAvailable')}</span>
                     )}
 
                     {employee.points > 0 && (
@@ -640,7 +650,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
                             onClick={(e) => { e.stopPropagation(); onResetPoints(); }}
                             className="text-[10px] text-white/40 hover:text-white transition-colors"
                         >
-                            تصفير
+                            {t('employees.resetPoints')}
                         </button>
                     )}
                 </div>
@@ -657,9 +667,11 @@ import { useAuth } from '../../context/AuthContext'; // ✅ Added useAuth
 import { isPinAvailable, suggestUniquePin } from '../../services/ownerService'; // ✅ For code validation
 
 export const EmployeesManager: React.FC = () => {
+    const { t } = useTranslation();
     const { user } = useAuth(); // ✅ Get current user
     const tenantId = (user as any)?.tenantId;
     const { branches: availableBranches } = useTenantBranches();
+    const DEPARTMENTS = useMemo(() => getDepartments(t), [t]);
 
     const [employees, setEmployees] = useState<User[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -694,7 +706,7 @@ export const EmployeesManager: React.FC = () => {
     };
 
     const handleBulkDelete = async () => {
-        if (!confirm(`هل أنت متأكد من حذف ${selectedEmployeeIds.length} موظف؟`)) return;
+        if (!confirm(t('employees.bulkDeleteConfirm', { count: selectedEmployeeIds.length }))) return;
 
         // ✅ FIX: Filter out managers from bulk delete if current user is manager
         const employeesToDelete = employees.filter(emp => selectedEmployeeIds.includes(emp.id));
@@ -723,10 +735,10 @@ export const EmployeesManager: React.FC = () => {
                 await deleteEmployee(id);
             }
             setSelectedEmployeeIds([]);
-            showSuccess('تم حذف الموظفين المحددين');
+            showSuccess(t('employees.bulkDeleteSuccess'));
         } catch (e) {
             logger.error('Error', e, 'EmployeesManager');
-            showError('حدث خطأ أثناء الحذف');
+            showError(t('employees.bulkDeleteError'));
         } finally {
             setLoading(false);
         }
@@ -804,13 +816,13 @@ export const EmployeesManager: React.FC = () => {
             return;
         }
         
-        if (confirm('هل تريد حذف هذا الموظف؟')) {
+        if (confirm(t('employees.deleteConfirm'))) {
             await deleteEmployee(id);
         }
     };
 
     const handleResetAllPoints = async () => {
-        if (confirm('هل تريد إعادة تعيين نقاط جميع الموظفين؟')) {
+        if (confirm(t('employees.resetAllPointsConfirm'))) {
             await resetAllPoints();
         }
     };
@@ -818,14 +830,14 @@ export const EmployeesManager: React.FC = () => {
     const handleToggleStatus = async (id: string, currentStatus: string) => {
         // ✅ FIX: Prevent manager from suspending themselves
         if (user?.role === 'manager' && user.id === id) {
-            alert('لا يمكنك إيقاف حسابك الخاص. يرجى التواصل مع المالك.');
+            alert(t('employees.cannotSuspendSelf') || 'لا يمكنك إيقاف حسابك الخاص. يرجى التواصل مع المالك.');
             return;
         }
 
         const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-        const actionText = newStatus === 'active' ? 'تفعيل' : 'إيقاف';
+        const actionText = newStatus === 'active' ? t('employees.activate') : t('employees.deactivate');
 
-        if (confirm(`هل تريد ${actionText} هذا الحساب؟`)) {
+        if (confirm(t('employees.toggleStatusConfirm', { action: actionText }))) {
             await updateEmployee(id, { status: newStatus });
         }
     };
@@ -833,7 +845,7 @@ export const EmployeesManager: React.FC = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <AdoraLoader size="md" message="جاري تحميل البيانات..." />
+                <AdoraLoader size="md" message={t('employees.loadingData')} />
             </div>
         );
     }
@@ -846,15 +858,15 @@ export const EmployeesManager: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-white mb-2 tracking-tight">إدارة الموظفين</h1>
+                    <h1 className="text-3xl font-extrabold text-white mb-2 tracking-tight">{t('employees.title')}</h1>
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary-500/10 border border-primary-500/20 text-primary-400 text-xs font-bold">
                             <Users className="w-3.5 h-3.5" />
-                            {filteredEmployees.length} موظف
+                            {t('employees.employeeCount', { count: filteredEmployees.length })}
                         </div>
                         {user?.role !== 'owner' && (
                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/40 text-[10px] font-medium tracking-wide">
-                                🔒 معزول حسب فروعك
+                                {t('employees.isolatedBranches')}
                             </div>
                         )}
                     </div>
@@ -881,7 +893,7 @@ export const EmployeesManager: React.FC = () => {
                                     : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
                                     }`}
                             >
-                                الكل
+                                {t('employees.all')}
                             </button>
                             {DEPARTMENTS.map((dept) => (
                                 <button
@@ -910,7 +922,7 @@ export const EmployeesManager: React.FC = () => {
                                 onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--theme-bg-secondary)'; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--theme-bg-tertiary)'; }}
                             >
-                                <option value="all">📍 كل الفروع</option>
+                                <option value="all">{t('employees.allBranches')}</option>
                                 {availableBranches.map(b => (
                                     <option key={b.id} value={b.id}>📍 {b.name}</option>
                                 ))}
@@ -929,11 +941,11 @@ export const EmployeesManager: React.FC = () => {
                     <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4 animate-pulse">
                         <Users className="w-10 h-10 text-white/30" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">لا يوجد موظفين</h3>
+                    <h3 className="text-xl font-bold text-white mb-2">{t('employees.noEmployees')}</h3>
                     <p className="text-white/40 max-w-md mx-auto">
                         {selectedBranchFilter !== 'all'
-                            ? 'لا يوجد موظفين مسجلين في هذا الفرع حالياً.'
-                            : 'ابدأ بإضافة موظفين جدد لإدارة فريق عملك بكفاءة.'}
+                            ? t('employees.noEmployeesBranch')
+                            : t('employees.noEmployeesMessage')}
                     </p>
                 </div>
             ) : (
@@ -962,7 +974,7 @@ export const EmployeesManager: React.FC = () => {
                         <span className="w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center text-xs font-bold text-white">
                             {selectedEmployeeIds.length}
                         </span>
-                        <span className="text-white font-medium">تم التحديد</span>
+                        <span className="text-white font-medium">{t('employees.selectedCount')}</span>
                     </div>
 
                     <button
@@ -970,7 +982,7 @@ export const EmployeesManager: React.FC = () => {
                         className="flex items-center gap-2 px-4 py-2 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors"
                     >
                         <Trash2 className="w-4 h-4" />
-                        <span>حذف المحدد</span>
+                        <span>{t('employees.deleteSelected')}</span>
                     </button>
 
                     <button
@@ -1008,9 +1020,11 @@ interface EditEmployeeModalProps {
 }
 
 const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, employee }) => {
+    const { t } = useTranslation();
     const { user } = useAuth(); // ✅ Fix: Get user from context
     const { branches: availableBranches } = useTenantBranches();
     const { showError, showSuccess } = useUX(); // ✅ Get both showError and showSuccess
+    const DEPARTMENTS = useMemo(() => getDepartments(t), [t]);
     
     // ✅ FIX: Check if manager is trying to edit themselves or another manager
     const isSelf = user?.id === employee.id;
@@ -1086,7 +1100,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
         
         if (!formData.name || !formData.code) return;
         if (selectedBranches.length === 0) {
-            alert('يرجى اختيار فرع واحد على الأقل');
+            alert(t('employees.selectOneBranch'));
             return;
         }
 
@@ -1133,11 +1147,11 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
             await updateEmployee(employee.id, updates);
             
             // ✅ Success feedback
-            showSuccess('تم تحديث بيانات الموظف بنجاح');
+            showSuccess(t('employees.updateSuccess'));
             onClose();
         } catch (err) {
             logger.error('Error updating employee', err, 'EmployeesManager');
-            showError('حدث خطأ في تحديث البيانات: ' + (err as any)?.message);
+            showError(t('employees.updateError', { message: (err as any)?.message || '' }));
         } finally {
             setIsSubmitting(false);
         }
@@ -1151,14 +1165,14 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
                     <X className="w-5 h-5" />
                 </button>
 
-                <h2 className="text-xl font-bold text-white mb-6">تعديل بيانات الموظف</h2>
+                <h2 className="text-xl font-bold text-white mb-6">{t('employees.editEmployee')}</h2>
 
                 <div className="space-y-4">
                     {/* ✅ Name field - LOCKED (readonly) */}
                     <div>
                         <label className="block text-sm text-white/70 mb-1 flex items-center gap-2">
-                            الاسم
-                            <span className="text-xs text-white/40">(غير قابل للتعديل)</span>
+                            {t('employees.nameLabel').replace(' *', '')}
+                            <span className="text-xs text-white/40">{t('employees.nameLocked')}</span>
                         </label>
                         <input
                             type="text"
@@ -1170,9 +1184,9 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
                     </div>
 
                     <div>
-                        <label className="block text-sm text-white/70 mb-2">الأقسام <span className="text-xs text-white/40">(يمكن تحديد أكثر من قسم)</span></label>
+                        <label className="block text-sm text-white/70 mb-2">{t('employees.departmentsLabel')} <span className="text-xs text-white/40">({t('employees.departmentsHint')})</span></label>
                         <p className="text-xs text-white/40 mb-2">
-                            💡 الموظف يرى فقط الأقسام المحددة له. يمكنه التنقل بينها إذا تم تحديد أكثر من قسم.
+                            {t('employees.departmentsDescription')}
                         </p>
                         <div className="grid grid-cols-2 gap-2">
                             {DEPARTMENTS.map((dept) => {
@@ -1198,14 +1212,17 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
                         </div>
                         {selectedDepartments.length > 0 && (
                             <p className="text-xs text-primary-400 mt-2">
-                                ✓ تم اختيار {selectedDepartments.length} قسم {selectedDepartments.length > 1 ? '(متعدد الأقسام)' : '(قسم واحد فقط)'}
+                                {selectedDepartments.length > 1 
+                                    ? t('employees.selectedDeptMultiple', { count: selectedDepartments.length })
+                                    : t('employees.selectedDeptSingle', { count: selectedDepartments.length })
+                                }
                             </p>
                         )}
                     </div>
 
                     {/* Attendance Exception Allowance */}
                     <div>
-                        <label className="block text-sm text-white/70 mb-2">إعفاء أيام الغياب (أسبوعياً)</label>
+                        <label className="block text-sm text-white/70 mb-2">{t('employees.offDaysLabel')}</label>
                         <div className="flex gap-2">
                             {[1, 2, 4].map((days) => (
                                 <button
@@ -1217,20 +1234,20 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
                                         : 'border-white/20 text-white/60 hover:border-white/40'
                                         }`}
                                 >
-                                    {days} {days === 1 ? 'يوم' : 'أيام'}
+                                    {days} {days === 1 ? t('employees.day') : t('employees.days')}
                                 </button>
                             ))}
                         </div>
                         <p className="text-[10px] text-white/40 mt-1.5 leading-relaxed">
-                            💡 عدد الأيام المسموح بغيابها أسبوعياً دون كسر "سلسلة الالتزام". يتم إعادة التعيين تلقائياً كل أسبوع.
+                            {t('employees.offDaysDescriptionEdit')}
                         </p>
                     </div>
 
                     {/* ✅ PIN Code field - LOCKED (readonly) */}
                     <div>
                         <label className="block text-sm text-white/70 mb-1 flex items-center gap-2">
-                            رمز الدخول (PIN)
-                            <span className="text-xs text-white/40">(غير قابل للتعديل)</span>
+                            {t('employees.pinLabel')}
+                            <span className="text-xs text-white/40">{t('employees.pinLocked')}</span>
                         </label>
                         <input
                             type="text"
@@ -1243,7 +1260,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
 
                     {/* ✅ Branch selection - NOW ALLOWED FOR MANAGERS */}
                     <div>
-                        <label className="block text-sm text-white/70 mb-2">تعديل فروع الموظف *</label>
+                        <label className="block text-sm text-white/70 mb-2">{t('employees.editBranchesLabel')}</label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2">
                             {availableBranches.map((branch) => {
                                 const isSelected = selectedBranches.includes(branch.id);
@@ -1268,7 +1285,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
                             })}
                         </div>
                         <p className="text-[10px] text-white/40 mt-1.5 leading-relaxed">
-                            💡 يمكنك اختيار فروع متعددة للموظف. الموظف سيكون قادراً على التنقل بينها.
+                            {t('employees.editBranchesHint')}
                         </p>
                     </div>
 
@@ -1277,7 +1294,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ isOpen, onClose, 
                         disabled={isSubmitting || !formData.name || !formData.code || selectedBranches.length === 0}
                         className="btn-primary w-full py-4"
                     >
-                        {isSubmitting ? <AdoraLoaderInline size={20} /> : 'حفظ التعديلات'}
+                        {isSubmitting ? <AdoraLoaderInline size={20} /> : t('employees.saveChanges')}
                     </button>
                 </div>
             </div>

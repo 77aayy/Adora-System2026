@@ -452,13 +452,14 @@ export const ReceptionDashboard: React.FC = () => {
             setActiveRoomDetails(details);
         }, tenantId); // ✅ CRITICAL: Pass tenantId as 3rd parameter (required)
 
-        // Subscribe to employees (Reception & Bellman)
+        // ✅ Subscribe to employees (Reception & Bellman)
+        // ✅ FIX: Pass tenantId for tenant isolation (required for SaaS)
         const unsubTeam = subscribeToEmployees((allEmployees) => {
             const relevant = allEmployees.filter(e =>
                 e.department === 'reception' || e.department === 'bellman'
             );
             setTeamMembers(relevant);
-        });
+        }, tenantId); // ✅ CRITICAL: Pass tenantId for tenant-scoped query
 
         return () => {
             unsubRooms();
@@ -1265,7 +1266,7 @@ export const ReceptionDashboard: React.FC = () => {
 
             {/* ✅ Onboarding Tour */}
             <TourGuide
-                steps={tourSteps}
+                steps={tourSteps && tourSteps.length > 0 ? tourSteps : []}
                 isOpen={showTour}
                 onClose={() => {
                     closeTour();

@@ -227,7 +227,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
     onRetry,
     onResetErrors,
 }) => {
-    const { i18n } = useTranslation();
+    const { i18n, t } = useTranslation(); // ✅ Add t for placeholder translation
     const appLang = i18n.language;
     const { voiceEnabled, playSound, haptic } = useUX();
     // ✅ Feature Gate: Check if AI Assistant feature is enabled
@@ -679,7 +679,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
                                     setTextInput('');
                                 }
                             }}
-                            placeholder="اكتب أمرك هنا..."
+                            placeholder={t('voiceInput.placeholder')}
                             style={{
                                 flex: 1,
                                 padding: '12px 16px',

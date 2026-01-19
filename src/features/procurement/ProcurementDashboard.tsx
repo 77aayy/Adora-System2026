@@ -764,7 +764,7 @@ export const ProcurementDashboard: React.FC = () => {
 
             {/* ✅ Onboarding Tour */}
             <TourGuide
-                steps={tourSteps}
+                steps={tourSteps && tourSteps.length > 0 ? tourSteps : []}
                 isOpen={showTour}
                 onClose={closeTour}
                 onComplete={completeTour}

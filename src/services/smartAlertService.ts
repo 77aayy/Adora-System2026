@@ -7,9 +7,10 @@
 import { db } from './firebase';
 import {
     collection, doc, setDoc, updateDoc, query,
-    where, getDocs, onSnapshot, Timestamp, serverTimestamp
+    where, getDocs, getDoc, onSnapshot, Timestamp, serverTimestamp
 } from 'firebase/firestore';
 import { logger } from './loggerService';
+import type { Staff } from './staffService'; // ✅ Type-only import for Staff['role']
 
 // ============================================================
 // TYPES
@@ -293,6 +294,7 @@ export async function escalateAlert(
 
 /**
  * Trigger notifications based on escalation level
+ * ✅ INTEGRATED: Uses pushNotificationService and notificationService
  */
 async function triggerNotifications(
     tenantId: string,
@@ -305,16 +307,129 @@ async function triggerNotifications(
     const levelConfig = rule.levels.find(l => l.level === level);
     if (!levelConfig) return;
     
-    // Here you would integrate with your notification system
-    // For now, we'll log the notification intent
-    logger.info('Triggering notifications', {
-        alertId: alert.id,
-        level,
-        roles: levelConfig.notifyRoles,
-        methods: levelConfig.notifyMethod,
-    }, 'smartAlertService');
-    
-    // TODO: Integrate with pushNotificationService, smsService, etc.
+    try {
+        // ✅ INTEGRATED: Send notifications based on roles and methods
+        const notificationPromises: Promise<void>[] = [];
+
+        for (const role of levelConfig.notifyRoles) {
+            // Skip 'all' role for now (would need special handling)
+            if (role === 'all') {
+                logger.info('Skipping "all" role notification (not implemented)', undefined, 'smartAlertService');
+                continue;
+            }
+
+            // ✅ Map role to department if it's a department role
+            const departmentMap: Record<string, string> = {
+                'reception': 'reception',
+                'housekeeping': 'housekeeping',
+                'maintenance': 'maintenance',
+                'bellman': 'bellman',
+                'procurement': 'procurement',
+                'coffeeShop': 'coffeeShop',
+                'employee': alert.department || 'reception', // Use alert department if role is generic 'employee'
+                'supervisor': alert.department || 'reception',
+                'manager': 'admin', // Managers use admin department
+            };
+
+            const department = departmentMap[role];
+            
+            // ✅ Type-safe department validation
+            type ValidDepartment = 'housekeeping' | 'bellman' | 'maintenance' | 'reception' | 'procurement' | 'coffeeShop';
+            const validDepartments: ValidDepartment[] = ['housekeeping', 'bellman', 'maintenance', 'reception', 'procurement', 'coffeeShop'];
+            
+            if (department && validDepartments.includes(department as ValidDepartment) && alert.branchId) {
+                const typedDepartment = department as ValidDepartment;
+                
+                // ✅ Send to department using notificationService
+                if (levelConfig.notifyMethod.includes('push')) {
+                    try {
+                        const { sendNotificationToDepartment } = await import('./notificationService');
+                        notificationPromises.push(
+                            sendNotificationToDepartment(
+                                typedDepartment,
+                                alert.title,
+                                alert.message,
+                                tenantId,
+                                alert.branchId,
+                                alert.severity === 'critical' || alert.severity === 'emergency' ? 'error' : 'warning',
+                                alert.id
+                            )
+                        );
+                    } catch (error) {
+                        logger.warn('Failed to send department notification', error, 'smartAlertService');
+                    }
+                }
+
+                // ✅ Send Push Notifications to FCM tokens if available
+                if (levelConfig.notifyMethod.includes('push')) {
+                    try {
+                        // Get employees in department
+                        // ✅ Map department to Staff role type
+                        const departmentToRoleMap: Record<ValidDepartment, Staff['role']> = {
+                            'housekeeping': 'housekeeping',
+                            'bellman': 'bellman',
+                            'maintenance': 'maintenance',
+                            'reception': 'reception',
+                            'procurement': 'staff', // Procurement uses 'staff' role
+                            'coffeeShop': 'staff' // CoffeeShop uses 'staff' role
+                        };
+                        const staffRole = departmentToRoleMap[typedDepartment];
+                        
+                        const { getStaffByRole } = await import('./staffService');
+                        const staffMembers = await getStaffByRole(tenantId, alert.branchId, staffRole);
+
+                        // Get FCM tokens for staff members
+                        const { sendPushNotification } = await import('./pushNotificationService');
+                        for (const staff of staffMembers) {
+                            try {
+                                // Get FCM token from fcm_tokens collection
+                                const tokenDoc = await getDoc(doc(db, 'fcm_tokens', staff.id));
+                                if (tokenDoc.exists()) {
+                                    const tokenData = tokenDoc.data();
+                                    const fcmToken = tokenData.token;
+                                    
+                                    if (fcmToken) {
+                                        notificationPromises.push(
+                                            sendPushNotification(fcmToken, {
+                                                title: alert.title,
+                                                body: alert.message,
+                                                icon: '/icon-192x192.png',
+                                                click_action: `/admin/alerts/${alert.id}`,
+                                                data: {
+                                                    alertId: alert.id,
+                                                    type: alert.type,
+                                                    severity: alert.severity,
+                                                    roomNumber: alert.roomNumber || ''
+                                                }
+                                            })
+                                        );
+                                    }
+                                }
+                            } catch (tokenError) {
+                                logger.warn(`Failed to send push notification to staff ${staff.id}`, tokenError, 'smartAlertService');
+                            }
+                        }
+                    } catch (pushError) {
+                        logger.warn('Failed to send push notifications', pushError, 'smartAlertService');
+                    }
+                }
+            }
+        }
+
+        // ✅ Execute all notifications in parallel
+        await Promise.allSettled(notificationPromises);
+
+        logger.info('Notifications triggered', {
+            alertId: alert.id,
+            level,
+            roles: levelConfig.notifyRoles,
+            methods: levelConfig.notifyMethod,
+            sent: notificationPromises.length
+        }, 'smartAlertService');
+    } catch (error) {
+        logger.error('Error triggering notifications', error, 'smartAlertService');
+        // Don't throw - notification failure shouldn't break alert creation
+    }
 }
 
 // ============================================================

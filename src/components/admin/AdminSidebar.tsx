@@ -30,7 +30,7 @@ import {
     Menu,
     X
 } from 'lucide-react';
-import { BookOpen, MessageCircle, MessageSquare, Radio, Languages, Share2 } from 'lucide-react';
+import { BookOpen, MessageCircle, MessageSquare, Radio, Languages, Share2, Sparkles, User, Phone, Key, Send, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { useTenant } from '../../context/TenantContext';
@@ -38,7 +38,10 @@ import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { useTheme } from '../../context/ThemeContext'; // ✅ Use theme context
 import { Branch } from '../../types';
 import { subscribeToTicketStatus, getUnrespondedTicketsCount, type SupportTicketStatus } from '../../services/supportTicketService';
-import { getAllTrialRequests } from '../../services/trialRequestService';
+import { getAllTrialRequests, submitTrialRequest } from '../../services/trialRequestService';
+import { UnifiedModal, ModalActions } from '../common/UnifiedModal';
+import { toast } from '../common/EnhancedToast';
+import { useUX } from '../../context/UXContext';
 
 interface AdminSidebarProps {
     isOwner: boolean;
@@ -59,6 +62,18 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     const [ticketStatus, setTicketStatus] = React.useState<SupportTicketStatus | null>(null);
     const [pendingSubscriptionRequests, setPendingSubscriptionRequests] = React.useState<number>(0);
     const [unrespondedTicketsCount, setUnrespondedTicketsCount] = React.useState<number>(0);
+    
+    // ✅ DEMO SUBSCRIPTION MODAL: State for "أرغب في الاشتراك" button (Demo only)
+    const [showSubscriptionModal, setShowSubscriptionModal] = React.useState(false);
+    const [subscriptionName, setSubscriptionName] = React.useState('');
+    const [subscriptionPhone, setSubscriptionPhone] = React.useState('');
+    const [subscriptionRequiredBranches, setSubscriptionRequiredBranches] = React.useState<number>(1);
+    const [isSubmittingSubscription, setIsSubmittingSubscription] = React.useState(false);
+    const [isSubscriptionSuccess, setIsSubscriptionSuccess] = React.useState(false);
+    const { success, error: showError } = useUX();
+    
+    // ✅ Check if user is demo account
+    const isDemoAccount = (user as any)?.isDemo === true;
     
     // ✅ ADORA SMART SIDEBAR: Collapsed State Management
     const [isCollapsed, setIsCollapsed] = React.useState<boolean>(false);
@@ -125,7 +140,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             items: [
                 { to: '/owner-dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: t('admin.overview') || t('admin.mainDashboard') || 'Overview', end: true },
                 { to: '/owner-panel', icon: <ShieldCheck className="w-4 h-4" />, label: t('admin.ownerDashboard') || 'Owner Dashboard' },
-                { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: t('admin.createManager') || 'Create Manager' },
+                { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: t('admin.manageSubscribers') || 'إدارة المشتركين' },
                 { to: '/owner-dashboard?tab=billing', icon: <DollarSign className="w-4 h-4" />, label: t('admin.billing') || 'Billing' },
                 { 
                     to: '/owner-dashboard?tab=subscription-requests', 
@@ -179,9 +194,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             label: t('admin.facilities') || 'إدارة المنشأة',
             icon: <Building2 className="w-4 h-4" style={{ color: 'var(--theme-primary-500)' }} />,
             items: [
-                { to: '/admin/branches', icon: <Globe className="w-4 h-4" />, label: t('sidebar.branches') || 'الفروع' },
+                { to: '/admin/branches', icon: <Globe className="w-4 h-4" />, label: t('sidebar.branches') },
                 { to: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" />, label: t('admin.roomsAndFloors') || 'الغرف والأدوار' },
-                { to: '/admin/employees', icon: <Users className="w-4 h-4" />, label: t('sidebar.employees') || 'الموظفين' },
+                { to: '/admin/employees', icon: <Users className="w-4 h-4" />, label: t('sidebar.employees') },
             ]
         },
         {
@@ -342,6 +357,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 flexDirection: 'column',
                 zIndex: 100,
                 transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                overflow: 'hidden', // ✅ FIX: Prevent text overflow and line artifacts when collapsed
             }}
         >
             {/* 🎨 Header with Dynamic Logo & Toggle Button - ✅ ADORA SMART SIDEBAR */}
@@ -368,7 +384,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     onMouseLeave={(e) => {
                         e.currentTarget.style.background = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 1)';
                     }}
-                    aria-label={isCollapsed ? t('sidebar.expand') || 'توسيع' : t('sidebar.collapse') || 'طي'}
+                    aria-label={isCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
                 >
                     {isCollapsed ? (
                         <ChevronRight className="w-3.5 h-3.5" style={{ color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(71, 85, 105, 1)' }} />
@@ -541,22 +557,26 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                         }
                                     }}
                                 >
-                                    <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0" style={{ overflow: 'hidden' }}>
                                         <div className={`p-1.5 sm:p-1.5 rounded-lg transition-all duration-300 flex-shrink-0 ${isExpanded ? 'bg-teal-500/20 shadow-sm' : ''}`}
                                              style={!isExpanded ? { background: 'var(--theme-bg-secondary)' } : {}}>
                                             {section.icon}
                                         </div>
-                                        <span 
-                                            className="text-[10px] sm:text-xs font-bold uppercase tracking-wider"
-                                            style={{
-                                                whiteSpace: 'normal',
-                                                wordBreak: 'break-word',
-                                                lineHeight: '1.4',
-                                                color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'var(--theme-text-secondary)',
-                                            }}
-                                        >
-                                            {section.label}
-                                        </span>
+                                        {/* ✅ FIX: Hide section label when collapsed */}
+                                        {!isCollapsed && (
+                                            <span 
+                                                className="text-[10px] sm:text-xs font-bold uppercase tracking-wider"
+                                                style={{
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    lineHeight: '1.4',
+                                                    color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'var(--theme-text-secondary)',
+                                                }}
+                                            >
+                                                {section.label}
+                                            </span>
+                                        )}
                                     </div>
                                     <ChevronDown
                                         className={`w-3.5 h-3.5 sm:w-3 sm:h-3 transition-transform duration-300 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
@@ -601,8 +621,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         height: '40px', // ✅ Strict height
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: '10px', // ✅ Strict gap
-                                                        padding: '0 12px', // ✅ Strict padding
+                                                        gap: isCollapsed ? '0' : '10px', // ✅ FIX: No gap when collapsed
+                                                        padding: isCollapsed ? '0 8px' : '0 12px', // ✅ FIX: Reduced padding when collapsed
                                                         marginBottom: '2px', // ✅ Minimal margin
                                                         borderRadius: '8px', // ✅ Strict border radius
                                                         fontSize: '13.5px', // ✅ Strict font size
@@ -613,6 +633,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         color: isActive ? '#20B2AA' : '#475569', // ✅ Active: Turquoise | Inactive: Slate gray
                                                         background: isActive ? 'rgba(32, 178, 170, 0.06)' : 'transparent', // ✅ Active: Light turquoise | Inactive: Transparent
                                                         position: 'relative', // ✅ For ActiveBar positioning
+                                                        overflow: 'hidden', // ✅ FIX: Prevent text overflow artifacts
                                                         // ✅ Premium Turquoise Border for Invoices when active
                                                         border: isActive && isInvoicesItem ? '2px solid #20B2AA' : 'none',
                                                         borderWidth: isActive && isInvoicesItem ? '2px' : '0',
@@ -655,8 +676,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         }
                                                     }}
                                                     >
-                                                        {/* ✅ ActiveBar - Thin vertical indicator on the right (RTL) */}
-                                                        {isActive && (
+                                                        {/* ✅ ActiveBar - Thin vertical indicator on the right (RTL) - Hidden when collapsed */}
+                                                        {isActive && !isCollapsed && (
                                                             <div 
                                                                 className="absolute right-0 top-1/2 -translate-y-1/2"
                                                                 style={{
@@ -691,7 +712,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                                 : item.icon
                                                             }
                                                         </span>
-                                                        {/* ✅ Label - Hidden when collapsed */}
+                                                        {/* ✅ Label - Hidden when collapsed with proper overflow handling */}
                                                         {!isCollapsed && (
                                                             <span 
                                                                 className="flex-1 truncate"
@@ -699,10 +720,18 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                                     fontFamily: 'Cairo, sans-serif',
                                                                     fontSize: '14px',
                                                                     fontWeight: 600,
+                                                                    overflow: 'hidden',
+                                                                    textOverflow: 'ellipsis',
+                                                                    whiteSpace: 'nowrap',
+                                                                    maxWidth: '100%',
                                                                 }}
                                                             >
                                                                 {item.label}
                                                             </span>
+                                                        )}
+                                                        {/* ✅ FIX: Ensure label is completely hidden when collapsed */}
+                                                        {isCollapsed && (
+                                                            <span style={{ display: 'none' }}>{item.label}</span>
                                                         )}
                                                         {/* ✅ Tooltip - Shows when collapsed and hovered */}
                                                         {isCollapsed && hoveredItem === item.to && (
@@ -748,10 +777,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         height: '40px', // ✅ Strict height
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: '10px', // ✅ Strict gap
-                                                        padding: '0 12px', // ✅ Strict padding
+                                                        gap: isCollapsed ? '0' : '10px', // ✅ FIX: No gap when collapsed
+                                                        padding: isCollapsed ? '0 8px' : '0 12px', // ✅ FIX: Reduced padding when collapsed
                                                         marginBottom: '2px', // ✅ Minimal margin
                                                         borderRadius: '8px', // ✅ Strict border radius
+                                                        overflow: 'hidden', // ✅ FIX: Prevent text overflow artifacts
                                                         fontSize: '13.5px', // ✅ Strict font size
                                                         fontWeight: 500, // ✅ Strict font weight
                                                         cursor: 'pointer',
@@ -815,16 +845,20 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                                     : item.icon
                                                                 }
                                                             </span>
-                                                            <span 
-                                                                className="flex-1 text-sm"
-                                                                style={{
-                                                                    whiteSpace: 'normal',
-                                                                    wordBreak: 'break-word',
-                                                                    lineHeight: '1.4',
-                                                                }}
-                                                            >
-                                                                {item.label}
-                                                            </span>
+                                                            {/* ✅ FIX: Hide label when collapsed */}
+                                                            {!isCollapsed ? (
+                                                                <span 
+                                                                    className="flex-1 text-sm"
+                                                                    style={{
+                                                                        whiteSpace: 'nowrap',
+                                                                        overflow: 'hidden',
+                                                                        textOverflow: 'ellipsis',
+                                                                        lineHeight: '1.4',
+                                                                    }}
+                                                                >
+                                                                    {item.label}
+                                                                </span>
+                                                            ) : null}
                                                             {(item as any).badge && (item as any).badge > 0 && (
                                                                 <span className={`ml-auto px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-xs font-bold flex-shrink-0 ${
                                                                     isActive 
@@ -884,10 +918,206 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                             </div>
                         </div>
                     )}
+
+                    {/* ✅ DEMO SUBSCRIPTION BUTTON: "أرغب في الاشتراك" - Only for Demo accounts */}
+                    {!isCollapsed && isDemoAccount && (
+                        <button
+                            onClick={() => setShowSubscriptionModal(true)}
+                            className="mt-4 mx-0.5 px-4 py-3 rounded-xl border-2 flex items-center justify-center gap-2.5 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
+                            style={{ 
+                                background: 'linear-gradient(135deg, #20B2AA 0%, #14B8A6 100%)',
+                                borderColor: '#20B2AA',
+                                color: '#ffffff',
+                                fontWeight: 600,
+                                fontFamily: 'Cairo, sans-serif',
+                            }}
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            <span className="text-sm">أرغب في الاشتراك</span>
+                        </button>
+                    )}
                 </nav>
             </div>
 
             {/* 🚪 Logout Button - ✅ REMOVED: Moved to header next to refresh button in EnhancedOwnerDashboard */}
+
+            {/* ✅ DEMO SUBSCRIPTION MODAL: "أرغب في الاشتراك" Modal (same as AboutUs trial modal) */}
+            <UnifiedModal
+                isOpen={showSubscriptionModal}
+                onClose={() => {
+                    if (!isSubmittingSubscription) {
+                        setShowSubscriptionModal(false);
+                        setIsSubscriptionSuccess(false);
+                        setSubscriptionName('');
+                        setSubscriptionPhone('');
+                        setSubscriptionRequiredBranches(1);
+                    }
+                }}
+                title={isSubscriptionSuccess ? undefined : 'أرغب في الاشتراك الرسمي'}
+                subtitle={isSubscriptionSuccess ? undefined : 'يرجى ملء البيانات التالية وسنتواصل معك قريباً'}
+                icon={isSubscriptionSuccess ? <CheckCircle2 className="w-6 h-6 text-green-400" /> : <Sparkles className="w-6 h-6 text-teal-400" />}
+                size="md"
+                showCloseButton={!isSubscriptionSuccess && !isSubmittingSubscription}
+                closeOnBackdrop={!isSubmittingSubscription}
+            >
+                {isSubscriptionSuccess ? (
+                    <div className="text-center py-8">
+                        <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
+                            <CheckCircle2 className="w-8 h-8 text-green-400" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">تم إرسال طلبك بنجاح!</h3>
+                        <p className="text-white/80">سنتواصل معك قريباً لإتمام عملية الاشتراك الرسمي</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {/* Name Input */}
+                        <div>
+                            <label className="block text-sm font-medium text-white/80 mb-2">
+                                الاسم <span className="text-red-400">*</span>
+                            </label>
+                            <div className="relative">
+                                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                                <input
+                                    type="text"
+                                    value={subscriptionName}
+                                    onChange={(e) => setSubscriptionName(e.target.value)}
+                                    placeholder={t('placeholder.enterName')}
+                                    className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                                    dir="rtl"
+                                    disabled={isSubmittingSubscription}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Phone Input */}
+                        <div>
+                            <label className="block text-sm font-medium text-white/80 mb-2">
+                                رقم الجوال <span className="text-red-400">*</span>
+                            </label>
+                            <div className="relative">
+                                <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                                <input
+                                    type="tel"
+                                    value={subscriptionPhone}
+                                    onChange={(e) => setSubscriptionPhone(e.target.value.replace(/\D/g, ''))}
+                                    placeholder={t('placeholder.phoneNumber')}
+                                    className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                                    dir="ltr"
+                                    disabled={isSubmittingSubscription}
+                                    maxLength={15}
+                                />
+                            </div>
+                            <p className="text-xs text-white/50 mt-1">مثال: 0501234567</p>
+                        </div>
+
+                        {/* Required Branches Input */}
+                        <div>
+                            <label className="block text-sm font-medium text-white/80 mb-2">
+                                عدد التراخيص المطلوبة (كل فرع = ترخيص واحد)
+                            </label>
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[1, 2, 3, 4, 5, 10, 15, 20].map((num) => (
+                                        <button
+                                            key={num}
+                                            type="button"
+                                            onClick={() => setSubscriptionRequiredBranches(num)}
+                                            disabled={isSubmittingSubscription}
+                                            className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                                                subscriptionRequiredBranches === num
+                                                    ? 'bg-teal-500 text-white border-2 border-teal-400'
+                                                    : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                                            }`}
+                                        >
+                                            {num}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="relative">
+                                    <Key className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="100"
+                                        value={subscriptionRequiredBranches}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value) || 1;
+                                            setSubscriptionRequiredBranches(Math.max(1, Math.min(100, val)));
+                                        }}
+                                        placeholder={t('placeholder.customBranches')}
+                                        className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                                        dir="ltr"
+                                        disabled={isSubmittingSubscription}
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-white/50 mt-2">
+                                المحدد: <span className="text-teal-400 font-semibold">{subscriptionRequiredBranches} ترخيص</span>
+                            </p>
+                        </div>
+
+                        {/* Submit Button */}
+                        <ModalActions
+                            onCancel={() => {
+                                if (!isSubmittingSubscription) {
+                                    setShowSubscriptionModal(false);
+                                    setSubscriptionName('');
+                                    setSubscriptionPhone('');
+                                    setSubscriptionRequiredBranches(1);
+                                }
+                            }}
+                            onConfirm={async () => {
+                                if (!subscriptionName.trim() || !subscriptionPhone.trim()) {
+                                    showError('يرجى ملء جميع الحقول المطلوبة');
+                                    return;
+                                }
+
+                                const phoneRegex = /^[0-9]{8,15}$/;
+                                const cleanPhone = subscriptionPhone.replace(/\s+/g, '');
+                                if (!phoneRegex.test(cleanPhone)) {
+                                    showError('رقم الجوال غير صحيح');
+                                    return;
+                                }
+
+                                setIsSubmittingSubscription(true);
+                                try {
+                                    // ✅ Submit with source: 'demo_account' to distinguish from AboutUs requests
+                                    const result = await submitTrialRequest(
+                                        subscriptionName.trim(), 
+                                        cleanPhone, 
+                                        'demo_account', 
+                                        subscriptionRequiredBranches
+                                    );
+
+                                    if (result.success) {
+                                        setIsSubscriptionSuccess(true);
+                                        success('تم إرسال طلبك بنجاح! سنتواصل معك قريباً');
+                                        
+                                        setTimeout(() => {
+                                            setShowSubscriptionModal(false);
+                                            setIsSubscriptionSuccess(false);
+                                            setSubscriptionName('');
+                                            setSubscriptionPhone('');
+                                            setSubscriptionRequiredBranches(1);
+                                        }, 3000);
+                                    } else {
+                                        showError(result.error || 'فشل إرسال الطلب');
+                                    }
+                                } catch (err: any) {
+                                    showError(err.message || 'حدث خطأ أثناء إرسال الطلب');
+                                } finally {
+                                    setIsSubmittingSubscription(false);
+                                }
+                            }}
+                            cancelText="إلغاء"
+                            confirmText="إرسال الطلب"
+                            confirmVariant="primary"
+                            loading={isSubmittingSubscription}
+                            disabled={!subscriptionName.trim() || !subscriptionPhone.trim() || isSubmittingSubscription}
+                        />
+                    </div>
+                )}
+            </UnifiedModal>
         </aside>
     );
 };

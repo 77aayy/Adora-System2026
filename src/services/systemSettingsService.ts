@@ -19,6 +19,7 @@ export interface SystemSettings {
     lastUpdateDate?: Date;
     defaultSubscriptionPrice?: number; // ✅ Default subscription price (applies to new subscriptions only)
     defaultTaxRate?: number; // ✅ Default VAT percentage (e.g. 15)
+    twoYearDiscountRate?: number; // ✅ Discount percentage for 2-year subscriptions (e.g. 5, 10)
     // ✅ Company Information for Receipt Vouchers, Invoices, and Expense Vouchers
     companyName?: string; // اسم الشركة
     companyTaxNumber?: string; // الرقم الضريبي
@@ -257,11 +258,46 @@ export const getSystemSettings = async (forceRefresh: boolean = false): Promise<
 const _fetchSystemSettings = async (): Promise<SystemSettings> => {
     // ✅ FIX: Always check localStorage FIRST as backup
     const localKey = 'adora_system_settings';
-    const localData = localStorage.getItem(localKey);
+    const localData = (typeof window !== 'undefined' && window.localStorage) ? localStorage.getItem(localKey) : null;
     const localSettings = localData ? JSON.parse(localData) : null;
     
+    // ✅ NEW: Try Cloud Function first (bypasses client Rules)
     try {
-        // ✅ Guard: Return localStorage or defaults if Firebase not initialized
+        const { functions, httpsCallable } = await import('./firebase');
+        if (functions) {
+            const getSettingsFunction = httpsCallable(functions, 'getSystemSettings');
+            const result = await getSettingsFunction({});
+            const response = result.data as any;
+
+            if (response.success && response.settings) {
+                const firebaseSettings = {
+                    ...DEFAULT_SETTINGS,
+                    ...response.settings,
+                    updates: response.settings.updates?.map((u: any) => ({
+                        ...u,
+                        releaseDate: u.releaseDate?.toDate ? new Date(u.releaseDate.toDate()) : new Date()
+                    })) || [],
+                    broadcastMessages: response.settings.broadcastMessages?.map((m: any) => ({
+                        ...m,
+                        startDate: m.startDate?.toDate ? new Date(m.startDate.toDate()) : new Date(),
+                        endDate: m.endDate?.toDate ? new Date(m.endDate.toDate()) : new Date()
+                    })) || []
+                } as SystemSettings;
+                
+                // ✅ Sync Firebase data to localStorage for offline access
+                if (typeof window !== 'undefined' && window.localStorage) {
+                    localStorage.setItem(localKey, JSON.stringify(firebaseSettings));
+                }
+                return firebaseSettings;
+            }
+        }
+    } catch (functionError: any) {
+        console.warn('Cloud Function getSystemSettings failed, using fallback:', functionError.message);
+        // Fall through to Firestore fallback
+    }
+    
+    // ✅ Fallback: Direct Firestore read (if Functions not available)
+    try {
         if (!db) {
             console.debug('Firebase not initialized, returning local/default settings');
             return localSettings ? { ...DEFAULT_SETTINGS, ...localSettings } : DEFAULT_SETTINGS;
@@ -286,7 +322,9 @@ const _fetchSystemSettings = async (): Promise<SystemSettings> => {
             } as SystemSettings;
             
             // ✅ Sync Firebase data to localStorage for offline access
-            localStorage.setItem(localKey, JSON.stringify(firebaseSettings));
+            if (typeof window !== 'undefined' && window.localStorage) {
+                localStorage.setItem(localKey, JSON.stringify(firebaseSettings));
+            }
             return firebaseSettings;
         }
         
@@ -296,8 +334,7 @@ const _fetchSystemSettings = async (): Promise<SystemSettings> => {
             return { ...DEFAULT_SETTINGS, ...localSettings };
         }
         
-        // If no settings exist anywhere, create default
-        await setSystemSettings(DEFAULT_SETTINGS);
+        // If no settings exist anywhere, return defaults (don't create via client)
         return DEFAULT_SETTINGS;
     } catch (error) {
         console.error('Error getting system settings:', error);
@@ -344,15 +381,20 @@ export const updateSystemSettings = async (
         const sanitizedUpdates = sanitizeBroadcastDates(updates);
         
         // ✅ Always save to localStorage as backup
-        const localKey = 'adora_system_settings';
-        const existing = localStorage.getItem(localKey);
-        const currentLocal = existing ? JSON.parse(existing) : {};
-        const merged = { ...currentLocal, ...sanitizedUpdates, updatedAt: new Date().toISOString(), updatedBy };
-        localStorage.setItem(localKey, JSON.stringify(merged));
+        let merged: any = null;
+        if (typeof window !== 'undefined' && window.localStorage) {
+            const localKey = 'adora_system_settings';
+            const existing = localStorage.getItem(localKey);
+            const currentLocal = existing ? JSON.parse(existing) : {};
+            merged = { ...currentLocal, ...sanitizedUpdates, updatedAt: new Date().toISOString(), updatedBy };
+            localStorage.setItem(localKey, JSON.stringify(merged));
+        }
         
         // 🔍 DEBUG: Log what we're saving
-        console.log('💾 updateSystemSettings: price=' + (sanitizedUpdates as any).defaultSubscriptionPrice + 
-                   ', merged_price=' + merged.defaultSubscriptionPrice);
+        if (merged) {
+            console.log('💾 updateSystemSettings: price=' + (sanitizedUpdates as any).defaultSubscriptionPrice + 
+                       ', merged_price=' + merged.defaultSubscriptionPrice);
+        }
         
         if (!db) {
             console.warn('Firebase not initialized, settings saved to localStorage only');
@@ -360,15 +402,43 @@ export const updateSystemSettings = async (
         }
         
         const docRef = doc(db, SYSTEM_SETTINGS_PATH);
+        
+        // ✅ CRITICAL: Get current document first to merge properly
+        const currentDoc = await getDoc(docRef);
+        const currentData = currentDoc.exists() ? currentDoc.data() : {};
+        
+        // ✅ CRITICAL: Deep merge developerBranding to avoid overwriting other fields
+        const mergedUpdates = { ...sanitizedUpdates };
+        if (sanitizedUpdates.developerBranding && currentData.developerBranding) {
+            mergedUpdates.developerBranding = {
+                ...currentData.developerBranding,
+                ...sanitizedUpdates.developerBranding
+            };
+        }
+        
         // ✅ FIX: Use setDoc with merge:true to CREATE if not exists, UPDATE if exists
         // updateDoc fails if document doesn't exist!
         await setDoc(docRef, {
-            ...sanitizedUpdates,
+            ...mergedUpdates,
             updatedAt: serverTimestamp(),
             updatedBy
         }, { merge: true });
         
-        console.log('✅ Settings saved to Firebase successfully');
+        // ✅ CRITICAL: Also update localStorage system_settings immediately
+        if (typeof window !== 'undefined' && window.localStorage) {
+            const localKey = 'adora_system_settings';
+            const existingLocal = localStorage.getItem(localKey);
+            const currentLocal = existingLocal ? JSON.parse(existingLocal) : {};
+            const updatedLocal = {
+                ...currentLocal,
+                ...mergedUpdates,
+                updatedAt: new Date().toISOString(),
+                updatedBy
+            };
+            localStorage.setItem(localKey, JSON.stringify(updatedLocal));
+        }
+        
+        console.log('✅ Settings saved to Firebase successfully', { developerBranding: mergedUpdates.developerBranding });
     } catch (error) {
         console.error('Error updating system settings in Firebase:', error);
         // ✅ Don't throw - localStorage backup already saved

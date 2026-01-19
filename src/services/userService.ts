@@ -211,52 +211,39 @@ export const loadAvailableBranches = async (user: User): Promise<Array<{ id: str
 
 /**
  * ✅ SaaS: Check rate limiting for PIN login attempts
+ * ⚠️ SIMPLIFIED: Uses localStorage-based rate limiting to avoid Firestore index requirement
  */
 const checkRateLimit = async (pin: string): Promise<{ allowed: boolean; remainingAttempts: number; lockoutUntil?: Date }> => {
     try {
-        const now = new Date();
-        const windowStart = new Date(now.getTime() - RATE_LIMIT_CONFIG.WINDOW_MINUTES * 60 * 1000);
+        // ✅ Use localStorage for rate limiting (avoids Firestore index requirement)
+        const rateLimitKey = `adora_rate_limit_${pin}`;
+        const stored = localStorage.getItem(rateLimitKey);
         
-        // Get failed attempts in the time window
-        const attemptsRef = collection(db, 'loginAttempts');
-        const q = query(
-            attemptsRef,
-            where('pin', '==', pin),
-            where('success', '==', false),
-            where('timestamp', '>=', Timestamp.fromDate(windowStart)),
-            where('timestamp', '<=', Timestamp.fromDate(now))
-        );
-        
-        const snapshot = await getDocs(q);
-        const failedAttempts = snapshot.size;
-        const remainingAttempts = Math.max(0, RATE_LIMIT_CONFIG.MAX_ATTEMPTS - failedAttempts);
-        
-        // Check if locked out
-        if (failedAttempts >= RATE_LIMIT_CONFIG.MAX_ATTEMPTS) {
-            // Find the most recent attempt to calculate lockout
-            const recentAttempts = snapshot.docs
-                .map(doc => doc.data().timestamp?.toDate())
-                .filter(Boolean)
-                .sort((a, b) => b.getTime() - a.getTime());
+        if (stored) {
+            const data = JSON.parse(stored);
+            const now = Date.now();
             
-            if (recentAttempts.length > 0) {
-                const lastAttempt = recentAttempts[0];
-                const lockoutUntil = new Date(lastAttempt.getTime() + RATE_LIMIT_CONFIG.LOCKOUT_MINUTES * 60 * 1000);
-                
-                if (now < lockoutUntil) {
-                    return {
-                        allowed: false,
-                        remainingAttempts: 0,
-                        lockoutUntil
-                    };
-                }
+            // Check if lockout period has passed
+            if (data.lockoutUntil && now < data.lockoutUntil) {
+                return {
+                    allowed: false,
+                    remainingAttempts: 0,
+                    lockoutUntil: new Date(data.lockoutUntil)
+                };
             }
+            
+            // Reset if window expired
+            const windowMs = RATE_LIMIT_CONFIG.WINDOW_MINUTES * 60 * 1000;
+            if (now - data.windowStart > windowMs) {
+                localStorage.removeItem(rateLimitKey);
+                return { allowed: true, remainingAttempts: RATE_LIMIT_CONFIG.MAX_ATTEMPTS };
+            }
+            
+            const remainingAttempts = Math.max(0, RATE_LIMIT_CONFIG.MAX_ATTEMPTS - data.attempts);
+            return { allowed: remainingAttempts > 0, remainingAttempts };
         }
         
-        return {
-            allowed: true,
-            remainingAttempts
-        };
+        return { allowed: true, remainingAttempts: RATE_LIMIT_CONFIG.MAX_ATTEMPTS };
     } catch (error) {
         // If rate limit check fails, allow the attempt (fail open for availability)
         logger.warn('Rate limit check failed', error, 'userService');
@@ -266,19 +253,66 @@ const checkRateLimit = async (pin: string): Promise<{ allowed: boolean; remainin
 
 /**
  * ✅ SaaS: Record login attempt
+ * ⚠️ SIMPLIFIED: Uses localStorage + Firestore (Firestore is optional, won't block login)
  */
 const recordLoginAttempt = async (pin: string, success: boolean): Promise<void> => {
     try {
-        await setDoc(doc(collection(db, 'loginAttempts')), {
-            pin,
-            success,
-            timestamp: serverTimestamp(),
-            ip: 'client', // Could be enhanced with actual IP if needed
-        });
+        // ✅ Always update localStorage (reliable, no auth needed)
+        const rateLimitKey = `adora_rate_limit_${pin}`;
+        const stored = localStorage.getItem(rateLimitKey);
+        const now = Date.now();
+        const windowMs = RATE_LIMIT_CONFIG.WINDOW_MINUTES * 60 * 1000;
         
-        // Clean up old attempts (older than 24 hours)
-        const cleanupDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        // Note: This cleanup would ideally be done via Cloud Function, not client-side
+        if (stored) {
+            const data = JSON.parse(stored);
+            // If window expired, start new window
+            if (now - data.windowStart > windowMs) {
+                localStorage.setItem(rateLimitKey, JSON.stringify({
+                    attempts: success ? 0 : 1,
+                    windowStart: now,
+                    lockoutUntil: null
+                }));
+            } else {
+                // Increment failed attempts
+                if (!success) {
+                    const newAttempts = (data.attempts || 0) + 1;
+                    const lockoutUntil = newAttempts >= RATE_LIMIT_CONFIG.MAX_ATTEMPTS
+                        ? now + (RATE_LIMIT_CONFIG.LOCKOUT_MINUTES * 60 * 1000)
+                        : null;
+                    
+                    localStorage.setItem(rateLimitKey, JSON.stringify({
+                        attempts: newAttempts,
+                        windowStart: data.windowStart,
+                        lockoutUntil
+                    }));
+                } else {
+                    // Reset on success
+                    localStorage.removeItem(rateLimitKey);
+                }
+            }
+        } else if (!success) {
+            // First failed attempt
+            localStorage.setItem(rateLimitKey, JSON.stringify({
+                attempts: 1,
+                windowStart: now,
+                lockoutUntil: null
+            }));
+        }
+        
+        // ✅ Try to record in Firestore (optional, won't block if fails)
+        if (db) {
+            try {
+                await setDoc(doc(collection(db, 'loginAttempts')), {
+                    pin,
+                    success,
+                    timestamp: serverTimestamp(),
+                    ip: 'client',
+                });
+            } catch (firestoreError) {
+                // Ignore Firestore errors - localStorage is enough
+                logger.warn('Failed to record login attempt in Firestore (using localStorage only)', firestoreError, 'userService');
+            }
+        }
     } catch (error) {
         // Fail silently - don't block login if recording fails
         logger.warn('Failed to record login attempt', error, 'userService');
@@ -329,7 +363,23 @@ const recordLoginAttempt = async (pin: string, success: boolean): Promise<void> 
  * ```
  */
 export const loginWithPin = async (pin: string, branchId?: string): Promise<User & { availableBranches?: Array<{ id: string; code?: string; name: string }> }> => {
-    // ✅ SaaS: Check rate limiting before processing login
+    // ✅ CRITICAL: Sign in anonymously FIRST (required for Cloud Functions)
+    try {
+        if (!auth.currentUser) {
+            const { signInAnonymously } = await import('firebase/auth');
+            await signInAnonymously(auth);
+            console.log('✅ Anonymous auth successful for login');
+        }
+    } catch (authError: unknown) {
+        const error = authError instanceof Error ? authError : new Error(String(authError));
+        logger.warn('Anonymous auth failed during login', error, 'userService');
+        
+        if (error.message?.includes('configuration-not-found') || (error as any)?.code === 'auth/configuration-not-found') {
+            throw new Error('⚠️ Anonymous Authentication غير مفعل في Firebase Console.\n\n📍 الحل:\nFirebase Console → Authentication → Sign-in method → Anonymous → Enable');
+        }
+    }
+    
+    // ✅ SaaS: Check rate limiting (localStorage-based, no Firestore needed)
     const rateLimitCheck = await checkRateLimit(pin);
     if (!rateLimitCheck.allowed) {
         const lockoutMessage = rateLimitCheck.lockoutUntil
@@ -338,10 +388,8 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
         throw new Error(lockoutMessage);
     }
     
-    // Check if owner code (hashed - no plain text in client bundle)
-    // ✅ SaaS: Backdoor now uses hash instead of plain text comparison
+    // ✅ Check if owner code (hashed - no plain text in client bundle)
     if (await verifyOwnerPin(pin)) {
-        // ✅ Record successful login attempt
         await recordLoginAttempt(pin, true);
         return {
             id: 'owner',
@@ -351,35 +399,152 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
             role: 'owner',
             points: 0,
             status: 'active',
-            // ✅ Owner has a special 'system' tenant or null to ignore tenant checks
             tenantId: 'system-owner',
             currentPoints: 0,
             lifetimePoints: 0,
-            branches: [], // ✅ Owner accesses all, but needs empty array for type
+            branches: [],
             activeBranchId: null
         };
     }
 
-    // Check for manager/employee in database
-    // First check globalCodes for tenant lookup (for managers with tenants - SaaS model)
-    // ✅ globalCodes is publicly readable (allow read: if true) - no auth needed
-    const codeDocRef = doc(db, 'globalCodes', pin);
-    let codeDocSnap;
-
+    // ✅ NEW: Use Cloud Function for login (bypasses client Rules)
     try {
-        // ✅ Read globalCodes BEFORE any authentication (it's publicly readable)
-        codeDocSnap = await getDoc(codeDocRef);
+        const { functions, httpsCallable } = await import('./firebase');
+        if (!functions) {
+            throw new Error('Firebase Functions غير متاحة');
+        }
+
+        const loginFunction = httpsCallable(functions, 'loginWithPin');
+        const result = await loginFunction({ pin, branchId });
+        const response = result.data as any;
+
+        if (!response.success) {
+            await recordLoginAttempt(pin, false);
+            throw new Error(response.error || 'فشل تسجيل الدخول');
+        }
+
+        if (!response.user) {
+            await recordLoginAttempt(pin, false);
+            throw new Error('لم يتم العثور على المستخدم');
+        }
+
+        // ✅ Record successful login attempt
+        await recordLoginAttempt(pin, true);
+
+        // ✅ Convert response to User format
+        const userData = response.user;
+        const user: User = {
+            id: userData.id,
+            name: userData.name,
+            code: pin,
+            role: userData.role,
+            department: userData.department || '',
+            points: 0,
+            status: 'active',
+            tenantId: userData.tenantId,
+            currentPoints: 0,
+            lifetimePoints: 0,
+            branches: userData.availableBranches || [],
+            activeBranchId: userData.branchId || null
+        };
+
+        // Save tenantId to localStorage
+        if (user.tenantId) {
+            localStorage.setItem('adora_tenant_id', user.tenantId);
+        }
+
+        if (branchId) {
+            saveBranchId(branchId);
+        }
+
+        return {
+            ...user,
+            availableBranches: userData.availableBranches || []
+        };
+
+    } catch (error: any) {
+        // ✅ Fallback to old method if Functions not available
+        console.warn('Cloud Function failed, using fallback:', error);
+        
+        // Fallback: Direct Firestore lookup (old method)
+        const codeDocRef = doc(db, 'globalCodes', pin);
+        let codeDocSnap;
+
+        try {
+            codeDocSnap = await getDoc(codeDocRef);
+            
+            if (codeDocSnap.exists()) {
+                const codeData = codeDocSnap.data();
+                console.log(`✅ Found PIN ${pin} in globalCodes:`, {
+                type: codeData?.type,
+                status: codeData?.status,
+                licenseStatus: codeData?.licenseStatus
+            });
+            
+            // ✅ Cache successful lookup for offline use
+            try {
+                localStorage.setItem(`globalCode_${pin}`, JSON.stringify({
+                    ...codeData,
+                    cachedAt: Date.now()
+                }));
+            } catch (cacheErr) {
+                // Ignore cache errors
+            }
+        } else {
+            console.log(`⚠️ PIN ${pin} not found in globalCodes - checking users collection...`);
+        }
     } catch (e: unknown) {
         // If permission denied, it means rules might not be deployed or there's an issue
         const error = e instanceof Error ? e : new Error(String(e));
+        const errorCode = (e as any)?.code;
+        const errorMessage = error.message || '';
+        
+        console.error(`❌ Global code lookup failed for PIN ${pin}:`, errorMessage);
         logger.error("Global code lookup failed", error, 'userService');
-        // Don't throw here - fall through to users collection lookup
+        
+        // ✅ FIX: If offline/unavailable error, try cache first
+        if (errorMessage.includes('offline') || errorCode === 'unavailable' || errorCode === 'failed-precondition') {
+            // Try to use cached data if available (from previous successful reads)
+            const cachedCodeKey = `globalCode_${pin}`;
+            const cachedCode = localStorage.getItem(cachedCodeKey);
+            
+            if (cachedCode) {
+                try {
+                    const parsed = JSON.parse(cachedCode);
+                    const cacheAge = Date.now() - (parsed.cachedAt || 0);
+                    const MAX_CACHE_AGE = 24 * 60 * 60 * 1000; // 24 hours
+                    
+                    if (cacheAge < MAX_CACHE_AGE) {
+                        console.log(`📦 Using cached globalCode data for PIN ${pin} (cache age: ${Math.round(cacheAge / 1000 / 60)} minutes)`);
+                        // Create a mock DocumentSnapshot-like object
+                        codeDocSnap = {
+                            exists: () => true,
+                            data: () => {
+                                const { cachedAt, ...data } = parsed;
+                                return data;
+                            }
+                        } as any;
+                    } else {
+                        console.warn(`⚠️ Cached globalCode for PIN ${pin} is too old (${Math.round(cacheAge / 1000 / 60 / 60)} hours), ignoring cache`);
+                    }
+                } catch (parseErr) {
+                    console.warn('⚠️ Failed to parse cached globalCode:', parseErr);
+                    // Invalid cache, continue to fallback
+                }
+            } else {
+                console.warn(`⚠️ No cached data for PIN ${pin}, and client is offline. Cannot login without internet or Anonymous Auth.`);
+            }
+        }
+        
+        // Don't throw here - fall through to users collection lookup or continue with cached data
     }
 
     if (codeDocSnap && codeDocSnap.exists()) {
         const codeData = codeDocSnap.data();
         const tenantId = codeData.tenantId;
         const managerId = codeData.managerId;
+        
+        // ✅ Cache successful lookup for offline use (already done above in try-catch)
 
         // ✅ FIX: Use data from globalCodes first (publicly readable)
         // Then try to get updated data from users collection if possible
@@ -500,6 +665,51 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
         // Save tenantId to localStorage for TenantContext
         if (tenantId) {
             localStorage.setItem('adora_tenant_id', tenantId);
+            
+            // ✅ CRITICAL: Load tenant-specific Firebase Config if exists
+            // ⚠️ NOTE: Must use master Firebase to read tenant doc (chicken-egg problem)
+            try {
+                // ✅ Use master Firebase to read tenant document (before switching to tenant Firebase)
+                const tenantDoc = await getDoc(doc(db, 'tenants', tenantId));
+                if (tenantDoc.exists()) {
+                    const tenantData = tenantDoc.data();
+                    const firebaseConfig = tenantData.info?.firebaseConfig;
+                    
+                    // ✅ Check if we need to switch Firebase config
+                    const { getSavedConfig } = await import('./firebase');
+                    const currentConfig = getSavedConfig();
+                    const needsSwitch = firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId;
+                    const isDifferent = currentConfig?.projectId !== firebaseConfig?.projectId;
+                    
+                    if (needsSwitch && isDifferent) {
+                        // ✅ Save tenant-specific Firebase Config to localStorage
+                        const { saveFirebaseConfig } = await import('./firebase');
+                        await saveFirebaseConfig(firebaseConfig, false); // Don't reload page yet
+                        console.log('🏢 Loaded tenant-specific Firebase config:', firebaseConfig.projectId);
+                        
+                        // ✅ CRITICAL: Reload page to ensure clean Firebase initialization
+                        // This prevents auth/configuration-not-found errors
+                        console.log('🔄 Reloading page to apply tenant Firebase configuration...');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 500); // Small delay to allow login to complete
+                        return {
+                            ...user,
+                            availableBranches: [],
+                            preferredBranchId: null,
+                            _firebaseReload: true // Flag to indicate reload is happening
+                        };
+                    } else if (!needsSwitch && currentConfig) {
+                        // ✅ Clear tenant config if manager doesn't have isolated Firebase
+                        const { clearFirebaseConfig } = await import('./firebase');
+                        clearFirebaseConfig();
+                        console.log('🌐 Using master Firebase configuration (no tenant-specific config)');
+                    }
+                }
+            } catch (e) {
+                logger.warn('Failed to load tenant Firebase config (non-critical)', e, 'userService');
+                // Continue with login even if Firebase config load fails
+            }
         }
 
         // ✅ Load available branches for manager
@@ -533,20 +743,27 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     }
 
     // Fallback: Lookup in users collection (for employees or if globalCodes lookup failed)
-    // ✅ FIX: Sign in anonymously BEFORE reading from users collection
-    try {
-        if (!auth.currentUser) {
-            await signInAnonymously(auth);
-        }
-    } catch (authError: unknown) {
-        // If anonymous auth fails, try to continue anyway (might work if already signed in)
-        const error = authError instanceof Error ? authError : new Error(String(authError));
-        logger.warn('Anonymous auth failed during login (non-critical)', error, 'userService');
+    // ✅ NOTE: Anonymous auth already done at the beginning of loginWithPin
+    // ✅ FIX: Check if db is available before querying
+    if (!db) {
+        await recordLoginAttempt(pin, false);
+        throw new Error('قاعدة البيانات غير متاحة - تأكد من الاتصال بالإنترنت');
     }
 
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('code', '==', pin));
-    const snapshot = await getDocs(q);
+    
+    let snapshot;
+    try {
+        snapshot = await getDocs(q);
+    } catch (queryError: any) {
+        // If offline, try cache or provide helpful message
+        if (queryError.message?.includes('offline') || queryError.code === 'unavailable') {
+            await recordLoginAttempt(pin, false);
+            throw new Error('لا يوجد اتصال بالإنترنت - يرجى التحقق من الاتصال والمحاولة مرة أخرى');
+        }
+        throw queryError;
+    }
 
     if (snapshot.empty) {
         // ✅ Record failed login attempt

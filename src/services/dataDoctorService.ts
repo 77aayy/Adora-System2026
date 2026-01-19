@@ -217,6 +217,22 @@ export const runDataDoctor = async (tenantId: string, branchId: string) => {
  * Check database integrity and auto-seed missing collections
  * This is the first thing that runs when a new tenant logs in
  */
+/**
+ * Get tenantId from localStorage (SaaS isolation)
+ */
+const getTenantId = (): string | null => {
+    try {
+        const storedUser = localStorage.getItem('adora_user');
+        if (storedUser) {
+            const user = JSON.parse(storedUser);
+            return user.tenantId || localStorage.getItem('adora_tenant_id');
+        }
+        return localStorage.getItem('adora_tenant_id');
+    } catch {
+        return null;
+    }
+};
+
 export const performHealthCheck = async (): Promise<{
     healthy: boolean;
     missingCollections: string[];
@@ -231,11 +247,22 @@ export const performHealthCheck = async (): Promise<{
         };
     }
 
+    // ✅ SaaS: Get tenantId for data isolation
+    const tenantId = getTenantId();
+    if (!tenantId) {
+        console.warn('⚠️ [Data Doctor] No tenantId found - skipping health check');
+        return {
+            healthy: false,
+            missingCollections: ['tenantId required'],
+            seeded: false
+        };
+    }
+
     try {
-        console.log('🏥 [Data Doctor] Performing database health check...');
+        console.log(`🏥 [Data Doctor] Performing database health check for tenant: ${tenantId}...`);
 
         // Check for missing collections
-        const missing = await checkMissingCollections();
+        const missing = await checkMissingCollections(tenantId);
 
         if (missing.length === 0) {
             console.log('✅ [Data Doctor] Database is healthy!');
@@ -250,7 +277,7 @@ export const performHealthCheck = async (): Promise<{
 
         // Auto-seed missing collections
         console.log('🌱 [Data Doctor] Auto-seeding missing collections...');
-        const seedingResult = await seedTenantDatabase({ includeDemoRoom: true });
+        const seedingResult = await seedTenantDatabase(tenantId, { includeDemoRoom: true });
 
         // Log the action
         try {
@@ -476,8 +503,11 @@ export const getDatabaseHealthReport = async (
     }
 
     try {
+        // ✅ SaaS: Get tenantId for data isolation
+        const tenantId = getTenantId();
+        
         // Check missing collections
-        report.missingCollections = await checkMissingCollections();
+        report.missingCollections = await checkMissingCollections(tenantId || undefined);
 
         if (report.missingCollections.length > 0) {
             report.overallHealth = 'warning';

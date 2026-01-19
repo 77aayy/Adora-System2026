@@ -133,12 +133,12 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
         info: <Info className="w-5 h-5 text-blue-400" />,
     };
 
-    // ✅ FIXED: Dark mode compatible backgrounds (solid, not glass)
+    // ✅ FIXED: Dark mode compatible backgrounds (solid, not glass) - No border
     const bgMap = {
-        success: 'bg-slate-800 border-green-500/50',
-        error: 'bg-slate-800 border-red-500/50',
-        warning: 'bg-slate-800 border-yellow-500/50',
-        info: 'bg-slate-800 border-blue-500/50',
+        success: 'bg-slate-800',
+        error: 'bg-slate-800',
+        warning: 'bg-slate-800',
+        info: 'bg-slate-800',
     };
 
     // ✅ Text colors that work in dark mode
@@ -158,13 +158,18 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
         <div
             className={`
                 pointer-events-auto
-                flex items-center gap-3 p-4 rounded-2xl border-2 shadow-2xl
+                flex items-center gap-3 p-4 rounded-2xl shadow-2xl toast
                 ${bgMap[toast.type]}
                 transition-all duration-300
                 ${isExiting ? 'opacity-0 translate-x-full scale-95' : 'opacity-100 translate-x-0 scale-100'}
                 animate-slide-in-right
                 max-w-sm sm:max-w-md
             `}
+            style={{ 
+                border: 'none', 
+                outline: 'none',
+                background: 'var(--theme-bg-secondary, rgba(30, 41, 59, 0.95))'
+            }}
             role="alert"
             aria-live="polite"
         >

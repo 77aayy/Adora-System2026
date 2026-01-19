@@ -79,3 +79,11 @@ build/
 out/
 .vercel
 .env*.local
+
+# Temporary reports (moved to project_history)
+*_REPORT.md
+*_SUMMARY.md
+*_STATUS.md
+DEPLOYMENT_*.md
+*_COMPLETE.md
+*_INSTRUCTIONS.md

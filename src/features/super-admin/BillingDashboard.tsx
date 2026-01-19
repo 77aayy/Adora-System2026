@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    DollarSign, CreditCard, FileText, AlertTriangle, CheckCircle,
+    DollarSign, CreditCard, FileText, CheckCircle,
     Clock, Calendar, RefreshCw, Plus, Eye, Download, ArrowLeft,
     Printer, Filter, ChevronDown, X, Check, Trash2, TrendingUp,
     TrendingDown, Users, Building2, Activity, Percent, BarChart3
@@ -59,6 +59,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { confirm as customConfirm } from '../../services/customConfirmService';
 import { AdminSidebar } from '../../components/admin/AdminSidebar';
+import { UnifiedModal, ModalActions } from '../../components/common/UnifiedModal';
+import { Lock, AlertTriangle } from 'lucide-react';
 
 interface BillingDashboardProps {
     embedded?: boolean; // ✅ When true, hides header and transitions (for tab embedding)
@@ -527,11 +529,10 @@ const ComprehensiveFinancialStats: React.FC<{
         <div className="space-y-4">
             {/* ✅ Essential Financial KPIs - Dynamic Responsive Grid (Like Owner KPI Dashboard) */}
             <div 
-                className="grid"
+                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
                 style={{
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: 'clamp(12px, 2vw, 16px)',
-                    padding: 'clamp(12px, 2vw, 16px)',
+                    gap: 'clamp(8px, 1.5vw, 12px)', // ✅ Reduced gap - less white space
+                    padding: 'clamp(4px, 1vw, 8px)', // ✅ Reduced padding - less white space
                 }}
             >
                 {/* 1. إجمالي الإيرادات */}
@@ -641,11 +642,10 @@ const ReceiptVouchersStats: React.FC<{
     
     return (
         <div 
-            className="grid"
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
             style={{
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: 'clamp(12px, 2vw, 16px)',
-                padding: 'clamp(12px, 2vw, 16px)',
+                gap: 'clamp(8px, 1.5vw, 12px)', // ✅ Reduced gap - less white space
+                padding: 'clamp(4px, 1vw, 8px)', // ✅ Reduced padding - less white space
             }}
         >
             <div className="stat-card-pro-compact stat-card-billing">
@@ -733,11 +733,10 @@ const ExpenseVouchersStats: React.FC<{
     
     return (
         <div 
-            className="grid"
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
             style={{
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: 'clamp(12px, 2vw, 16px)',
-                padding: 'clamp(12px, 2vw, 16px)',
+                gap: 'clamp(8px, 1.5vw, 12px)', // ✅ Reduced gap - less white space
+                padding: 'clamp(4px, 1vw, 8px)', // ✅ Reduced padding - less white space
             }}
         >
             <div className="stat-card-pro-compact stat-card-billing">
@@ -802,30 +801,36 @@ const ReceiptVouchersTab: React.FC<{
     const { success, error } = useUX();
     const { user } = useAuth();
     
-    // ✅ Handle delete selected vouchers
-    const handleDelete = async () => {
+    // ✅ Handle delete selected vouchers (Password protected)
+    const handleDeleteClick = () => {
         if (selectedVouchers.size === 0) {
             error('يرجى تحديد سند واحد على الأقل للحذف');
             return;
         }
+        setShowDeleteModal(true);
+    };
+    
+    const handleDeleteConfirm = async () => {
+        // ✅ Validate password
+        if (deletePassword !== 'adora') {
+            error('الباسورد غير صحيح. الباسورد: adora');
+            return;
+        }
         
-        const confirmed = await customConfirm({
-            type: 'danger',
-            title: 'تأكيد الحذف',
-            message: `هل أنت متأكد من حذف ${selectedVouchers.size} سند${selectedVouchers.size > 1 ? 'ات' : ''}؟\n\nهذا الإجراء لا يمكن التراجع عنه.`,
-            confirmText: 'حذف',
-            cancelText: 'إلغاء'
-        });
-        
-        if (!confirmed) {
+        // ✅ Validate reason (required)
+        if (!deleteReason.trim()) {
+            error('يرجى كتابة سبب الحذف (إجباري)');
             return;
         }
         
         setDeleting(true);
         try {
-            await deleteReceiptVouchers(Array.from(selectedVouchers), user?.id);
+            await deleteReceiptVouchers(Array.from(selectedVouchers), user?.id, deleteReason.trim());
             success(`تم حذف ${selectedVouchers.size} سند بنجاح`);
             setSelectedVouchers(new Set());
+            setShowDeleteModal(false);
+            setDeletePassword('');
+            setDeleteReason('');
             // Reload data
             window.location.reload();
         } catch (err: any) {
@@ -850,6 +855,11 @@ const ReceiptVouchersTab: React.FC<{
     const [showFilters, setShowFilters] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [previewVoucher, setPreviewVoucher] = useState<ReceiptVoucher | null>(null);
+    
+    // ✅ Delete Modal State (Password protected)
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deleteReason, setDeleteReason] = useState('');
     
     
     // ✅ Filtered and sorted vouchers
@@ -1644,7 +1654,7 @@ const ReceiptVouchersTab: React.FC<{
                     {filteredVouchers.filter(v => !v.isDeleted).length > 0 && (
                         <>
                             <button
-                                onClick={handleDelete}
+                                onClick={handleDeleteClick}
                                 disabled={selectedVouchers.size === 0 || deleting}
                                 className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -2174,6 +2184,90 @@ const ReceiptVouchersTab: React.FC<{
                     </div>
                 </div>
             )}
+            
+            {/* ✅ Delete Modal (Password Protected) */}
+            <UnifiedModal
+                isOpen={showDeleteModal}
+                onClose={() => {
+                    if (!deleting) {
+                        setShowDeleteModal(false);
+                        setDeletePassword('');
+                        setDeleteReason('');
+                    }
+                }}
+                title="حذف السندات (محمي بكلمة مرور)"
+                subtitle={`سيتم حذف ${selectedVouchers.size} سند${selectedVouchers.size > 1 ? 'ات' : ''}. هذا الإجراء لا يمكن التراجع عنه.`}
+                icon={<Lock className="w-6 h-6 text-red-400" />}
+                size="md"
+                showCloseButton={!deleting}
+                closeOnBackdrop={!deleting}
+            >
+                <div className="space-y-4">
+                    {/* Password Input */}
+                    <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">
+                            كلمة المرور <span className="text-red-400">*</span>
+                        </label>
+                        <div className="relative">
+                            <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                            <input
+                                type="password"
+                                value={deletePassword}
+                                onChange={(e) => setDeletePassword(e.target.value)}
+                                placeholder="adora"
+                                className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all"
+                                dir="ltr"
+                                disabled={deleting}
+                                autoFocus
+                            />
+                        </div>
+                        <p className="text-xs text-white/50 mt-1">الباسورد: adora</p>
+                    </div>
+
+                    {/* Reason Input (Required) */}
+                    <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">
+                            سبب الحذف <span className="text-red-400">*</span>
+                        </label>
+                        <textarea
+                            value={deleteReason}
+                            onChange={(e) => setDeleteReason(e.target.value)}
+                            placeholder="يرجى كتابة سبب الحذف (مطلوب)"
+                            rows={3}
+                            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all resize-none"
+                            dir="rtl"
+                            disabled={deleting}
+                            required
+                        />
+                    </div>
+
+                    {/* Warning */}
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-red-300">
+                            <p className="font-semibold mb-1">تنبيه مهم!</p>
+                            <p>سيتم تسجيل عملية الحذف في سجل المحذوفات. تأكد من صحة السبب المدون.</p>
+                        </div>
+                    </div>
+
+                    {/* Actions */}
+                    <ModalActions
+                        onCancel={() => {
+                            if (!deleting) {
+                                setShowDeleteModal(false);
+                                setDeletePassword('');
+                                setDeleteReason('');
+                            }
+                        }}
+                        onConfirm={handleDeleteConfirm}
+                        cancelText="إلغاء"
+                        confirmText="حذف"
+                        confirmVariant="danger"
+                        loading={deleting}
+                        disabled={!deletePassword || !deleteReason.trim() || deleting}
+                    />
+                </div>
+            </UnifiedModal>
         </div>
     );
 };
@@ -3345,30 +3439,41 @@ const InvoicesTab: React.FC<{
     const [showFilters, setShowFilters] = useState(false);
     const [deleting, setDeleting] = useState(false);
     
-    // ✅ Handle delete selected invoices
-    const handleDelete = async () => {
+    // ✅ Delete Modal State (Password protected)
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deleteReason, setDeleteReason] = useState('');
+    
+    // ✅ Handle delete selected invoices (Password protected)
+    const handleDeleteClick = () => {
         if (selectedInvoices.size === 0) {
             error('يرجى تحديد فاتورة واحدة على الأقل للحذف');
             return;
         }
+        setShowDeleteModal(true);
+    };
+    
+    const handleDeleteConfirm = async () => {
+        // ✅ Validate password
+        if (deletePassword !== 'adora') {
+            error('الباسورد غير صحيح. الباسورد: adora');
+            return;
+        }
         
-        const confirmed = await customConfirm({
-            type: 'danger',
-            title: 'تأكيد الحذف',
-            message: `هل أنت متأكد من حذف ${selectedInvoices.size} فاتورة${selectedInvoices.size > 1 ? 'ات' : ''}؟\n\nهذا الإجراء لا يمكن التراجع عنه.`,
-            confirmText: 'حذف',
-            cancelText: 'إلغاء'
-        });
-        
-        if (!confirmed) {
+        // ✅ Validate reason (required)
+        if (!deleteReason.trim()) {
+            error('يرجى كتابة سبب الحذف (إجباري)');
             return;
         }
         
         setDeleting(true);
         try {
-            await deleteInvoices(Array.from(selectedInvoices), user?.id);
+            await deleteInvoices(Array.from(selectedInvoices), user?.id, deleteReason.trim());
             success(`تم حذف ${selectedInvoices.size} فاتورة بنجاح`);
             setSelectedInvoices(new Set());
+            setShowDeleteModal(false);
+            setDeletePassword('');
+            setDeleteReason('');
             // Reload data
             window.location.reload();
         } catch (err: any) {
@@ -3804,12 +3909,22 @@ const InvoicesTab: React.FC<{
                             <tbody>
                                 <tr style="border-bottom: 1px solid #e5e7eb;">
                                     <td style="padding: 12px; text-align: right; font-size: 10pt; color: #1f2937; border-left: 1px solid #e5e7eb;">
-                                        اشتراك ${invoice.subscriptionDuration === 1 ? 'سنة واحدة' : invoice.subscriptionDuration === 2 ? 'سنتين' : 'غير محدد'} - ${invoice.branchName || '-'} (${invoice.branchCode || '-'})
+                                        اشتراك ${invoice.subscriptionDuration === 1 ? 'سنة واحدة' : invoice.subscriptionDuration === 2 ? 'سنتين' : 'غير محدد'} - ${invoice.numberOfBranches || 1} ${(invoice.numberOfBranches || 1) === 1 ? 'فرع' : 'فروع'} - ${invoice.branchName || '-'} (${invoice.branchCode || '-'})
                                     </td>
-                                    <td style="padding: 12px; text-align: center; font-size: 10pt; color: #1f2937; border-left: 1px solid #e5e7eb;">${invoice.numberOfBranches || 1}</td>
+                                    <td style="padding: 12px; text-align: center; font-size: 10pt; color: #1f2937; border-left: 1px solid #e5e7eb;">${(invoice.numberOfBranches || 1) * (invoice.subscriptionDuration || 1)}</td>
                                     <td style="padding: 12px; text-align: left; font-size: 10pt; color: #1f2937; border-left: 1px solid #e5e7eb;">${(invoice.items?.[0]?.price || subtotal).toLocaleString()} ر.س</td>
                                     <td style="padding: 12px; text-align: left; font-size: 10pt; color: #1f2937; font-weight: 600;">${subtotal.toLocaleString()} ر.س</td>
                                 </tr>
+                                ${invoice.items && invoice.items.length > 1 && invoice.items[1]?.price < 0 ? `
+                                <tr style="border-bottom: 1px solid #e5e7eb; background: #fef2f2;">
+                                    <td style="padding: 12px; text-align: right; font-size: 10pt; color: #dc2626; border-left: 1px solid #e5e7eb; font-weight: 600;">
+                                        ${invoice.items[1].description || 'خصم للاشتراك سنتين'}
+                                    </td>
+                                    <td style="padding: 12px; text-align: center; font-size: 10pt; color: #dc2626; border-left: 1px solid #e5e7eb;">1</td>
+                                    <td style="padding: 12px; text-align: left; font-size: 10pt; color: #dc2626; border-left: 1px solid #e5e7eb;">${Math.abs(invoice.items[1].price).toLocaleString()} ر.س</td>
+                                    <td style="padding: 12px; text-align: left; font-size: 10pt; color: #dc2626; font-weight: 600;">-${Math.abs(invoice.items[1].price).toLocaleString()} ر.س</td>
+                                </tr>
+                                ` : ''}
                             </tbody>
                         </table>
                         
@@ -3928,7 +4043,7 @@ const InvoicesTab: React.FC<{
                     {filteredInvoices.length > 0 && (
                         <>
                             <button
-                                onClick={handleDelete}
+                                onClick={handleDeleteClick}
                                 disabled={selectedInvoices.size === 0 || deleting}
                                 className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -4332,6 +4447,90 @@ const InvoicesTab: React.FC<{
                     })()
                 )}
             </div>
+            
+            {/* ✅ Delete Modal (Password Protected) */}
+            <UnifiedModal
+                isOpen={showDeleteModal}
+                onClose={() => {
+                    if (!deleting) {
+                        setShowDeleteModal(false);
+                        setDeletePassword('');
+                        setDeleteReason('');
+                    }
+                }}
+                title="حذف الفواتير (محمي بكلمة مرور)"
+                subtitle={`سيتم حذف ${selectedInvoices.size} فاتورة${selectedInvoices.size > 1 ? 'ات' : ''}. هذا الإجراء لا يمكن التراجع عنه.`}
+                icon={<Lock className="w-6 h-6 text-red-400" />}
+                size="md"
+                showCloseButton={!deleting}
+                closeOnBackdrop={!deleting}
+            >
+                <div className="space-y-4">
+                    {/* Password Input */}
+                    <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">
+                            كلمة المرور <span className="text-red-400">*</span>
+                        </label>
+                        <div className="relative">
+                            <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                            <input
+                                type="password"
+                                value={deletePassword}
+                                onChange={(e) => setDeletePassword(e.target.value)}
+                                placeholder="adora"
+                                className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all"
+                                dir="ltr"
+                                disabled={deleting}
+                                autoFocus
+                            />
+                        </div>
+                        <p className="text-xs text-white/50 mt-1">الباسورد: adora</p>
+                    </div>
+
+                    {/* Reason Input (Required) */}
+                    <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">
+                            سبب الحذف <span className="text-red-400">*</span>
+                        </label>
+                        <textarea
+                            value={deleteReason}
+                            onChange={(e) => setDeleteReason(e.target.value)}
+                            placeholder="يرجى كتابة سبب الحذف (مطلوب)"
+                            rows={3}
+                            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all resize-none"
+                            dir="rtl"
+                            disabled={deleting}
+                            required
+                        />
+                    </div>
+
+                    {/* Warning */}
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-red-300">
+                            <p className="font-semibold mb-1">تنبيه مهم!</p>
+                            <p>سيتم تسجيل عملية الحذف في سجل المحذوفات. تأكد من صحة السبب المدون.</p>
+                        </div>
+                    </div>
+
+                    {/* Actions */}
+                    <ModalActions
+                        onCancel={() => {
+                            if (!deleting) {
+                                setShowDeleteModal(false);
+                                setDeletePassword('');
+                                setDeleteReason('');
+                            }
+                        }}
+                        onConfirm={handleDeleteConfirm}
+                        cancelText="إلغاء"
+                        confirmText="حذف"
+                        confirmVariant="danger"
+                        loading={deleting}
+                        disabled={!deletePassword || !deleteReason.trim() || deleting}
+                    />
+                </div>
+            </UnifiedModal>
         </div>
     );
 };

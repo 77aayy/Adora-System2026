@@ -38,6 +38,7 @@ import { ThemeToggleButton } from '../common/ThemeToggle';
 import { LanguageSwitcher } from '../common/LanguageSwitcher';
 import { getGreetingParts } from '../../utils/greetings';
 import { ADORA_THEME } from '../../design/adoraTheme';
+import { useGlobalServices } from '../providers/GlobalServicesProvider';
 
 interface DepartmentTab {
     id: string;
@@ -55,6 +56,7 @@ export const PremiumHeader: React.FC = () => {
     const { user, logout, branchId, setBranch } = useAuth();
     const { branches } = useTenantBranches();
     const { isEnabled: isProcurementEnabled } = useFeatureGate('procurementSystem');
+    const { isOnline } = useGlobalServices(); // ✅ Get online status from GlobalServicesProvider
     
     const [showBranchMenu, setShowBranchMenu] = useState(false);
     const [showActionsMenu, setShowActionsMenu] = useState(false);
@@ -257,20 +259,37 @@ export const PremiumHeader: React.FC = () => {
                                 />
                             </button>
 
-                            {/* ADORA Logo - Prominent with Turquoise Glow */}
-                            <Link 
-                                to="/admin" 
-                                className="flex items-center flex-shrink-0 group transition-transform duration-300 hover:scale-105"
-                            >
-                                <img
-                                    src="/adora-logo.png"
-                                    alt="Adora"
-                                    className="h-9 sm:h-10 lg:h-11 w-auto object-contain transition-all duration-300"
-                                    style={{ 
-                                        filter: 'var(--logo-filter, none) drop-shadow(0 2px 8px rgba(20, 184, 166, 0.2))',
+                            {/* ADORA Logo - Prominent with Turquoise Glow + Offline Indicator */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                <Link 
+                                    to="/admin" 
+                                    className="flex items-center flex-shrink-0 group transition-transform duration-300 hover:scale-105"
+                                >
+                                    <img
+                                        src="/adora-logo.png"
+                                        alt="Adora"
+                                        className="h-9 sm:h-10 lg:h-11 w-auto object-contain transition-all duration-300"
+                                        style={{ 
+                                            filter: 'var(--logo-filter, none) drop-shadow(0 2px 8px rgba(20, 184, 166, 0.2))',
+                                        }}
+                                    />
+                                </Link>
+                                {/* ✅ Header Offline Indicator - Simple dot (green/red) next to logo */}
+                                <div
+                                    className="w-2.5 h-2.5 rounded-full transition-all duration-300 animate-pulse"
+                                    style={{
+                                        background: isOnline 
+                                            ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                                            : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                        boxShadow: isOnline 
+                                            ? '0 0 8px rgba(16, 185, 129, 0.5)' 
+                                            : '0 0 8px rgba(239, 68, 68, 0.5)',
+                                        flexShrink: 0,
                                     }}
+                                    title={isOnline ? 'متصل بالإنترنت' : 'غير متصل بالإنترنت'}
+                                    aria-label={isOnline ? 'متصل' : 'غير متصل'}
                                 />
-                            </Link>
+                            </div>
 
                             {/* Branch Selector - Spacious Design with Turquoise Accent */}
                             {/* Always show branch selector, even if branches array is empty */}

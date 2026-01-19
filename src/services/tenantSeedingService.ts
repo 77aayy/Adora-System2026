@@ -18,7 +18,8 @@ import {
     query,
     limit,
     Timestamp,
-    serverTimestamp
+    serverTimestamp,
+    writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -369,29 +370,30 @@ export const HEALTH_CHECK_DOC = {
 
 /**
  * Check if a collection has any documents
+ * ✅ SaaS: Uses tenantId for data isolation
  */
-const isCollectionEmpty = async (collectionName: string): Promise<boolean> => {
+const isCollectionEmpty = async (collectionName: string, tenantId?: string): Promise<boolean> => {
     if (!db) return true;
 
     try {
-        const q = query(collection(db, collectionName), limit(1));
+        // ✅ SaaS: Use tenant path if tenantId provided
+        const collectionPath = tenantId 
+            ? `tenants/${tenantId}/${collectionName}`
+            : collectionName;
+        const q = query(collection(db, collectionPath), limit(1));
         const snapshot = await getDocs(q);
         return snapshot.empty;
     } catch (error: any) {
         // ✅ Graceful handling: If permission denied, assume collection needs seeding
-        // This allows seeding to proceed even if read access is restricted
         const isPermissionError = error?.code === 'permission-denied' || 
                                   error?.message?.includes('permission') ||
                                   error?.message?.includes('Missing or insufficient');
         
         if (isPermissionError) {
-            // If we can't read due to permissions, assume it needs seeding
-            // The seeding write will either succeed (if we have write access) or fail gracefully
-            return true;
+            return true; // Assume needs seeding
         }
         
-        // For other errors, also assume it needs seeding to attempt fixing
-        return true;
+        return true; // For other errors, assume needs seeding
     }
 };
 
@@ -412,17 +414,32 @@ const seedSettings = async (): Promise<number> => {
 
 /**
  * Seed room statuses collection
+ * ✅ SaaS: Uses tenantId for data isolation
+ * ✅ FIX: Uses batch writes to prevent "INTERNAL ASSERTION FAILED" errors
  */
-const seedRoomStatuses = async (): Promise<number> => {
-    if (!db) return 0;
+const seedRoomStatuses = async (tenantId: string): Promise<number> => {
+    if (!db || !tenantId) return 0;
     let count = 0;
+    const BATCH_SIZE = 50;
+    const statuses = [...DEFAULT_ROOM_STATUSES];
 
-    for (const status of DEFAULT_ROOM_STATUSES) {
-        await setDoc(doc(db, 'roomStatuses', status.id), {
-            ...status,
-            createdAt: serverTimestamp()
-        }, { merge: true });
-        count++;
+    for (let i = 0; i < statuses.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = statuses.slice(i, i + BATCH_SIZE);
+
+        for (const status of chunk) {
+            batch.set(doc(db, `tenants/${tenantId}/roomStatuses`, status.id), {
+                ...status,
+                createdAt: serverTimestamp()
+            }, { merge: true });
+            count++;
+        }
+
+        await batch.commit();
+        
+        if (i + BATCH_SIZE < statuses.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
     }
 
     return count;
@@ -430,17 +447,32 @@ const seedRoomStatuses = async (): Promise<number> => {
 
 /**
  * Seed departments collection
+ * ✅ SaaS: Uses tenantId for data isolation
+ * ✅ FIX: Uses batch writes to prevent "INTERNAL ASSERTION FAILED" errors
  */
-const seedDepartments = async (): Promise<number> => {
-    if (!db) return 0;
+const seedDepartments = async (tenantId: string): Promise<number> => {
+    if (!db || !tenantId) return 0;
     let count = 0;
+    const BATCH_SIZE = 50;
+    const departments = [...DEFAULT_DEPARTMENTS];
 
-    for (const dept of DEFAULT_DEPARTMENTS) {
-        await setDoc(doc(db, 'departments', dept.id), {
-            ...dept,
-            createdAt: serverTimestamp()
-        }, { merge: true });
-        count++;
+    for (let i = 0; i < departments.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = departments.slice(i, i + BATCH_SIZE);
+
+        for (const dept of chunk) {
+            batch.set(doc(db, `tenants/${tenantId}/departments`, dept.id), {
+                ...dept,
+                createdAt: serverTimestamp()
+            }, { merge: true });
+            count++;
+        }
+
+        await batch.commit();
+        
+        if (i + BATCH_SIZE < departments.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
     }
 
     return count;
@@ -448,17 +480,32 @@ const seedDepartments = async (): Promise<number> => {
 
 /**
  * Seed roles collection
+ * ✅ SaaS: Uses tenantId for data isolation
+ * ✅ FIX: Uses batch writes to prevent "INTERNAL ASSERTION FAILED" errors
  */
-const seedRoles = async (): Promise<number> => {
-    if (!db) return 0;
+const seedRoles = async (tenantId: string): Promise<number> => {
+    if (!db || !tenantId) return 0;
     let count = 0;
+    const BATCH_SIZE = 50;
+    const roles = [...DEFAULT_ROLES];
 
-    for (const role of DEFAULT_ROLES) {
-        await setDoc(doc(db, 'roles', role.id), {
-            ...role,
-            createdAt: serverTimestamp()
-        }, { merge: true });
-        count++;
+    for (let i = 0; i < roles.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = roles.slice(i, i + BATCH_SIZE);
+
+        for (const role of chunk) {
+            batch.set(doc(db, `tenants/${tenantId}/roles`, role.id), {
+                ...role,
+                createdAt: serverTimestamp()
+            }, { merge: true });
+            count++;
+        }
+
+        await batch.commit();
+        
+        if (i + BATCH_SIZE < roles.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
     }
 
     return count;
@@ -466,17 +513,32 @@ const seedRoles = async (): Promise<number> => {
 
 /**
  * Seed maintenance templates collection
+ * ✅ SaaS: Uses tenantId for data isolation
+ * ✅ FIX: Uses batch writes to prevent "INTERNAL ASSERTION FAILED" errors
  */
-const seedMaintenanceTemplates = async (): Promise<number> => {
-    if (!db) return 0;
+const seedMaintenanceTemplates = async (tenantId: string): Promise<number> => {
+    if (!db || !tenantId) return 0;
     let count = 0;
+    const BATCH_SIZE = 50;
+    const templates = [...DEFAULT_MAINTENANCE_TEMPLATES];
 
-    for (const template of DEFAULT_MAINTENANCE_TEMPLATES) {
-        await setDoc(doc(db, 'maintenanceTemplates', template.id), {
-            ...template,
-            createdAt: serverTimestamp()
-        }, { merge: true });
-        count++;
+    for (let i = 0; i < templates.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = templates.slice(i, i + BATCH_SIZE);
+
+        for (const template of chunk) {
+            batch.set(doc(db, `tenants/${tenantId}/maintenanceTemplates`, template.id), {
+                ...template,
+                createdAt: serverTimestamp()
+            }, { merge: true });
+            count++;
+        }
+
+        await batch.commit();
+        
+        if (i + BATCH_SIZE < templates.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
     }
 
     return count;
@@ -484,17 +546,32 @@ const seedMaintenanceTemplates = async (): Promise<number> => {
 
 /**
  * Seed ranks collection (for gamification)
+ * ✅ SaaS: Uses tenantId for data isolation
+ * ✅ FIX: Uses batch writes to prevent "INTERNAL ASSERTION FAILED" errors
  */
-const seedRanks = async (): Promise<number> => {
-    if (!db) return 0;
+const seedRanks = async (tenantId: string): Promise<number> => {
+    if (!db || !tenantId) return 0;
     let count = 0;
+    const BATCH_SIZE = 50;
+    const ranks = [...DEFAULT_RANKS];
 
-    for (const rank of DEFAULT_RANKS) {
-        await setDoc(doc(db, 'ranks', rank.id), {
-            ...rank,
-            createdAt: serverTimestamp()
-        }, { merge: true });
-        count++;
+    for (let i = 0; i < ranks.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = ranks.slice(i, i + BATCH_SIZE);
+
+        for (const rank of chunk) {
+            batch.set(doc(db, `tenants/${tenantId}/ranks`, rank.id), {
+                ...rank,
+                createdAt: serverTimestamp()
+            }, { merge: true });
+            count++;
+        }
+
+        await batch.commit();
+        
+        if (i + BATCH_SIZE < ranks.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
     }
 
     return count;
@@ -503,17 +580,31 @@ const seedRanks = async (): Promise<number> => {
 /**
  * Seed achievements collection for a specific tenant (for gamification ranks)
  * This creates the default rank progression system
+ * ✅ FIX: Uses batch writes to prevent "INTERNAL ASSERTION FAILED" errors
  */
 export const seedTenantAchievements = async (tenantId: string): Promise<number> => {
     if (!db || !tenantId) return 0;
     let count = 0;
+    const BATCH_SIZE = 50;
+    const achievements = [...DEFAULT_ACHIEVEMENTS];
 
-    for (const achievement of DEFAULT_ACHIEVEMENTS) {
-        await setDoc(doc(db, `tenants/${tenantId}/achievements`, achievement.id), {
-            ...achievement,
-            createdAt: serverTimestamp()
-        }, { merge: true });
-        count++;
+    for (let i = 0; i < achievements.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = achievements.slice(i, i + BATCH_SIZE);
+
+        for (const achievement of chunk) {
+            batch.set(doc(db, `tenants/${tenantId}/achievements`, achievement.id), {
+                ...achievement,
+                createdAt: serverTimestamp()
+            }, { merge: true });
+            count++;
+        }
+
+        await batch.commit();
+        
+        if (i + BATCH_SIZE < achievements.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
     }
 
     console.log(`  ✅ ${count} achievements seeded for tenant ${tenantId}`);
@@ -522,15 +613,16 @@ export const seedTenantAchievements = async (tenantId: string): Promise<number> 
 
 /**
  * Create demo room
+ * ✅ SaaS: Uses tenantId for data isolation
  */
-const seedDemoRoom = async (): Promise<number> => {
-    if (!db) return 0;
+const seedDemoRoom = async (tenantId: string): Promise<number> => {
+    if (!db || !tenantId) return 0;
 
     // Check if any rooms exist
-    const roomsEmpty = await isCollectionEmpty('rooms');
+    const roomsEmpty = await isCollectionEmpty('rooms', tenantId);
     if (!roomsEmpty) return 0;
 
-    await setDoc(doc(db, 'rooms', DEFAULT_DEMO_ROOM.id), {
+    await setDoc(doc(db, `tenants/${tenantId}/rooms`, DEFAULT_DEMO_ROOM.id), {
         ...DEFAULT_DEMO_ROOM,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -541,11 +633,12 @@ const seedDemoRoom = async (): Promise<number> => {
 
 /**
  * Create health check document
+ * ✅ SaaS: Uses tenantId for data isolation
  */
-const seedHealthCheck = async (): Promise<number> => {
-    if (!db) return 0;
+const seedHealthCheck = async (tenantId: string): Promise<number> => {
+    if (!db || !tenantId) return 0;
 
-    await setDoc(doc(db, 'health_check', 'status'), {
+    await setDoc(doc(db, `tenants/${tenantId}/health_check`, 'status'), {
         ...HEALTH_CHECK_DOC,
         lastCheck: serverTimestamp()
     });
@@ -559,12 +652,16 @@ const seedHealthCheck = async (): Promise<number> => {
 
 /**
  * Seeds all required collections for a new tenant database
+ * ✅ SaaS: Uses tenantId for data isolation
  * Uses merge: true to avoid overwriting existing data
  */
-export const seedTenantDatabase = async (options?: {
-    forceReseed?: boolean;
-    includeDemoRoom?: boolean;
-}): Promise<SeedingResult> => {
+export const seedTenantDatabase = async (
+    tenantId: string,
+    options?: {
+        forceReseed?: boolean;
+        includeDemoRoom?: boolean;
+    }
+): Promise<SeedingResult> => {
     const result: SeedingResult = {
         success: false,
         collectionsCreated: [],
@@ -577,86 +674,108 @@ export const seedTenantDatabase = async (options?: {
         return result;
     }
 
+    if (!tenantId) {
+        result.errors.push('tenantId is required for SaaS isolation');
+        return result;
+    }
+
     const { forceReseed = false, includeDemoRoom = true } = options || {};
 
-    console.log('🌱 Starting database seeding...');
+    console.log(`🌱 Starting database seeding for tenant: ${tenantId}...`);
 
     try {
+        // ✅ FIX: Add delay between collections to prevent overwhelming Firestore
         // Settings
         try {
-            if (forceReseed || await isCollectionEmpty('settings')) {
-                const count = await seedSettings();
+            if (forceReseed || await isCollectionEmpty('settings', tenantId)) {
+                const count = await seedSettings(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('settings');
                 console.log('  ✅ settings seeded');
+                await new Promise(resolve => setTimeout(resolve, 200)); // Delay between collections
             }
         } catch (e: any) {
             result.errors.push(`settings: ${e.message}`);
+            console.error('❌ Error seeding settings:', e);
         }
 
         // Room Statuses
         try {
-            if (forceReseed || await isCollectionEmpty('roomStatuses')) {
-                const count = await seedRoomStatuses();
+            const isEmpty = await isCollectionEmpty('roomStatuses', tenantId);
+            console.log(`  🔍 roomStatuses empty check: ${isEmpty} (forceReseed: ${forceReseed})`);
+            if (forceReseed || isEmpty) {
+                const count = await seedRoomStatuses(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('roomStatuses');
-                console.log('  ✅ roomStatuses seeded');
+                console.log(`  ✅ roomStatuses seeded (${count} documents)`);
+                await new Promise(resolve => setTimeout(resolve, 200));
+            } else {
+                console.log('  ⏭️ roomStatuses skipped (not empty)');
             }
         } catch (e: any) {
             result.errors.push(`roomStatuses: ${e.message}`);
+            console.error('❌ Error seeding roomStatuses:', e);
         }
 
         // Departments
         try {
-            if (forceReseed || await isCollectionEmpty('departments')) {
-                const count = await seedDepartments();
+            if (forceReseed || await isCollectionEmpty('departments', tenantId)) {
+                const count = await seedDepartments(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('departments');
                 console.log('  ✅ departments seeded');
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch (e: any) {
             result.errors.push(`departments: ${e.message}`);
+            console.error('❌ Error seeding departments:', e);
         }
 
         // Roles
         try {
-            if (forceReseed || await isCollectionEmpty('roles')) {
-                const count = await seedRoles();
+            if (forceReseed || await isCollectionEmpty('roles', tenantId)) {
+                const count = await seedRoles(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('roles');
                 console.log('  ✅ roles seeded');
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch (e: any) {
             result.errors.push(`roles: ${e.message}`);
+            console.error('❌ Error seeding roles:', e);
         }
 
         // Maintenance Templates
         try {
-            if (forceReseed || await isCollectionEmpty('maintenanceTemplates')) {
-                const count = await seedMaintenanceTemplates();
+            if (forceReseed || await isCollectionEmpty('maintenanceTemplates', tenantId)) {
+                const count = await seedMaintenanceTemplates(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('maintenanceTemplates');
                 console.log('  ✅ maintenanceTemplates seeded');
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch (e: any) {
             result.errors.push(`maintenanceTemplates: ${e.message}`);
+            console.error('❌ Error seeding maintenanceTemplates:', e);
         }
 
         // Ranks
         try {
-            if (forceReseed || await isCollectionEmpty('ranks')) {
-                const count = await seedRanks();
+            if (forceReseed || await isCollectionEmpty('ranks', tenantId)) {
+                const count = await seedRanks(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('ranks');
                 console.log('  ✅ ranks seeded');
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch (e: any) {
             result.errors.push(`ranks: ${e.message}`);
+            console.error('❌ Error seeding ranks:', e);
         }
 
         // Health Check
         try {
-            const count = await seedHealthCheck();
+            const count = await seedHealthCheck(tenantId);
             result.totalDocuments += count;
             result.collectionsCreated.push('health_check');
             console.log('  ✅ health_check seeded');
@@ -667,7 +786,7 @@ export const seedTenantDatabase = async (options?: {
         // Demo Room (optional)
         if (includeDemoRoom) {
             try {
-                const count = await seedDemoRoom();
+                const count = await seedDemoRoom(tenantId);
                 if (count > 0) {
                     result.totalDocuments += count;
                     result.collectionsCreated.push('rooms (demo)');
@@ -698,7 +817,11 @@ export const seedTenantDatabase = async (options?: {
 /**
  * Check which collections are missing
  */
-export const checkMissingCollections = async (): Promise<string[]> => {
+/**
+ * Check for missing collections
+ * ✅ SaaS: Uses tenantId for data isolation
+ */
+export const checkMissingCollections = async (tenantId?: string): Promise<string[]> => {
     const requiredCollections = [
         'settings',
         'roomStatuses',
@@ -712,7 +835,7 @@ export const checkMissingCollections = async (): Promise<string[]> => {
     const missing: string[] = [];
 
     for (const collectionName of requiredCollections) {
-        const isEmpty = await isCollectionEmpty(collectionName);
+        const isEmpty = await isCollectionEmpty(collectionName, tenantId);
         if (isEmpty) {
             missing.push(collectionName);
         }

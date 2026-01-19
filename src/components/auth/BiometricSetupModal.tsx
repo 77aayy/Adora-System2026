@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Fingerprint, CheckCircle, X, AlertCircle, RefreshCw } from 'lucide-react';
 import {
     registerBiometric,
@@ -26,6 +27,7 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
     onComplete,
     onSkip
 }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const { success, error, warning } = useUX();
     const [attempt, setAttempt] = useState(1);
@@ -61,16 +63,16 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
 
             if (attempt >= totalAttempts) {
                 setCompleted(true);
-                success('تم تسجيل البصمة بنجاح! يمكنك الآن الدخول بالبصمة');
+                success(t('biometric.registerSuccess'));
                 setTimeout(() => {
                     onComplete();
                 }, 2000);
             } else {
                 setAttempt(attempt + 1);
-                success(`تم تسجيل المحاولة ${attempt}/${totalAttempts}. يرجى المحاولة مرة أخرى`);
+                success(t('biometric.registerAttemptSuccess', { attempt, total: totalAttempts }));
             }
         } catch (err: any) {
-            error(err.message || 'فشل تسجيل البصمة');
+            error(err.message || t('biometric.registerError'));
         } finally {
             setIsRegistering(false);
         }
@@ -85,11 +87,11 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
         const { skipCount, isPermanent } = recordBiometricSkip(user.id, user.tenantId);
         
         if (isPermanent) {
-            warning('لن تظهر هذه النافذة مرة أخرى. يمكنك تفعيل البصمة من الإعدادات لاحقاً');
+            warning(t('biometric.skipPermanentMessage'));
         } else {
             const remaining = maxSkips - skipCount;
             if (remaining <= 2) {
-                warning(`ستظهر هذه النافذة ${remaining} مرة/مرات فقط`);
+                warning(t('biometric.skipRemainingMessage', { remaining }));
             }
         }
         
@@ -102,16 +104,15 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
                 <div className="solid-modal rounded-2xl p-6 max-w-md w-full" style={{ background: '#1e293b' }}>
                     <div className="text-center">
                         <AlertCircle className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-                        <h3 className="text-xl font-bold text-white mb-2">البصمة غير مدعومة</h3>
-                        <p className="text-slate-400 mb-6">
-                            متصفحك أو جهازك لا يدعم تسجيل الدخول بالبصمة.
-                            يمكنك استخدام كود الدخول بدلاً من ذلك.
+                        <h3 className="text-xl font-bold text-white mb-2">{t('biometric.notSupportedTitle')}</h3>
+                        <p className="text-slate-400 mb-6 whitespace-pre-line">
+                            {t('biometric.notSupportedMessage')}
                         </p>
                         <button
                             onClick={onSkip}
                             className="px-6 py-3 bg-teal-500 rounded-xl text-white hover:bg-teal-600 transition-colors"
                         >
-                            موافق
+                            {t('biometric.okButton')}
                         </button>
                     </div>
                 </div>
@@ -125,9 +126,9 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
                 <div className="solid-modal rounded-2xl p-6 max-w-md w-full" style={{ background: '#1e293b' }}>
                     <div className="text-center">
                         <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4 animate-pulse" />
-                        <h3 className="text-xl font-bold text-white mb-2">تم بنجاح! ✅</h3>
+                        <h3 className="text-xl font-bold text-white mb-2">{t('biometric.completedTitle')}</h3>
                         <p className="text-slate-400">
-                            تم تسجيل البصمة بنجاح. يمكنك الآن الدخول بالبصمة في المرة القادمة.
+                            {t('biometric.completedMessage')}
                         </p>
                     </div>
                 </div>
@@ -142,16 +143,16 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
                     <div className="w-20 h-20 rounded-full bg-teal-500/20 flex items-center justify-center mx-auto mb-4">
                         <Fingerprint className="w-10 h-10 text-teal-400" />
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">تسجيل البصمة</h3>
+                    <h3 className="text-2xl font-bold text-white mb-2">{t('biometric.registerTitle')}</h3>
                     <p className="text-white/60">
-                        للمزيد من الأمان، يرجى تسجيل بصمتك للدخول السريع
+                        {t('biometric.registerMessage')}
                     </p>
                 </div>
 
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-white/60">المحاولة {attempt} من {totalAttempts}</span>
-                        <span className="text-sm text-white/60">{Math.round((attempt / totalAttempts) * 100)}%</span>
+                        <span className="text-sm text-white/60">{t('biometric.attemptProgress', { current: attempt, total: totalAttempts })}</span>
+                        <span className="text-sm text-white/60">{t('biometric.progressPercent', { percent: Math.round((attempt / totalAttempts) * 100) })}</span>
                     </div>
                     <div className="w-full bg-white/10 rounded-full h-2">
                         <div
@@ -163,10 +164,10 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
 
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-6">
                     <p className="text-sm text-blue-400 text-center">
-                        {attempt === 1 && '🔒 اضغط على البصمة أو Face ID للمرة الأولى'}
-                        {attempt === 2 && '🔒 اضغط مرة أخرى للمرة الثانية'}
-                        {attempt === 3 && '🔒 اضغط مرة أخرى للمرة الثالثة'}
-                        {attempt === 4 && '🔒 المحاولة الأخيرة - اضغط مرة أخرى'}
+                        {attempt === 1 && t('biometric.instructionAttempt1')}
+                        {attempt === 2 && t('biometric.instructionAttempt2')}
+                        {attempt === 3 && t('biometric.instructionAttempt3')}
+                        {attempt === 4 && t('biometric.instructionAttempt4')}
                     </p>
                 </div>
 
@@ -185,7 +186,7 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
                         onClick={handleSkip}
                         className="flex-1 px-4 py-3 bg-white/5 rounded-xl text-white hover:bg-white/10 transition-colors text-sm"
                     >
-                        تخطي ({maxSkips - currentSkipCount} متبقية)
+                        {t('biometric.skipButton', { remaining: maxSkips - currentSkipCount })}
                     </button>
                     <button
                         onClick={handleRegister}
@@ -195,12 +196,12 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
                         {isRegistering ? (
                             <>
                                 <AdoraLoaderInline size={16} />
-                                جاري التسجيل...
+                                {t('biometric.registering')}
                             </>
                         ) : (
                             <>
                                 <Fingerprint className="w-4 h-4" />
-                                تسجيل البصمة
+                                {t('biometric.registerButton')}
                             </>
                         )}
                     </button>

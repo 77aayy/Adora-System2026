@@ -8,6 +8,7 @@
  * @license Property of Ayman Ahmed - Adora Hotels Management System
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Building, DoorOpen, ChevronRight } from 'lucide-react';
 import { db } from '../../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -45,10 +46,14 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
     onClose,
     onSelect,
     showOccupiedOnly = false,
-    title = 'اختر الغرفة'
+    title
 }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const { tenantId } = useTenant();
+    
+    // ✅ i18n: Use translated default title
+    const displayTitle = title || t('roomSelector.defaultTitle');
 
     const [rooms, setRooms] = useState<Room[]>([]);
     const [roomsByFloor, setRoomsByFloor] = useState<Record<number, Room[]>>({});
@@ -164,14 +169,14 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
                             className="flex items-center gap-2 text-white/70 hover:text-white"
                         >
                             <ChevronRight className="w-5 h-5" />
-                            <span>الرجوع</span>
+                            <span>{t('common.back')}</span>
                         </button>
                     ) : (
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center">
                                 <Building className="w-5 h-5 text-primary-400" />
                             </div>
-                            <h3 className="text-lg font-semibold text-white">{title}</h3>
+                            <h3 className="text-lg font-semibold text-white">{displayTitle}</h3>
                         </div>
                     )}
                     <button onClick={onClose} className="text-white/60 hover:text-white">

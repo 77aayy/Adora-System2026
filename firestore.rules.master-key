@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // 🔐 MASTER KEY ARCHITECTURE
+    // ✅ Strategy: Read-only for clients, Write via Cloud Functions (Admin SDK)
+    // ============================================
+    
+    // ✅ SIMPLE RULE: Everyone can read (authenticated), NO ONE can write (except Functions)
+    match /{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false; // ✅ Only Cloud Functions (Admin SDK) can write
+    }
+    
+    // ============================================
+    // 📝 EXCEPTIONS (Client can create logs)
+    // ============================================
+    
+    // Audit logs - Client can create (for logging), but not update/delete
+    match /audit_logs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null; // ✅ Client can log actions
+      allow update, delete: if false; // ✅ Only Functions can modify
+    }
+    
+    match /auditLogs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+    
+    // Data doctor logs - Client can create
+    match /data_doctor_logs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+    
+    // Health check - Public read, authenticated write
+    match /health_check/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    
+    // Trial requests - Client can create (for new trial signups)
+    match /trial_requests/{requestId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+      allow update, delete: if false; // ✅ Only Functions can process
+    }
+    
+    match /trialRequests/{requestId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null;
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // ⚠️ DEFAULT DENY (Safety net)
+    // ============================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

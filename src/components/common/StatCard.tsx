@@ -189,43 +189,44 @@ export const StatCard: React.FC<StatCardProps> = ({
             style={{
                 background: isDark ? 'rgba(30, 41, 59, 0.8)' : '#ffffff', // ✅ Dark bg in dark mode, white in light mode
                 border: isDark ? '1px solid rgba(32, 178, 170, 0.2)' : '1px solid #e2e8f0', // ✅ Turquoise border in dark mode
-                borderRadius: '20px',
-                padding: '12px 16px', // ✅ Responsive padding: smaller on mobile
-                minHeight: '90px', // ✅ Min height instead of fixed (responsive)
-                height: 'auto', // ✅ Auto height for mobile flexibility
-                // ✅ Enhanced Shadow for Better Visual Separation - More Visible
+                borderRadius: 'clamp(8px, 1.5vw, 12px)', // ✅ Smaller border radius - more compact
+                padding: 'clamp(10px, 1.5vw, 14px) clamp(12px, 1.5vw, 16px)', // ✅ Compact padding - reduced from previous
+                minHeight: 'auto', // ✅ Auto height - no fixed min-height
+                height: 'auto', // ✅ Auto height for flexibility
+                // ✅ Subtle Shadow - No excessive depth
                 boxShadow: isDark 
-                    ? '0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)' 
-                    : defaultShadow,
-                gap: '12px', // ✅ Responsive gap: smaller on mobile
+                    ? '0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.15)' 
+                    : '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)',
+                gap: 'clamp(8px, 1.5vw, 10px)', // ✅ Compact gap between elements
             } as React.CSSProperties}
             onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = ADORA_THEME.colors.primary; // ✅ Turquoise DNA
-                e.currentTarget.style.transform = 'translateY(-4px)'; // ✅ Enhanced hover lift
-                // ✅ Stronger shadow on hover for better depth perception
+                e.currentTarget.style.transform = 'translateY(-2px)'; // ✅ Subtle hover lift - reduced from -4px
+                // ✅ Subtle shadow on hover
                 e.currentTarget.style.boxShadow = isDark 
-                    ? '0 12px 28px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.3)' 
-                    : hoverShadow;
+                    ? '0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.2)' 
+                    : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)';
             }}
             onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = isDark ? 'rgba(32, 178, 170, 0.2)' : '#e2e8f0';
                 e.currentTarget.style.transform = 'translateY(0)';
-                // ✅ Restore enhanced shadow
+                // ✅ Restore subtle shadow
                 e.currentTarget.style.boxShadow = isDark 
-                    ? '0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)' 
-                    : defaultShadow;
+                    ? '0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.15)' 
+                    : '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)';
             }}
         >
             {/* Content Section - Left (RTL) */}
-            <div className="flex flex-col gap-1 flex-1 min-w-0">
-                {/* Value - Premium Typography - Responsive */}
+            <div className="flex flex-col gap-0.5 sm:gap-1 flex-1 min-w-0">
+                {/* Value - Premium Typography - Responsive (Smaller on mobile) */}
                 <h2 
-                    className="m-0 font-extrabold leading-none truncate text-xl sm:text-2xl"
+                    className="m-0 font-extrabold leading-tight truncate text-base sm:text-lg md:text-xl lg:text-2xl"
                     style={{
                         color: isDark ? 'rgba(255, 255, 255, 0.95)' : '#1e293b', // ✅ Dark text on light bg, light text on dark bg
                         fontWeight: 800,
                         lineHeight: '1.2',
-                        margin: '4px 0 0 0', // ✅ Margin as per spec
+                        margin: '2px 0 0 0', // ✅ Smaller margin on mobile
+                        fontSize: 'clamp(14px, 3vw, 24px)', // ✅ Responsive font size
                     }}
                 >
                     {typeof displayValue === 'number' 
@@ -234,18 +235,32 @@ export const StatCard: React.FC<StatCardProps> = ({
                     }
                 </h2>
                 
-                {/* Label - Clean & Readable - ✅ Text Truncation for Long Labels - Responsive */}
+                {/* Label - Clean & Readable - ✅ Text Truncation for Long Labels - Responsive (Smaller on mobile) */}
                 <p 
-                    className="m-0 font-semibold leading-tight text-xs sm:text-sm truncate"
+                    className="m-0 font-semibold leading-tight truncate text-[10px] sm:text-xs md:text-sm"
                     style={{
                         color: isDark ? 'rgba(255, 255, 255, 0.7)' : '#64748b', // ✅ Dark text on light bg, light text on dark bg
                         fontWeight: 600,
-                        lineHeight: '1.4',
+                        lineHeight: '1.3',
                         maxWidth: '100%', // ✅ Full width on mobile, truncate on desktop
+                        fontSize: 'clamp(10px, 2vw, 14px)', // ✅ Responsive font size
                     }}
                 >
                     {label}
                 </p>
+                
+                {/* Last Update - Smaller on mobile */}
+                {lastUpdate && (
+                    <p 
+                        className="m-0 font-medium leading-tight text-[9px] sm:text-[10px] md:text-xs truncate mt-0.5"
+                        style={{
+                            color: isDark ? 'rgba(255, 255, 255, 0.5)' : '#94a3b8',
+                            fontSize: 'clamp(9px, 1.5vw, 12px)', // ✅ Responsive font size
+                        }}
+                    >
+                        {lastUpdate}
+                    </p>
+                )}
             </div>
             
             {/* Icon Section - Right (RTL) - Premium Design - Responsive */}
@@ -268,22 +283,26 @@ export const StatCard: React.FC<StatCardProps> = ({
                 >
                     {React.isValidElement(iconElement) 
                         ? React.cloneElement(iconElement as React.ReactElement<any>, {
-                            className: 'w-5 h-5 sm:w-6 sm:h-6',
+                            className: 'w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6',
                             size: undefined, // ✅ Let className handle size (responsive)
                             strokeWidth: 2.5, // ✅ Duo-tone stroke width
                             style: { 
                                 color: iconBgColor,
                                 opacity: 0.9, // ✅ Duo-tone opacity
+                                width: 'clamp(16px, 4vw, 24px)', // ✅ Responsive icon size
+                                height: 'clamp(16px, 4vw, 24px)',
                             }
                         })
                         : typeof iconElement === 'function'
                         ? React.createElement(iconElement as React.ComponentType<any>, {
-                            className: 'w-5 h-5 sm:w-6 sm:h-6',
+                            className: 'w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6',
                             size: undefined, // ✅ Let className handle size (responsive)
                             strokeWidth: 2.5, // ✅ Duo-tone stroke width
                             style: { 
                                 color: iconBgColor,
                                 opacity: 0.9, // ✅ Duo-tone opacity
+                                width: 'clamp(16px, 4vw, 24px)', // ✅ Responsive icon size
+                                height: 'clamp(16px, 4vw, 24px)',
                             }
                         })
                         : iconElement

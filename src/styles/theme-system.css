@@ -1328,20 +1328,34 @@ html.light .to-slate-900 {
    ============================================================ */
 
 /* Force visible borders on ALL cards in light mode */
-html[data-theme="light"] [class*="rounded-xl"],
-html[data-theme="light"] [class*="rounded-2xl"],
-html[data-theme="light"] [class*="rounded-3xl"],
-html.light [class*="rounded-xl"],
-html.light [class*="rounded-2xl"],
-html.light [class*="rounded-3xl"] {
+/* ✅ EXCLUDE: Toast notifications - they should not have borders */
+html[data-theme="light"] [class*="rounded-xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
+html[data-theme="light"] [class*="rounded-2xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
+html[data-theme="light"] [class*="rounded-3xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
+html.light [class*="rounded-xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
+html.light [class*="rounded-2xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
+html.light [class*="rounded-3xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]) {
   border-color: #cbd5e1 !important;
 }
 
 /* Ensure all card-like elements have visible shadows */
-html[data-theme="light"] .bg-white,
-html.light .bg-white {
+/* ✅ EXCLUDE: Toast notifications - they should not have borders */
+html[data-theme="light"] .bg-white:not(.toast):not([class*="toast"]):not([id*="toast"]),
+html.light .bg-white:not(.toast):not([class*="toast"]):not([id*="toast"]) {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05) !important;
   border: 1px solid #e2e8f0 !important;
+}
+
+/* ✅ FIX: Toast notifications should never have borders in light mode */
+html[data-theme="light"] .toast,
+html[data-theme="light"] [class*="toast"],
+html[data-theme="light"] [id*="toast"],
+html.light .toast,
+html.light [class*="toast"],
+html.light [id*="toast"] {
+  border: none !important;
+  outline: none !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
 }
 
 /* Navigation bar high contrast */

@@ -40,6 +40,7 @@ import {
     subscribeToMessages
 } from '../../services/smartChatService';
 import { useTranslation } from 'react-i18next';
+import { useTenantBranches } from '../../hooks/useTenantData';
 
 // ============================================================
 // TYPES
@@ -295,21 +296,32 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
     className = ''
 }) => {
     const { t } = useTranslation();
+    const { branches } = useTenantBranches(); // ✅ Get all tenant branches
+    
     // State
     const [chats, setChats] = useState<MonitoredChat[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'critical'>('all');
     const [selectedChat, setSelectedChat] = useState<MonitoredChat | null>(null);
     const [lastRefresh, setLastRefresh] = useState(new Date());
+    const [resolvedToday, setResolvedToday] = useState<number>(0); // ✅ Track resolved chats count
 
     // ============================================================
     // SUBSCRIPTION
     // ============================================================
 
     useEffect(() => {
-        if (!db) return;
+        if (!db || !tenantId) return;
         
-        const branchIds = branchId ? [branchId] : ['main']; // TODO: Get all branches if not specified
+        // ✅ FIX: Get all branches if not specified
+        const branchIds = branchId 
+            ? [branchId] 
+            : branches.map(b => b.id).filter(Boolean); // ✅ Use all tenant branches
+        
+        // ✅ Fallback: If no branches found, use ['main'] for backward compatibility
+        if (branchIds.length === 0) {
+            branchIds.push('main');
+        }
 
         const unsubscribes: (() => void)[] = [];
 
@@ -358,7 +370,7 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
         });
 
         return () => unsubscribes.forEach(u => u());
-    }, [tenantId, branchId]);
+    }, [tenantId, branchId, branches]); // ✅ Add branches to dependencies
 
     // ============================================================
     // COMPUTED VALUES
@@ -383,6 +395,75 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
         return result.sort((a, b) => b.waitingTime - a.waitingTime);
     }, [chats, searchQuery, statusFilter]);
 
+    // ✅ FIX: Load resolvedToday count from chat_rooms collection (archived chats today)
+    useEffect(() => {
+        if (!db || !tenantId) return;
+
+        const loadResolvedToday = async () => {
+            try {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const todayStart = Timestamp.fromDate(today);
+
+                // ✅ Get all branches if not specified
+                const branchIds = branchId 
+                    ? [branchId] 
+                    : branches.map(b => b.id).filter(Boolean);
+                
+                if (branchIds.length === 0) {
+                    branchIds.push('main');
+                }
+
+                let totalResolved = 0;
+
+                // ✅ Count archived chats from all branches (archived today)
+                for (const bid of branchIds) {
+                    try {
+                        const roomsRef = collection(db, `tenants/${tenantId}/branches/${bid}/chat_rooms`);
+                        const q = query(
+                            roomsRef,
+                            where('status', '==', 'archived'), // ✅ Chat rooms with status='archived'
+                            where('archivedAt', '>=', todayStart) // ✅ Archived today
+                        );
+                        const snapshot = await getDocs(q);
+                        totalResolved += snapshot.size;
+                    } catch (error) {
+                        // ⚠️ If query fails (e.g., missing index), try without archivedAt filter
+                        try {
+                            const roomsRef = collection(db, `tenants/${tenantId}/branches/${bid}/chat_rooms`);
+                            const q = query(
+                                roomsRef,
+                                where('status', '==', 'archived')
+                            );
+                            const snapshot = await getDocs(q);
+                            // Filter client-side for today
+                            const todayResolved = snapshot.docs.filter(doc => {
+                                const archivedAt = doc.data().archivedAt;
+                                if (!archivedAt) return false;
+                                const archivedDate = archivedAt.toDate ? archivedAt.toDate() : new Date(archivedAt);
+                                return archivedDate >= todayStart.toDate();
+                            });
+                            totalResolved += todayResolved.length;
+                        } catch (fallbackError) {
+                            console.warn(`Failed to load resolved chats for branch ${bid}:`, fallbackError);
+                        }
+                    }
+                }
+
+                setResolvedToday(totalResolved);
+            } catch (error) {
+                console.error('Error loading resolvedToday:', error);
+                setResolvedToday(0);
+            }
+        };
+
+        loadResolvedToday();
+        
+        // ✅ Refresh resolved count every 30 seconds
+        const interval = setInterval(loadResolvedToday, 30000);
+        return () => clearInterval(interval);
+    }, [tenantId, branchId, branches]); // ✅ Add branches to dependencies
+
     const stats: ChatStats = useMemo(() => {
         const totalActive = chats.length;
         const waitingResponse = chats.filter(c => c.unreadCount > 0).length;
@@ -391,10 +472,10 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
         const avgResponseTime = withResponse.length > 0
             ? Math.round(withResponse.reduce((sum, c) => sum + (c.responseTime || 0), 0) / withResponse.length)
             : 0;
-        const resolvedToday = 0; // TODO: Track from separate collection
+        // ✅ FIX: Use resolvedToday state instead of placeholder
 
         return { totalActive, waitingResponse, criticalSLA, avgResponseTime, resolvedToday };
-    }, [chats]);
+    }, [chats, resolvedToday]); // ✅ Add resolvedToday to dependencies
 
     // ============================================================
     // RENDER
@@ -479,7 +560,7 @@ export const LiveChatMonitor: React.FC<LiveChatMonitorProps> = ({
                     ].map(opt => (
                         <button
                             key={opt.value}
-                            onClick={() => setStatusFilter(opt.value as any)}
+                            onClick={() => setStatusFilter(opt.value as 'all' | 'waiting' | 'critical')}
                             className={`px-3 py-2 rounded-lg text-sm transition-colors ${
                                 statusFilter === opt.value
                                     ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'

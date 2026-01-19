@@ -267,7 +267,8 @@ const ToastItem: React.FC<{ toast: Toast }> = ({ toast: t }) => {
                 background: 'var(--theme-bg-secondary, rgba(15, 23, 42, 0.95))',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
-                border: `1px solid ${borderColorMap[t.type]}`,
+                border: 'none',
+                outline: 'none',
                 margin: 0,
                 padding: '0.875rem 1rem',
                 // ✅ REMOVED: Black box-shadow - replaced with subtle colored shadow
@@ -279,11 +280,7 @@ const ToastItem: React.FC<{ toast: Toast }> = ({ toast: t }) => {
                 backgroundColor: 'var(--theme-bg-secondary, rgba(15, 23, 42, 0.95))',
                 // ✅ Remove any parent wrapper styles
                 position: 'relative',
-                isolation: 'isolate',
-                // ✅ Remove black borders completely
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                borderColor: borderColorMap[t.type]
+                isolation: 'isolate'
             }}
         >
             {/* Icon */}

@@ -428,10 +428,14 @@ export const startActivityPolling = (
     console.log('⚠️ startActivityPolling is deprecated - using on-demand fetch instead');
     
     // Just do initial fetch, no polling
-    fetchActivityLogs().then(({ logs }) => {
+    fetchActivityLogs().then((result) => {
+        const logs = result?.logs || [];
         if (logs.length > 0) {
             callback(logs);
         }
+    }).catch(err => {
+        console.error('Failed to fetch activity logs in startActivityPolling:', err);
+        callback([]); // Call with empty array on error
     });
     
     // Return empty cleanup

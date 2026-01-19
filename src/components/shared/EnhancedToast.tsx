@@ -68,23 +68,28 @@ export const EnhancedToast: React.FC<EnhancedToastProps> = ({ toast, onRemove })
     };
 
     const bgMap = {
-        success: 'bg-green-500/20 border-green-500/30',
-        error: 'bg-red-500/20 border-red-500/30',
-        warning: 'bg-yellow-500/20 border-yellow-500/30',
-        info: 'bg-blue-500/20 border-blue-500/30',
+        success: 'bg-green-500/20',
+        error: 'bg-red-500/20',
+        warning: 'bg-yellow-500/20',
+        info: 'bg-blue-500/20',
     };
 
     return (
         <div
             className={`
                 pointer-events-auto
-                flex items-start gap-3 p-4 rounded-2xl border shadow-2xl bg-white dark:bg-slate-800
+                flex items-start gap-3 p-4 rounded-2xl shadow-2xl toast
                 ${bgMap[toast.type]}
                 transition-all duration-300
                 ${isExiting ? 'opacity-0 translate-x-full scale-95' : 'opacity-100 translate-x-0 scale-100'}
                 animate-slide-in-right
                 max-w-sm sm:max-w-md
             `}
+            style={{ 
+                border: 'none', 
+                outline: 'none',
+                background: 'var(--theme-bg-secondary, rgba(30, 41, 59, 0.95))'
+            }}
             role="alert"
             aria-live="polite"
         >

@@ -218,6 +218,8 @@ export default defineConfig({
             // ✅ Include recharts and its lodash dependency
             'recharts'
         ],
+        // ✅ Exclude optional dependencies that may not be installed
+        exclude: ['@sentry/react'],
     },
     build: {
         outDir: 'dist',

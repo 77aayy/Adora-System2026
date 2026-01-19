@@ -25,15 +25,17 @@ import {
     Cloud,
     Download,
     Trophy,
-    Gift
+    Gift,
+    DollarSign
 } from 'lucide-react';
 import {
     getRoomTypes,
     getSeasons,
     getSeasonalPrices,
-    addRoomType,
+    // ✅ REMOVED: addRoomType, deleteRoomType
+    // Room type management is centralized in RoomsManager only
+    // ✅ ALLOWED: updateRoomType for basePrice updates (financial linking)
     updateRoomType,
-    deleteRoomType,
     addSeason,
     deleteSeason,
     setSeasonalPrice,
@@ -44,6 +46,7 @@ import {
 import { syncSeasonsFromSources, ParsedSeason } from '../../services/calendarSyncService';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { useTenantBranches } from '../../hooks/useTenantData';
 import { Timestamp } from 'firebase/firestore';
 import { logger } from '../../services/loggerService';
 
@@ -84,6 +87,7 @@ const PricingSettings: React.FC = () => {
     const { user, branchId } = useAuth();
     const { success, error: showError } = useUX();
     const tenantId = (user as any)?.tenantId;
+    const { branches } = useTenantBranches();
 
     const [activeTab, setActiveTab] = useState('seasons');
     const [loading, setLoading] = useState(true);
@@ -98,8 +102,16 @@ const PricingSettings: React.FC = () => {
         seasonName: string,
         price: number
     } | null>(null);
+    // ✅ Base Price Editing State (Financial Linking)
+    const [editingBasePrice, setEditingBasePrice] = useState<{
+        roomTypeId: string,
+        roomTypeName: string,
+        basePrice: number
+    } | null>(null);
 
-    // Load Data
+    // ✅ Load Data - Filter types by approvedRoomTypes from branch
+    // ✅ CENTRALIZED: Room type management is ONLY in RoomsManager
+    // ✅ This page ONLY displays approved types and manages pricing (seasons, prices)
     const loadAll = async () => {
         if (!tenantId || !branchId) return;
         setLoading(true);
@@ -109,7 +121,27 @@ const PricingSettings: React.FC = () => {
                 getSeasons(tenantId, branchId),
                 getSeasonalPrices(tenantId, branchId)
             ]);
-            setTypes(t);
+
+            // ✅ FILTER: Only show types approved in branch.approvedRoomTypes
+            const currentBranch = branches.find(b => b.id === branchId);
+            const approvedRoomTypes = (currentBranch as any)?.approvedRoomTypes as string[] | undefined;
+
+            let filteredTypes = t;
+            if (approvedRoomTypes && Array.isArray(approvedRoomTypes) && approvedRoomTypes.length > 0) {
+                // ✅ Filter: Only show types whose name matches approvedRoomTypes (case-insensitive)
+                filteredTypes = t.filter(type => 
+                    approvedRoomTypes.some(approved => 
+                        approved.toLowerCase() === type.name.toLowerCase()
+                    )
+                );
+                logger.info('Filtered room types by approvedRoomTypes', { 
+                    total: t.length, 
+                    approved: approvedRoomTypes.length, 
+                    filtered: filteredTypes.length 
+                }, 'PricingSettings');
+            }
+
+            setTypes(filteredTypes);
             setSeasons(s);
             setPrices(p);
         } catch (error) {
@@ -123,8 +155,12 @@ const PricingSettings: React.FC = () => {
         loadAll();
     }, [tenantId, branchId]);
 
-    // ------------------------------------------------------------
-    // ROOM TYPES logic moved to RoomsManager
+    // ✅ CENTRALIZED MANAGEMENT:
+    // ✅ Room type ADD/EDIT/DELETE is ONLY in RoomsManager (src/features/admin/RoomsManager.tsx)
+    // ✅ This page (PricingSettings) ONLY:
+    //    - Displays approved room types (from branch.approvedRoomTypes)
+    //    - Manages pricing (seasons, seasonal prices, booking rates)
+    //    - Does NOT allow adding/editing/deleting room types
     // ------------------------------------------------------------
 
     // ------------------------------------------------------------
@@ -204,6 +240,21 @@ const PricingSettings: React.FC = () => {
             loadAll();
         } catch (err) {
             showError('فشل التحديث');
+        }
+    };
+
+    // ✅ Handle Base Price Update (Financial Linking)
+    const handleSaveBasePrice = async () => {
+        if (!tenantId || !branchId || !editingBasePrice) return;
+        try {
+            await updateRoomType(tenantId, branchId, editingBasePrice.roomTypeId, {
+                basePrice: editingBasePrice.basePrice
+            });
+            success('تم تحديث السعر الأساسي');
+            setEditingBasePrice(null);
+            loadAll();
+        } catch (err) {
+            showError('فشل تحديث السعر الأساسي');
         }
     };
 
@@ -719,10 +770,41 @@ const PricingSettings: React.FC = () => {
                                     <h4 className="text-white font-bold -rotate-90 whitespace-nowrap tracking-wider text-sm">{type.name}</h4>
                                 </div>
 
-                                {/* Mobile Header */}
-                                <div className="md:hidden p-4 bg-slate-800/50 border-b border-white/5 font-bold text-white flex justify-between">
+                                {/* Mobile Header with Base Price Button */}
+                                <div className="md:hidden p-4 bg-slate-800/50 border-b border-white/5 font-bold text-white flex justify-between items-center">
                                     <span>{type.name}</span>
-                                    <span className="text-xs text-slate-400 flex items-center gap-1"><Users className="w-3 h-3" /> {type.maxOccupancy}</span>
+                                    <div className="flex items-center gap-2">
+                                        {/* ✅ Base Price Display & Edit Button */}
+                                        <button
+                                            onClick={() => setEditingBasePrice({
+                                                roomTypeId: type.id,
+                                                roomTypeName: type.name,
+                                                basePrice: type.basePrice || 0
+                                            })}
+                                            className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${(type.basePrice || 0) > 0 ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}
+                                            title="تعديل السعر الأساسي"
+                                        >
+                                            <DollarSign className="w-3 h-3" />
+                                            {(type.basePrice || 0) > 0 ? `${type.basePrice}` : 'غير محدد'}
+                                        </button>
+                                        <span className="text-xs text-slate-400 flex items-center gap-1"><Users className="w-3 h-3" /> {type.maxOccupancy}</span>
+                                    </div>
+                                </div>
+
+                                {/* Desktop: Base Price Button in Header */}
+                                <div className="hidden md:flex absolute left-4 top-4 z-20">
+                                    <button
+                                        onClick={() => setEditingBasePrice({
+                                            roomTypeId: type.id,
+                                            roomTypeName: type.name,
+                                            basePrice: type.basePrice || 0
+                                        })}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${(type.basePrice || 0) > 0 ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 animate-pulse'}`}
+                                        title="السعر الأساسي - تعديل"
+                                    >
+                                        <DollarSign className="w-3.5 h-3.5" />
+                                        {(type.basePrice || 0) > 0 ? `${type.basePrice} ر.س` : '❗ غير محدد'}
+                                    </button>
                                 </div>
 
                                 <div className="p-6 md:pr-20 overflow-x-auto">
@@ -908,7 +990,7 @@ const PricingSettings: React.FC = () => {
                 </div>
             )}
 
-            {/* Editing Price Modal */}
+            {/* Editing Seasonal Price Modal */}
             {editingPrice && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/90" onClick={() => setEditingPrice(null)} style={{ backdropFilter: 'none' }} />
@@ -943,6 +1025,55 @@ const PricingSettings: React.FC = () => {
                                     className="py-3 rounded-xl bg-teal-500 text-white font-bold shadow-lg shadow-teal-500/20 hover:bg-teal-600 transition-all"
                                 >
                                     حفظ التعديل
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ✅ Editing Base Price Modal (Financial Linking) */}
+            {editingBasePrice && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/90" onClick={() => setEditingBasePrice(null)} style={{ backdropFilter: 'none' }} />
+                    <div className="relative w-full max-w-sm rounded-3xl p-6 border border-white/10 animate-slide-up" style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}>
+                        <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                            <DollarSign className="w-5 h-5 text-teal-400" />
+                            السعر الأساسي
+                        </h3>
+                        <p className="text-sm text-slate-400 mb-6">
+                            تحديث السعر الأساسي لـ <span className="text-teal-400 font-bold">{editingBasePrice.roomTypeName}</span>
+                            <br />
+                            <span className="text-xs text-orange-400 mt-1 block">💡 هذا السعر يُطبق في الأيام العادية (غير الموسمية)</span>
+                        </p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs text-slate-400 mb-1">السعر الأساسي (SAR)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={editingBasePrice.basePrice}
+                                    onChange={(e) => setEditingBasePrice({ ...editingBasePrice, basePrice: Number(e.target.value) })}
+                                    className="input text-center text-2xl font-bold text-teal-400"
+                                    autoFocus
+                                    placeholder="0"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                                <button
+                                    onClick={() => setEditingBasePrice(null)}
+                                    className="py-3 rounded-xl text-white font-bold hover:bg-white/5 transition-all"
+                                    style={{ background: 'var(--theme-bg-tertiary)' }}
+                                >
+                                    إلغاء
+                                </button>
+                                <button
+                                    onClick={handleSaveBasePrice}
+                                    className="py-3 rounded-xl bg-teal-500 text-white font-bold shadow-lg shadow-teal-500/20 hover:bg-teal-600 transition-all"
+                                >
+                                    حفظ السعر الأساسي
                                 </button>
                             </div>
                         </div>

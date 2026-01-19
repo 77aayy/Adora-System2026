@@ -21,6 +21,7 @@ export interface OnboardingStatus {
         procurement?: Timestamp;
         coffeeshop?: Timestamp;
         admin?: Timestamp;
+        owner?: Timestamp;
     };
     createdAt: Timestamp;
     updatedAt: Timestamp;
@@ -33,7 +34,8 @@ export type DepartmentTour =
     | 'maintenance' 
     | 'procurement' 
     | 'coffeeshop' 
-    | 'admin';
+    | 'admin'
+    | 'owner';
 
 // ============================================================
 // SERVICE FUNCTIONS
@@ -120,7 +122,7 @@ export const resetAllTours = async (userId: string): Promise<void> => {
         // Clear localStorage too
         const departments: DepartmentTour[] = [
             'reception', 'housekeeping', 'bellman', 
-            'maintenance', 'procurement', 'coffeeshop', 'admin'
+            'maintenance', 'procurement', 'coffeeshop', 'admin', 'owner'
         ];
         departments.forEach(dept => {
             localStorage.removeItem(`adora_tour_${dept}_${userId}`);

@@ -51,12 +51,25 @@ try {
     console.error('❌ i18n setup error:', error);
 }
 
-// RTL handler
+// ✅ RTL handler - Supports all languages (ar: rtl, en/hi/bn: ltr)
 export const updateDirection = (lang: string) => {
-    const dir = lang === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.setAttribute('dir', dir);
-    document.documentElement.setAttribute('lang', lang);
-    localStorage.setItem('adora-language', lang);
+    // RTL languages: Arabic only
+    const rtlLanguages = ['ar'];
+    const dir = rtlLanguages.includes(lang) ? 'rtl' : 'ltr';
+    
+    if (typeof document !== 'undefined') {
+        document.documentElement.setAttribute('dir', dir);
+        document.documentElement.setAttribute('lang', lang);
+    }
+    
+    // ✅ Unify localStorage key
+    try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+            localStorage.setItem('adora-language', lang);
+        }
+    } catch (e) {
+        // localStorage not available
+    }
 };
 
 // Change language and update direction

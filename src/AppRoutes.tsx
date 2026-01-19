@@ -67,6 +67,10 @@ import LoginScreen from './features/auth/LoginScreen';
 import { SetupWizard } from './features/setup/SetupWizard';
 import { FirebaseSetupWizard } from './features/setup/FirebaseSetupWizard';
 
+// ✅ Onboarding (locked for managers with 0 branches)
+const CreateFirstBranch = lazyLoad(() => import(/* webpackChunkName: "onboarding" */ './features/onboarding/CreateFirstBranch').then(m => ({ default: m.CreateFirstBranch })));
+const ApproveRoomTypes = lazyLoad(() => import(/* webpackChunkName: "onboarding" */ './features/onboarding/ApproveRoomTypes').then(m => ({ default: m.ApproveRoomTypes })));
+
 // Core
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
@@ -109,6 +113,24 @@ export const AppRoutes: React.FC = () => {
                 <Route path="/login" element={<LoginScreen />} />
                 <Route path="/setup" element={<SetupWizard />} />
                 <Route path="/firebase-setup" element={<FirebaseSetupWizard />} />
+
+                {/* ================= Onboarding (Locked for Managers) ================= */}
+                <Route
+                    path="/onboarding/create-first-branch"
+                    element={
+                        <ProtectedRoute>
+                            <CreateFirstBranch />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/onboarding/approve-room-types"
+                    element={
+                        <ProtectedRoute>
+                            <ApproveRoomTypes />
+                        </ProtectedRoute>
+                    }
+                />
 
                 {/* ================= Super Admin (Secured) ================= */}
                 <Route

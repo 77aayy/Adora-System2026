@@ -632,7 +632,7 @@ const OverviewPage: React.FC = () => {
                 isOpen={showTour}
                 onClose={closeTour}
                 onComplete={completeTour}
-                steps={tourSteps.length > 0 ? tourSteps : [
+                steps={tourSteps && tourSteps.length > 0 ? tourSteps : [
                     {
                         target: '#admin-sidebar',
                         title: 'القائمة الجانبية',

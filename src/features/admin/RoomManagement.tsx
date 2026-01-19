@@ -25,6 +25,7 @@ import { Room } from '../../types';
 // ✅ Types: Use shared Room type from types/index.ts
 
 export const RoomManagement: React.FC = () => {
+    const { t } = useTranslation();
     const { user: currentUser } = useAuth();
     const [rooms, setRooms] = useState<Room[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -81,13 +82,13 @@ export const RoomManagement: React.FC = () => {
         } catch (error: any) {
             logger.error('Error adding room', error, 'RoomManagement');
             haptic('error');
-            alert(t('admin.rooms.addError') || 'حدث خطأ في إضافة الغرفة');
+            alert(t('rooms.management.addError'));
         }
     };
 
     // Delete room
     const handleDeleteRoom = async (roomId: string, roomNumber: string) => {
-        if (!confirm(`هل أنت متأكد من حذف الغرفة ${roomNumber}?`)) return;
+        if (!confirm(t('rooms.management.deleteConfirm', { roomNumber }))) return;
 
         try {
             await deleteDoc(doc(db, 'rooms', roomId));

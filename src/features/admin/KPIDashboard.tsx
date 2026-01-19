@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     BarChart,
     Bar,
@@ -300,6 +301,7 @@ const TopEmployeesCard: React.FC<{ employees: EmployeePerformance[] }> = ({ empl
 // ============================================================
 
 export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>(period);
     const [loading, setLoading] = useState(true);
@@ -567,11 +569,11 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
         return () => clearInterval(interval);
     }, [selectedPeriod, branchId]);
 
-    // KPI Cards data
+    // KPI Cards data - ✅ i18n: Translated titles
     const kpiCards: KPICardData[] = useMemo(() => [
         {
             id: 'total',
-            title: 'إجمالي الطلبات',
+            title: t('kpi.cards.totalRequests'),
             value: totalRequests,
             change: 12,
             trend: 'up',
@@ -580,7 +582,7 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
         },
         {
             id: 'completed',
-            title: 'الطلبات المكتملة',
+            title: t('kpi.cards.completedRequests'),
             value: completedRequests,
             change: 8,
             trend: 'up',
@@ -589,7 +591,7 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
         },
         {
             id: 'response',
-            title: 'متوسط وقت الاستجابة',
+            title: t('kpi.cards.avgResponseTime'),
             value: formatTime(avgResponseTime),
             change: 15,
             trend: avgResponseTime < 30 ? 'up' : 'down',
@@ -598,29 +600,29 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
         },
         {
             id: 'rating',
-            title: 'تقييم النزلاء',
+            title: t('kpi.cards.guestRating'),
             value: avgRating.toFixed(1),
             change: 5,
             trend: avgRating >= 4 ? 'up' : 'down',
             icon: <Star className="w-6 h-6" />,
             color: '#F59E0B',
-            suffix: '/ 5',
+            suffix: t('kpi.suffix.outOf5'),
         },
         // ✅ NEW: Minibar Revenue Card
         {
             id: 'revenue',
-            title: 'إيرادات الميني بار',
+            title: t('kpi.cards.minibarRevenue'),
             value: minibarRevenue,
             change: 0,
             trend: 'up',
             icon: <TrendingUp className="w-6 h-6" />,
             color: '#22C55E',
-            suffix: ' ريال',
+            suffix: t('kpi.suffix.riyal'),
         },
         // ✅ NEW: Low Stock Alert Card
         {
             id: 'lowstock',
-            title: 'تنبيهات المخزون',
+            title: t('kpi.cards.lowStockAlerts'),
             value: lowStockCount,
             change: 0,
             trend: lowStockCount > 0 ? 'down' : 'stable',
@@ -629,7 +631,7 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
         },
         {
             id: 'pending',
-            title: 'طلبات معلقة',
+            title: t('kpi.cards.pendingRequests'),
             value: pendingRequests,
             change: pendingRequests > 5 ? 20 : -10,
             trend: pendingRequests > 5 ? 'down' : 'up',
@@ -638,15 +640,15 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
         },
         {
             id: 'satisfaction',
-            title: 'نسبة الرضا',
+            title: t('kpi.cards.satisfactionRate'),
             value: Math.round((completedRequests / Math.max(totalRequests, 1)) * 100),
             change: 3,
             trend: 'up',
             icon: <ThumbsUp className="w-6 h-6" />,
             color: '#8B5CF6',
-            suffix: '%',
+            suffix: t('kpi.suffix.percent'),
         },
-    ], [totalRequests, completedRequests, avgResponseTime, avgRating, pendingRequests]);
+    ], [t, totalRequests, completedRequests, avgResponseTime, avgRating, minibarRevenue, lowStockCount, pendingRequests]);
 
     if (loading) {
         return (

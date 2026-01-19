@@ -8,7 +8,7 @@ import React from 'react';
 import { useTheme } from '../../context/ThemeContext';
 
 // ============================================================
-// SIGNATURE CONFIG FROM LOCALSTORAGE
+// SIGNATURE CONFIG FROM LOCALSTORAGE + FIREBASE
 // ============================================================
 
 const getConfig = () => {
@@ -53,10 +53,51 @@ export const DeveloperSignature: React.FC<DeveloperSignatureProps> = ({
     const [config, setConfig] = React.useState(getConfig());
     const greeting = encodeURIComponent(getWhatsAppGreeting());
     
+    // ✅ FIX: Load from Firebase on mount (with localStorage as fallback)
+    React.useEffect(() => {
+        const loadDeveloperSettings = async () => {
+            try {
+                const { getSystemSettings } = await import('../../services/systemSettingsService');
+                const settings = await getSystemSettings();
+                if (settings?.developerBranding) {
+                    const branding = settings.developerBranding;
+                    const newConfig = {
+                        devName: branding.devName || config.devName,
+                        phoneSA: branding.devPhoneSA || config.phoneSA,
+                        phoneEG: branding.devPhoneEG || config.phoneEG,
+                        email: branding.devEmail || config.email,
+                    };
+                    
+                    // Update state
+                    setConfig(newConfig);
+                    
+                    // Sync to localStorage for backward compatibility
+                    if (branding.devName) localStorage.setItem('adora_dev_name', branding.devName);
+                    if (branding.devPhoneSA) localStorage.setItem('adora_dev_phone_sa', branding.devPhoneSA);
+                    if (branding.devPhoneEG) localStorage.setItem('adora_dev_phone_eg', branding.devPhoneEG);
+                    if (branding.devEmail) localStorage.setItem('adora_dev_email', branding.devEmail);
+                    if (branding.devSignature) localStorage.setItem('adora_dev_signature', branding.devSignature);
+                }
+            } catch (err) {
+                console.warn('Failed to load developer settings from Firebase, using localStorage:', err);
+            }
+        };
+        
+        loadDeveloperSettings();
+    }, []);
+    
     // ✅ FIX: Listen for settings updates from owner dashboard
     React.useEffect(() => {
         const handleSettingsUpdate = (event: CustomEvent) => {
-            setConfig(event.detail);
+            const newConfig = event.detail;
+            // Update state
+            setConfig(newConfig);
+            // Also update localStorage to ensure persistence
+            if (newConfig.devName) localStorage.setItem('adora_dev_name', newConfig.devName);
+            if (newConfig.phoneSA) localStorage.setItem('adora_dev_phone_sa', newConfig.phoneSA);
+            if (newConfig.phoneEG) localStorage.setItem('adora_dev_phone_eg', newConfig.phoneEG);
+            if (newConfig.email) localStorage.setItem('adora_dev_email', newConfig.email);
+            if (newConfig.signature) localStorage.setItem('adora_dev_signature', newConfig.signature);
         };
         
         window.addEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);

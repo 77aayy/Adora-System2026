@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapPin, AlertTriangle, X, RefreshCw, CheckCircle } from 'lucide-react';
 import { checkBranchLocation } from '../../services/branchLocationService';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +22,7 @@ export const BranchLocationWarning: React.FC<BranchLocationWarningProps> = ({
     onConfirm,
     onCancel
 }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const navigate = useNavigate();
     const [checking, setChecking] = useState(true);
@@ -73,8 +75,8 @@ export const BranchLocationWarning: React.FC<BranchLocationWarningProps> = ({
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" style={{ backdropFilter: 'none' }}>
                 <div className="glass rounded-2xl p-6 max-w-md w-full">
                     <div className="text-center">
-                        <AdoraLoader size="md" message="جاري التحقق من الموقع..." />
-                        <p className="text-white/60">جاري التحقق من الموقع...</p>
+                        <AdoraLoader size="md" message={t('branchLocation.checkingLocation')} />
+                        <p className="text-white/60">{t('branchLocation.checkingLocation')}</p>
                     </div>
                 </div>
             </div>
@@ -93,11 +95,11 @@ export const BranchLocationWarning: React.FC<BranchLocationWarningProps> = ({
                         <AlertTriangle className="w-6 h-6 text-yellow-400" />
                     </div>
                     <div className="flex-1">
-                        <h3 className="text-xl font-bold text-white mb-2">تنبيه الموقع</h3>
+                        <h3 className="text-xl font-bold text-white mb-2">{t('branchLocation.warningTitle')}</h3>
                         <p className="text-white/80 mb-2">{checkResult.warning}</p>
                         {checkResult.distance && (
                             <p className="text-sm text-white/60">
-                                المسافة: {checkResult.distance} متر
+                                {t('branchLocation.distanceLabel', { distance: checkResult.distance })}
                             </p>
                         )}
                     </div>
@@ -117,7 +119,7 @@ export const BranchLocationWarning: React.FC<BranchLocationWarningProps> = ({
                             className="w-full px-4 py-3 bg-teal-500/20 border border-teal-500/30 rounded-xl text-teal-400 hover:bg-teal-500/30 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                             <MapPin className="w-4 h-4" />
-                            {loading ? 'جاري الانتقال...' : 'الانتقال إلى الفرع الصحيح'}
+                            {loading ? t('branchLocation.switching') : t('branchLocation.switchToCorrectBranch')}
                         </button>
                     )}
                     
@@ -125,14 +127,14 @@ export const BranchLocationWarning: React.FC<BranchLocationWarningProps> = ({
                         onClick={onConfirm}
                         className="w-full px-4 py-3 bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-400 hover:bg-yellow-500/30 transition-colors"
                     >
-                        المتابعة على أي حال
+                        {t('branchLocation.continueAnyway')}
                     </button>
                     
                     <button
                         onClick={onCancel}
                         className="w-full px-4 py-3 bg-white/5 rounded-xl text-white/60 hover:bg-white/10 transition-colors"
                     >
-                        إلغاء
+                        {t('branchLocation.cancel')}
                     </button>
                 </div>
             </div>

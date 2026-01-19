@@ -1,6 +1,48 @@
 # Project Role & Context
 You are a Senior React Native & Web Architect building "Adora Hotel Management System".
-We are migrating a legacy Vanilla JS/Firebase project to a modern React + TypeScript + Vite + Tailwind architecture.
+
+## 🏢 PROJECT IDENTITY & ARCHITECTURE (CRITICAL - NEVER FORGET)
+
+**Project Name:** Adora Hotel Management System  
+**Architecture Type:** SaaS (Software as a Service) - Multi-Tenant Platform  
+**Migration Status:** Legacy Vanilla JS/Firebase → Modern React + TypeScript + Vite + Tailwind
+
+### Core Business Model (SaaS Multi-Tenancy):
+- **Platform Owner:** System owner who manages all tenants (hotels/managers)
+- **Tenants (Managers):** Each hotel manager gets their own isolated tenant with:
+  - Isolated Firebase project (optional - can use shared Firebase)
+  - Isolated data collections: `tenants/{tenantId}/collection`
+  - Isolated settings, rooms, requests, employees, etc.
+  - Branch-based access control (multiple hotel branches per tenant)
+- **Users:** Employees working within a tenant (reception, bellman, housekeeping, etc.)
+
+### Data Isolation Strategy (CRITICAL):
+- **Tenant-Specific Data:** ALL operational data MUST be in `tenants/{tenantId}/collection`:
+  - `tenants/{tenantId}/settings` (NOT `settings`)
+  - `tenants/{tenantId}/rooms` (NOT `rooms`)
+  - `tenants/{tenantId}/requests` (NOT `requests`)
+  - `tenants/{tenantId}/employees` (NOT `employees`)
+  - `tenants/{tenantId}/roomStatuses`, `departments`, `roles`, etc.
+- **Platform-Level Data (Owner Only):** Only in root collections:
+  - `managers` (list of all tenants)
+  - `receiptVouchers` (billing for owner)
+  - `invoices` (billing for owner)
+  - `system_settings` (platform-wide settings, owner only)
+
+### Key Features:
+1. **Owner Dashboard:** Manage tenants, billing, subscriptions, Firebase setup
+2. **Manager Dashboard:** Hotel operations (reception, housekeeping, maintenance, etc.)
+3. **Employee Dashboards:** Role-based (reception, bellman, housekeeping, maintenance, procurement, coffee shop)
+4. **Guest Portal:** For hotel guests to place requests
+5. **Multi-Branch Support:** Each tenant can have multiple hotel branches
+6. **Subscription Management:** 1-year or 2-year subscriptions with discounts
+7. **Firebase Auto-Setup:** Automatic Firebase configuration for new tenants
+
+### Critical Rules:
+- **NEVER write tenant data to root collections** (e.g., `settings`, `rooms`) - ALWAYS use `tenants/{tenantId}/collection`
+- **ALWAYS get `tenantId` from localStorage or TenantContext** before database operations
+- **Owner operations** can access cross-tenant data (managers list, billing)
+- **Manager/Employee operations** MUST be isolated to their tenant
 
 # Tech Stack Standards
 - **Framework:** React (Vite) with TypeScript.
@@ -121,6 +163,108 @@ We are migrating a legacy Vanilla JS/Firebase project to a modern React + TypeSc
 - **If Context dependency is unclear** → Analyze with `grep` first, then ASK
 - **If build fails after change** → Revert immediately and analyze BEFORE retry
 
+## 🔍 Code Review & Variable Scope Rules (CRITICAL - Prevent Runtime Errors)
+
+**MANDATORY Before Any Code Change:**
+
+1. **Read Complete Code Block FIRST:**
+   - Read the ENTIRE function/method before making changes
+   - Understand the full context and flow
+   - Identify ALL variables used in the code block
+
+2. **Variable Scope Verification:**
+   - ✅ Check if variables are defined in the correct scope
+   - ✅ Verify variables used in `console.log` are accessible
+   - ✅ Ensure variables inside `if` blocks are not used outside
+   - ✅ Check for `ReferenceError: X is not defined` risks
+
+3. **Common Mistakes to Avoid:**
+   - ❌ Using variable defined inside `if` block outside the block
+   - ❌ Using variable in `console.log` before checking if it exists
+   - ❌ Assuming variable exists without null/undefined checks
+   - ❌ Not reading the full code context before editing
+
+4. **Before Editing Any File:**
+   - Read the complete function/method
+   - Identify all variables and their scopes
+   - Check for potential scope issues
+   - Verify all `console.log` statements use accessible variables
+   - Test mentally: "Will this variable exist when this line executes?"
+
+**Example of WRONG code:**
+```typescript
+if (typeof window !== 'undefined') {
+    const merged = { ...data };
+    localStorage.setItem('key', JSON.stringify(merged));
+}
+console.log('Merged:', merged); // ❌ ERROR: merged is not defined outside if block
+```
+
+**Example of CORRECT code:**
+```typescript
+let merged: any = null;
+if (typeof window !== 'undefined') {
+    merged = { ...data };
+    localStorage.setItem('key', JSON.stringify(merged));
+}
+if (merged) {
+    console.log('Merged:', merged); // ✅ SAFE: merged is checked before use
+}
+```
+
+## ⚠️ NEVER Confirm Without Verification (CRITICAL - Prevent False Positives)
+
+**MANDATORY Before Saying "Done" or "No Errors":**
+
+1. **ALWAYS Run Linter Check:**
+   - Use `read_lints` tool on ALL modified files
+   - NEVER say "no syntax errors" without actually checking
+   - Wait for linter results before confirming
+
+2. **Read Complete Modified Code (CRITICAL - After Every Edit):**
+   - After making changes with `search_replace`, read the ENTIRE modified section
+   - Read at least 20-30 lines BEFORE and AFTER the modified area
+   - Check for leftover broken code from previous edits
+   - Verify all brackets, braces, and parentheses are balanced
+   - Look for orphaned code fragments (especially `} else {` without `if`, incomplete blocks)
+   - **CRITICAL**: After `search_replace`, always read the modified function/method COMPLETELY
+
+3. **Common False Confirmations to Avoid:**
+   - ❌ Saying "no syntax errors" without running linter
+   - ❌ Confirming "code is correct" after partial edits
+   - ❌ Not checking for leftover code from replacements
+   - ❌ Assuming code is correct without verification
+   - ❌ **NOT reading the complete code block after `search_replace`** (most common mistake)
+
+4. **Before Confirming Completion:**
+   - ✅ Run `read_lints` on all modified files
+   - ✅ **Read the complete modified code block (20-30 lines before/after)**
+   - ✅ Check for syntax errors manually
+   - ✅ Verify no broken code fragments remain
+   - ✅ Check for orphaned `} else {`, incomplete blocks, duplicate `return` statements
+   - ✅ Only then say "Done" or "No errors"
+
+5. **After `search_replace` Operations (MANDATORY):**
+   - ✅ Read the entire function/method that was modified
+   - ✅ Check for leftover code fragments from the old code
+   - ✅ Verify no duplicate logic or incomplete blocks
+   - ✅ Ensure all code paths are complete (no hanging `else` without `if`)
+   - ✅ Read at least 50 lines around the modified area to catch context issues
+
+**Example of WRONG behavior:**
+```
+User: "هل هناك أخطاء syntax؟"
+Assistant: "لا توجد أخطاء syntax. الكود صحيح." ❌ WRONG - Didn't check!
+[Later user finds error]
+```
+
+**Example of CORRECT behavior:**
+```
+User: "هل هناك أخطاء syntax؟"
+Assistant: [Runs read_lints tool first]
+Assistant: "تم فحص الكود - لا توجد أخطاء syntax." ✅ CORRECT - Verified!
+```
+
 ## Success Criteria
 
 After any backbone change, verify:
@@ -129,3 +273,33 @@ After any backbone change, verify:
 - ✅ All features (Reception, Bellman, Admin, etc.) still load correctly
 - ✅ No memory leaks (check React DevTools Profiler)
 - ✅ Firebase Rules updated if new collections added
+
+## 🎨 Visual Consistency & Color Standards (CRITICAL - Unified Design System)
+
+**MANDATORY Color Unification Rule:**
+
+When the user requests to "unify visual experience" or "add a color for visual consistency", you MUST use the **STANDARD TURQUOISE COLOR** used in the "Performance Rate 99.9%" indicator.
+
+**The Standard Turquoise Color:**
+- **Tailwind Class:** `text-primary-500`
+- **Hex Value:** `#14b8a6`
+- **Usage:** This is the unified turquoise color for ALL visual elements requiring consistency
+- **Examples:**
+  - Text highlights: `text-primary-500`
+  - Backgrounds: `bg-primary-500/20` or `bg-primary-500/10`
+  - Borders: `border-primary-500/30`
+  - Icons: `text-primary-500`
+
+**When to Apply:**
+- ✅ When user says "وحد التجربة البصرية" (unify visual experience)
+- ✅ When adding new UI elements that need color consistency
+- ✅ When replacing any turquoise/teal colors (`text-teal-300`, `text-teal-400`, etc.)
+- ✅ When creating new cards, badges, or highlights that need brand color
+
+**DO NOT use:**
+- ❌ `text-teal-300` (too light)
+- ❌ `text-teal-400` (inconsistent)
+- ❌ `text-teal-600` (too dark)
+- ❌ Any other teal/turquoise variant
+
+**Always use:** `text-primary-500` for unified visual consistency across the entire project.

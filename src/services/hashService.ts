@@ -45,20 +45,24 @@ export const generateSecurePin = (length: number = 6): string => {
 
 const OWNER_PIN_HASH = import.meta.env.VITE_OWNER_PIN_HASH as string | undefined;
 
-// ✅ SaaS: Hardcoded hash for '765255' (owner backdoor)
-// This is the SHA-256 hash of '765255' - calculated once and stored here
-// Hash: 4e0ca1ba71b351230a9c4fa7e5a224ab955dfc986c04a660053bca16a95990f4
-const OWNER_BACKDOOR_HASH = '4e0ca1ba71b351230a9c4fa7e5a224ab955dfc986c04a660053bca16a95990f4';
+// 🔐 SECURITY: Backdoor removed - Owner PIN MUST be set via VITE_OWNER_PIN_HASH environment variable
+// In production, VITE_OWNER_PIN_HASH must be set in .env
+// No hardcoded secrets allowed
 
 export const verifyOwnerPin = async (pin: string): Promise<boolean> => {
-    // Check environment variable hash first
-    if (OWNER_PIN_HASH) {
-        const matchesEnvHash = await verifyPin(pin, OWNER_PIN_HASH);
-        if (matchesEnvHash) return true;
+    // ✅ SECURITY: Only check environment variable hash - no hardcoded backdoor
+    if (!OWNER_PIN_HASH) {
+        // In production, this should never happen (validation in main.tsx prevents it)
+        if (import.meta.env.PROD) {
+            logger.error('VITE_OWNER_PIN_HASH not set in production - owner PIN verification disabled', undefined, 'hashService');
+            return false;
+        }
+        // Development: Allow empty for testing (but warn)
+        logger.warn('VITE_OWNER_PIN_HASH not set - owner PIN verification disabled', undefined, 'hashService');
+        return false;
     }
     
-    // ✅ SaaS: Check against hardcoded backdoor hash (instead of plain text)
-    // This provides better security than plain text comparison
-    const matchesBackdoorHash = await verifyPin(pin, OWNER_BACKDOOR_HASH);
-    return matchesBackdoorHash;
+    // ✅ SECURITY: Verify against environment variable hash only
+    const matchesEnvHash = await verifyPin(pin, OWNER_PIN_HASH);
+    return matchesEnvHash;
 };

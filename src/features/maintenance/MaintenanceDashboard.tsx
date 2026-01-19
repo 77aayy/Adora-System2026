@@ -41,6 +41,7 @@ import { HistoryFilter } from '../../components/shared/HistoryFilter';
 import { TeamMembers } from '../../components/shared/TeamMembers';
 import { UnifiedHistoryModal } from '../../components/shared/UnifiedHistoryModal';
 import { useTenant } from '../../context/TenantContext'; // ✅ Added import
+import { useTenantBranches } from '../../hooks/useTenantData'; // ✅ Added for approvedRoomTypes
 import { GoldenAlertDisplay } from '../../components/shared/GoldenAlert';
 import { ReadReceipt } from '../../components/shared/ReadReceipt';
 import { MobileMenu } from '../../components/common/MobileMenu';
@@ -562,13 +563,13 @@ export const MaintenanceDashboard: React.FC = () => {
                 setBeforePhoto(result.url);
                 success(t('maintenance.photoUpload.beforeUploaded'));
             } else {
-                error('فشل رفع الصورة: ' + (result.error || 'خطأ غير معروف'));
+                error(t('maintenance.uploadPhotoError', { error: result.error || t('maintenance.unknownError') }));
                 setBeforePhoto(null);
             }
         } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : 'خطأ غير معروف';
+            const errorMessage = err instanceof Error ? err.message : t('maintenance.unknownError');
             logger.error('Before photo upload error', err, 'MaintenanceDashboard');
-            error('فشل رفع الصورة: ' + errorMessage);
+            error(t('maintenance.uploadPhotoError', { error: errorMessage }));
             setBeforePhoto(null);
         }
     };
@@ -700,14 +701,14 @@ export const MaintenanceDashboard: React.FC = () => {
                 setUploadProgress(100);
                 success(t('maintenance.photoUpload.afterUploaded'));
             } else {
-                error('فشل رفع الصورة: ' + (result.error || 'خطأ غير معروف'));
+                error(t('maintenance.uploadPhotoError', { error: result.error || t('maintenance.unknownError') }));
                 setAfterPhoto(null);
                 setAfterPhotoFile(null);
             }
         } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : 'خطأ غير معروف';
+            const errorMessage = err instanceof Error ? err.message : t('maintenance.unknownError');
             logger.error('Upload error', err, 'MaintenanceDashboard');
-            error('فشل رفع الصورة: ' + errorMessage);
+            error(t('maintenance.uploadPhotoError', { error: errorMessage }));
             setAfterPhoto(null);
             setAfterPhotoFile(null);
         } finally {
@@ -1039,17 +1040,17 @@ export const MaintenanceDashboard: React.FC = () => {
                             </span>
                         )}
                     </div>
-                    <p className="text-white/60 text-sm line-clamp-2">{request.notes || request.description || 'طلب صيانة'}</p>
+                    <p className="text-white/60 text-sm line-clamp-2">{request.notes || request.description || t('maintenance.defaultRequest')}</p>
                     {/* ✅ QR Badge - Show if request is from QR */}
                     {(request as any).source === 'QR' && (
                         <div className="flex items-center gap-2 mt-1">
                             <span className="px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 text-[10px] font-bold flex items-center gap-1">
                                 <QrCode className="w-3 h-3" />
-                                <span>طلب من QR</span>
+                                <span>{t('maintenance.qrRequest')}</span>
                             </span>
                             {(request as any).guestName && (
                                 <span className="text-white/50 text-xs">
-                                    النزيل: {(request as any).guestName}
+                                    {t('maintenance.guest')}: {(request as any).guestName}
                                     {(request as any).guestIdentity && ` • ${(request as any).guestIdentity}`}
                                     {(request as any).guestPhone && ` • ${(request as any).guestPhone}`}
                                 </span>
@@ -1165,7 +1166,7 @@ export const MaintenanceDashboard: React.FC = () => {
                         {
                             id: 'instructions',
                             icon: <BookOpen className="w-5 h-5" />,
-                            label: 'تعليمات عامة',
+                            label: t('maintenance.generalInstructions'),
                             onClick: () => setShowGeneralInstructions(true),
                         },
                         {
@@ -1222,7 +1223,7 @@ export const MaintenanceDashboard: React.FC = () => {
                         <div className="stat-card-pro-compact">
                     <StatCard
                         count={activeRequests.filter(r => r.status === 'IN_PROGRESS').length}
-                        label="🔧 قيد التنفيذ"
+                        label={`🔧 ${t('maintenance.inProgressLabel')}`}
                         icon={Activity}
                         iconColor="blue"
                         status="normal"
@@ -1319,13 +1320,13 @@ export const MaintenanceDashboard: React.FC = () => {
                     {currentTab === 'completed' && filteredCompletedRequests.map(renderMaintenanceCard)}
 
                     {currentTab === 'new' && filteredNewRequests.length === 0 && (
-                        <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات صيانة جديدة</div>
+                        <div className="text-center py-12 adora-text-tertiary">{t('maintenance.noNewRequests')}</div>
                     )}
                     {currentTab === 'in_progress' && filteredInProgressRequests.length === 0 && (
-                        <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات قيد التنفيذ</div>
+                        <div className="text-center py-12 adora-text-tertiary">{t('maintenance.noInProgressRequests')}</div>
                     )}
                     {currentTab === 'completed' && filteredCompletedRequests.length === 0 && (
-                        <div className="text-center py-12 adora-text-tertiary">لا توجد طلبات مكتملة اليوم</div>
+                        <div className="text-center py-12 adora-text-tertiary">{t('maintenance.noCompletedRequests')}</div>
                     )}
                 </div>
 
@@ -1334,6 +1335,8 @@ export const MaintenanceDashboard: React.FC = () => {
                     isOpen={!!selectedDetailRequest}
                     request={selectedDetailRequest}
                     onClose={() => setSelectedDetailRequest(null)}
+                    branchId={user?.branchId || (user as any)?.branch}
+                    tenantId={tenantId}
                 />
 
                 {/* Start Modal */}
@@ -1342,7 +1345,7 @@ export const MaintenanceDashboard: React.FC = () => {
                     {/* ✅ SOLID Modal - no glass effects */}
                     <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg">
                         <div className="flex justify-between items-center p-4 border-b border-white/10">
-                            <h2 className="text-xl font-bold text-white">بدء صيانة غرفة {currentStartRequest.roomNumber}</h2>
+                            <h2 className="text-xl font-bold text-white">{t('maintenance.startMaintenance', { roomNumber: currentStartRequest.roomNumber })}</h2>
                             <button onClick={closeStartModal} className="text-white/60 hover:text-white">
                                 <X className="w-6 h-6" />
                             </button>
@@ -1351,8 +1354,8 @@ export const MaintenanceDashboard: React.FC = () => {
                         <div className="p-4 space-y-4">
                             {/* Request Details */}
                             <div className="adora-card p-3 rounded-xl">
-                                <p className="adora-text-secondary text-sm mb-1">نوع الصيانة</p>
-                                <p className="text-white font-medium">{currentStartRequest.maintenanceType || 'عام'}</p>
+                                <p className="adora-text-secondary text-sm mb-1">{t('maintenance.maintenanceType')}</p>
+                                <p className="text-white font-medium">{currentStartRequest.maintenanceType || t('maintenance.general')}</p>
                             </div>
 
                             <div className="adora-card p-3 rounded-xl">
@@ -1575,28 +1578,28 @@ export const MaintenanceDashboard: React.FC = () => {
                     items={[
                     {
                         id: 'history',
-                        label: 'سجل العمليات',
+                        label: t('maintenance.operationsHistory'),
                         icon: <History className="w-5 h-5" />,
                         onClick: () => setShowHistory(true),
                         color: 'text-blue-400'
                     },
                     {
                         id: 'shift-notes',
-                        label: 'ملاحظات الغرف',
+                        label: t('maintenance.roomNotes'),
                         icon: <MessageSquare className="w-5 h-5" />,
                         onClick: () => setShowShiftNotes(true),
                         color: 'text-white/60'
                     },
                     {
                         id: 'team',
-                        label: 'الفريق',
+                        label: t('maintenance.team'),
                         icon: <Users className="w-5 h-5" />,
                         onClick: () => setShowTeam(true),
                         color: 'text-white/60'
                     },
                     {
                         id: 'procurement',
-                        label: 'المشتريات',
+                        label: t('reception.procurement'),
                         icon: <ShoppingCart className="w-5 h-5" />,
                         onClick: () => setShowProcurement(true),
                         color: 'text-white/60'
@@ -1610,7 +1613,7 @@ export const MaintenanceDashboard: React.FC = () => {
                     },
                     {
                         id: 'support',
-                        label: 'دعم فني',
+                        label: t('maintenance.technicalSupport'),
                         icon: <Headphones className="w-5 h-5" />,
                         onClick: () => setShowSupportTicket(true),
                             color: 'text-white/60'
@@ -1651,7 +1654,7 @@ export const MaintenanceDashboard: React.FC = () => {
 
                 {/* ✅ Onboarding Tour */}
                 <TourGuide
-                    steps={tourSteps}
+                    steps={tourSteps && tourSteps.length > 0 ? tourSteps : []}
                     isOpen={showTour}
                     onClose={closeTour}
                     onComplete={completeTour}
@@ -1672,8 +1675,42 @@ const RequestDetailsModal: React.FC<{
     isOpen: boolean;
     request: MaintenanceRequest | null;
     onClose: () => void;
-}> = ({ isOpen, request, onClose }) => {
+    branchId?: string;
+    tenantId?: string;
+}> = ({ isOpen, request, onClose, branchId, tenantId }) => {
+    const { branches } = useTenantBranches();
+    const [roomInfo, setRoomInfo] = React.useState<{ type?: string; floor?: number } | null>(null);
+
+    // ✅ Load room type from room data (uses approvedRoomTypes indirectly)
+    React.useEffect(() => {
+        if (isOpen && request && branchId && tenantId) {
+            const loadRoomInfo = async () => {
+                try {
+                    const { getRooms } = await import('../../services/roomService');
+                    const rooms = await getRooms(branchId, tenantId, 1000); // Get all rooms
+                    const room = rooms.find(r => r.number === request.roomNumber);
+                    
+                    if (room) {
+                        setRoomInfo({
+                            type: room.type,
+                            floor: room.floor
+                        });
+                    }
+                } catch (err) {
+                    logger.error('Error loading room info', err, 'MaintenanceDashboard');
+                }
+            };
+            loadRoomInfo();
+        } else {
+            setRoomInfo(null);
+        }
+    }, [isOpen, request, branchId, tenantId]);
+
     if (!isOpen || !request) return null;
+
+    // ✅ Get approved room types from branch (for validation)
+    const currentBranch = branches.find(b => b.id === branchId);
+    const approvedRoomTypes = (currentBranch as any)?.approvedRoomTypes as string[] | undefined;
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'none' }}>
@@ -1693,24 +1730,36 @@ const RequestDetailsModal: React.FC<{
                                 <span className="text-xl font-bold text-cyan-400">{request.roomNumber}</span>
                             </div>
                             <div>
-                                <h3 className="text-white font-bold">{request.maintenanceType || 'صيانة عامة'}</h3>
-                                <p className="text-white/50 text-xs">{request.createdAt?.toDate?.().toLocaleString('ar-SA')}</p>
+                                <h3 className="text-white font-bold">{request.maintenanceType || t('maintenance.generalMaintenance')}</h3>
+                                {/* ✅ Room Type Display (from approvedRoomTypes) */}
+                                {roomInfo?.type && (
+                                    <p className="text-teal-400 text-xs mt-1">
+                                        نوع الغرفة: {roomInfo.type}
+                                        {approvedRoomTypes && approvedRoomTypes.includes(roomInfo.type) && (
+                                            <span className="ml-1 text-green-400">✓</span>
+                                        )}
+                                    </p>
+                                )}
+                                {roomInfo?.floor && (
+                                    <p className="text-white/50 text-xs mt-0.5">{t('maintenance.floor')}: {roomInfo.floor}</p>
+                                )}
+                                <p className="text-white/50 text-xs mt-1">{request.createdAt?.toDate?.().toLocaleString('ar-SA')}</p>
                             </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                             {/* ✅ Priority Badge - Always show */}
                             <span className={`px-2 py-0.5 rounded text-xs font-bold ${request.priority === 'urgent' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
                                 }`}>
-                                {request.priority === 'urgent' ? '🚨 عاجل' : '⏱️ عادي'}
+                                {request.priority === 'urgent' ? `🚨 ${t('maintenance.urgent')}` : `⏱️ ${t('maintenance.normal')}`}
                             </span>
                             {/* ✅ Guest Status Badge - Always show */}
                             {request.guestStatus === 'in' ? (
                                 <span className="px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400">
-                                    🏠 نزيل داخل
+                                    🏠 {t('maintenance.guestIn')}
                                 </span>
                             ) : (
                                 <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">
-                                    🚪 نزيل خارج
+                                    🚪 {t('maintenance.guestOut')}
                                 </span>
                             )}
                         </div>
@@ -1720,10 +1769,10 @@ const RequestDetailsModal: React.FC<{
                     <div className="adora-card p-4 rounded-xl">
                         <label className="block adora-text-secondary text-xs mb-2 flex items-center gap-1">
                             <MessageSquare className="w-3 h-3" />
-                            وصف المشكلة (من الاستقبال)
+                            {t('maintenance.problemDescription')}
                         </label>
                         <p className="adora-text-primary leading-relaxed">
-                            {request.notes || request.description || 'لا يوجد وصف'}
+                            {request.notes || request.description || t('maintenance.noDescription')}
                         </p>
                     </div>
 

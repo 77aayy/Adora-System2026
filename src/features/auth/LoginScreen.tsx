@@ -38,7 +38,7 @@ const getDynamicGreeting = (t: (key: string) => string) => {
   if (hour >= 5 && hour < 12) {
     return {
       greeting: t('greetings.morning'),
-      message: t('auth.morningMessage') || 'ابدأ يومك بإنتاجية عالية',
+      message: t('auth.morningMessage'),
       icon: Sunrise,
       iconColor: 'text-amber-500',
       emoji: '☀️'
@@ -46,7 +46,7 @@ const getDynamicGreeting = (t: (key: string) => string) => {
   } else if (hour >= 12 && hour < 17) {
     return {
       greeting: t('greetings.afternoon'),
-      message: t('auth.afternoonMessage') || 'استمر في تحقيق النجاح',
+      message: t('auth.afternoonMessage'),
       icon: Sun,
       iconColor: 'text-yellow-500',
       emoji: '🌤️'
@@ -54,7 +54,7 @@ const getDynamicGreeting = (t: (key: string) => string) => {
   } else if (hour >= 17 && hour < 21) {
     return {
       greeting: t('greetings.evening'),
-      message: t('auth.eveningMessage') || 'نهاية يوم مميز',
+      message: t('auth.eveningMessage'),
       icon: Sunset,
       iconColor: 'text-orange-500',
       emoji: '🌅'
@@ -62,7 +62,7 @@ const getDynamicGreeting = (t: (key: string) => string) => {
   } else {
     return {
       greeting: t('greetings.night'),
-      message: t('auth.nightMessage') || 'وقت للراحة أو إنهاء المهام',
+      message: t('auth.nightMessage'),
       icon: Moon,
       iconColor: 'text-indigo-400',
       emoji: '🌙'
@@ -152,10 +152,51 @@ const LoginScreen: React.FC = () => {
     }
   });
 
+  // ✅ FIX: Load from Firebase on mount (with localStorage as fallback)
+  useEffect(() => {
+    const loadDeveloperSettings = async () => {
+      try {
+        const { getSystemSettings } = await import('../../services/systemSettingsService');
+        const settings = await getSystemSettings();
+        if (settings?.developerBranding) {
+          const branding = settings.developerBranding;
+          const newConfig = {
+            devName: branding.devName || devConfig.devName,
+            phoneSA: branding.devPhoneSA || devConfig.phoneSA,
+            phoneEG: branding.devPhoneEG || devConfig.phoneEG,
+            email: branding.devEmail || devConfig.email,
+          };
+          
+          // Update state
+          setDevConfig(newConfig);
+          
+          // Sync to localStorage for backward compatibility
+          if (branding.devName) localStorage.setItem('adora_dev_name', branding.devName);
+          if (branding.devPhoneSA) localStorage.setItem('adora_dev_phone_sa', branding.devPhoneSA);
+          if (branding.devPhoneEG) localStorage.setItem('adora_dev_phone_eg', branding.devPhoneEG);
+          if (branding.devEmail) localStorage.setItem('adora_dev_email', branding.devEmail);
+          if (branding.devSignature) localStorage.setItem('adora_dev_signature', branding.devSignature);
+        }
+      } catch (err) {
+        console.warn('Failed to load developer settings from Firebase, using localStorage:', err);
+      }
+    };
+    
+    loadDeveloperSettings();
+  }, []);
+  
   // ✅ FIX: Listen for settings updates from owner dashboard
   useEffect(() => {
     const handleSettingsUpdate = (event: CustomEvent) => {
-      setDevConfig(event.detail);
+      const newConfig = event.detail;
+      // Update state
+      setDevConfig(newConfig);
+      // Also update localStorage to ensure persistence
+      if (newConfig.devName) localStorage.setItem('adora_dev_name', newConfig.devName);
+      if (newConfig.phoneSA) localStorage.setItem('adora_dev_phone_sa', newConfig.phoneSA);
+      if (newConfig.phoneEG) localStorage.setItem('adora_dev_phone_eg', newConfig.phoneEG);
+      if (newConfig.email) localStorage.setItem('adora_dev_email', newConfig.email);
+      if (newConfig.signature) localStorage.setItem('adora_dev_signature', newConfig.signature);
     };
     
     window.addEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
@@ -217,7 +258,7 @@ const LoginScreen: React.FC = () => {
     if (magicCode) {
       setBranchCode(magicCode);
       setUserType('employee');
-      showInfo(hotelName ? (t('auth.welcomeToHotel', { hotel: hotelName }) || `مرحباً بك في ${hotelName}!`) : (t('auth.welcomeToAdora') || 'مرحباً بك في Adora!'));
+      showInfo(hotelName ? t('auth.welcomeToHotel', { hotel: hotelName }) : t('auth.welcomeToAdora'));
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [showInfo, t]);
@@ -278,11 +319,11 @@ const LoginScreen: React.FC = () => {
   const getConfig = () => {
     switch (userType) {
       case 'owner':
-        return { showBranch: false, pinLength: 6, pinLabel: t('auth.ownerPinLabel') || 'كود المالك', branchLength: 0 };
+        return { showBranch: false, pinLength: 6, pinLabel: t('auth.ownerPinLabel'), branchLength: 0 };
       case 'manager':
-        return { showBranch: false, pinLength: 4, pinLabel: t('auth.managerPinLabel') || 'كود المدير', branchLength: 0 };
+        return { showBranch: false, pinLength: 4, pinLabel: t('auth.managerPinLabel'), branchLength: 0 };
       case 'employee':
-        return { showBranch: true, pinLength: 4, pinLabel: t('auth.employeePinLabel') || 'كود الموظف', branchLength: 4 };
+        return { showBranch: true, pinLength: 4, pinLabel: t('auth.employeePinLabel'), branchLength: 4 };
     }
   };
 
@@ -355,18 +396,18 @@ const LoginScreen: React.FC = () => {
     // Validation
     if (userType === 'employee') {
       if (branchCode.length === 0) {
-        setError(t('auth.enterBranchCodeFirst') || 'أدخل كود الفرع أولاً');
+        setError(t('auth.enterBranchCodeFirst'));
         triggerHaptic('error');
         return;
       }
       if (pin.length < config.pinLength) {
-        setError(t('auth.enterEmployeeCode', { digits: config.pinLength }) || `أدخل كود الموظف (${config.pinLength} أرقام)`);
+        setError(t('auth.enterEmployeeCode', { digits: config.pinLength }));
         triggerHaptic('error');
         return;
       }
     } else {
       if (pin.length < config.pinLength) {
-        setError(t('auth.enterFullCode', { digits: config.pinLength }) || `أدخل الكود كاملاً (${config.pinLength} أرقام)`);
+        setError(t('auth.enterFullCode', { digits: config.pinLength }));
         triggerHaptic('error');
         return;
       }
@@ -402,7 +443,18 @@ const LoginScreen: React.FC = () => {
 
     } catch (err: any) {
       triggerHaptic('error');
-      setError(err.message || t('auth.wrongCode') || 'كود خاطئ');
+      
+      // ✅ Better error messages for common issues
+      let errorMessage = err.message || t('auth.wrongCode');
+      
+      // If error mentions Anonymous Auth or configuration-not-found
+      if (errorMessage.includes('Anonymous Authentication') || errorMessage.includes('configuration-not-found')) {
+        errorMessage = '⚠️ Anonymous Authentication غير مفعل في Firebase Console.\n\n📍 الحل:\nFirebase Console → Authentication → Sign-in method → Anonymous → Enable';
+      } else if (errorMessage.includes('offline') || errorMessage.includes('الاتصال')) {
+        errorMessage = '⚠️ لا يوجد اتصال بالإنترنت.\n\nيرجى التحقق من الاتصال والمحاولة مرة أخرى.';
+      }
+      
+      setError(errorMessage);
       setPin('');
     } finally {
       setIsLoading(false);
@@ -420,7 +472,7 @@ const LoginScreen: React.FC = () => {
       navigate(path || '/admin');
     } catch (err: any) {
       triggerHaptic('error');
-      setError(err.message || t('auth.biometricFailed') || 'فشل التحقق من البصمة');
+      setError(err.message || t('auth.biometricFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -456,7 +508,7 @@ const LoginScreen: React.FC = () => {
           }
           backdrop-blur-sm shadow-sm
         `}
-        aria-label={isDark ? (t('auth.dayMode') || 'الوضع النهاري') : (t('auth.nightMode') || 'الوضع الليلي')}
+        aria-label={isDark ? t('auth.dayMode') : t('auth.nightMode')}
       >
         {isDark ? (
           <Sun className="w-5 h-5" />
@@ -658,7 +710,7 @@ const LoginScreen: React.FC = () => {
             <div className="relative z-10">
               <img
                 src="/adora-logo.png"
-                alt={t('auth.welcomeMessage') || 'Adora - منظومة إدارة الفنادق'}
+                alt={t('auth.welcomeMessage')}
                 className="logo-float logo-crisp"
                 style={{ 
                   width: 'clamp(80px, 25vw, 160px)',
@@ -689,7 +741,7 @@ const LoginScreen: React.FC = () => {
               <GreetingIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${greeting.iconColor} animate-bounce-gentle`} />
             </p>
             <p className={`text-xs sm:text-base font-medium ${isDark ? 'text-slate-300' : 'text-teal-600'}`}>
-              {t('auth.welcomeMessage') || 'مرحباً بك في منظومة إدارة الفنادق'}
+              {t('auth.welcomeMessage')}
             </p>
             <p className={`text-[10px] sm:text-sm italic hidden sm:block ${isDark ? 'text-slate-400' : 'text-teal-500/80'}`}>
               ✨ {greeting.message} ✨
@@ -712,7 +764,7 @@ const LoginScreen: React.FC = () => {
               active={userType === 'employee'}
               onClick={() => setUserType('employee')}
               icon={<User className="w-4 h-4" />}
-              label={t('auth.employee') || 'موظف'}
+              label={t('auth.employee')}
               color="from-teal-500 to-teal-600 shadow-teal-500/30"
               isDark={isDark}
             />
@@ -721,7 +773,7 @@ const LoginScreen: React.FC = () => {
               active={userType === 'manager'}
               onClick={() => setUserType('manager')}
               icon={<Shield className="w-4 h-4" />}
-              label={t('auth.manager') || 'مدير'}
+              label={t('auth.manager')}
               color="from-blue-500 to-blue-600 shadow-blue-500/30"
               isDark={isDark}
             />
@@ -730,7 +782,7 @@ const LoginScreen: React.FC = () => {
               active={userType === 'owner'}
               onClick={() => setUserType('owner')}
               icon={<Crown className="w-4 h-4" />}
-              label={t('auth.owner') || 'مالك'}
+              label={t('auth.owner')}
               color="from-amber-500 to-amber-600 shadow-amber-500/30"
               isDark={isDark}
             />
@@ -771,8 +823,8 @@ const LoginScreen: React.FC = () => {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Building2 className={`w-4 h-4 ${activeInput === 'branch' ? 'text-teal-500' : isDark ? 'text-slate-400' : 'text-slate-400'}`} />
-                  <span className={`text-sm font-medium ${activeInput === 'branch' ? isDark ? 'text-teal-400' : 'text-teal-700' : isDark ? 'text-slate-300' : 'text-slate-500'}`}>{t('auth.branchCodeLabel') || 'كود الفرع'}</span>
-                  {activeInput === 'branch' && <span className="text-xs text-teal-500 animate-pulse">● {t('auth.activeLabel') || 'نشط'}</span>}
+                  <span className={`text-sm font-medium ${activeInput === 'branch' ? isDark ? 'text-teal-400' : 'text-teal-700' : isDark ? 'text-slate-300' : 'text-slate-500'}`}>{t('auth.branchCodeLabel')}</span>
+                  {activeInput === 'branch' && <span className="text-xs text-teal-500 animate-pulse">● {t('auth.activeLabel')}</span>}
                 </div>
                 <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{branchCode.length}/1-4</span>
               </div>
@@ -820,7 +872,7 @@ const LoginScreen: React.FC = () => {
                 {userType === 'manager' && <Shield className={`w-4 h-4 text-blue-500`} />}
                 {userType === 'employee' && <User className={`w-4 h-4 ${activeInput === 'pin' ? 'text-teal-500' : 'text-slate-400'}`} />}
                 <span className={`text-sm font-medium ${activeInput === 'pin' || userType !== 'employee' ? isDark ? 'text-teal-400' : 'text-teal-700' : isDark ? 'text-slate-300' : 'text-slate-500'}`}>{config.pinLabel}</span>
-                {(activeInput === 'pin' || userType !== 'employee') && <span className="text-xs text-teal-500 animate-pulse">● {t('auth.activeLabel') || 'نشط'}</span>}
+                {(activeInput === 'pin' || userType !== 'employee') && <span className="text-xs text-teal-500 animate-pulse">● {t('auth.activeLabel')}</span>}
               </div>
               <div className="flex items-center gap-2">
                 <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>{pin.length}/{config.pinLength}</span>
@@ -912,15 +964,15 @@ const LoginScreen: React.FC = () => {
             onClick={() => {
               // ✅ FIX: Get developer info from state (auto-updates)
               const devPhone = devConfig.phoneSA || '966570707121';
-              const branchName = localStorage.getItem('adora_branch_name') || t('auth.branchNotSpecified') || 'غير محدد';
+              const branchName = localStorage.getItem('adora_branch_name') || t('auth.branchNotSpecified');
               const message = encodeURIComponent(
-                t('auth.forgotCodeMessage', { branch: branchName }) || `السلام عليكم،\nأنا مدير فرع [${branchName}]،\nفقدت كود الدخول الخاص بي وأرغب في استعادته أو تحديثه.\nشكراً لكم.`
+                t('auth.forgotCodeMessage', { branch: branchName })
               );
               window.open(`https://wa.me/${devPhone}?text=${message}`, '_blank');
             }}
             className={`w-full mt-3 py-2 text-center text-sm transition-colors ${isDark ? 'text-teal-400 hover:text-teal-300' : 'text-teal-600 hover:text-teal-700'} hover:underline`}
           >
-            🔑 {t('auth.forgotCode') || 'نسيت الكود؟'}
+            🔑 {t('auth.forgotCode')}
           </button>
         </div>
 

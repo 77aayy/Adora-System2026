@@ -4,7 +4,8 @@
  * Adora Hotel Management System V3
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Star, Save, RefreshCw, Settings, Sparkles, ChevronDown, ChevronUp,
     UserPlus, CheckCircle2, ClipboardCheck, Bell, Wrench, ShoppingCart,
@@ -200,159 +201,160 @@ interface DepartmentConfig {
 // SECTION DESCRIPTIONS (Transparency for managers)
 // ============================================================
 
-const SECTION_DESCRIPTIONS: Record<string, { title: string; description: string; tip?: string }> = {
+// Section descriptions - i18n-aware function
+const getSectionDescriptions = (t: (key: string) => string): Record<string, { title: string; description: string; tip?: string }> => ({
     bellman: {
-        title: '🛎️ قسم البيلمان - نقاط خدمة النزلاء',
-        description: 'يتم منح النقاط للبيلمان عند استلام وتوديع النزلاء، وإكمال طلبات نقل الأمتعة. الإنجاز السريع يمنح مكافأة إضافية.',
-        tip: '💡 كلما زادت سرعة الاستجابة، زادت النقاط المكتسبة'
+        title: t('pointsConfiguration.sections.bellman.title'),
+        description: t('pointsConfiguration.sections.bellman.description'),
+        tip: t('pointsConfiguration.sections.bellman.tip')
     },
     housekeeping: {
-        title: '🧹 قسم الهاوسكيبنج - نقاط النظافة',
-        description: 'يكتسب عمال النظافة النقاط عند بدء التنظيف، إكمال الغرف، واجتياز التفتيش. الأوقات المحددة هي الحد الأقصى للإنجاز.',
-        tip: '⚡ الإنجاز قبل الوقت المحدد = نقاط إضافية | التأخير = خصم نقاط'
+        title: t('pointsConfiguration.sections.housekeeping.title'),
+        description: t('pointsConfiguration.sections.housekeeping.description'),
+        tip: t('pointsConfiguration.sections.housekeeping.tip')
     },
     maintenance: {
-        title: '🔧 قسم الصيانة - نقاط الإصلاحات',
-        description: 'يحصل فنيو الصيانة على نقاط عند إتمام طلبات الإصلاح. السرعة في حل المشاكل مهمة لراحة النزلاء.',
-        tip: '🔧 الصيانة السريعة تعني نزيل سعيد ونقاط أكثر'
+        title: t('pointsConfiguration.sections.maintenance.title'),
+        description: t('pointsConfiguration.sections.maintenance.description'),
+        tip: t('pointsConfiguration.sections.maintenance.tip')
     },
     coffeeShop: {
-        title: '☕ قسم الكوفي شوب - نقاط الطلبات',
-        description: 'يتم احتساب النقاط بناءً على سرعة تحضير وتوصيل طلبات المشروبات والوجبات الخفيفة للغرف.',
-        tip: '☕ التوصيل السريع = نقاط مكافأة | التأخير = خصم'
+        title: t('pointsConfiguration.sections.coffeeShop.title'),
+        description: t('pointsConfiguration.sections.coffeeShop.description'),
+        tip: t('pointsConfiguration.sections.coffeeShop.tip')
     },
     procurement: {
-        title: '📦 قسم المشتريات - نقاط التوريد',
-        description: 'يتم تقييم موظفي المشتريات بناءً على سرعة توفير المطلوبات لكل قسم. الأهداف الزمنية مختلفة حسب القسم الطالب.',
-        tip: '📦 كل قسم له وقت مستهدف مختلف للمشتريات'
+        title: t('pointsConfiguration.sections.procurement.title'),
+        description: t('pointsConfiguration.sections.procurement.description'),
+        tip: t('pointsConfiguration.sections.procurement.tip')
     },
     reception: {
-        title: '🏨 قسم الاستقبال - نقاط الخدمة',
-        description: 'يحصل موظفو الاستقبال على نقاط عند إنشاء الطلبات وتأكيدها بسرعة. التأخير في التأكيد يؤدي لخصم النقاط.',
-        tip: '⏱️ سرعة التأكيد مهمة - التأخير الشديد يعني خصم مضاعف'
+        title: t('pointsConfiguration.sections.reception.title'),
+        description: t('pointsConfiguration.sections.reception.description'),
+        tip: t('pointsConfiguration.sections.reception.tip')
     },
     ratings: {
-        title: '⭐ نظام التقييمات - نقاط رضا النزلاء',
-        description: 'تُمنح النقاط بناءً على تقييم النزيل للخدمة المقدمة. التقييم الممتاز يعني نقاط أكثر، والضعيف يعني خصم.',
-        tip: '🎯 رضا النزيل هو المعيار الأهم'
+        title: t('pointsConfiguration.sections.ratings.title'),
+        description: t('pointsConfiguration.sections.ratings.description'),
+        tip: t('pointsConfiguration.sections.ratings.tip')
     },
     financial: {
-        title: '💰 القيم المالية - نظام الصرف',
-        description: 'يحدد قيمة كل نقطة بالريال والحد الأدنى المطلوب لطلب صرف المكافآت. يتم مراجعة طلبات الصرف من الإدارة.',
-        tip: '💵 الموظف يمكنه طلب صرف النقاط عند الوصول للحد الأدنى'
+        title: t('pointsConfiguration.sections.financial.title'),
+        description: t('pointsConfiguration.sections.financial.description'),
+        tip: t('pointsConfiguration.sections.financial.tip')
     }
-};
+});
 
-const DEPARTMENTS: DepartmentConfig[] = [
+// Departments config - i18n-aware function
+const getDepartments = (t: (key: string) => string): DepartmentConfig[] => [
     {
-        name: 'البيلمان',
+        name: t('pointsConfiguration.departments.bellman'),
         key: 'bellman',
         color: 'text-purple-400',
         bgColor: 'bg-purple-500/20',
         icon: <Bell className="w-5 h-5" />,
         fields: [
-            { key: 'checkin', label: 'تسجيل دخول/خروج', icon: <UserPlus className="w-4 h-4" /> },
-            { key: 'complete', label: 'إتمام طلب', icon: <CheckCircle2 className="w-4 h-4" /> },
-            { key: 'fast', label: 'إنجاز سريع', icon: <Zap className="w-4 h-4" />, timeKey: 'fastTime', timeLabel: 'خلال' },
-            { key: 'delay', label: 'تأخير', icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'delayTime', timeLabel: 'بعد' }
+            { key: 'checkin', label: t('pointsConfiguration.fields.checkin'), icon: <UserPlus className="w-4 h-4" /> },
+            { key: 'complete', label: t('pointsConfiguration.fields.complete'), icon: <CheckCircle2 className="w-4 h-4" /> },
+            { key: 'fast', label: t('pointsConfiguration.fields.fast'), icon: <Zap className="w-4 h-4" />, timeKey: 'fastTime', timeLabel: t('pointsConfiguration.within') },
+            { key: 'delay', label: t('pointsConfiguration.fields.delay'), icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'delayTime', timeLabel: t('pointsConfiguration.after') }
         ]
     },
     {
-        name: 'الهاوسكيبنج',
+        name: t('pointsConfiguration.departments.housekeeping'),
         key: 'housekeeping',
         color: 'text-cyan-400',
         bgColor: 'bg-cyan-500/20',
         icon: <Sparkles className="w-5 h-5" />,
         fields: [
-            { key: 'start', label: 'بدء تنظيف', icon: <Sparkles className="w-4 h-4" /> },
-            { key: 'completeOccupied', label: 'إتمام (ساكن)', icon: <CheckCircle2 className="w-4 h-4" /> },
-            { key: 'completeCheckout', label: 'إتمام (مغادرة)', icon: <CheckCircle2 className="w-4 h-4" /> },
-            { key: 'inspection', label: 'فحص غرفة', icon: <ClipboardCheck className="w-4 h-4" /> },
-            { key: 'fast', label: 'إنجاز سريع', icon: <Zap className="w-4 h-4" />, timeKey: 'fastTime', timeLabel: 'خلال' },
-            { key: 'delay', label: 'تأخير', icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'delayTime', timeLabel: 'بعد' }
+            { key: 'start', label: t('pointsConfiguration.fields.start'), icon: <Sparkles className="w-4 h-4" /> },
+            { key: 'completeOccupied', label: t('pointsConfiguration.fields.completeOccupied'), icon: <CheckCircle2 className="w-4 h-4" /> },
+            { key: 'completeCheckout', label: t('pointsConfiguration.fields.completeCheckout'), icon: <CheckCircle2 className="w-4 h-4" /> },
+            { key: 'inspection', label: t('pointsConfiguration.fields.inspection'), icon: <ClipboardCheck className="w-4 h-4" /> },
+            { key: 'fast', label: t('pointsConfiguration.fields.fast'), icon: <Zap className="w-4 h-4" />, timeKey: 'fastTime', timeLabel: t('pointsConfiguration.within') },
+            { key: 'delay', label: t('pointsConfiguration.fields.delay'), icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'delayTime', timeLabel: t('pointsConfiguration.after') }
         ]
     },
     {
-        name: 'الصيانة',
+        name: t('pointsConfiguration.departments.maintenance'),
         key: 'maintenance',
         color: 'text-amber-400',
         bgColor: 'bg-amber-500/20',
         icon: <Wrench className="w-5 h-5" />,
         fields: [
-            { key: 'complete', label: 'إتمام صيانة (موحدة)', icon: <CheckCircle2 className="w-4 h-4" /> },
-            { key: 'fast', label: 'إنجاز سريع', icon: <Zap className="w-4 h-4" />, timeKey: 'fastTime', timeLabel: 'خلال' },
-            { key: 'delay', label: 'تأخير', icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'delayTime', timeLabel: 'بعد' }
+            { key: 'complete', label: t('pointsConfiguration.fields.completeMaintenance'), icon: <CheckCircle2 className="w-4 h-4" /> },
+            { key: 'fast', label: t('pointsConfiguration.fields.fast'), icon: <Zap className="w-4 h-4" />, timeKey: 'fastTime', timeLabel: t('pointsConfiguration.within') },
+            { key: 'delay', label: t('pointsConfiguration.fields.delay'), icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'delayTime', timeLabel: t('pointsConfiguration.after') }
         ]
     },
     {
-        name: 'الكوفي شوب',
+        name: t('pointsConfiguration.departments.coffeeShop'),
         key: 'coffeeShop',
         color: 'text-orange-400',
         bgColor: 'bg-orange-500/20',
         icon: <Coffee className="w-5 h-5" />,
         fields: [
-            { key: 'complete', label: 'إتمام طلب', icon: <CheckCircle2 className="w-4 h-4" /> },
-            { key: 'fast', label: 'إنجاز سريع', icon: <Zap className="w-4 h-4" />, timeKey: 'fastTime', timeLabel: 'خلال' },
-            { key: 'delay', label: 'تأخير', icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'delayTime', timeLabel: 'بعد' }
+            { key: 'complete', label: t('pointsConfiguration.fields.complete'), icon: <CheckCircle2 className="w-4 h-4" /> },
+            { key: 'fast', label: t('pointsConfiguration.fields.fast'), icon: <Zap className="w-4 h-4" />, timeKey: 'fastTime', timeLabel: t('pointsConfiguration.within') },
+            { key: 'delay', label: t('pointsConfiguration.fields.delay'), icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'delayTime', timeLabel: t('pointsConfiguration.after') }
         ]
     },
     {
-        name: 'المشتريات',
+        name: t('pointsConfiguration.departments.procurement'),
         key: 'procurement',
         color: 'text-green-400',
         bgColor: 'bg-green-500/20',
         icon: <ShoppingCart className="w-5 h-5" />,
         fields: [
-            { key: 'targetTimeHousekeeping', label: 'هدف المشتريات (هاوسكيبنج)', icon: <Timer className="w-4 h-4" />, isTimeField: true },
-            { key: 'targetTimeMaintenance', label: 'هدف المشتريات (صيانة)', icon: <Timer className="w-4 h-4" />, isTimeField: true },
-            { key: 'targetTimeReception', label: 'هدف المشتريات (استقبال)', icon: <Timer className="w-4 h-4" />, isTimeField: true },
-            { key: 'purchase', label: 'نقاط الشراء', icon: <ShoppingCart className="w-4 h-4" /> }, // Removed inline targetTime
-            { key: 'receive', label: 'استلام بضاعة', icon: <CheckCircle2 className="w-4 h-4" /> },
-            { key: 'early', label: 'بونص تبكير', icon: <Zap className="w-4 h-4" /> },
-            { key: 'ontime', label: 'إنجاز بالموعد', icon: <Clock className="w-4 h-4" /> },
-            { key: 'delay', label: 'خصم تأخير', icon: <AlertCircle className="w-4 h-4" />, min: -10 }
+            { key: 'targetTimeHousekeeping', label: t('pointsConfiguration.fields.targetTimeHousekeeping'), icon: <Timer className="w-4 h-4" />, isTimeField: true },
+            { key: 'targetTimeMaintenance', label: t('pointsConfiguration.fields.targetTimeMaintenance'), icon: <Timer className="w-4 h-4" />, isTimeField: true },
+            { key: 'targetTimeReception', label: t('pointsConfiguration.fields.targetTimeReception'), icon: <Timer className="w-4 h-4" />, isTimeField: true },
+            { key: 'purchase', label: t('pointsConfiguration.fields.purchase'), icon: <ShoppingCart className="w-4 h-4" /> },
+            { key: 'receive', label: t('pointsConfiguration.fields.receive'), icon: <CheckCircle2 className="w-4 h-4" /> },
+            { key: 'early', label: t('pointsConfiguration.fields.early'), icon: <Zap className="w-4 h-4" /> },
+            { key: 'ontime', label: t('pointsConfiguration.fields.ontime'), icon: <Clock className="w-4 h-4" /> },
+            { key: 'delay', label: t('pointsConfiguration.fields.delayPenalty'), icon: <AlertCircle className="w-4 h-4" />, min: -10 }
         ]
     },
     {
-        name: 'الاستقبال',
+        name: t('pointsConfiguration.departments.reception'),
         key: 'reception',
         color: 'text-blue-400',
         bgColor: 'bg-blue-500/20',
         icon: <Bell className="w-5 h-5" />,
         fields: [
-            { key: 'create', label: 'إنشاء طلب', icon: <Bell className="w-4 h-4" /> },
-            { key: 'confirm', label: 'تأكيد طلب (موحد)', icon: <CheckCircle2 className="w-4 h-4" /> },
-            { key: 'complete', label: 'إتمام طلب', icon: <CheckCircle2 className="w-4 h-4" /> },
-            // Speed Confirmation
-            { key: 'targetConfirmationTime', label: 'هدف تأكيد سريع', icon: <Timer className="w-4 h-4" />, isTimeField: true },
-            { key: 'lateConfirmationPenalty', label: 'خصم تأخير بسيط', icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'lateConfirmationTime', timeLabel: 'بعد' },
-            { key: 'veryLateConfirmationPenalty', label: 'خصم تأخير كبير', icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'veryLateConfirmationTime', timeLabel: 'بعد' },
+            { key: 'create', label: t('pointsConfiguration.fields.create'), icon: <Bell className="w-4 h-4" /> },
+            { key: 'confirm', label: t('pointsConfiguration.fields.confirm'), icon: <CheckCircle2 className="w-4 h-4" /> },
+            { key: 'complete', label: t('pointsConfiguration.fields.complete'), icon: <CheckCircle2 className="w-4 h-4" /> },
+            { key: 'targetConfirmationTime', label: t('pointsConfiguration.fields.targetConfirmationTime'), icon: <Timer className="w-4 h-4" />, isTimeField: true },
+            { key: 'lateConfirmationPenalty', label: t('pointsConfiguration.fields.lateConfirmationPenalty'), icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'lateConfirmationTime', timeLabel: t('pointsConfiguration.after') },
+            { key: 'veryLateConfirmationPenalty', label: t('pointsConfiguration.fields.veryLateConfirmationPenalty'), icon: <AlertCircle className="w-4 h-4" />, min: -10, timeKey: 'veryLateConfirmationTime', timeLabel: t('pointsConfiguration.after') },
         ]
     },
     {
-        name: 'التقييمات',
+        name: t('pointsConfiguration.departments.ratings'),
         key: 'ratings',
         color: 'text-yellow-400',
         bgColor: 'bg-yellow-500/20',
         icon: <Star className="w-5 h-5" />,
         fields: [
-            { key: 'enabled', label: 'تفعيل نقاط التقييم', icon: <CheckCircle2 className="w-4 h-4" />, isBoolean: true },
-            { key: 'excellent', label: 'ممتاز ⭐⭐⭐⭐⭐', icon: <ThumbsUp className="w-4 h-4" /> },
-            { key: 'veryGood', label: 'جيد جداً ⭐⭐⭐⭐', icon: <ThumbsUp className="w-4 h-4" /> },
-            { key: 'good', label: 'جيد ⭐⭐⭐', icon: <ThumbsUp className="w-4 h-4" /> },
-            { key: 'fair', label: 'مقبول ⭐⭐', icon: <Clock className="w-4 h-4" /> },
-            { key: 'poor', label: 'ضعيف ⭐', icon: <ThumbsDown className="w-4 h-4" />, min: -10 }
+            { key: 'enabled', label: t('pointsConfiguration.fields.enableRatings'), icon: <CheckCircle2 className="w-4 h-4" />, isBoolean: true },
+            { key: 'excellent', label: t('pointsConfiguration.fields.excellent'), icon: <ThumbsUp className="w-4 h-4" /> },
+            { key: 'veryGood', label: t('pointsConfiguration.fields.veryGood'), icon: <ThumbsUp className="w-4 h-4" /> },
+            { key: 'good', label: t('pointsConfiguration.fields.good'), icon: <ThumbsUp className="w-4 h-4" /> },
+            { key: 'fair', label: t('pointsConfiguration.fields.fair'), icon: <Clock className="w-4 h-4" /> },
+            { key: 'poor', label: t('pointsConfiguration.fields.poor'), icon: <ThumbsDown className="w-4 h-4" />, min: -10 }
         ]
     },
     {
-        name: 'القيم المالية',
+        name: t('pointsConfiguration.departments.financial'),
         key: 'financial' as any,
         color: 'text-emerald-400',
         bgColor: 'bg-emerald-500/20',
         icon: <DollarSign className="w-5 h-5" />,
         fields: [
-            { key: 'exchangeRate', label: 'قيمة النقطة (ريال)', icon: <DollarSign className="w-4 h-4" />, min: 0 },
-            { key: 'minRedemption', label: 'الحد الأدنى للصرف (نقطة)', icon: <AlertCircle className="w-4 h-4" />, min: 0 }
+            { key: 'exchangeRate', label: t('pointsConfiguration.fields.exchangeRate'), icon: <DollarSign className="w-4 h-4" />, min: 0 },
+            { key: 'minRedemption', label: t('pointsConfiguration.fields.minRedemption'), icon: <AlertCircle className="w-4 h-4" />, min: 0 }
         ]
     }
 ];
@@ -408,15 +410,15 @@ const TimeUnitSelector: React.FC<{ value: number; onChange: (val: number) => voi
                 <button
                     onClick={() => handleUnitChange('minutes')}
                     className={`px-2 py-1 text-[10px] ${unit === 'minutes' ? 'bg-yellow-500 text-black' : 'text-white/40 hover:text-white'}`}
-                >د</button>
+                >{t('pointsConfiguration.minutes')}</button>
                 <button
                     onClick={() => handleUnitChange('hours')}
                     className={`px-2 py-1 text-[10px] ${unit === 'hours' ? 'bg-yellow-500 text-black' : 'text-white/40 hover:text-white'}`}
-                >س</button>
+                >{t('pointsConfiguration.hours')}</button>
                 <button
                     onClick={() => handleUnitChange('days')}
                     className={`px-2 py-1 text-[10px] ${unit === 'days' ? 'bg-yellow-500 text-black' : 'text-white/40 hover:text-white'}`}
-                >ي</button>
+                >{t('pointsConfiguration.days')}</button>
             </div>
         </div>
     );
@@ -425,7 +427,8 @@ const TimeUnitSelector: React.FC<{ value: number; onChange: (val: number) => voi
 const DepartmentSection: React.FC<DepartmentSectionProps> = ({
     dept, values, onChange, expanded, onToggle
 }) => {
-    const sectionDesc = SECTION_DESCRIPTIONS[dept.key];
+    const { t } = useTranslation();
+    const sectionDesc = getSectionDescriptions(t)[dept.key];
     
     return (
         <div className="rounded-2xl border border-white/5 overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-black/20" style={{ background: 'var(--theme-bg-secondary)' }}>
@@ -454,7 +457,7 @@ const DepartmentSection: React.FC<DepartmentSectionProps> = ({
                     </div>
                     <div className="text-right">
                         <h3 className={`text-lg font-semibold ${dept.color}`}>{dept.name}</h3>
-                        <p className="text-sm text-white/50">{dept.fields.length} إعداد</p>
+                        <p className="text-sm text-white/50">{t('pointsConfiguration.settingsCount', { count: dept.fields.length })}</p>
                     </div>
                 </div>
                 {expanded ? <ChevronUp className="w-5 h-5 text-white/40" /> : <ChevronDown className="w-5 h-5 text-white/40" />}
@@ -479,7 +482,7 @@ const DepartmentSection: React.FC<DepartmentSectionProps> = ({
                                     onClick={() => onChange(field.key, !values[field.key])}
                                     className={`px-4 py-2 rounded-lg font-medium transition-all ${values[field.key] ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
                                 >
-                                    {values[field.key] ? 'مفعل' : 'معطل'}
+                                    {values[field.key] ? t('pointsConfiguration.enabled') : t('pointsConfiguration.disabled')}
                                 </button>
                             ) : field.isTimeField ? (
                                 <TimeUnitSelector
@@ -490,14 +493,14 @@ const DepartmentSection: React.FC<DepartmentSectionProps> = ({
                                 <div className="flex items-center gap-4">
                                     {field.timeKey && (
                                         <div className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
-                                            <span className="text-[10px] text-white/30 font-bold uppercase">{field.timeLabel}</span>
+                                            <span className="text-[10px] text-white/30 font-bold uppercase">{field.timeLabel === 'خلال' ? t('pointsConfiguration.within') : t('pointsConfiguration.after')}</span>
                                             <input
                                                 type="number"
                                                 value={values[field.timeKey] || 0}
                                                 onChange={(e) => onChange(field.timeKey!, parseInt(e.target.value) || 0)}
                                                 className="w-10 text-center text-xs font-bold bg-transparent text-blue-400 outline-none"
                                             />
-                                            <span className="text-[8px] text-white/20">د</span>
+                                            <span className="text-[8px] text-white/20">{t('pointsConfiguration.minutes')}</span>
                                         </div>
                                     )}
 
@@ -520,7 +523,7 @@ const DepartmentSection: React.FC<DepartmentSectionProps> = ({
                                         >
                                             +
                                         </button>
-                                        <span className="text-white/40 text-[10px] mr-1">نقطة</span>
+                                        <span className="text-white/40 text-[10px] mr-1">{t('pointsConfiguration.point')}</span>
                                     </div>
                                 </div>
                             )}
@@ -541,6 +544,7 @@ const DepartmentSection: React.FC<DepartmentSectionProps> = ({
 // ============================================================
 
 export const PointsConfiguration: React.FC = () => {
+    const { t } = useTranslation();
     const { user, authReady } = useAuth();
     const [config, setConfig] = useState<FullPointsConfig>(DEFAULT_CONFIG);
     const [loading, setLoading] = useState(true);
@@ -565,13 +569,13 @@ export const PointsConfiguration: React.FC = () => {
     const tenantId = user?.tenantId || (user?.role === 'owner' ? 'system-owner' : null);
     
     // Hotel name for PDF
-    const hotelName = (user as any)?.hotelName || (user as any)?.branchName || 'فندق أدورا';
+    const hotelName = (user as any)?.hotelName || (user as any)?.branchName || t('pointsConfiguration.defaultHotelName');
 
     // ✅ CRITICAL: Show loading while auth is not ready
     if (!authReady) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#0F172A]">
-                <AdoraLoader size="lg" message="جاري تحميل بيانات المستخدم..." />
+                <AdoraLoader size="lg" message={t('pointsConfiguration.loadingUserData')} />
             </div>
         );
     }
@@ -581,7 +585,7 @@ export const PointsConfiguration: React.FC = () => {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#0F172A]">
                 <div className="text-center text-white">
-                    <p className="text-xl mb-4">⚠️ يجب تسجيل الدخول للوصول إلى هذه الصفحة</p>
+                    <p className="text-xl mb-4">{t('pointsConfiguration.loginRequired')}</p>
                 </div>
             </div>
         );
@@ -797,7 +801,7 @@ export const PointsConfiguration: React.FC = () => {
     };
 
     const renderChallengeSettings = () => {
-        if (!challengeConfig) return <div className="p-8 text-center text-slate-400">جاري تحميل الإعدادات...</div>;
+        if (!challengeConfig) return <div className="p-8 text-center text-slate-400">{t('pointsConfiguration.loadingSettings')}</div>;
 
         return (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -806,10 +810,10 @@ export const PointsConfiguration: React.FC = () => {
                         <div>
                             <h3 className="text-xl font-bold flex items-center gap-2 mb-2">
                                 <Trophy className="text-yellow-500" />
-                                إعدادات مكافآت الالتزام
+                                {t('pointsConfiguration.challenges.title')}
                             </h3>
                             <p className="text-sm text-slate-400">
-                                قم بتخصيص عدد النقاط الممنوحة للموظفين عند تحقيقهم لسلاسل الالتزام.
+                                {t('pointsConfiguration.challenges.description')}
                             </p>
                         </div>
                         <button
@@ -818,7 +822,7 @@ export const PointsConfiguration: React.FC = () => {
                             className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
                         >
                             {challengeSyncing ? <AdoraLoaderInline size={20} /> : <Save className="w-5 h-5" />}
-                            حفظ الإعدادات
+                            {t('pointsConfiguration.saveSettings')}
                         </button>
                     </div>
 
@@ -831,7 +835,7 @@ export const PointsConfiguration: React.FC = () => {
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">يوم {milestone.day}</span>
+                                            <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">{t('pointsConfiguration.challenges.day', { day: milestone.day })}</span>
                                             <div className="h-px w-8 bg-white/5" />
                                         </div>
                                         <input
@@ -849,7 +853,7 @@ export const PointsConfiguration: React.FC = () => {
                                         onChange={(e) => handleUpdateMilestone(idx, 'rewardPoints', parseInt(e.target.value) || 0)}
                                         className="w-24 bg-slate-900 border border-white/10 rounded-xl p-3 text-white font-black text-center focus:border-yellow-500 outline-none"
                                     />
-                                    <span className="text-xs font-bold text-slate-400">نقطة</span>
+                                    <span className="text-xs font-bold text-slate-400">{t('pointsConfiguration.point')}</span>
                                 </div>
                             </div>
                         ))}
@@ -860,9 +864,8 @@ export const PointsConfiguration: React.FC = () => {
                             <AlertCircle className="w-5 h-5 text-blue-400" />
                         </div>
                         <div className="text-sm text-blue-300/80 leading-relaxed">
-                            <p className="font-black text-blue-300 mb-1 text-base">نظام المكافآت الذكي ⚙️</p>
-                            يتم تطبيق هذه القيم تلقائياً على جميع الموظفين عند تسجيل حضورهم اليومي.
-                            تغيير هذه القيم لا يؤثر على النقاط التي تم اكتسابها سابقاً، بل يطبق على الجوائز القادمة فقط لضمان العدالة في السجلات المالية.
+                            <p className="font-black text-blue-300 mb-1 text-base">{t('pointsConfiguration.challenges.smartRewards')}</p>
+                            {t('pointsConfiguration.challenges.smartRewardsDescription')}
                         </div>
                     </div>
                 </div>
@@ -873,7 +876,7 @@ export const PointsConfiguration: React.FC = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <AdoraLoader size="md" message="جاري تحميل البيانات..." />
+                <AdoraLoader size="md" message={t('common.loading')} />
             </div>
         );
     }
@@ -885,21 +888,21 @@ export const PointsConfiguration: React.FC = () => {
                     onClick={() => setActiveTab('points')}
                     className={`pb-4 px-2 text-sm font-bold transition-all relative ${activeTab === 'points' ? 'text-yellow-400' : 'text-white/40 hover:text-white'}`}
                 >
-                    نقاط المهام
+                    {t('pointsConfiguration.pointsTab')}
                     {activeTab === 'points' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-yellow-400 rounded-full" />}
                 </button>
                 <button
                     onClick={() => setActiveTab('achievements')}
                     className={`pb-4 px-2 text-sm font-bold transition-all relative ${activeTab === 'achievements' ? 'text-yellow-400' : 'text-white/40 hover:text-white'}`}
                 >
-                    الأوسمة والرتب
+                    {t('pointsConfiguration.achievementsTab')}
                     {activeTab === 'achievements' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-yellow-400 rounded-full" />}
                 </button>
                 <button
                     onClick={() => setActiveTab('challenges')}
                     className={`pb-4 px-2 text-sm font-bold transition-all relative ${activeTab === 'challenges' ? 'text-yellow-400' : 'text-white/40 hover:text-white'}`}
                 >
-                    مكافآت الالتزام
+                    {t('pointsConfiguration.challengesTab')}
                     {activeTab === 'challenges' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-yellow-400 rounded-full" />}
                 </button>
             </div>
@@ -917,8 +920,8 @@ export const PointsConfiguration: React.FC = () => {
                                 <FileText className="w-5 h-5 text-teal-400" />
                             </div>
                             <div>
-                                <h3 className="text-sm font-bold text-teal-300">📋 تحميل دليل النقاط والرتب</h3>
-                                <p className="text-xs text-teal-400/60">اطبع التقرير ووزعه على الموظفين للشفافية</p>
+                                <h3 className="text-sm font-bold text-teal-300">{t('pointsConfiguration.downloadGuide')}</h3>
+                                <p className="text-xs text-teal-400/60">{t('pointsConfiguration.downloadGuideDescription')}</p>
                             </div>
                         </div>
                         <div className="flex gap-2">
@@ -928,7 +931,7 @@ export const PointsConfiguration: React.FC = () => {
                                 className="px-4 py-2 rounded-xl bg-white/5 text-teal-300 hover:bg-teal-500/20 transition-all text-xs font-bold flex items-center gap-2 border border-teal-500/20"
                             >
                                 <Download className="w-4 h-4" />
-                                ملخص سريع
+                                {t('pointsConfiguration.quickSummary')}
                             </button>
                             <button
                                 onClick={() => handleGeneratePDF('full')}
@@ -936,7 +939,7 @@ export const PointsConfiguration: React.FC = () => {
                                 className="px-5 py-2 rounded-xl bg-teal-500 text-white hover:bg-teal-600 transition-all text-xs font-bold flex items-center gap-2 shadow-lg shadow-teal-500/20"
                             >
                                 {generatingPDF ? <AdoraLoaderInline size={16} /> : <FileText className="w-4 h-4" />}
-                                تحميل الدليل الكامل PDF
+                                {t('pointsConfiguration.downloadFullGuide')}
                             </button>
                         </div>
                     </div>
@@ -952,8 +955,8 @@ export const PointsConfiguration: React.FC = () => {
                                     <Star className={`w-6 h-6 text-white transition-transform duration-500 ${isCollapsed ? '' : 'rotate-12'}`} />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-white tracking-tight">إعدادات النقاط المركزية (V4)</h2>
-                                    <p className="text-sm text-white/40">تحكم كامل في منابع النقاط لجميع الأقسام</p>
+                                    <h2 className="text-xl font-bold text-white tracking-tight">{t('pointsConfiguration.title')}</h2>
+                                    <p className="text-sm text-white/40">{t('pointsConfiguration.subtitle')}</p>
                                 </div>
                             </div>
 
@@ -964,7 +967,7 @@ export const PointsConfiguration: React.FC = () => {
                                             onClick={(e) => { e.stopPropagation(); handleReset(); }}
                                             className="px-4 py-2 rounded-xl bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-all text-xs font-bold"
                                         >
-                                            إعادة تعيين
+                                            {t('pointsConfiguration.reset')}
                                         </button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleSave(); }}
@@ -972,7 +975,7 @@ export const PointsConfiguration: React.FC = () => {
                                             className={`px-6 py-2 rounded-xl font-black text-sm flex items-center gap-2 transition-all ${hasChanges ? 'bg-yellow-500 text-black hover:shadow-lg hover:shadow-yellow-500/20' : 'bg-white/10 text-white/20 cursor-not-allowed'}`}
                                         >
                                             {saving ? <AdoraLoaderInline size={16} /> : <Save className="w-4 h-4" />}
-                                            حفظ الإعدادات
+                                            {t('pointsConfiguration.saveSettings')}
                                         </button>
                                     </div>
                                 )}
@@ -985,7 +988,7 @@ export const PointsConfiguration: React.FC = () => {
 
                     {!isCollapsed && (
                         <div className="animate-fadeIn space-y-4">
-                            {DEPARTMENTS.map(dept => (
+                            {getDepartments(t).map(dept => (
                                 <DepartmentSection
                                     key={dept.key}
                                     dept={dept}
@@ -1000,9 +1003,9 @@ export const PointsConfiguration: React.FC = () => {
                                 <div className="flex items-start gap-4">
                                     <Sparkles className="w-6 h-6 text-yellow-400 flex-shrink-0" />
                                     <div className="space-y-1">
-                                        <p className="text-yellow-400 font-bold text-xs">تنبيه النظام الموحد:</p>
+                                        <p className="text-yellow-400 font-bold text-xs">{t('pointsConfiguration.systemAlert.title')}</p>
                                         <p className="text-yellow-400/70 text-[11px] leading-relaxed">
-                                            تعديل النقاط هنا يؤثر على جميع الموظفين في الفندق الخاص بك. تم دمج مهام الصيانة والاستقبال لتسهيل السيطرة، وتم تفعيل نظام "الوقت المستهدف" للمشتريات لضمان الفعالية المالية.
+                                            {t('pointsConfiguration.systemAlert.message')}
                                         </p>
                                     </div>
                                 </div>

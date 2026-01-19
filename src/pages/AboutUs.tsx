@@ -50,7 +50,9 @@ import {
     Languages,
     ChevronDown,
     DoorOpen,
-    Key
+    Key,
+    Moon,
+    Sun
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
@@ -69,7 +71,7 @@ interface SectionProps {
 }
 
 const Section: React.FC<SectionProps> = ({ children, className = '' }) => (
-    <section className={`py-16 sm:py-20 md:py-24 px-4 sm:px-6 lg:px-8 ${className}`}>
+    <section className={`py-8 sm:py-12 md:py-16 px-4 sm:px-6 lg:px-8 ${className}`}>
         {children}
     </section>
 );
@@ -102,7 +104,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, del
             ref={ref as React.RefObject<HTMLDivElement>}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={`p-4 sm:p-6 rounded-xl transition-all duration-500 ease-out cursor-pointer ${
+            className={`p-4 sm:p-5 rounded-xl transition-all duration-500 ease-out cursor-pointer ${
                 isVisible 
                     ? 'opacity-100 translate-y-0 scale-100' 
                     : 'opacity-0 translate-y-12 scale-95'
@@ -227,7 +229,7 @@ const AnimatedSection: React.FC<AnimatedSectionProps> = ({ children, delay = 0 }
 // ============================================================
 
 export const AboutUs: React.FC = () => {
-    const { isDark } = useTheme();
+    const { isDark, toggleTheme } = useTheme();
     const { i18n, t } = useTranslation();
     const navigate = useNavigate();
     
@@ -257,6 +259,49 @@ export const AboutUs: React.FC = () => {
             window.location.href = 'https://adora-hotels.com/about';
         }
     }, []);
+    
+    // ✅ Inject star animation styles into document head
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        
+        const styleId = 'about-us-star-animation';
+        if (document.getElementById(styleId)) return; // Already injected
+        
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            @keyframes starTwinkle {
+                0% { 
+                    opacity: 0.2; 
+                    transform: scale(0.9);
+                }
+                25% { 
+                    opacity: 0.6; 
+                    transform: scale(1);
+                }
+                50% { 
+                    opacity: 1; 
+                    transform: scale(1.1);
+                }
+                75% { 
+                    opacity: 0.5; 
+                    transform: scale(1);
+                }
+                100% { 
+                    opacity: 0.2; 
+                    transform: scale(0.9);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        return () => {
+            const existingStyle = document.getElementById(styleId);
+            if (existingStyle) {
+                existingStyle.remove();
+            }
+        };
+    }, []);
     const [showTrialModal, setShowTrialModal] = useState(false);
     const [trialName, setTrialName] = useState('');
     const [trialPhone, setTrialPhone] = useState('');
@@ -274,15 +319,48 @@ export const AboutUs: React.FC = () => {
     const turquoiseLight = 'rgba(32, 178, 170, 0.1)';
     const turquoiseDark = 'rgba(32, 178, 170, 0.2)';
     
-    const currentLang = i18n.language || 'ar';
+    // ✅ FIX: Use state to track language changes and trigger re-render
+    const [currentLang, setCurrentLang] = useState<string>(i18n.language || 'ar');
+    
+    // ✅ Update language when i18n changes - Listen to i18n events
+    useEffect(() => {
+        const updateLanguage = () => {
+            setCurrentLang(i18n.language || 'ar');
+        };
+        
+        // Initial update
+        updateLanguage();
+        
+        // Listen to language change events
+        i18n.on('languageChanged', updateLanguage);
+        
+        return () => {
+            i18n.off('languageChanged', updateLanguage);
+        };
+    }, [i18n]);
     
     const handleLanguageChange = async (lang: 'ar' | 'en') => {
         await changeLanguage(lang);
+        setCurrentLang(lang); // ✅ Update state immediately
         setShowLangMenu(false);
     };
 
     // Room numbers - Reduced count, all inside circle
     const roomNumbers = [102, 103, 104, 105, 106, 107, 108];
+    
+    // ✅ Generate stars data once with useMemo to prevent re-rendering
+    const starsData = React.useMemo(() => {
+        return Array.from({ length: 50 }, (_, i) => {
+            return {
+                key: `star-${i}`,
+                delay: (i * 0.1) % 5,
+                duration: 6 + (i % 4),
+                size: 1 + ((i % 3) * 0.5),
+                top: (i * 7.3) % 70,
+                left: (i * 11.7) % 100
+            };
+        });
+    }, []);
     
     // Color palette for room borders - Turquoise Theme Variations
     const roomBorderColors = [
@@ -374,10 +452,12 @@ export const AboutUs: React.FC = () => {
             return;
         }
 
-        // Basic phone validation (numbers only, at least 8 digits)
-        const phoneRegex = /^[0-9]{8,15}$/;
-        const cleanPhone = trialPhone.replace(/\s+/g, '');
-        if (!phoneRegex.test(cleanPhone)) {
+        // ✅ Accept any phone number format for international users
+        // Remove all non-digit characters except + for international format
+        const cleanPhone = trialPhone.replace(/[^\d+]/g, '');
+        
+        // Only check if phone is not empty after cleaning
+        if (!cleanPhone || cleanPhone.length < 3) {
             toast.error(t('aboutUs.trialForm.phoneInvalid'));
             return;
         }
@@ -417,26 +497,33 @@ export const AboutUs: React.FC = () => {
             {/* Premium Animated Background - Removed for unified experience */}
             
             {/* 🌙 DARK MODE - Night Sky with Stars */}
-            <div className={`absolute inset-0 transition-all duration-[1500ms] ease-in-out ${isDark ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`absolute inset-0 transition-all duration-[3000ms] ease-in-out ${isDark ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950" />
-                <div className={`absolute bottom-0 left-0 right-0 h-96 bg-gradient-to-t from-orange-900/20 via-purple-900/10 to-transparent transition-opacity duration-[2000ms] ${isDark ? 'opacity-100' : 'opacity-0'}`} />
+                <div className={`absolute bottom-0 left-0 right-0 h-96 bg-gradient-to-t from-orange-900/20 via-purple-900/10 to-transparent transition-opacity duration-[3000ms] ${isDark ? 'opacity-100' : 'opacity-0'}`} style={{ 
+                    maskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.05) 5%, rgba(0,0,0,0.1) 10%, rgba(0,0,0,0.2) 20%, rgba(0,0,0,0.35) 30%, rgba(0,0,0,0.5) 40%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.75) 60%, rgba(0,0,0,0.85) 70%, rgba(0,0,0,0.92) 80%, rgba(0,0,0,0.96) 90%, rgba(0,0,0,1) 100%)',
+                    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.05) 5%, rgba(0,0,0,0.1) 10%, rgba(0,0,0,0.2) 20%, rgba(0,0,0,0.35) 30%, rgba(0,0,0,0.5) 40%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.75) 60%, rgba(0,0,0,0.85) 70%, rgba(0,0,0,0.92) 80%, rgba(0,0,0,0.96) 90%, rgba(0,0,0,1) 100%)'
+                }} />
                 <div className="absolute inset-0 overflow-hidden">
                     <div className="absolute top-0 left-1/4 w-[600px] h-[400px] bg-gradient-to-b from-teal-500/10 via-cyan-500/5 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
                     <div className="absolute top-20 right-1/4 w-[500px] h-[300px] bg-gradient-to-b from-purple-500/10 via-indigo-500/5 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
                 </div>
-                <div className="absolute inset-0 stars-container">
-                    {[...Array(50)].map((_, i) => (
+                {/* ✅ Stars - Visible in Dark Mode with slow fade in/out */}
+                <div className="absolute inset-0 stars-container" style={{ opacity: isDark ? 1 : 0, transition: 'opacity 3s ease-in-out', pointerEvents: 'none' }}>
+                    {starsData.map((star) => (
                         <div
-                            key={i}
-                            className="absolute rounded-full bg-white animate-twinkle"
+                            key={star.key}
+                            className="absolute rounded-full bg-white star-twinkle"
                             style={{
-                                width: `${Math.random() * 3 + 1}px`,
-                                height: `${Math.random() * 3 + 1}px`,
-                                top: `${Math.random() * 70}%`,
-                                left: `${Math.random() * 100}%`,
-                                animationDelay: `${Math.random() * 3}s`,
-                                animationDuration: `${Math.random() * 2 + 2}s`,
-                                opacity: Math.random() * 0.7 + 0.3
+                                width: `${star.size}px`,
+                                height: `${star.size}px`,
+                                top: `${star.top}%`,
+                                left: `${star.left}%`,
+                                animationName: 'starTwinkle',
+                                animationDuration: `${star.duration}s`,
+                                animationTimingFunction: 'ease-in-out',
+                                animationIterationCount: 'infinite',
+                                animationDelay: `${star.delay}s`,
+                                willChange: 'opacity, transform'
                             }}
                         />
                     ))}
@@ -451,17 +538,23 @@ export const AboutUs: React.FC = () => {
                 <div className="absolute bottom-0 right-0 w-64 h-64 corner-decoration corner-br" />
             </div>
             
-            {/* Glowing accents */}
-            <div className={`absolute top-10 right-10 w-48 h-48 rounded-full blur-3xl glow-pulse transition-all duration-[1500ms] ${
+            {/* Glowing accents - Gradual fade for purple background */}
+            <div className={`absolute top-10 right-10 w-48 h-48 rounded-full blur-3xl glow-pulse transition-all duration-[3000ms] ${
                 isDark 
                     ? 'bg-gradient-to-br from-purple-500/20 to-indigo-500/10' 
                     : 'bg-gradient-to-br from-teal-400/30 to-cyan-400/20'
-            }`} />
-            <div className={`absolute bottom-20 left-10 w-56 h-56 rounded-full blur-3xl glow-pulse-delay transition-all duration-[1500ms] ${
+            }`} style={{
+                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0.2) 60%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0.2) 60%, transparent 100%)'
+            }} />
+            <div className={`absolute bottom-20 left-10 w-56 h-56 rounded-full blur-3xl glow-pulse-delay transition-all duration-[3000ms] ${
                 isDark 
                     ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/10' 
                     : 'bg-gradient-to-br from-emerald-400/25 to-teal-400/15'
-            }`} />
+            }`} style={{
+                maskImage: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0.2) 60%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0.2) 60%, transparent 100%)'
+            }} />
             <div className={`absolute top-1/2 left-1/4 w-32 h-32 rounded-full blur-2xl animate-pulse transition-all duration-[1500ms] ${
                 isDark 
                     ? 'bg-gradient-to-br from-cyan-500/15 to-blue-500/10' 
@@ -476,9 +569,10 @@ export const AboutUs: React.FC = () => {
                     overflowX: 'hidden'
                 }}
             >
-            {/* ✅ Language Switcher Only - Floating Top Right */}
-            <div className="fixed top-4 right-4 z-50">
+            {/* ✅ Language Switcher & Theme Toggle - Floating Top Right */}
+            <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
                 <div className="relative">
+                    {/* Language Button */}
                     <button
                         onClick={() => setShowLangMenu(!showLangMenu)}
                         className={`
@@ -574,6 +668,33 @@ export const AboutUs: React.FC = () => {
                         </>
                     )}
                 </div>
+                
+                {/* Theme Toggle Button */}
+                <button
+                    onClick={toggleTheme}
+                    className={`
+                        flex items-center justify-center px-4 py-2.5 rounded-xl
+                        transition-all duration-300
+                        active:scale-95
+                        ${isDark
+                            ? 'bg-slate-800/80 backdrop-blur-sm text-white hover:bg-slate-700/90 border border-slate-700/50 shadow-lg'
+                            : 'bg-white/90 backdrop-blur-sm text-slate-700 hover:bg-white border border-slate-200/50 shadow-lg'
+                        }
+                    `}
+                    style={{
+                        boxShadow: isDark 
+                            ? '0 4px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(32, 178, 170, 0.1)'
+                            : '0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(32, 178, 170, 0.1)',
+                        transition: 'all 3s ease-in-out'
+                    }}
+                    title={isDark ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن'}
+                >
+                    {isDark ? (
+                        <Sun className="w-5 h-5 transition-all duration-1000" style={{ color: turquoise }} />
+                    ) : (
+                        <Moon className="w-5 h-5 transition-all duration-1000" style={{ color: turquoise }} />
+                    )}
+                </button>
             </div>
 
             {/* Hero Section - Unified Background */}
@@ -585,7 +706,7 @@ export const AboutUs: React.FC = () => {
                 }}
             >
                 <Container>
-                    <div className="text-center space-y-4 sm:space-y-6 hero-content" style={{ position: 'relative', zIndex: 1 }}>
+                    <div className="text-center space-y-3 sm:space-y-4 hero-content" style={{ position: 'relative', zIndex: 1 }}>
                         {/* Logo Container - Mobile Responsive, Centered */}
                         <div 
                             className="flex justify-center items-center mb-4 sm:mb-6 relative mx-auto"
@@ -771,8 +892,11 @@ export const AboutUs: React.FC = () => {
                                 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-3 sm:mb-4 px-4"
                                 style={{ color: 'var(--theme-text-primary)' }}
                             >
-                                {t('aboutUs.hero.title').replace('{adora}', '').trim()}
-                                <span key="adora" style={{ color: turquoise, fontWeight: '700', letterSpacing: '1px' }}>ADORA</span>
+                                {currentLang === 'ar' ? (
+                                    <>نظام ادورا - <span key="adora" style={{ color: turquoise, fontWeight: '700', letterSpacing: '1px' }}>ADORA</span> لإدارة الفنادق</>
+                                ) : (
+                                    <>Adora System - <span key="adora" style={{ color: turquoise, fontWeight: '700', letterSpacing: '1px' }}>ADORA</span> Hotel Management</>
+                                )}
                             </h1>
                         </AnimatedSection>
                         <AnimatedSection delay={200}>
@@ -794,11 +918,19 @@ export const AboutUs: React.FC = () => {
                             <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mt-6 sm:mt-8 px-4">
                                 <button
                                     onClick={() => setShowTrialModal(true)}
-                                    className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-300 flex items-center gap-2 hover:scale-110 hover:shadow-2xl active:scale-95 shadow-lg"
+                                    className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-300 flex items-center gap-2 hover:scale-110 hover:shadow-2xl active:scale-95 shadow-lg group"
                                     style={{ 
                                         backgroundColor: turquoise,
                                         transform: 'translateY(0)',
                                         transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+                                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(32, 178, 170, 0.4), 0 0 0 1px rgba(32, 178, 170, 0.2)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                        e.currentTarget.style.boxShadow = '0 10px 30px rgba(32, 178, 170, 0.3)';
                                     }}
                                 >
                                     {t('aboutUs.hero.ctaButton')}
@@ -810,17 +942,31 @@ export const AboutUs: React.FC = () => {
                 </Container>
             </Section>
 
-            {/* Features Section - Unified Background */}
+            {/* Features Section - Unified Background with gradual purple fade - NO DIVIDING LINE */}
             <Section 
                 style={{
-                    background: 'transparent'
+                    background: 'transparent',
+                    position: 'relative'
                 }}
             >
+                {/* Gradual fade overlay from purple to transparent - Ultra smooth gradient, no sharp line */}
+                <div 
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                        background: isDark 
+                            ? 'linear-gradient(to bottom, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.12) 8%, rgba(139, 92, 246, 0.09) 16%, rgba(139, 92, 246, 0.06) 24%, rgba(139, 92, 246, 0.04) 32%, rgba(139, 92, 246, 0.03) 40%, rgba(139, 92, 246, 0.02) 48%, rgba(139, 92, 246, 0.015) 56%, rgba(139, 92, 246, 0.01) 64%, rgba(139, 92, 246, 0.005) 72%, transparent 85%)'
+                            : 'linear-gradient(to bottom, rgba(139, 92, 246, 0.08) 0%, rgba(139, 92, 246, 0.06) 8%, rgba(139, 92, 246, 0.04) 16%, rgba(139, 92, 246, 0.03) 24%, rgba(139, 92, 246, 0.02) 32%, rgba(139, 92, 246, 0.015) 40%, rgba(139, 92, 246, 0.01) 48%, rgba(139, 92, 246, 0.005) 56%, transparent 70%)',
+                        transition: 'opacity 3s ease-in-out',
+                        opacity: isDark ? 1 : 0.5,
+                        maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.95) 5%, rgba(0,0,0,0.9) 10%, rgba(0,0,0,0.8) 20%, rgba(0,0,0,0.7) 30%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0.2) 80%, rgba(0,0,0,0.1) 90%, transparent 100%)',
+                        WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.95) 5%, rgba(0,0,0,0.9) 10%, rgba(0,0,0,0.8) 20%, rgba(0,0,0,0.7) 30%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0.2) 80%, rgba(0,0,0,0.1) 90%, transparent 100%)'
+                    }}
+                />
                 <Container>
                     <AnimatedSection delay={0}>
-                        <div className="text-center mb-8 sm:mb-12 px-4">
+                        <div className="text-center mb-6 sm:mb-8 px-4">
                             <h2 
-                                className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4"
+                                className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3"
                                 style={{ 
                                     color: 'var(--theme-text-primary)',
                                     textShadow: '0 2px 10px rgba(32, 178, 170, 0.1)'
@@ -837,7 +983,7 @@ export const AboutUs: React.FC = () => {
                         </div>
                     </AnimatedSection>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 px-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 px-4">
                         {/* Feature 1: إدارة الاستقبال */}
                         <FeatureCard
                             icon={<Users className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
@@ -926,9 +1072,9 @@ export const AboutUs: React.FC = () => {
                 <Container>
                     <div className="max-w-4xl mx-auto">
                         <AnimatedSection delay={0}>
-                            <div className="text-center mb-12">
+                            <div className="text-center mb-6 sm:mb-8">
                                 <div 
-                                    className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center transition-all duration-500 hover:scale-110 hover:rotate-12"
+                                    className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center transition-all duration-500 hover:scale-110 hover:rotate-12"
                                     style={{ 
                                         backgroundColor: turquoiseLight,
                                         boxShadow: '0 4px 20px rgba(32, 178, 170, 0.2)',
@@ -938,7 +1084,7 @@ export const AboutUs: React.FC = () => {
                                     <Lock className="w-8 h-8" style={{ color: turquoise }} />
                                 </div>
                                 <h2 
-                                    className="text-3xl sm:text-4xl font-bold mb-4"
+                                    className="text-3xl sm:text-4xl font-bold mb-2 sm:mb-3"
                                     style={{ 
                                         color: 'var(--theme-text-primary)',
                                         textShadow: '0 2px 10px rgba(32, 178, 170, 0.1)'
@@ -955,7 +1101,7 @@ export const AboutUs: React.FC = () => {
                             </div>
                         </AnimatedSection>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[
                                 { titleKey: 'aboutUs.security.tenantIsolation.title', descKey: 'aboutUs.security.tenantIsolation.desc' },
                                 { titleKey: 'aboutUs.security.rbac.title', descKey: 'aboutUs.security.rbac.desc' },
@@ -1009,12 +1155,12 @@ export const AboutUs: React.FC = () => {
                         : '#fefefe',
                     position: 'relative',
                     overflow: 'hidden',
-                    minHeight: 'clamp(500px, 60vh, 700px)',
+                    minHeight: 'clamp(400px, 50vh, 600px)',
                     display: 'flex',
                     alignItems: 'center',
                     width: '100%',
-                    paddingTop: 'clamp(32px, 8vw, 64px)',
-                    paddingBottom: 'clamp(32px, 8vw, 64px)'
+                    paddingTop: 'clamp(24px, 6vw, 48px)',
+                    paddingBottom: 'clamp(24px, 6vw, 48px)'
                 }}
             >
                 <Container>
@@ -1474,31 +1620,104 @@ export const AboutUs: React.FC = () => {
                                         }}
                                     />
                                 ))}
+                                
+                                {/* 🎯 Elegant Radar Pointer - Sophisticated Design for Adora */}
+                                <div
+                                    className="radar-elegant-pointer"
+                                    style={{
+                                        position: 'absolute',
+                                        top: '50%',
+                                        left: '50%',
+                                        transform: 'translate(-50%, -50%)',
+                                        transformOrigin: 'center center',
+                                        width: '2px',
+                                        height: '40%',
+                                        zIndex: 15,
+                                        animation: 'radarSweep 10s linear infinite'
+                                    }}
+                                >
+                                    {/* Main Pointer - Elegant Turquoise/Teal Gradient */}
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
+                                            width: '2px',
+                                            height: '100%',
+                                            background: `linear-gradient(to bottom, 
+                                                ${turquoise} 0%, 
+                                                rgba(32, 178, 170, 0.8) 30%,
+                                                rgba(20, 184, 166, 0.6) 60%,
+                                                rgba(20, 184, 166, 0.3) 90%,
+                                                transparent 100%
+                                            )`,
+                                            borderRadius: '1px',
+                                            boxShadow: `0 0 8px ${turquoise}40, 0 0 16px ${turquoise}30, 0 0 24px ${turquoise}20`,
+                                            filter: 'drop-shadow(0 0 2px rgba(32, 178, 170, 0.6))'
+                                        }}
+                                    />
+                                    
+                                    {/* Subtle Glow Trail */}
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
+                                            width: '6px',
+                                            height: '25%',
+                                            background: `linear-gradient(to bottom, ${turquoise}30 0%, transparent 100%)`,
+                                            borderRadius: '3px',
+                                            filter: 'blur(2px)',
+                                            opacity: 0.6
+                                        }}
+                                    />
+                                    
+                                    {/* Elegant Center Point */}
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '50%',
+                                            left: '50%',
+                                            transform: 'translate(-50%, -50%)',
+                                            width: 'clamp(10px, 1.5vw, 14px)',
+                                            height: 'clamp(10px, 1.5vw, 14px)',
+                                            borderRadius: '50%',
+                                            background: `radial-gradient(circle, ${turquoise} 0%, rgba(32, 178, 170, 0.8) 50%, rgba(20, 184, 166, 0.4) 100%)`,
+                                            boxShadow: `0 0 12px ${turquoise}60, 0 0 24px ${turquoise}40, inset 0 0 8px rgba(255, 255, 255, 0.2)`,
+                                            border: `1.5px solid rgba(32, 178, 170, 0.4)`,
+                                            zIndex: 20,
+                                            animation: 'pulse 3s ease-in-out infinite'
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
                         
-                        <div className="flex flex-wrap items-center justify-center gap-4 mt-6 sm:mt-8">
+                        <div className="flex flex-wrap items-center justify-center gap-4 mt-4 sm:mt-6">
                             <button
                                 onClick={() => {
                                     setScrollPosition(window.scrollY);
                                     setShowTrialModal(true);
                                 }}
-                                className="px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center gap-3 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
+                                className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-300 flex items-center gap-2 hover:scale-110 hover:shadow-2xl active:scale-95 shadow-lg group"
                                 style={{
-                                    background: '#ffffff',
-                                    color: '#14b8a6',
-                                    border: '1px solid rgba(226, 232, 240, 0.8)',
-                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04)'
+                                    backgroundColor: turquoise,
+                                    transform: 'translateY(0)',
+                                    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+                                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(32, 178, 170, 0.4), 0 0 0 1px rgba(32, 178, 170, 0.2)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(32, 178, 170, 0.3)';
                                 }}
                             >
                                 {t('aboutUs.cta.button')}
-                                <Send 
-                                    className="w-5 h-5" 
-                                    style={{ 
-                                        color: '#14b8a6',
-                                        transform: 'rotate(-45deg)'
-                                    }} 
-                                />
+                                <Send className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
                             </button>
                         </div>
                 </Container>
@@ -1588,12 +1807,12 @@ export const AboutUs: React.FC = () => {
                                 <input
                                     type="tel"
                                     value={trialPhone}
-                                    onChange={(e) => setTrialPhone(e.target.value.replace(/\D/g, ''))}
-                                    placeholder={t('aboutUs.trialForm.phonePlaceholder')}
+                                    onChange={(e) => setTrialPhone(e.target.value.replace(/[^\d+]/g, ''))}
+                                    placeholder={t('aboutUs.trialForm.phonePlaceholder') || '+1234567890'}
                                     className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
                                     dir="ltr"
                                     disabled={isSubmitting}
-                                    maxLength={15}
+                                    maxLength={20}
                                 />
                             </div>
                             <p className="text-xs text-white/50 mt-1">{t('aboutUs.trialForm.phoneExample')}</p>
@@ -2108,14 +2327,7 @@ export const AboutUs: React.FC = () => {
                     }
                 }
                 
-                /* Twinkling stars animation */
-                @keyframes twinkle {
-                    0%, 100% { opacity: 0.3; transform: scale(1); }
-                    50% { opacity: 1; transform: scale(1.5); }
-                }
-                .animate-twinkle {
-                    animation: twinkle ease-in-out infinite;
-                }
+                /* Twinkling stars animation - Moved to useEffect injection in document.head */
                 
                 /* Shooting star animation */
                 @keyframes shootingStar {
@@ -2279,13 +2491,13 @@ export const AboutUs: React.FC = () => {
                 
                 /* Sparkle effects */
                 .animate-sparkle {
-                    animation: sparkle 2s ease-in-out infinite;
+                    animation: sparkle 4s ease-in-out infinite;
                 }
                 .animate-sparkle-delay {
-                    animation: sparkle 2s ease-in-out infinite 0.5s;
+                    animation: sparkle 4s ease-in-out infinite 1s;
                 }
                 .animate-sparkle-delay-2 {
-                    animation: sparkle 2s ease-in-out infinite 1s;
+                    animation: sparkle 4s ease-in-out infinite 2s;
                 }
                 @keyframes sparkle {
                     0%, 100% { opacity: 0; transform: scale(0); }

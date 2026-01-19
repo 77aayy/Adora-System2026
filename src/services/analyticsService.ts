@@ -4,7 +4,7 @@
  * Tracks usage, performance, and business metrics across all tenants
  */
 
-import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, limit, startAfter } from 'firebase/firestore';
+import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, limit, startAfter, getDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { logger } from './loggerService';
 
@@ -34,6 +34,21 @@ const toSafeDate = (value: unknown, fallback: Date = new Date()): Date => {
     }
     
     return fallback;
+};
+
+/**
+ * ✅ SANDBOX INTEGRITY: Check if tenant is demo account (fast helper)
+ * Filters demo data from analytics and billing
+ * Checks both tenant.info.isDemo and manager.isDemo
+ */
+const isDemoTenant = (tenant: any, manager?: any): boolean => {
+    // Fast check: If manager is provided and has isDemo flag, use it
+    if (manager && typeof manager.isDemo === 'boolean') {
+        return manager.isDemo === true;
+    }
+    
+    // Fast check: Check tenant.info.isDemo (already loaded in context)
+    return tenant?.info?.isDemo === true || false;
 };
 
 // ============================================================
@@ -174,9 +189,12 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
             ...doc.data()
         })) as Array<{ id: string; info?: any; [key: string]: any }>;
         
-        const activeTenants = tenants.filter(t => t.info?.status === 'active').length;
-        const suspendedTenants = tenants.filter(t => t.info?.status === 'suspended').length;
-        const expiredTenants = tenants.filter(t => {
+        // ✅ SANDBOX INTEGRITY: Filter out demo tenants from analytics
+        const realTenants = tenants.filter(t => !isDemoTenant(t));
+        
+        const activeTenants = realTenants.filter(t => t.info?.status === 'active').length;
+        const suspendedTenants = realTenants.filter(t => t.info?.status === 'suspended').length;
+        const expiredTenants = realTenants.filter(t => {
             if (!t.info?.licenseExpiry) return false;
             const expiry = toSafeDate(t.info.licenseExpiry, new Date(0));
             return expiry < new Date();
@@ -184,9 +202,9 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         
         // Plan distribution - from already loaded data (no extra queries!)
         const planDistribution = {
-            basic: tenants.filter(t => t.info?.plan === 'basic').length,
-            pro: tenants.filter(t => t.info?.plan === 'pro').length,
-            enterprise: tenants.filter(t => t.info?.plan === 'enterprise').length
+            basic: realTenants.filter(t => t.info?.plan === 'basic').length,
+            pro: realTenants.filter(t => t.info?.plan === 'pro').length,
+            enterprise: realTenants.filter(t => t.info?.plan === 'enterprise').length
         };
         
         // ✅ OPTIMIZED: Calculate totals from tenant info (cached in tenant doc)
@@ -198,7 +216,8 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         let totalRequestsToday = 0;
         
         // ✅ Use cached counts from tenant documents (no extra Firebase queries!)
-        for (const tenant of tenants) {
+        // ✅ SANDBOX INTEGRITY: Only count real tenants (exclude demo)
+        for (const tenant of realTenants) {
             // These should be cached in tenant doc during writes
             totalUsers += tenant.info?.cachedStats?.totalUsers || 0;
             totalBranches += tenant.info?.cachedStats?.totalBranches || tenant.info?.maxBranches || 1;
@@ -207,9 +226,9 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         }
         
         // ✅ If no cached stats, estimate from tenant count (avoid N queries)
-        if (totalUsers === 0 && tenants.length > 0) {
-            totalUsers = tenants.length * 5; // Estimate 5 users per tenant
-            totalBranches = tenants.length * 2; // Estimate 2 branches per tenant
+        if (totalUsers === 0 && realTenants.length > 0) {
+            totalUsers = realTenants.length * 5; // Estimate 5 users per tenant
+            totalBranches = realTenants.length * 2; // Estimate 2 branches per tenant
         }
         
         // ✅ REAL DATA: Calculate revenue from actual subscriptions
@@ -226,7 +245,7 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         thisMonth.setDate(1);
         thisMonth.setHours(0, 0, 0, 0);
         
-        const newTenantsThisMonth = tenants.filter(t => {
+        const newTenantsThisMonth = realTenants.filter(t => {
             const createdAt = t.info?.createdAt?.toDate();
             return createdAt && createdAt >= thisMonth;
         }).length;
@@ -357,15 +376,15 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         try {
             // Check QR Services adoption
             let qrServiceUsers = 0;
-            tenants.forEach(t => {
+            realTenants.forEach(t => {
                 if (t.settings?.qrServices?.enabled) {
                     qrServiceUsers++;
                 }
             });
-            if (tenants.length > 0) {
+            if (realTenants.length > 0) {
                 featureAdoption['qrServices'] = {
                     tenantsUsing: qrServiceUsers,
-                    adoptionRate: Math.round((qrServiceUsers / tenants.length) * 100)
+                    adoptionRate: Math.round((qrServiceUsers / realTenants.length) * 100)
                 };
             }
         } catch (err) {
@@ -373,13 +392,13 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         }
         
         // ✅ Calculate churn and retention rates
-        const churnRate = tenants.length > 0 
-            ? Math.round(((suspendedTenants + expiredTenants) / tenants.length) * 100) 
+        const churnRate = realTenants.length > 0 
+            ? Math.round(((suspendedTenants + expiredTenants) / realTenants.length) * 100) 
             : 0;
         const retentionRate = 100 - churnRate;
         
         return {
-            totalTenants: tenants.length,
+            totalTenants: realTenants.length,
             activeTenants,
             suspendedTenants,
             expiredTenants,
@@ -464,9 +483,15 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
         const { getAllManagers } = await import('./ownerService');
         const managers = await getAllManagers() as Array<any>; // ✅ Cast to any to allow dynamic properties
         
+        // ✅ SANDBOX INTEGRITY: Filter out demo tenants from analytics
+        const realTenants = tenants.filter(t => {
+            const manager = managers.find(m => m.tenantId === t.id);
+            return !isDemoTenant(t, manager);
+        });
+        
         const analytics: TenantAnalytics[] = [];
         
-        for (const tenant of tenants) {
+        for (const tenant of realTenants) {
             const tenantId = tenant.id;
             const info = tenant.info || {};
             
@@ -610,30 +635,139 @@ export const getTenantAnalyticsById = async (tenantId: string): Promise<TenantAn
 
 /**
  * Get usage report for date range
+ * ✅ IMPLEMENTED: Aggregates request counts, active users, features used from date range
  */
 export const getUsageReport = async (
     startDate: Date,
     endDate: Date,
     tenantId?: string
-): Promise<UsageReport[]> => {
-    // TODO: Implement usage reporting
-    // This would aggregate request counts, active users, features used, etc.
-    // from the specified date range
-    return [];
+): Promise<Array<{
+    date: string;
+    requests: number;
+    activeUsers: number;
+    featuresUsed: string[];
+}>> => {
+    try {
+        if (!db) {
+            logger.error('Firebase not initialized - cannot get usage report', undefined, 'analyticsService');
+            return [];
+        }
+
+        const startTimestamp = Timestamp.fromDate(startDate);
+        const endTimestamp = Timestamp.fromDate(endDate);
+
+        let requestsQuery;
+        if (tenantId) {
+            // ✅ Tenant-specific usage report
+            requestsQuery = query(
+                collection(db, 'requests'),
+                where('tenantId', '==', tenantId),
+                where('createdAt', '>=', startTimestamp),
+                where('createdAt', '<=', endTimestamp)
+            );
+        } else {
+            // ✅ System-wide usage report (Owner only)
+            requestsQuery = query(
+                collection(db, 'requests'),
+                where('createdAt', '>=', startTimestamp),
+                where('createdAt', '<=', endTimestamp)
+            );
+        }
+
+        const requestsSnapshot = await getDocs(requestsQuery);
+        const requests = requestsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as Array<any>;
+
+        // ✅ Group by date and aggregate
+        const dailyStats: Record<string, {
+            requests: number;
+            activeUsers: Set<string>;
+            featuresUsed: Set<string>;
+        }> = {};
+
+        requests.forEach(request => {
+            const createdAt = request.createdAt?.toDate ? request.createdAt.toDate() : new Date(request.createdAt || Date.now());
+            const dateKey = createdAt.toISOString().split('T')[0]; // YYYY-MM-DD
+
+            if (!dailyStats[dateKey]) {
+                dailyStats[dateKey] = {
+                    requests: 0,
+                    activeUsers: new Set(),
+                    featuresUsed: new Set()
+                };
+            }
+
+            dailyStats[dateKey].requests++;
+            
+            // Track active users (employees who created/updated requests)
+            if (request.createdBy?.id) {
+                dailyStats[dateKey].activeUsers.add(request.createdBy.id);
+            }
+            if (request.assignedTo?.id) {
+                dailyStats[dateKey].activeUsers.add(request.assignedTo.id);
+            }
+
+            // Track features used (based on request type)
+            if (request.type) {
+                dailyStats[dateKey].featuresUsed.add(request.type);
+            }
+        });
+
+        // ✅ Convert to array format
+        const report = Object.entries(dailyStats).map(([date, stats]) => ({
+            date,
+            requests: stats.requests,
+            activeUsers: stats.activeUsers.size,
+            featuresUsed: Array.from(stats.featuresUsed)
+        })).sort((a, b) => a.date.localeCompare(b.date));
+
+        logger.info(`Usage report generated: ${report.length} days`, { startDate, endDate, tenantId }, 'analyticsService');
+        return report;
+    } catch (error) {
+        logger.error('Error generating usage report', error, 'analyticsService');
+        return [];
+    }
 };
 
 /**
  * Get top tenants by usage
+ * ✅ IMPLEMENTED: Ranks tenants by total requests, active users, etc.
  */
 export const getTopTenantsByUsage = async (limitCount: number = 10): Promise<TenantAnalytics[]> => {
-    // TODO: Implement top tenants ranking
-    // This would rank tenants by total requests, active users, etc.
-    return [];
+    try {
+        // ✅ Use existing getTenantAnalytics function
+        const allTenants = await getTenantAnalytics(true); // Force refresh for accurate ranking
+
+        // ✅ Sort by totalRequests (descending), then by activeEmployees
+        const sortedTenants = allTenants.sort((a, b) => {
+            // Primary sort: totalRequests
+            if (b.totalRequests !== a.totalRequests) {
+                return b.totalRequests - a.totalRequests;
+            }
+            // Secondary sort: activeEmployees
+            if (b.activeEmployees !== a.activeEmployees) {
+                return b.activeEmployees - a.activeEmployees;
+            }
+            // Tertiary sort: totalEmployees
+            return b.totalEmployees - a.totalEmployees;
+        });
+
+        // ✅ Return top N tenants
+        const topTenants = sortedTenants.slice(0, limitCount);
+
+        logger.info(`Top ${topTenants.length} tenants by usage generated`, { limitCount }, 'analyticsService');
+        return topTenants;
+    } catch (error) {
+        logger.error('Error getting top tenants by usage', error, 'analyticsService');
+        return [];
+    }
 };
 
 /**
  * Log an analytics event
- * Simple event logging for tracking user actions
+ * ✅ IMPLEMENTED: Sends to Firebase Analytics if available
  */
 export const logEvent = (event: {
     eventName: string;
@@ -641,13 +775,36 @@ export const logEvent = (event: {
     properties?: Record<string, any>;
 }): void => {
     try {
-        // Simple console logging for now
-        // In production, you might want to send to analytics service
+        // ✅ Simple console logging (always)
         logger.debug('Analytics Event', event, 'analyticsService');
         
-        // TODO: Send to analytics service (e.g., Firebase Analytics, Mixpanel, etc.)
+        // ✅ Send to Firebase Analytics if available (optional, doesn't break if not available)
+        // Use dynamic import without await (fire-and-forget pattern for void function)
+        import('firebase/analytics').then(({ getAnalytics, logEvent: firebaseLogEvent }) => {
+            try {
+                const analytics = getAnalytics();
+                
+                if (analytics) {
+                    // ✅ Send event to Firebase Analytics
+                    firebaseLogEvent(analytics, event.eventName, {
+                        category: event.category,
+                        ...(event.properties || {})
+                    });
+                }
+            } catch (analyticsError) {
+                // ✅ Firebase Analytics is optional - don't fail if not available
+                // This can happen if:
+                // - Firebase Analytics not configured
+                // - Running in development mode
+                // - Analytics disabled
+                logger.debug('Firebase Analytics not available (optional)', analyticsError, 'analyticsService');
+            }
+        }).catch(() => {
+            // ✅ Dynamic import failed - Firebase Analytics not available (optional)
+            // This can happen if firebase/analytics is not installed or configured
+        });
     } catch (error) {
         logger.error('Error logging event', error, 'analyticsService');
-        // Fail silently - don't interrupt user flow
+        // ✅ Fail silently - don't interrupt user flow
     }
 };

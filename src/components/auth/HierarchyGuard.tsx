@@ -21,6 +21,13 @@ export const HierarchyGuard: React.FC<{ children: React.ReactNode }> = ({ childr
     const navigate = useNavigate();
     const location = useLocation();
 
+    // ✅ Debug: Log current state
+    React.useEffect(() => {
+        if (user?.role === 'manager' && !branchId) {
+            console.log('🔍 HierarchyGuard: Manager without branchId', { pathname: location.pathname, role: user.role });
+        }
+    }, [user, branchId, location.pathname]);
+
     // 0. Handle Loading State
     // If user is undefined (still loading from Firebase), show a neutral loading state
     if (user === undefined) {
@@ -100,8 +107,13 @@ export const HierarchyGuard: React.FC<{ children: React.ReactNode }> = ({ childr
                                     تنبيه: لم يتم ربط حسابك بأي فروع نَشِطة حالياً.
                                 </p>
                                 <button
-                                    onClick={() => navigate('/admin/branches')}
-                                    className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-green-500/25 transition-all"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        console.log('🔍 Navigating to /admin/branches');
+                                        navigate('/admin/branches', { replace: true });
+                                    }}
+                                    className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-green-500/25 transition-all active:scale-95"
                                 >
                                     <Plus className="w-5 h-5" />
                                     <span>إنشاء أو ربط فرع جديد</span>

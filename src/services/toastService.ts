@@ -87,7 +87,7 @@ class ToastManager {
             .toast {
                 /* ✅ Theme-aware background using CSS variables */
                 background: var(--theme-bg-secondary, #FFFFFF);
-                border: 1px solid var(--theme-border-primary, #e2e8f0);
+                border: none;
                 border-radius: 1rem;
                 padding: 1rem 1.25rem;
                 box-shadow: var(--theme-shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
@@ -98,7 +98,6 @@ class ToastManager {
                 transform: translateX(120%);
                 opacity: 0;
                 transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-                border-right: 4px solid;
                 direction: rtl;
                 font-family: var(--font-family, 'Tajawal', sans-serif);
             }
@@ -146,11 +145,11 @@ class ToastManager {
                 color: var(--theme-text-primary, #1E293B);
             }
 
-            .toast-success { border-right-color: #10B981; }
-            .toast-error { border-right-color: #EF4444; }
-            .toast-warning { border-right-color: #F59E0B; }
-            .toast-info { border-right-color: #14b8a6; }
-            .toast-loading { border-right-color: #6366F1; }
+            .toast-success { }
+            .toast-error { }
+            .toast-warning { }
+            .toast-info { }
+            .toast-loading { }
 
             @media (max-width: 768px) {
                 #toastContainer {

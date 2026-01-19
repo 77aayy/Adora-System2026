@@ -18,6 +18,7 @@ import { getAuth, Auth } from 'firebase/auth';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getAnalytics, logEvent, Analytics } from 'firebase/analytics';
 import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
+import { getFunctions, Functions, httpsCallable } from 'firebase/functions';
 
 // ============================================================
 // CONFIGURATION STORAGE KEY
@@ -48,8 +49,9 @@ export interface FirebaseConfig {
 /**
  * Get Firebase config from localStorage (tenant-specific)
  * Returns null if not configured
+ * ✅ EXPORTED: For checking current config before switching
  */
-const getSavedConfig = (): FirebaseConfig | null => {
+export const getSavedConfig = (): FirebaseConfig | null => {
     if (typeof window === 'undefined') return null;
 
     const savedConfig = localStorage.getItem(FIREBASE_CONFIG_KEY);
@@ -58,9 +60,21 @@ const getSavedConfig = (): FirebaseConfig | null => {
     try {
         const parsed = JSON.parse(savedConfig) as FirebaseConfig;
         
-        // Validate required fields
+        // ✅ CRITICAL: Validate ALL required fields for Firebase Auth
         if (!parsed.apiKey || !parsed.projectId || !parsed.authDomain) {
             console.warn('⚠️ Saved config is incomplete, ignoring...');
+            console.warn('   Missing:', {
+                apiKey: !parsed.apiKey,
+                projectId: !parsed.projectId,
+                authDomain: !parsed.authDomain
+            });
+            return null;
+        }
+        
+        // ✅ Validate authDomain format (must match Firebase project)
+        if (!parsed.authDomain.includes(parsed.projectId)) {
+            console.warn('⚠️ Saved config has invalid authDomain, ignoring...');
+            console.warn(`   authDomain (${parsed.authDomain}) doesn't match projectId (${parsed.projectId})`);
             return null;
         }
 
@@ -135,6 +149,7 @@ let auth: Auth | null = null;
 let storage: FirebaseStorage | null = null;
 let analytics: Analytics | null = null;
 let appCheck: AppCheck | null = null;
+let functions: Functions | null = null;
 let isConfigured = false;
 
 // 🛡️ ADORA FIREBASE PROTECTION LAYER
@@ -150,6 +165,14 @@ const initializeFirebaseServices = () => {
         return;
     }
 
+    // ✅ DEBUG: Log config details (without sensitive data)
+    console.log('🔍 Initializing Firebase with config:', {
+        projectId: config.projectId,
+        authDomain: config.authDomain,
+        hasApiKey: !!config.apiKey,
+        hasStorageBucket: !!config.storageBucket
+    });
+
     try {
         // Clean up existing apps to prevent duplicate initialization
         const existingApps = getApps();
@@ -159,18 +182,20 @@ const initializeFirebaseServices = () => {
             app = existingApps[0];
         } else {
             app = initializeApp(config);
+            console.log('✅ Firebase app initialized');
         }
 
         // ⚡ PERFORMANCE: Initialize Firestore with optimal cache settings
+        // ⚠️ FIX: Disabled multi-tab manager to prevent "INTERNAL ASSERTION FAILED" errors
         try {
-            // Try modern persistence API first (Firebase v10+)
+            // Use simple persistent cache without multi-tab manager (fixes SDK bug)
             db = initializeFirestore(app, {
                 localCache: persistentLocalCache({
-                    tabManager: persistentMultipleTabManager(),
+                    // tabManager removed - causes "Unexpected state" errors
                     cacheSizeBytes: CACHE_SIZE_UNLIMITED
                 })
             });
-            console.log('✅ Firestore initialized with persistent multi-tab cache (unlimited)');
+            console.log('✅ Firestore initialized with persistent cache (unlimited, single-tab)');
             // 🛡️ Mark Firestore as ready after successful initialization
             isFirestoreReady = true;
         } catch (e: any) {
@@ -207,8 +232,33 @@ const initializeFirebaseServices = () => {
             }
         }
         
-        auth = getAuth(app);
-        storage = getStorage(app);
+        // ✅ CRITICAL: Initialize Auth and Storage with error handling
+        try {
+            auth = getAuth(app);
+            console.log('✅ Firebase Auth initialized');
+            console.log('   Auth instance:', auth ? 'OK' : 'NULL');
+            console.log('   Auth app name:', auth?.app?.name);
+        } catch (authError: any) {
+            console.error('❌ Failed to initialize Firebase Auth:', authError);
+            console.error('   Error code:', authError?.code);
+            console.error('   Error message:', authError?.message);
+            // Don't set auth to null - keep existing if available
+        }
+        
+        try {
+            storage = getStorage(app);
+            console.log('✅ Firebase Storage initialized');
+        } catch (storageError: any) {
+            console.error('❌ Failed to initialize Firebase Storage:', storageError);
+        }
+        
+        try {
+            functions = getFunctions(app);
+            console.log('✅ Firebase Functions initialized');
+        } catch (functionsError: any) {
+            console.error('❌ Failed to initialize Firebase Functions:', functionsError);
+        }
+        
         isConfigured = true;
 
         // Initialize Analytics only if measurementId is provided
@@ -270,13 +320,13 @@ initializeFirebaseServices();
  * @param config New Firebase configuration
  * @param reloadPage If true, reload the page to apply changes (default: false)
  */
-export const saveFirebaseConfig = (config: FirebaseConfig, reloadPage: boolean = false): void => {
+export const saveFirebaseConfig = async (config: FirebaseConfig, reloadPage: boolean = false): Promise<void> => {
     localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(config));
     localStorage.setItem(FIREBASE_CONFIG_VALIDATED_KEY, 'true');
     console.log('✅ Firebase configuration saved');
     
-    // Reinitialize Firebase with new config without page reload
-    reinitializeFirebase();
+    // ✅ Reinitialize Firebase with new config without page reload (async)
+    await reinitializeFirebase();
     
     if (reloadPage) {
         window.location.reload();
@@ -309,8 +359,9 @@ export const isAppCheckEnabled = (): boolean => {
 /**
  * Reinitialize Firebase services with current config
  * Called after saving new configuration
+ * ✅ FIX: Made async to properly wait for app deletion and reinitialize Firestore with persistence
  */
-export const reinitializeFirebase = (): boolean => {
+export const reinitializeFirebase = async (): Promise<boolean> => {
     const config = getFirebaseConfig();
     
     if (!config) {
@@ -322,26 +373,58 @@ export const reinitializeFirebase = (): boolean => {
         // Delete existing app if any
         const existingApps = getApps();
         if (existingApps.length > 0) {
-            // We need to delete and recreate to apply new config
-            deleteApp(existingApps[0]).then(() => {
-                const newApp = initializeApp(config);
-                app = newApp;
-                db = getFirestore(newApp);
-                auth = getAuth(newApp);
-                storage = getStorage(newApp);
-                isConfigured = true;
-                console.log('🔄 Firebase reinitialized with new configuration');
-            }).catch(err => {
-                console.error('❌ Error reinitializing Firebase:', err);
-            });
-        } else {
-            app = initializeApp(config);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            storage = getStorage(app);
-            isConfigured = true;
-            console.log('✅ Firebase initialized with new configuration');
+            // ✅ CRITICAL: Wait for app deletion before creating new one
+            await deleteApp(existingApps[0]);
+            console.log('🧹 Deleted existing Firebase app');
         }
+        
+        // ✅ Create new app with tenant config
+        app = initializeApp(config);
+        
+        // ✅ Reinitialize Firestore with persistence (same as initial setup)
+        // ⚠️ FIX: Disabled multi-tab manager to prevent "INTERNAL ASSERTION FAILED" errors
+        try {
+            db = initializeFirestore(app, {
+                localCache: persistentLocalCache({
+                    // tabManager removed - causes "Unexpected state" errors
+                    cacheSizeBytes: CACHE_SIZE_UNLIMITED
+                })
+            });
+            console.log('✅ Firestore reinitialized with persistent cache (unlimited, single-tab)');
+            isFirestoreReady = true;
+        } catch (e: any) {
+            // Fallback to simple getFirestore if persistence fails
+            if (e.code === 'failed-precondition' || e.message?.includes('already been called')) {
+                db = getFirestore(app);
+                console.log('ℹ️ Using existing Firestore instance');
+                isFirestoreReady = true;
+            } else {
+                db = getFirestore(app);
+                isFirestoreReady = true;
+                console.log('✅ Firestore reinitialized (simple mode)');
+            }
+        }
+        
+        // ✅ CRITICAL: Reinitialize Auth and Storage with error handling
+        try {
+            auth = getAuth(app);
+            console.log('✅ Firebase Auth reinitialized');
+        } catch (authError: any) {
+            console.error('❌ Failed to reinitialize Firebase Auth:', authError);
+            // Auth might fail if config is invalid - log but continue
+        }
+        
+        try {
+            storage = getStorage(app);
+            console.log('✅ Firebase Storage reinitialized');
+        } catch (storageError: any) {
+            console.error('❌ Failed to reinitialize Firebase Storage:', storageError);
+        }
+        
+        isConfigured = true;
+        
+        console.log('🔄 Firebase reinitialized with new configuration');
+        console.log(`   Project: ${config.projectId}`);
         
         return true;
     } catch (e) {
@@ -688,7 +771,7 @@ export const isFirestoreReadyForUse = (): boolean => {
 // ============================================================
 
 // Export Firebase services (may be null if not configured)
-export { db, auth, storage, analytics, logEvent, app };
+export { db, auth, storage, analytics, logEvent, app, functions, httpsCallable };
 
 // For backwards compatibility, provide a default export
 export default app;

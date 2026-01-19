@@ -47,27 +47,19 @@ import { PremiumSelect } from '../../components/ui/PremiumSelect';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { RoomsManagerHelp } from '../../components/common/ContextualHelp'; // ✅ Contextual Help
 import { logger } from '../../services/loggerService';
+import { updateBranch } from '../../services/branchService';
+import { useTranslation } from 'react-i18next';
 
-// Status colors
-const STATUS_COLORS: Record<RoomStatus, { bg: string; text: string; label: string }> = {
-    available: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'متاح' },
-    occupied: { bg: 'bg-blue-500/20', text: 'text-blue-400', label: 'مشغول' },
-    cleaning: { bg: 'bg-purple-500/20', text: 'text-purple-400', label: 'تنظيف' },
-    maintenance: { bg: 'bg-orange-500/20', text: 'text-orange-400', label: 'صيانة' },
-    out_of_order: { bg: 'bg-red-500/20', text: 'text-red-400', label: 'خارج الخدمة' },
-};
+// ✅ i18n: Status colors - Labels will be set dynamically using t()
+const getStatusColors = (t: (key: string) => string): Record<RoomStatus, { bg: string; text: string; label: string }> => ({
+    available: { bg: 'bg-green-500/20', text: 'text-green-400', label: t('rooms.status.available') },
+    occupied: { bg: 'bg-blue-500/20', text: 'text-blue-400', label: t('rooms.status.occupied') },
+    cleaning: { bg: 'bg-purple-500/20', text: 'text-purple-400', label: t('rooms.status.cleaning') },
+    maintenance: { bg: 'bg-orange-500/20', text: 'text-orange-400', label: t('rooms.status.maintenance') },
+    out_of_order: { bg: 'bg-red-500/20', text: 'text-red-400', label: t('rooms.status.outOfOrder') },
+});
 
-// Room types
-const ROOM_TYPES: Array<{ value: string; label: string }> = [
-    { value: 'standard', label: 'عادية' },
-    { value: 'twin', label: 'غرفة تؤم' },
-    { value: 'king', label: 'كينج' },
-    { value: 'studio', label: 'ستوديو' },
-    { value: 'suite_1', label: 'غرفة وصاله' },
-    { value: 'suite_2', label: 'غرفتين و صاله' },
-    { value: 'vip', label: 'VIP' },
-    { value: 'other', label: 'إدخال يدوي...' },
-];
+// ✅ REMOVED: Hardcoded ROOM_TYPES - Now uses approvedRoomTypes from branch
 
 // ============================================================
 // ADD ROOM MODAL
@@ -82,11 +74,26 @@ interface AddRoomModalProps {
 }
 
 const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, tenantId, availableBranches = [] }) => {
+    const { t } = useTranslation();
     const [selectedBranchId, setSelectedBranchId] = useState(branchId);
     
     // ✅ Get current branch name for display (updates when branch changes)
     const targetBranchId = availableBranches.length > 1 ? selectedBranchId : branchId;
     const currentBranch = availableBranches.find(b => b.id === targetBranchId) || availableBranches[0];
+    
+    // ✅ Build room types options from approvedRoomTypes (replaces hardcoded ROOM_TYPES)
+    const roomTypesOptions = React.useMemo(() => {
+        const approved = (currentBranch as any)?.approvedRoomTypes as string[] | undefined;
+        if (!approved || approved.length === 0) {
+            // Fallback: Empty array if no approved types yet
+            return [{ value: 'other', label: t('rooms.addModal.manualEntry') }];
+        }
+        // Convert approvedRoomTypes to { value, label } format + add "other" option
+        return [
+            ...approved.map(type => ({ value: type, label: type })),
+            { value: 'other', label: t('rooms.addModal.manualEntry') }
+        ];
+    }, [currentBranch, t]);
     
     // ✅ FIX: Format branch name properly (e.g., "فرع 1 - الكورنيش" or "فرع 2 - الأندلس")
     const currentBranchName = useMemo(() => {
@@ -146,6 +153,26 @@ const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, 
             // ✅ Use selected branch instead of prop branchId
             const targetBranchId = availableBranches.length > 1 ? selectedBranchId : branchId;
             
+            // ✅ AUTO-UPDATE approvedRoomTypes: If custom type was added, update branch document
+            let isNewTypeAdded = false;
+            if (formData.type === 'other' && formData.customType.trim() && tenantId && targetBranchId) {
+                const currentBranch = availableBranches.find(b => b.id === targetBranchId);
+                const currentApproved = ((currentBranch as any)?.approvedRoomTypes as string[]) || [];
+                
+                // ✅ Check if type already exists (case-insensitive)
+                const typeExists = currentApproved.some(t => t.toLowerCase() === finalType.toLowerCase());
+                
+                if (!typeExists) {
+                    // ✅ Add new type to approvedRoomTypes
+                    const updatedApproved = [...currentApproved, finalType.trim()];
+                    await updateBranch(tenantId, targetBranchId, {
+                        approvedRoomTypes: updatedApproved
+                    } as any);
+                    logger.info('Auto-updated approvedRoomTypes', { tenantId, branchId: targetBranchId, newType: finalType }, 'RoomsManager');
+                    isNewTypeAdded = true;
+                }
+            }
+            
             if (mode === 'single') {
                 await addRoom({
                     number: formData.number,
@@ -165,6 +192,33 @@ const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, 
                     tenantId || ''
                 );
             }
+
+            // ✅ FINANCIAL LINKING: Check if new type has basePrice set
+            // ✅ Alert manager to set price for newly added room type
+            if (isNewTypeAdded && tenantId && targetBranchId) {
+                try {
+                    // Check if room type document exists and has basePrice
+                    const existingTypes = await getRoomTypes(tenantId, targetBranchId);
+                    const typeDoc = existingTypes.find(t => t.name.toLowerCase() === finalType.toLowerCase());
+                    
+                    // ✅ Show alert if type exists but has no basePrice (or basePrice is 0)
+                    if (!typeDoc || !typeDoc.basePrice || typeDoc.basePrice === 0) {
+                        const shouldNavigate = window.confirm(
+                            `⚠️ تم إضافة نوع جديد: "${finalType}"\n\n` +
+                            `💡 هذا النوع يحتاج إلى تحديد "السعر الأساسي" ليعمل بشكل صحيح في جميع الأقسام.\n\n` +
+                            `هل تريد الذهاب إلى صفحة الأسعار الآن لتحديد السعر؟`
+                        );
+                        
+                        if (shouldNavigate) {
+                            // Navigate to pricing settings - route is /admin/prices
+                            window.location.href = '/admin/prices';
+                        }
+                    }
+                } catch (err) {
+                    logger.warn('Could not check room type pricing', err, 'RoomsManager');
+                }
+            }
+            
             onClose();
         } catch (err) {
             logger.error('Error adding room', err, 'RoomsManager');
@@ -182,12 +236,12 @@ const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, 
                 </button>
 
                 <div className="mb-6">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2">إضافة غرفة</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2">{t('rooms.addModal.title')}</h2>
                     {/* ✅ Branch Indicator - Shows which branch rooms will be added to */}
                     <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-500/10 border border-primary-500/20">
                         <Building2 className="w-4 h-4 text-primary-400 shrink-0" />
                         <span className="text-sm text-primary-300">
-                            سيتم إضافة الغرف إلى: <span className="font-bold text-primary-400">{currentBranchName}</span>
+                            {t('rooms.addModal.branchIndicator', { branchName: currentBranchName })}
                         </span>
                     </div>
                 </div>
@@ -199,21 +253,21 @@ const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, 
                         className={`flex-1 py-2 rounded-xl transition-all font-medium ${mode === 'single' ? 'bg-gradient-to-r from-teal-400 to-teal-500 text-white shadow-lg' : 'text-slate-600 dark:text-white/70 bg-slate-100 dark:bg-slate-700'
                             }`}
                     >
-                        غرفة واحدة
+                        {t('rooms.addModal.singleRoom')}
                     </button>
                     <button
                         onClick={() => setMode('batch')}
                         className={`flex-1 py-2 rounded-xl transition-all font-medium ${mode === 'batch' ? 'bg-gradient-to-r from-teal-400 to-teal-500 text-white shadow-lg' : 'text-slate-600 dark:text-white/70 bg-slate-100 dark:bg-slate-700'
                             }`}
                     >
-                        دفعة غرف
+                        {t('rooms.addModal.batchRooms')}
                     </button>
                 </div>
 
                 <div className="space-y-4">
                     {mode === 'single' ? (
                         <div>
-                            <label className="block text-sm text-slate-600 dark:text-white/70 mb-1">رقم الغرفة</label>
+                            <label className="block text-sm text-slate-600 dark:text-white/70 mb-1">{t('rooms.addModal.roomNumber')}</label>
                             <input
                                 type="text"
                                 value={formData.number}
@@ -246,7 +300,7 @@ const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, 
                     )}
 
                     <div>
-                        <label className="block text-sm text-slate-600 dark:text-white/70 mb-1">الدور</label>
+                        <label className="block text-sm text-slate-600 dark:text-white/70 mb-1">{t('rooms.addModal.floor')}</label>
                         <input
                             type="number"
                             min="1"
@@ -259,7 +313,7 @@ const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, 
                     {/* ✅ Branch Selector - Only show if manager has multiple branches */}
                     {availableBranches.length > 1 && (
                         <div>
-                            <label className="block text-sm text-slate-600 dark:text-white/70 mb-1">الفرع</label>
+                            <label className="block text-sm text-slate-600 dark:text-white/70 mb-1">{t('rooms.addModal.branch')}</label>
                             <select
                                 value={selectedBranchId}
                                 onChange={(e) => setSelectedBranchId(e.target.value)}
@@ -279,7 +333,7 @@ const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, 
                             label="النوع"
                             value={formData.type}
                             onChange={(val) => setFormData({ ...formData, type: val })}
-                            options={ROOM_TYPES}
+                            options={roomTypesOptions}
                             placeholder="اختر نوع الغرفة"
                         />
 
@@ -321,9 +375,13 @@ const AddRoomModal: React.FC<AddRoomModalProps> = ({ isOpen, onClose, branchId, 
 // ============================================================
 
 export const RoomsManager: React.FC = () => {
+    const { t } = useTranslation();
     const { user, branchId, setBranch } = useAuth();
     const tenantId = (user as any)?.tenantId;
     const { branches } = useTenantBranches();
+    
+    // ✅ i18n: Get STATUS_COLORS with translations
+    const STATUS_COLORS = useMemo(() => getStatusColors(t), [t]);
     
     // ✅ Filter branches for manager (only assigned branches)
     const availableBranches = React.useMemo(() => {
@@ -414,7 +472,7 @@ export const RoomsManager: React.FC = () => {
     };
 
     const handleDeleteType = async (id: string) => {
-        if (!confirm('هل أنت متأكد من حذف هذا النوع؟')) return;
+        if (!confirm(t('rooms.addModal.deleteTypeConfirm'))) return;
         if (!tenantId || !branchId) return;
         await deleteRoomType(tenantId, branchId, id);
         loadTypes();
@@ -432,10 +490,10 @@ export const RoomsManager: React.FC = () => {
             }
         }
         if (added > 0) {
-            alert(`تم إضافة ${added} أنواع جديدة`);
+            alert(t('rooms.addModal.addedNewTypes', { count: added }));
             loadTypes();
         } else {
-            alert('جميع الأنواع موجودة');
+            alert(t('rooms.addModal.allTypesExist'));
         }
     };
 
@@ -623,7 +681,7 @@ export const RoomsManager: React.FC = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <AdoraLoader size="md" message="جاري تحميل البيانات..." />
+                <AdoraLoader size="md" message={t('rooms.management.loading')} />
             </div>
         );
     }
@@ -636,11 +694,11 @@ export const RoomsManager: React.FC = () => {
             {/* Header & Tabs */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-white mb-1">إدارة الغرف والتصنيفات</h1>
+                    <h1 className="text-2xl font-bold text-white mb-1">{t('rooms.management.title')}</h1>
                     <p className="text-white/60">
                         {activeTab === 'rooms'
-                            ? `${stats.total} غرفة • ${stats.available} متاح • ${stats.occupied} مشغول`
-                            : 'إعداد وتخصيص أنواع الغرف والأسعار الأساسية'}
+                            ? `${stats.total} ${t('common.rooms')} • ${stats.available} ${t('rooms.status.available')} • ${stats.occupied} ${t('rooms.status.occupied')}`
+                            : t('rooms.addModal.settings')}
                     </p>
                 </div>
 
@@ -757,13 +815,13 @@ export const RoomsManager: React.FC = () => {
                     {filteredRooms.length === 0 ? (
                         <div className="rounded-2xl transition-colors duration-300 p-12 text-center border-dashed border-2" style={{ borderColor: 'var(--theme-border-primary)', background: 'var(--theme-bg-tertiary)' }}>
                             <DoorOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                            <h3 className="text-xl font-bold text-white mb-2">لا توجد غرف مضافة</h3>
-                            <p className="text-slate-400 mb-6">ابدأ بإضافة الغرف وتوزيعها على الأدوار</p>
+                            <h3 className="text-xl font-bold text-white mb-2">{t('rooms.addModal.noRoomsTitle')}</h3>
+                            <p className="text-slate-400 mb-6">{t('rooms.addModal.noRoomsMessage')}</p>
                             <button
                                 onClick={() => setIsAddModalOpen(true)}
                                 className="btn-primary"
                             >
-                                إضافة الغرفة الأولى
+                                {t('rooms.addModal.addFirstRoom')}
                             </button>
                         </div>
                     ) : (
@@ -785,7 +843,7 @@ export const RoomsManager: React.FC = () => {
                                         </div>
                                         <h3 className="text-2xl font-bold text-white mb-1">{room.number}</h3>
                                         <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
-                                            {ROOM_TYPES.find(t => t.value === room.type)?.label || room.type}
+                                            {room.type}
                                         </p>
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${statusInfo.bg.replace('/20', '/10')} border-white/5 ${statusInfo.text}`}>
                                             <div className={`w-1.5 h-1.5 rounded-full ${statusInfo.text.replace('text-', 'bg-')}`} />

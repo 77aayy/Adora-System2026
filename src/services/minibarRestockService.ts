@@ -6,6 +6,7 @@
 
 import { db } from './firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, onSnapshot } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -170,7 +171,14 @@ export const updateRoomMinibar = async (
         );
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
-            await updateDoc(doc(db, 'roomMinibars', snapshot.docs[0].id), data as any);
+            // ✅ Type-safe: RoomMinibar interface matches Firestore document structure
+            await updateDoc(doc(db, 'roomMinibars', snapshot.docs[0].id), {
+                roomNumber: data.roomNumber,
+                branch: data.branch,
+                items: data.items,
+                lastUpdated: data.lastUpdated,
+                updatedBy: data.updatedBy
+            });
         }
     } else {
         await addDoc(collection(db, 'roomMinibars'), data);
@@ -185,6 +193,9 @@ export const updateRoomMinibar = async (
  * Record minibar consumption
  * ⚠️ DEPRECATED: Use consumeMinibarItems from minibarService.ts instead (uses runTransaction)
  * This function is kept for backward compatibility but should be migrated
+ * 
+ * 🔐 SECURITY: Requires tenantId and roomCardId for atomic transaction
+ * If not provided, throws error (no legacy non-atomic method)
  */
 export const recordConsumption = async (
     roomNumber: string,
@@ -195,67 +206,40 @@ export const recordConsumption = async (
     tenantId?: string,
     roomCardId?: string
 ): Promise<string> => {
-    // ✅ FIX: If tenantId and roomCardId provided, use the new atomic method
-    if (tenantId && roomCardId) {
-        try {
-            const { consumeMinibarItems } = await import('./minibarService');
-            const { loadMinibarProducts } = await import('./minibarService');
-            const products = await loadMinibarProducts(tenantId);
-            
-            const consumption: Record<string, number> = {};
-            items.forEach(item => {
-                consumption[item.itemId] = item.quantity;
-            });
-
-            const result = await consumeMinibarItems(
-                tenantId,
-                branch,
-                roomNumber,
-                roomCardId,
-                consumption,
-                products,
-                recordedBy,
-                recordedByName
-            );
-
-            return result.consumptionRecordId;
-        } catch (error) {
-            logger.error('Failed to use atomic minibar consumption, falling back to legacy method', error, 'minibarRestockService');
-            // Fall through to legacy method
-        }
+    // ✅ SECURITY: Require tenantId and roomCardId for atomic transaction
+    if (!tenantId || !roomCardId) {
+        const errorMsg = 'recordConsumption requires tenantId and roomCardId for atomic transaction. Use consumeMinibarItems from minibarService.ts instead.';
+        logger.error(errorMsg, undefined, 'minibarRestockService');
+        throw new Error(errorMsg);
     }
 
-    // ⚠️ LEGACY METHOD: Non-atomic (kept for backward compatibility)
-    const total = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    // ✅ FIX: Always use atomic method (consumeMinibarItems)
+    try {
+        const { consumeMinibarItems } = await import('./minibarService');
+        const { loadMinibarProducts } = await import('./minibarService');
+        const products = await loadMinibarProducts(tenantId);
+        
+        const consumption: Record<string, number> = {};
+        items.forEach(item => {
+            consumption[item.itemId] = item.quantity;
+        });
 
-    const record: Omit<ConsumptionRecord, 'id'> = {
-        roomNumber,
-        branch,
-        items,
-        total,
-        recordedAt: Timestamp.now(),
-        recordedBy,
-        recordedByName,
-        tenantId,
-        roomCardId
-    };
+        const result = await consumeMinibarItems(
+            tenantId,
+            branch,
+            roomNumber,
+            roomCardId,
+            consumption,
+            products,
+            recordedBy,
+            recordedByName
+        );
 
-    const docRef = await addDoc(collection(db, tenantId ? `tenants/${tenantId}/minibar_consumption` : 'minibarConsumption'), record);
-
-    // ⚠️ WARNING: This is NOT atomic - may cause Race Conditions
-    // TODO: Migrate all callers to use consumeMinibarItems instead
-    for (const item of items) {
-        const itemDoc = doc(db, 'minibarItems', item.itemId);
-        const itemData = await getDocs(query(collection(db, 'minibarItems'), where('id', '==', item.itemId)));
-        if (!itemData.empty) {
-            const current = itemData.docs[0].data();
-            await updateDoc(itemDoc, { stock: Math.max(0, (current.stock || 0) - item.quantity) });
-        }
+        return result.consumptionRecordId;
+    } catch (error) {
+        logger.error('Failed to record minibar consumption atomically', error, 'minibarRestockService');
+        throw error; // Don't fall back to legacy - fail fast
     }
-
-    logger.warn('⚠️ Using legacy non-atomic recordConsumption method. Consider migrating to consumeMinibarItems', undefined, 'minibarRestockService');
-
-    return docRef.id;
 };
 
 /**
@@ -432,7 +416,14 @@ export const getConsumptionAnalytics = async (
 
 import { useState, useEffect, useCallback } from 'react';
 
-export const useMinibar = (branch: string) => {
+/**
+ * React Hook for Minibar Management
+ * ⚠️ DEPRECATED: Prefer using minibarService directly for better control
+ * 
+ * @param branch - Branch ID
+ * @param tenantId - Tenant ID (required for atomic operations)
+ */
+export const useMinibar = (branch: string, tenantId?: string) => {
     const [items, setItems] = useState<MinibarItem[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -449,10 +440,16 @@ export const useMinibar = (branch: string) => {
         roomNumber: string,
         consumedItems: { itemId: string; itemName: string; quantity: number; price: number }[],
         userId: string,
-        userName: string
+        userName: string,
+        roomCardId?: string
     ) => {
-        return recordConsumption(roomNumber, branch, consumedItems, userId, userName);
-    }, [branch]);
+        // ✅ SECURITY: Require tenantId and roomCardId for atomic transaction
+        if (!tenantId || !roomCardId) {
+            throw new Error('useMinibar.recordConsumption requires tenantId (hook param) and roomCardId. Use consumeMinibarItems from minibarService.ts for better control.');
+        }
+        
+        return recordConsumption(roomNumber, branch, consumedItems, userId, userName, tenantId, roomCardId);
+    }, [branch, tenantId]);
 
     const createTask = useCallback(async (
         roomNumber: string,

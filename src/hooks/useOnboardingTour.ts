@@ -12,6 +12,7 @@ import {
     DepartmentTour 
 } from '../services/onboardingService';
 import { TourStep } from '../components/shared/TourGuide';
+import { logger } from '../services/loggerService';
 
 // ============================================================
 // TOUR STEPS FOR EACH DEPARTMENT
@@ -229,6 +230,21 @@ export const TOUR_STEPS: Record<DepartmentTour, TourStep[]> = {
             description: 'إعدادات النظام والتكاملات',
             placement: 'bottom'
         }
+    ],
+
+    owner: [
+        {
+            target: '[data-tour="owner-overview-stats"]',
+            title: '👑 لوحة المالك الرئيسية',
+            description: 'إحصائيات شاملة عن النظام: الإيرادات، المشتركين، والتحليلات',
+            placement: 'bottom'
+        },
+        {
+            target: '[data-tour="owner-tabs"]',
+            title: '📑 التبويبات الرئيسية',
+            description: 'انتقل بين: الرئيسية، المشتركين، الفواتير، الإعدادات، وطلبات الاشتراك. استخدم هذه التبويبات للوصول السريع لجميع أقسام لوحة المالك',
+            placement: 'bottom'
+        }
     ]
 };
 
@@ -281,7 +297,7 @@ export const useOnboardingTour = (department: DepartmentTour): UseOnboardingTour
                     }, 1500);
                 }
             } catch (error) {
-                console.error('Error checking tour status:', error);
+                logger.error('Error checking tour status', error, 'useOnboardingTour');
             } finally {
                 setIsLoading(false);
                 setHasChecked(true);
@@ -309,7 +325,7 @@ export const useOnboardingTour = (department: DepartmentTour): UseOnboardingTour
             try {
                 await markTourCompleted(user.id, department);
             } catch (error) {
-                console.error('Error marking tour completed:', error);
+                logger.error('Error marking tour completed', error, 'useOnboardingTour');
             }
         }
     }, [user?.id, department]);

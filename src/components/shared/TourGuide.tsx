@@ -180,7 +180,7 @@ export const TourGuide: React.FC<TourGuideProps> = ({ steps, isOpen, onClose, on
                 />
             </svg>
 
-            {/* ✅ Highlight Border - follows element exactly */}
+            {/* ✅ Highlight Border - follows element exactly - Turquoise (#20B2AA) */}
             <div
                 className="absolute border-2 border-white rounded-xl pointer-events-none"
                 style={{
@@ -188,7 +188,7 @@ export const TourGuide: React.FC<TourGuideProps> = ({ steps, isOpen, onClose, on
                     left: targetRect.left - 4,
                     width: targetRect.width + 8,
                     height: targetRect.height + 8,
-                    boxShadow: '0 0 0 4px rgba(13,148,136,0.5), 0 0 20px rgba(13,148,136,0.3)',
+                    boxShadow: '0 0 0 4px rgba(32,178,170,0.5), 0 0 20px rgba(32,178,170,0.3)',
                     zIndex: 2,
                     transition: 'all 0.15s ease-out'
                 }}
@@ -207,7 +207,7 @@ export const TourGuide: React.FC<TourGuideProps> = ({ steps, isOpen, onClose, on
             >
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-5 shadow-2xl border border-slate-200 dark:border-white/10">
                     <div className="flex justify-between items-start mb-2 sm:mb-3">
-                        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--theme-primary-500)' }}>
+                        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#20B2AA' }}>
                             خطوة {currentStepIndex + 1} من {steps.length}
                         </span>
                         <button 
@@ -246,7 +246,7 @@ export const TourGuide: React.FC<TourGuideProps> = ({ steps, isOpen, onClose, on
                                     className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-colors"
                                     style={{ 
                                         background: idx === currentStepIndex 
-                                            ? 'var(--theme-primary-500)' 
+                                            ? '#20B2AA' 
                                             : 'var(--theme-border-primary)' 
                                     }}
                                 />
@@ -256,7 +256,7 @@ export const TourGuide: React.FC<TourGuideProps> = ({ steps, isOpen, onClose, on
                         <button
                             onClick={handleNext}
                             className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm text-white transition-all"
-                            style={{ background: 'var(--theme-primary-500)' }}
+                            style={{ background: '#20B2AA' }}
                         >
                             {currentStepIndex === steps.length - 1 ? 'إنهاء' : 'التالي'}
                             {currentStepIndex !== steps.length - 1 && <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />}

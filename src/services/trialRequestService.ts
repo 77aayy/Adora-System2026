@@ -7,7 +7,7 @@
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, where, Timestamp, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { logger } from './loggerService';
-import { validateRoleAccess } from './tenantSecurityService';
+import { validateRoleAccess, isCurrentUserOwner, getCurrentUserRole } from './tenantSecurityService';
 
 // ============================================================
 // TYPES
@@ -165,43 +165,80 @@ export const markTrialRequestAsContacted = async (
         return { success: false, error };
     }
 
-    // ✅ Check if user is authenticated (not Anonymous)
-    if (!auth?.currentUser || auth.currentUser.isAnonymous) {
-        const error = 'يجب تسجيل الدخول كمالك للنظام. المستخدم الحالي غير مصادق عليه.';
-        logger.error('User not authenticated or is Anonymous', null, 'trialRequestService');
-        return { success: false, error };
-    }
-
-    const userId = auth.currentUser.uid;
-
-    // ✅ Check userBindings for owner role (fallback if custom claims not loaded)
-    try {
-        const userBindingRef = doc(db, 'userBindings', userId);
-        const userBindingDoc = await getDoc(userBindingRef);
-        
-        if (userBindingDoc.exists()) {
-            const userBinding = userBindingDoc.data();
-            if (userBinding.role === 'owner') {
-                logger.info('Owner role confirmed via userBindings', { userId }, 'trialRequestService');
-            } else {
-                logger.warn('User does not have owner role in userBindings', { userId, role: userBinding.role }, 'trialRequestService');
-                // Continue anyway - Firestore Rules will enforce
+    // ✅ FIX: Check owner role using multiple methods (localStorage + auth + userBindings)
+    // Method 1: Check localStorage first (fastest and most reliable)
+    const isOwner = isCurrentUserOwner();
+    const userRole = getCurrentUserRole();
+    
+    if (!isOwner && userRole !== 'owner') {
+        // Method 2: Try auth.currentUser if available
+        if (auth?.currentUser && !auth.currentUser.isAnonymous) {
+            const userId = auth.currentUser.uid;
+            
+            // Method 3: Check userBindings as fallback
+            try {
+                const userBindingRef = doc(db, 'userBindings', userId);
+                const userBindingDoc = await getDoc(userBindingRef);
+                
+                if (userBindingDoc.exists()) {
+                    const userBinding = userBindingDoc.data();
+                    if (userBinding.role === 'owner') {
+                        logger.info('Owner role confirmed via userBindings', { userId }, 'trialRequestService');
+                    } else {
+                        const error = 'يجب تسجيل الدخول كمالك للنظام. المستخدم الحالي غير مصادق عليه.';
+                        logger.error('User does not have owner role', { userId, role: userBinding.role }, 'trialRequestService');
+                        return { success: false, error };
+                    }
+                } else {
+                    // No userBinding found - check if user is authenticated
+                    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+                        const error = 'يجب تسجيل الدخول كمالك للنظام. المستخدم الحالي غير مصادق عليه.';
+                        logger.error('User not authenticated or is Anonymous', null, 'trialRequestService');
+                        return { success: false, error };
+                    }
+                    // Continue - Firestore Rules will enforce
+                    logger.warn('No userBinding found, proceeding with Firestore Rules enforcement', { userId }, 'trialRequestService');
+                }
+            } catch (bindingError: any) {
+                logger.warn('Failed to check userBindings, proceeding anyway', bindingError, 'trialRequestService');
+                // Continue - Firestore Rules will enforce
             }
         } else {
-            logger.warn('No userBinding found for user', { userId }, 'trialRequestService');
-            // Continue anyway - Firestore Rules will enforce
+            // No auth.currentUser or is Anonymous
+            const error = 'يجب تسجيل الدخول كمالك للنظام. المستخدم الحالي غير مصادق عليه.';
+            logger.error('User not authenticated or is Anonymous', null, 'trialRequestService');
+            return { success: false, error };
         }
-    } catch (bindingError: any) {
-        logger.warn('Failed to check userBindings, proceeding anyway', bindingError, 'trialRequestService');
-        // Continue anyway - Firestore Rules will enforce
+    } else {
+        // Owner confirmed via localStorage
+        logger.info('Owner role confirmed via localStorage', { role: userRole }, 'trialRequestService');
     }
 
-    // ✅ Optional: Try client-side RBAC check (soft check)
+    // ✅ Optional: Try client-side RBAC check (soft check - already confirmed above)
     try {
         validateRoleAccess('owner');
     } catch (rbacError: any) {
-        logger.warn('Client-side RBAC check failed, but proceeding to Firestore', rbacError, 'trialRequestService');
+        // If we already confirmed owner via localStorage, this is just a warning
+        if (isOwner) {
+            logger.warn('Client-side RBAC check failed but owner confirmed via localStorage, proceeding', rbacError, 'trialRequestService');
+        } else {
+            logger.warn('Client-side RBAC check failed, but proceeding to Firestore', rbacError, 'trialRequestService');
+        }
     }
+    
+    // Get userId for logging (use auth.currentUser if available, otherwise from localStorage)
+    const userId = auth?.currentUser?.uid || (typeof window !== 'undefined' ? (() => {
+        try {
+            const storedUser = localStorage.getItem('adora_user');
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                return user.uid || user.id || null;
+            }
+        } catch (e) {
+            // Ignore
+        }
+        return null;
+    })() : null);
 
     try {
         // ✅ Validate required fields
@@ -252,10 +289,61 @@ export const addFollowUpToTrialRequest = async (
         return { success: false, error };
     }
 
+    // ✅ FIX: Check owner role using multiple methods (same as markTrialRequestAsContacted)
+    const isOwner = isCurrentUserOwner();
+    const userRole = getCurrentUserRole();
+    
+    if (!isOwner && userRole !== 'owner') {
+        // Try auth.currentUser if available
+        if (auth?.currentUser && !auth.currentUser.isAnonymous) {
+            // Check userBindings as fallback
+            try {
+                const userId = auth.currentUser.uid;
+                const userBindingRef = doc(db, 'userBindings', userId);
+                const userBindingDoc = await getDoc(userBindingRef);
+                
+                if (userBindingDoc.exists()) {
+                    const userBinding = userBindingDoc.data();
+                    if (userBinding.role !== 'owner') {
+                        const error = 'يجب تسجيل الدخول كمالك للنظام. المستخدم الحالي غير مصادق عليه.';
+                        logger.error('User does not have owner role', { userId, role: userBinding.role }, 'trialRequestService');
+                        return { success: false, error };
+                    }
+                } else {
+                    // No userBinding found - check if user is authenticated
+                    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+                        const error = 'يجب تسجيل الدخول كمالك للنظام. المستخدم الحالي غير مصادق عليه.';
+                        logger.error('User not authenticated or is Anonymous', null, 'trialRequestService');
+                        return { success: false, error };
+                    }
+                    // Continue - Firestore Rules will enforce
+                    logger.warn('No userBinding found, proceeding with Firestore Rules enforcement', { userId }, 'trialRequestService');
+                }
+            } catch (bindingError: any) {
+                logger.warn('Failed to check userBindings, proceeding anyway', bindingError, 'trialRequestService');
+                // Continue - Firestore Rules will enforce
+            }
+        } else {
+            // No auth.currentUser or is Anonymous
+            const error = 'يجب تسجيل الدخول كمالك للنظام. المستخدم الحالي غير مصادق عليه.';
+            logger.error('User not authenticated or is Anonymous', null, 'trialRequestService');
+            return { success: false, error };
+        }
+    } else {
+        // Owner confirmed via localStorage
+        logger.info('Owner role confirmed via localStorage', { role: userRole }, 'trialRequestService');
+    }
+
+    // ✅ Optional: Try client-side RBAC check (soft check - already confirmed above)
     try {
         validateRoleAccess('owner');
     } catch (rbacError: any) {
-        logger.warn('Client-side RBAC check failed, but proceeding to Firestore', rbacError, 'trialRequestService');
+        // If we already confirmed owner via localStorage, this is just a warning
+        if (isOwner) {
+            logger.warn('Client-side RBAC check failed but owner confirmed via localStorage, proceeding', rbacError, 'trialRequestService');
+        } else {
+            logger.warn('Client-side RBAC check failed, but proceeding to Firestore', rbacError, 'trialRequestService');
+        }
     }
 
     try {

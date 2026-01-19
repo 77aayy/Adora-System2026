@@ -3,7 +3,7 @@
  * Complete billing management for SaaS
  */
 
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, onSnapshot, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, onSnapshot, orderBy, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 // ============================================================
@@ -86,6 +86,8 @@ export interface ReceiptVoucher {
     subscriptionDuration: 1 | 2; // 1 = سنة، 2 = سنتين
     currency: string;
     paymentMethod?: 'cash' | 'credit' | 'bank_transfer' | 'deferred'; // ✅ طريقة استلام المبلغ
+    discountAmount?: number; // ✅ مبلغ الخصم (للاشتراك سنتين)
+    discountRate?: number; // ✅ نسبة الخصم (%)
     isDeleted?: boolean; // ✅ حالة الحذف
     deletedAt?: Date; // ✅ تاريخ الحذف
     deletedBy?: string; // ✅ من قام بالحذف
@@ -226,6 +228,10 @@ const getNextInvoiceNumber = async (): Promise<number> => {
  * Create receipt voucher (سند قبض)
  * يتم إنشاؤه تلقائياً عند إضافة مدير جديد
  */
+/**
+ * Creates a receipt voucher for subscription payment and automatically generates an invoice.
+ * Calculates discount for 2-year subscriptions and assigns sequential voucher number.
+ */
 export const createReceiptVoucher = async (voucher: Omit<ReceiptVoucher, 'id' | 'createdAt' | 'voucherNumber'>): Promise<string> => {
     try {
         // ✅ Get next voucher number
@@ -353,21 +359,54 @@ export const deleteReceiptVoucher = async (
 
 /**
  * Delete multiple receipt vouchers (soft delete)
+ * ✅ ENHANCED: Records deletion in deleted_billing_records collection
  */
 export const deleteReceiptVouchers = async (
     voucherIds: string[],
-    deletedBy?: string
+    deletedBy?: string,
+    deletionReason?: string
 ): Promise<void> => {
     try {
+        if (!db) throw new Error('Database not initialized');
+        
         const batch = writeBatch(db);
+        
+        // Get voucher data before deletion for audit trail
+        const vouchersToDelete: any[] = [];
+        for (const voucherId of voucherIds) {
+            const voucherRef = doc(db, 'receiptVouchers', voucherId);
+            const voucherSnap = await getDoc(voucherRef);
+            if (voucherSnap.exists()) {
+                vouchersToDelete.push({
+                    id: voucherId,
+                    ...voucherSnap.data()
+                });
+            }
+        }
+        
+        // Soft delete vouchers
         voucherIds.forEach(voucherId => {
             const voucherRef = doc(db, 'receiptVouchers', voucherId);
             batch.update(voucherRef, {
                 isDeleted: true,
                 deletedAt: Timestamp.now(),
-                deletedBy: deletedBy || null
+                deletedBy: deletedBy || null,
+                deletionReason: deletionReason || null
             });
         });
+        
+        // ✅ Record deletion in deleted_billing_records collection for audit trail
+        const deletedRecordRef = doc(collection(db, 'deleted_billing_records'));
+        batch.set(deletedRecordRef, {
+            type: 'receipt_voucher',
+            voucherIds: voucherIds,
+            vouchers: vouchersToDelete,
+            deletedBy: deletedBy || null,
+            deletionReason: deletionReason || 'لم يتم تحديد السبب',
+            deletedAt: Timestamp.now(),
+            count: voucherIds.length
+        });
+        
         await batch.commit();
     } catch (error) {
         console.error('Error deleting receipt vouchers:', error);
@@ -415,6 +454,10 @@ export const upsertSubscription = async (subscription: Omit<Subscription, 'id'>)
 /**
  * Renew subscription
  */
+/**
+ * Renews subscription by calculating new expiry date (current + duration years) and updates Firestore.
+ * Also updates tenant license expiry and payment status.
+ */
 export const renewSubscription = async (
     tenantId: string, 
     period: 'monthly' | 'quarterly' | 'yearly' = 'monthly',
@@ -458,9 +501,24 @@ export const renewSubscription = async (
 
 /**
  * Create invoice
+ * 🔐 SECURITY: Blocked for demo accounts
  */
 export const createInvoice = async (invoice: Omit<Invoice, 'id' | 'invoiceNumber'>): Promise<string> => {
     try {
+        // 🔐 SECURITY: Check if account is demo - BLOCK invoice creation
+        if (invoice.tenantId) {
+            const managersRef = collection(db, 'managers');
+            const q = query(managersRef, where('tenantId', '==', invoice.tenantId));
+            const snapshot = await getDocs(q);
+            
+            if (!snapshot.empty) {
+                const managerData = snapshot.docs[0].data();
+                if (managerData.isDemo === true) {
+                    throw new Error('⚠️ لا يمكن إنشاء فاتورة في حساب الديمو. يرجى الاشتراك للاستخدام الكامل.');
+                }
+            }
+        }
+        
         // ✅ Get next invoice number
         const invoiceNumber = await getNextInvoiceNumber();
         
@@ -473,7 +531,11 @@ export const createInvoice = async (invoice: Omit<Invoice, 'id' | 'invoiceNumber
             createdAt: Timestamp.now()
         });
         return invRef.id;
-    } catch (error) {
+    } catch (error: any) {
+        // Re-throw demo error with original message
+        if (error?.message?.includes('ديمو') || error?.message?.includes('الديمو')) {
+            throw error;
+        }
         console.error('Error creating invoice:', error);
         throw error;
     }
@@ -485,10 +547,32 @@ export const createInvoice = async (invoice: Omit<Invoice, 'id' | 'invoiceNumber
 export const createInvoiceFromReceiptVoucher = async (voucher: ReceiptVoucher): Promise<string> => {
     try {
         const taxRate = 15; // 15% VAT
-        const subtotal = voucher.totalAmount / (1 + taxRate / 100);
-        const taxAmount = voucher.totalAmount - subtotal;
+        // ✅ Calculate subtotal: if discount exists, add it back to totalAmount before calculating tax
+        const amountBeforeDiscount = voucher.discountAmount ? voucher.totalAmount + voucher.discountAmount : voucher.totalAmount;
+        const subtotal = amountBeforeDiscount / (1 + taxRate / 100);
+        const taxAmount = amountBeforeDiscount - subtotal;
         
         const invoiceNumber = await getNextInvoiceNumber();
+        
+        // ✅ Build items array with discount if applicable
+        const items: Array<{ description: string; quantity: number; price: number }> = [];
+        
+        // Base subscription item
+        const basePrice = (subtotal / voucher.numberOfBranches) / voucher.subscriptionDuration;
+        items.push({
+            description: `اشتراك ${voucher.subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'} - ${voucher.branchName} (${voucher.branchCode})`,
+            quantity: voucher.numberOfBranches * voucher.subscriptionDuration,
+            price: basePrice
+        });
+        
+        // Discount item if applicable
+        if (voucher.discountAmount && voucher.discountAmount > 0) {
+            items.push({
+                description: `خصم ${voucher.discountRate}% للاشتراك سنتين`,
+                quantity: 1,
+                price: -voucher.discountAmount // Negative price for discount
+            });
+        }
         
         const invoiceData: Omit<Invoice, 'id' | 'invoiceNumber'> = {
             invoiceNumber,
@@ -500,11 +584,7 @@ export const createInvoiceFromReceiptVoucher = async (voucher: ReceiptVoucher): 
             issueDate: voucher.createdAt,
             dueDate: voucher.createdAt,
             paidDate: voucher.createdAt,
-            items: [{
-                description: `اشتراك ${voucher.subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'} - ${voucher.branchName} (${voucher.branchCode})`,
-                quantity: voucher.numberOfBranches,
-                price: voucher.subscriptionPrice
-            }],
+            items: items,
             paymentMethod: voucher.paymentMethod || 'cash',
             managerName: voucher.managerName,
             managerCode: voucher.managerCode,
@@ -515,7 +595,9 @@ export const createInvoiceFromReceiptVoucher = async (voucher: ReceiptVoucher): 
             subtotal,
             taxAmount,
             totalAmount: voucher.totalAmount,
-            notes: `فاتورة ضريبية مقابلة لسند قبض رقم ${voucher.voucherNumber || voucher.id.slice(0, 8)}`
+            notes: voucher.discountAmount && voucher.discountAmount > 0 
+                ? `فاتورة ضريبية مقابلة لسند قبض رقم ${voucher.voucherNumber || voucher.id.slice(0, 8)} - خصم ${voucher.discountRate}% للاشتراك سنتين`
+                : `فاتورة ضريبية مقابلة لسند قبض رقم ${voucher.voucherNumber || voucher.id.slice(0, 8)}`
         };
         
         const invRef = await addDoc(collection(db, 'invoices'), {
@@ -615,21 +697,54 @@ export const deleteInvoice = async (
 
 /**
  * Delete multiple invoices (soft delete)
+ * ✅ ENHANCED: Records deletion in deleted_billing_records collection
  */
 export const deleteInvoices = async (
     invoiceIds: string[],
-    deletedBy?: string
+    deletedBy?: string,
+    deletionReason?: string
 ): Promise<void> => {
     try {
+        if (!db) throw new Error('Database not initialized');
+        
         const batch = writeBatch(db);
+        
+        // Get invoice data before deletion for audit trail
+        const invoicesToDelete: any[] = [];
+        for (const invoiceId of invoiceIds) {
+            const invoiceRef = doc(db, 'invoices', invoiceId);
+            const invoiceSnap = await getDoc(invoiceRef);
+            if (invoiceSnap.exists()) {
+                invoicesToDelete.push({
+                    id: invoiceId,
+                    ...invoiceSnap.data()
+                });
+            }
+        }
+        
+        // Soft delete invoices
         invoiceIds.forEach(invoiceId => {
             const invoiceRef = doc(db, 'invoices', invoiceId);
             batch.update(invoiceRef, {
                 isDeleted: true,
                 deletedAt: Timestamp.now(),
-                deletedBy: deletedBy || null
+                deletedBy: deletedBy || null,
+                deletionReason: deletionReason || null
             });
         });
+        
+        // ✅ Record deletion in deleted_billing_records collection for audit trail
+        const deletedRecordRef = doc(collection(db, 'deleted_billing_records'));
+        batch.set(deletedRecordRef, {
+            type: 'invoice',
+            invoiceIds: invoiceIds,
+            invoices: invoicesToDelete,
+            deletedBy: deletedBy || null,
+            deletionReason: deletionReason || 'لم يتم تحديد السبب',
+            deletedAt: Timestamp.now(),
+            count: invoiceIds.length
+        });
+        
         await batch.commit();
     } catch (error) {
         console.error('Error deleting invoices:', error);
@@ -908,29 +1023,29 @@ export const calculateTotalRevenue = async (): Promise<number> => {
     try {
         if (!db) return 0;
         
-        let totalRevenue = 0;
-
-        // 1. Sum ALL invoices (including pending, paid, overdue) - not just paid
-        // ✅ FIX: This ensures we show accurate totals even if invoices exist but aren't marked as 'paid'
-        const allInvoicesQuery = query(collection(db, 'invoices'));
-        const allInvoicesSnapshot = await getDocs(allInvoicesQuery);
-        allInvoicesSnapshot.docs.forEach(doc => {
-            const data = doc.data();
-            // Only count if not soft-deleted
-            if (!data.isDeleted && data.amount) {
-                totalRevenue += data.amount || 0;
+        // ✅ SANDBOX INTEGRITY: Get all managers to check isDemo flag
+        const { getAllManagers } = await import('./ownerService');
+        const managers = await getAllManagers() as Array<any>;
+        const demoTenantIds = new Set<string>();
+        managers.forEach((m: any) => {
+            if (m.isDemo === true && m.tenantId) {
+                demoTenantIds.add(m.tenantId);
             }
         });
+        
+        let totalRevenue = 0;
 
-        // 2. Sum all completed payments
-        const completedPaymentsQuery = query(
-            collection(db, 'payments'),
-            where('status', '==', 'completed')
-        );
-        const completedPaymentsSnapshot = await getDocs(completedPaymentsQuery);
-        completedPaymentsSnapshot.docs.forEach(doc => {
+        // ✅ FIX: Calculate from receiptVouchers ONLY (single source of truth)
+        // Receipt vouchers are the primary source - invoices are derived from them
+        // This prevents double-counting (invoices + payments)
+        const receiptVouchersQuery = query(collection(db, 'receiptVouchers'));
+        const receiptVouchersSnapshot = await getDocs(receiptVouchersQuery);
+        receiptVouchersSnapshot.docs.forEach(doc => {
             const data = doc.data();
-            totalRevenue += data.amount || 0;
+            // Only count if not soft-deleted AND not from demo tenant AND has totalAmount
+            if (!data.isDeleted && data.totalAmount && !demoTenantIds.has(data.tenantId || '')) {
+                totalRevenue += data.totalAmount || 0;
+            }
         });
 
         return totalRevenue;
@@ -1001,6 +1116,10 @@ export const getDeletedBillingCount = async (): Promise<number> => {
  * ✅ REAL DATA: Based on active subscriptions only
  * ⚡ PERFORMANCE: 60-second memory cache
  */
+/**
+ * Calculates Monthly Recurring Revenue (MRR) by summing all active subscription monthly prices.
+ * Uses caching to avoid recalculating on every call.
+ */
 export const calculateMonthlyRecurringRevenue = async (forceRefresh: boolean = false): Promise<number> => {
     const { cachedFetch } = await import('../utils/requestCache');
     
@@ -1008,9 +1127,20 @@ export const calculateMonthlyRecurringRevenue = async (forceRefresh: boolean = f
         'billing:mrr',
         async () => {
             try {
+                // ✅ SANDBOX INTEGRITY: Get all managers to check isDemo flag
+                const { getAllManagers } = await import('./ownerService');
+                const managers = await getAllManagers() as Array<any>;
+                const demoTenantIds = new Set<string>();
+                managers.forEach((m: any) => {
+                    if (m.isDemo === true && m.tenantId) {
+                        demoTenantIds.add(m.tenantId);
+                    }
+                });
+                
                 let mrr = 0;
 
                 // Get all active subscriptions
+                // ✅ SANDBOX INTEGRITY: Filter out demo subscriptions
                 const activeSubsQuery = query(
                     collection(db, 'subscriptions'),
                     where('status', '==', 'active')
@@ -1019,6 +1149,11 @@ export const calculateMonthlyRecurringRevenue = async (forceRefresh: boolean = f
 
                 activeSubsSnapshot.docs.forEach(doc => {
                     const data = doc.data();
+                    // Skip demo subscriptions
+                    if (demoTenantIds.has(data.tenantId || '')) {
+                        return;
+                    }
+                    
                     const pricePerMonth = data.pricePerMonth || 0;
                     const billingCycle = data.billingCycle || 'monthly';
 
@@ -1161,60 +1296,42 @@ export const calculateAnnualRecurringRevenue = async (): Promise<number> => {
  */
 export const calculateMonthlyRenewalRevenue = async (): Promise<number> => {
     try {
+        if (!db) return 0;
+        
+        // ✅ SANDBOX INTEGRITY: Get all managers to check isDemo flag
+        const { getAllManagers } = await import('./ownerService');
+        const managers = await getAllManagers() as Array<any>;
+        const demoTenantIds = new Set<string>();
+        managers.forEach((m: any) => {
+            if (m.isDemo === true && m.tenantId) {
+                demoTenantIds.add(m.tenantId);
+            }
+        });
+        
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         startOfMonth.setHours(0, 0, 0, 0);
         
         let renewalRevenue = 0;
 
-        // 1. Get paid invoices from this month (renewal-related)
-        const paidInvoicesQuery = query(
-            collection(db, 'invoices'),
-            where('status', '==', 'paid'),
-            where('issueDate', '>=', Timestamp.fromDate(startOfMonth)),
-            where('issueDate', '<=', Timestamp.now())
+        // ✅ FIX: Calculate from receiptVouchers created this month (renewals)
+        // Receipt vouchers created this month represent renewals or new subscriptions
+        const receiptVouchersQuery = query(
+            collection(db, 'receiptVouchers'),
+            where('createdAt', '>=', Timestamp.fromDate(startOfMonth)),
+            where('createdAt', '<=', Timestamp.now())
         );
-        const paidInvoicesSnapshot = await getDocs(paidInvoicesQuery);
-        paidInvoicesSnapshot.docs.forEach(doc => {
+        const receiptVouchersSnapshot = await getDocs(receiptVouchersQuery);
+        receiptVouchersSnapshot.docs.forEach(doc => {
             const data = doc.data();
-            // Check if invoice is for renewal (description contains renewal keywords)
-            const description = (data.items?.[0]?.description || '').toLowerCase();
-            if (description.includes('renewal') || description.includes('تجديد') || 
-                description.includes('license') || description.includes('ترخيص')) {
-                renewalRevenue += data.amount || 0;
+            // Skip demo vouchers and deleted ones
+            if (data.isDeleted || demoTenantIds.has(data.tenantId || '')) {
+                return;
             }
-        });
-
-        // 2. Get completed payments from this month (renewal-related)
-        const completedPaymentsQuery = query(
-            collection(db, 'payments'),
-            where('status', '==', 'completed'),
-            where('paidAt', '>=', Timestamp.fromDate(startOfMonth)),
-            where('paidAt', '<=', Timestamp.now())
-        );
-        const completedPaymentsSnapshot = await getDocs(completedPaymentsQuery);
-        completedPaymentsSnapshot.docs.forEach(doc => {
-            const data = doc.data();
-            // Check if payment notes indicate renewal
-            const notes = (data.notes || '').toLowerCase();
-            if (notes.includes('renewal') || notes.includes('تجديد') || 
-                notes.includes('license') || notes.includes('ترخيص')) {
-                renewalRevenue += data.amount || 0;
-            }
-        });
-
-        // 3. Also check subscriptions renewed this month (if renewalDate is in current month)
-        const allSubs = await getAllSubscriptions();
-        allSubs.forEach(sub => {
-            if (sub.renewalDate && sub.renewalDate >= startOfMonth && sub.renewalDate <= now) {
-                // If yearly subscription, add full year price
-                if (sub.billingCycle === 'yearly') {
-                    renewalRevenue += sub.pricePerMonth * 12;
-                } else if (sub.billingCycle === 'quarterly') {
-                    renewalRevenue += sub.pricePerMonth * 3;
-                } else {
-                    renewalRevenue += sub.pricePerMonth;
-                }
+            
+            // Count all receipt vouchers created this month (they represent payments/renewals)
+            if (data.totalAmount) {
+                renewalRevenue += data.totalAmount || 0;
             }
         });
 
@@ -1270,7 +1387,7 @@ export const getNearestExpiringSubscription = async (): Promise<{
         let tenantName: string | undefined;
         
         try {
-            const { getDoc } = await import('firebase/firestore');
+            // ✅ getDoc is already imported at the top of the file
             const tenantRef = doc(db, 'tenants', nearest.subscription.tenantId);
             const tenantDoc = await getDoc(tenantRef);
             if (tenantDoc.exists()) {

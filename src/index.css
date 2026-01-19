@@ -974,30 +974,28 @@ input[type=number] {
      🎨 PREMIUM STAT CARDS - Light Mode (Like Reference Images)
      ============================================================ */
   
-  /* Force stat cards in light mode - PREMIUM FLOATING DESIGN */
+  /* Force stat cards in light mode - COMPACT & SIMPLE (No excessive padding) */
   html[data-theme="light"] .stat-card-pro-compact,
   html.light .stat-card-pro-compact {
     background: #ffffff !important;
-    border: none !important;
-    border-radius: 28px !important;
-    padding: 28px 24px !important;
-    min-height: 180px !important;
-    /* Strong floating shadow like reference images */
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    padding: 12px 14px !important; /* ✅ Reduced from 28px 24px - Compact padding */
+    min-height: auto !important; /* ✅ Auto height - no fixed min-height */
+    /* Subtle shadow - no excessive depth */
     box-shadow: 
-      0 8px 30px rgba(0, 0, 0, 0.08),
-      0 2px 8px rgba(0, 0, 0, 0.04),
-      0 0 1px rgba(0, 0, 0, 0.08) !important;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    transition: all 0.2s ease !important;
   }
   
   html[data-theme="light"] .stat-card-pro-compact:hover,
   html.light .stat-card-pro-compact:hover {
-    transform: translateY(-10px) scale(1.02) !important;
-    /* Even stronger shadow on hover */
+    transform: translateY(-2px) !important; /* ✅ Subtle hover - reduced from -10px */
+    /* Subtle shadow on hover */
     box-shadow: 
-      0 25px 60px rgba(0, 0, 0, 0.15),
-      0 8px 20px rgba(0, 0, 0, 0.08),
-      0 0 1px rgba(0, 0, 0, 0.1) !important;
+      0 4px 12px rgba(0, 0, 0, 0.08),
+      0 2px 4px rgba(0, 0, 0, 0.06) !important;
   }
   
   /* Force stat card values - Bold but proportional */
@@ -1942,10 +1940,40 @@ a:hover {
   color: rgba(45, 212, 191, 1);
 }
 
-/* Better Selection */
+/* Better Selection - Fixed for Light/Dark Mode */
 ::selection {
-  background: rgba(45, 212, 191, 0.3);
-  color: white;
+  background: rgba(20, 184, 166, 0.4); /* primary-500 with better opacity */
+  color: #ffffff; /* White text for dark backgrounds */
+}
+
+/* Light Mode Selection - Dark background with dark text */
+[data-theme="light"] ::selection,
+html:not([data-theme]) ::selection {
+  background: rgba(20, 184, 166, 0.25); /* Slightly lighter for light mode */
+  color: #0f172a; /* Dark text for light backgrounds */
+}
+
+/* Dark Mode Selection - Lighter background with white text */
+[data-theme="dark"] ::selection {
+  background: rgba(20, 184, 166, 0.5); /* More opaque for dark mode */
+  color: #ffffff; /* White text for dark backgrounds */
+}
+
+/* Firefox */
+::-moz-selection {
+  background: rgba(20, 184, 166, 0.4);
+  color: #ffffff;
+}
+
+[data-theme="light"] ::-moz-selection,
+html:not([data-theme]) ::-moz-selection {
+  background: rgba(20, 184, 166, 0.25);
+  color: #0f172a;
+}
+
+[data-theme="dark"] ::-moz-selection {
+  background: rgba(20, 184, 166, 0.5);
+  color: #ffffff;
 }
 
 /* Disable text selection on buttons and icons only */
