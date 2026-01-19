@@ -1857,18 +1857,18 @@ const ReceiptVouchersTab: React.FC<{
             {/* ✅ Grouped Vouchers - تجميع السندات حسب المشترك والتاريخ */}
             <div className="space-y-4">
                 {filteredVouchers.length === 0 ? (
-                    <p className="text-center text-slate-500 dark:text-white/40 py-8">لا توجد سندات قبض</p>
+                    <p className="text-center text-slate-600 dark:text-slate-300 py-8">لا توجد سندات قبض</p>
                 ) : (
                     <>
                         {/* Select All */}
-                        <div className="flex items-center gap-2 pb-2 border-b border-slate-200 dark:border-white/10">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-300 dark:border-slate-600">
                             <input
                                 type="checkbox"
                                 checked={selectedVouchers.size === filteredVouchers.length && filteredVouchers.length > 0}
                                 onChange={toggleSelectAll}
-                                className="w-4 h-4 rounded border-slate-300 dark:border-white/20 bg-white dark:bg-white/5 text-teal-500 focus:ring-teal-500/50"
+                                className="w-4 h-4 rounded border-slate-400 dark:border-slate-500 bg-white dark:bg-slate-700 text-teal-500 focus:ring-teal-500/50"
                             />
-                            <span className="text-sm text-slate-600 dark:text-white/60">
+                            <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
                                 تحديد الكل ({filteredVouchers.length})
                             </span>
                         </div>
@@ -1928,10 +1928,10 @@ const ReceiptVouchersTab: React.FC<{
                                 return (
                                     <div
                                         key={groupKey}
-                                        className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-2xl border-2 border-slate-200 dark:border-white/10 shadow-lg overflow-hidden"
+                                        className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden"
                                     >
                                         {/* ✅ Group Header - معلومات المشترك */}
-                                        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-900/20 dark:to-emerald-900/20 p-4 border-b border-slate-200 dark:border-white/10">
+                                        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-800/40 dark:to-emerald-800/40 p-4 border-b border-slate-200 dark:border-slate-700">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-4">
                                                     {/* Group Checkbox */}
@@ -1944,7 +1944,7 @@ const ReceiptVouchersTab: React.FC<{
                                                         />
                                                         <div className={`
                                                             w-5 h-5 rounded-lg border-2 transition-all duration-200
-                                                            ${allSelected ? 'bg-teal-500 border-teal-500' : someSelected ? 'bg-teal-200 border-teal-400' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600'}
+                                                            ${allSelected ? 'bg-teal-500 dark:bg-teal-600 border-teal-500 dark:border-teal-600' : someSelected ? 'bg-teal-200 dark:bg-teal-700 border-teal-400 dark:border-teal-500' : 'bg-white dark:bg-slate-700 border-slate-400 dark:border-slate-500'}
                                                             flex items-center justify-center
                                                         `}>
                                                             {(allSelected || someSelected) && <Check className="w-3 h-3 text-white" />}
@@ -1954,14 +1954,14 @@ const ReceiptVouchersTab: React.FC<{
                                                     {/* Manager Info */}
                                                     <div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="font-bold text-slate-800 dark:text-white text-lg">
+                                                            <span className="font-bold text-slate-900 dark:text-white text-lg">
                                                                 {firstVoucher.managerName}
                                                             </span>
-                                                            <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold">
+                                                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-600">
                                                                 كود: {firstVoucher.managerCode}
                                                             </span>
                                                         </div>
-                                                        <div className="flex items-center gap-2 mt-1 text-sm text-slate-600 dark:text-slate-400">
+                                                        <div className="flex items-center gap-2 mt-1 text-sm text-slate-700 dark:text-slate-300">
                                                             <Calendar className="w-3.5 h-3.5" />
                                                             <span>
                                                                 {new Date(firstVoucher.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -1977,8 +1977,8 @@ const ReceiptVouchersTab: React.FC<{
                                                 {/* Group Total & Actions */}
                                                 <div className="flex items-center gap-4">
                                                     <div className="text-left">
-                                                        <p className="text-xs text-slate-500 dark:text-slate-400">إجمالي ({groupVouchers.length} {groupVouchers.length === 1 ? 'سند' : 'سندات'})</p>
-                                                        <p className="text-xl font-bold text-teal-600 dark:text-teal-400">
+                                                        <p className="text-xs text-slate-600 dark:text-slate-300">إجمالي ({groupVouchers.length} {groupVouchers.length === 1 ? 'سند' : 'سندات'})</p>
+                                                        <p className="text-xl font-bold text-teal-700 dark:text-teal-400">
                                                             {totalAmount.toLocaleString()} <span className="text-sm">ر.س</span>
                                                         </p>
                                                     </div>
@@ -2002,11 +2002,11 @@ const ReceiptVouchersTab: React.FC<{
                                                     className={`
                                                         relative flex items-center gap-3 p-3 rounded-xl transition-all duration-200
                                                         ${voucher.isDeleted 
-                                                            ? 'bg-red-50 dark:bg-red-900/10 opacity-60' 
-                                                            : 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                                            ? 'bg-red-50 dark:bg-red-950/30 opacity-60' 
+                                                            : 'bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600'
                                                         }
-                                                        ${selectedVouchers.has(voucher.id) ? 'ring-2 ring-teal-500' : ''}
-                                                        border border-slate-200 dark:border-slate-700
+                                                        ${selectedVouchers.has(voucher.id) ? 'ring-2 ring-teal-500 dark:ring-teal-400' : ''}
+                                                        ${!voucher.isDeleted && !selectedVouchers.has(voucher.id) ? '' : ''}
                                                     `}
                                                 >
                                                     {/* Checkbox */}
@@ -2019,7 +2019,7 @@ const ReceiptVouchersTab: React.FC<{
                                                         />
                                                         <div className={`
                                                             w-4 h-4 rounded border-2 transition-all
-                                                            ${selectedVouchers.has(voucher.id) ? 'bg-teal-500 border-teal-500' : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-500'}
+                                                            ${selectedVouchers.has(voucher.id) ? 'bg-teal-500 dark:bg-teal-600 border-teal-500 dark:border-teal-600' : 'bg-white dark:bg-slate-700 border-slate-400 dark:border-slate-500'}
                                                             flex items-center justify-center
                                                         `}>
                                                             {selectedVouchers.has(voucher.id) && <Check className="w-2.5 h-2.5 text-white" />}
@@ -2028,44 +2028,44 @@ const ReceiptVouchersTab: React.FC<{
                                                     
                                                     {/* Voucher Number */}
                                                     <div className={`
-                                                        flex-shrink-0 w-10 h-10 rounded-lg flex flex-col items-center justify-center
-                                                        ${voucher.paymentMethod === 'cash' ? 'bg-emerald-100 dark:bg-emerald-900/30' : 
-                                                          voucher.paymentMethod === 'credit' ? 'bg-blue-100 dark:bg-blue-900/30' :
-                                                          voucher.paymentMethod === 'bank_transfer' ? 'bg-purple-100 dark:bg-purple-900/30' :
-                                                          'bg-amber-100 dark:bg-amber-900/30'}
+                                                        flex-shrink-0 w-10 h-10 rounded-lg flex flex-col items-center justify-center border
+                                                        ${voucher.paymentMethod === 'cash' ? 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-700' : 
+                                                          voucher.paymentMethod === 'credit' ? 'bg-blue-50 dark:bg-blue-900/40 border-blue-200 dark:border-blue-700' :
+                                                          voucher.paymentMethod === 'bank_transfer' ? 'bg-purple-50 dark:bg-purple-900/40 border-purple-200 dark:border-purple-700' :
+                                                          'bg-amber-50 dark:bg-amber-900/40 border-amber-200 dark:border-amber-700'}
                                                     `}>
-                                                        <span className="text-[8px] text-slate-500 dark:text-slate-400">سند</span>
+                                                        <span className="text-[8px] text-slate-600 dark:text-slate-300 font-medium">سند</span>
                                                         <span className={`text-sm font-bold ${
-                                                            voucher.paymentMethod === 'cash' ? 'text-emerald-600 dark:text-emerald-400' :
-                                                            voucher.paymentMethod === 'credit' ? 'text-blue-600 dark:text-blue-400' :
-                                                            voucher.paymentMethod === 'bank_transfer' ? 'text-purple-600 dark:text-purple-400' :
-                                                            'text-amber-600 dark:text-amber-400'
+                                                            voucher.paymentMethod === 'cash' ? 'text-emerald-700 dark:text-emerald-300' :
+                                                            voucher.paymentMethod === 'credit' ? 'text-blue-700 dark:text-blue-300' :
+                                                            voucher.paymentMethod === 'bank_transfer' ? 'text-purple-700 dark:text-purple-300' :
+                                                            'text-amber-700 dark:text-amber-300'
                                                         }`}>{voucher.voucherNumber || '-'}</span>
                                                     </div>
                                                     
                                                     {/* Branch Info - الأهم للمحاسب */}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="font-semibold text-slate-800 dark:text-white">
+                                                            <span className="font-semibold text-slate-900 dark:text-white">
                                                                 فرع: {voucher.branchName || '-'}
                                                             </span>
-                                                            <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold">
+                                                            <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 text-[10px] font-bold border border-slate-300 dark:border-slate-500">
                                                                 #{voucher.branchCode || '-'}
                                                             </span>
                                                             {voucher.isDeleted && (
-                                                                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                                                                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
                                                                     محذوف
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-600 dark:text-slate-300">
                                                             <span>{voucher.subscriptionDuration === 1 ? 'سنة' : 'سنتين'}</span>
                                                             <span>•</span>
                                                             <span className={`font-medium ${
-                                                                voucher.paymentMethod === 'cash' ? 'text-emerald-600 dark:text-emerald-400' :
-                                                                voucher.paymentMethod === 'credit' ? 'text-blue-600 dark:text-blue-400' :
-                                                                voucher.paymentMethod === 'bank_transfer' ? 'text-purple-600 dark:text-purple-400' :
-                                                                'text-amber-600 dark:text-amber-400'
+                                                                voucher.paymentMethod === 'cash' ? 'text-emerald-700 dark:text-emerald-300' :
+                                                                voucher.paymentMethod === 'credit' ? 'text-blue-700 dark:text-blue-300' :
+                                                                voucher.paymentMethod === 'bank_transfer' ? 'text-purple-700 dark:text-purple-300' :
+                                                                'text-amber-700 dark:text-amber-300'
                                                             }`}>
                                                                 {voucher.paymentMethod === 'cash' ? 'كاش' :
                                                                  voucher.paymentMethod === 'credit' ? 'كريديت' :
@@ -2076,20 +2076,20 @@ const ReceiptVouchersTab: React.FC<{
                                                     
                                                     {/* Amount */}
                                                     <div className="flex-shrink-0 text-left">
-                                                        <span className="text-base font-bold text-slate-800 dark:text-white">
+                                                        <span className="text-base font-bold text-slate-900 dark:text-white">
                                                             {voucher.totalAmount.toLocaleString()}
                                                         </span>
-                                                        <span className="text-[10px] text-slate-500 dark:text-slate-400 mr-1">ر.س</span>
+                                                        <span className="text-[10px] text-slate-600 dark:text-slate-300 mr-1">ر.س</span>
                                                     </div>
                                                     
                                                     {/* Actions */}
                                                     <div className="flex items-center gap-1">
                                                         <button
                                                             onClick={() => setPreviewVoucher(voucher)}
-                                                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 transition-all"
+                                                            className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-600 dark:hover:bg-slate-500 transition-all border border-slate-300 dark:border-slate-500"
                                                             title="معاينة"
                                                         >
-                                                            <Eye className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+                                                            <Eye className="w-3.5 h-3.5 text-slate-700 dark:text-slate-200" />
                                                         </button>
                                                         <button
                                                             onClick={() => {
@@ -2102,10 +2102,10 @@ const ReceiptVouchersTab: React.FC<{
                                                                     setTimeout(() => printWindow.print(), 250);
                                                                 }
                                                             }}
-                                                            className="p-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 dark:bg-teal-900/30 dark:hover:bg-teal-900/50 transition-all"
+                                                            className="p-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 dark:bg-teal-800 dark:hover:bg-teal-700 transition-all border border-teal-200 dark:border-teal-700"
                                                             title="طباعة"
                                                         >
-                                                            <Printer className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                                                            <Printer className="w-3.5 h-3.5 text-teal-700 dark:text-teal-300" />
                                                         </button>
                                                     </div>
                                                 </div>
@@ -2121,66 +2121,76 @@ const ReceiptVouchersTab: React.FC<{
             
             {/* ✅ Preview Modal - معاينة السند - محسّن للوضوح */}
             {previewVoucher && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                    <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/70 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl border-2 border-slate-200 dark:border-slate-700">
                         <div className="flex items-center justify-between mb-5">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white">سند قبض #{previewVoucher.voucherNumber}</h3>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">سند قبض #{previewVoucher.voucherNumber}</h3>
                             <button
                                 onClick={() => setPreviewVoucher(null)}
-                                className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 transition-colors"
+                                className="p-2 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 transition-colors border border-slate-300 dark:border-slate-600"
                             >
-                                <X className="w-5 h-5 text-slate-600 dark:text-white/60" />
+                                <X className="w-5 h-5 text-slate-700 dark:text-slate-200" />
                             </button>
                         </div>
                         
                         <div className="space-y-4">
                             {/* التاريخ */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
-                                    <p className="text-xs text-slate-500 dark:text-white/50 mb-1 font-medium">التاريخ الميلادي</p>
-                                    <p className="text-slate-800 dark:text-white font-semibold">{new Date(previewVoucher.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })} م</p>
+                                <div className="bg-slate-100 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-300 dark:border-slate-600">
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">التاريخ الميلادي</p>
+                                    <p className="text-slate-900 dark:text-white font-semibold">{new Date(previewVoucher.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })} م</p>
                                 </div>
-                                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
-                                    <p className="text-xs text-slate-500 dark:text-white/50 mb-1 font-medium">التاريخ الهجري</p>
+                                <div className="bg-slate-100 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-300 dark:border-slate-600">
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">التاريخ الهجري</p>
                                     <p className="text-slate-800 dark:text-white font-semibold">{new Date(previewVoucher.createdAt).toLocaleDateString('ar-SA-u-ca-islamic', { year: 'numeric', month: 'short', day: 'numeric' })} هـ</p>
                                 </div>
                             </div>
                             
                             {/* المشترك */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
-                                    <p className="text-xs text-slate-500 dark:text-white/50 mb-1 font-medium">اسم المشترك</p>
-                                    <p className="text-slate-800 dark:text-white font-semibold">{previewVoucher.managerName}</p>
+                                <div className="bg-slate-100 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-300 dark:border-slate-600">
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">اسم المشترك</p>
+                                    <p className="text-slate-900 dark:text-white font-semibold">{previewVoucher.managerName}</p>
                                 </div>
-                                <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
-                                    <p className="text-xs text-slate-500 dark:text-white/50 mb-1 font-medium">كود المشترك</p>
-                                    <p className="text-slate-800 dark:text-white font-bold text-lg">{previewVoucher.managerCode}</p>
+                                <div className="bg-slate-100 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-300 dark:border-slate-600">
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">كود المشترك</p>
+                                    <p className="text-slate-900 dark:text-white font-bold text-lg">{previewVoucher.managerCode}</p>
                                 </div>
                             </div>
                             
                             {/* الفرع - السند الواحد لفرع واحد فقط! */}
-                            <div className="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-4 border border-teal-200 dark:border-teal-700/30">
-                                <p className="text-xs text-teal-600 dark:text-teal-400 mb-2 font-medium">بيانات الفرع</p>
+                            <div className="bg-teal-50 dark:bg-teal-900/40 rounded-xl p-4 border border-teal-200 dark:border-teal-700">
+                                <p className="text-xs text-teal-700 dark:text-teal-300 mb-2 font-medium">بيانات الفرع</p>
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-slate-800 dark:text-white font-bold text-lg">{previewVoucher.branchName || 'الفرع الرئيسي'}</p>
-                                        <p className="text-slate-500 dark:text-slate-400 text-sm">كود الفرع: #{previewVoucher.branchCode}</p>
+                                        <p className="text-slate-900 dark:text-white font-bold text-lg">{previewVoucher.branchName || 'الفرع الرئيسي'}</p>
+                                        <p className="text-slate-600 dark:text-slate-300 text-sm">كود الفرع: #{previewVoucher.branchCode}</p>
                                     </div>
                                     <div className="text-left">
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">مدة الاشتراك</p>
-                                        <p className="text-teal-600 dark:text-teal-400 font-bold">{previewVoucher.subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'}</p>
+                                        <p className="text-xs text-slate-600 dark:text-slate-300">مدة الاشتراك</p>
+                                        <p className="text-teal-700 dark:text-teal-400 font-bold">{previewVoucher.subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'}</p>
                                     </div>
                                 </div>
                             </div>
                             
                             {/* طريقة الدفع */}
-                            <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-transparent">
-                                <p className="text-xs text-slate-500 dark:text-white/50 mb-2 font-medium">طريقة الدفع</p>
+                            <div className={`rounded-xl p-3 border ${
+                                previewVoucher.paymentMethod === 'cash' ? 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-700' :
+                                previewVoucher.paymentMethod === 'credit' ? 'bg-blue-50 dark:bg-blue-900/40 border-blue-200 dark:border-blue-700' :
+                                previewVoucher.paymentMethod === 'bank_transfer' ? 'bg-purple-50 dark:bg-purple-900/40 border-purple-200 dark:border-purple-700' :
+                                'bg-amber-50 dark:bg-amber-900/40 border-amber-200 dark:border-amber-700'
+                            }`}>
+                                <p className={`text-xs mb-2 font-medium ${
+                                    previewVoucher.paymentMethod === 'cash' ? 'text-emerald-700 dark:text-emerald-300' :
+                                    previewVoucher.paymentMethod === 'credit' ? 'text-blue-700 dark:text-blue-300' :
+                                    previewVoucher.paymentMethod === 'bank_transfer' ? 'text-purple-700 dark:text-purple-300' :
+                                    'text-amber-700 dark:text-amber-300'
+                                }`}>طريقة الدفع</p>
                                 <p className={`text-base font-bold ${
-                                    previewVoucher.paymentMethod === 'cash' ? 'text-emerald-600 dark:text-emerald-400' :
-                                    previewVoucher.paymentMethod === 'credit' ? 'text-blue-600 dark:text-blue-400' :
-                                    previewVoucher.paymentMethod === 'bank_transfer' ? 'text-purple-600 dark:text-purple-400' :
-                                    'text-amber-600 dark:text-amber-400'
+                                    previewVoucher.paymentMethod === 'cash' ? 'text-emerald-700 dark:text-emerald-300' :
+                                    previewVoucher.paymentMethod === 'credit' ? 'text-blue-700 dark:text-blue-300' :
+                                    previewVoucher.paymentMethod === 'bank_transfer' ? 'text-purple-700 dark:text-purple-300' :
+                                    'text-amber-700 dark:text-amber-300'
                                 }`}>
                                     {previewVoucher.paymentMethod === 'cash' ? '💵 كاش' :
                                      previewVoucher.paymentMethod === 'credit' ? '💳 كريديت' :
@@ -2195,9 +2205,9 @@ const ReceiptVouchersTab: React.FC<{
                             </div>
                             
                             {previewVoucher.notes && (
-                                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 border border-amber-200 dark:border-amber-700/30">
-                                    <p className="text-xs text-amber-600 dark:text-amber-400 mb-1 font-medium">ملاحظات</p>
-                                    <p className="text-slate-700 dark:text-white/80">{previewVoucher.notes}</p>
+                                <div className="bg-amber-50 dark:bg-amber-900/40 rounded-xl p-3 border border-amber-200 dark:border-amber-700">
+                                    <p className="text-xs text-amber-700 dark:text-amber-300 mb-1 font-medium">ملاحظات</p>
+                                    <p className="text-slate-800 dark:text-white">{previewVoucher.notes}</p>
                                 </div>
                             )}
                         </div>
@@ -3325,19 +3335,23 @@ const ExpenseVouchersTab: React.FC<{
                                 className={`
                                     group relative overflow-hidden rounded-xl transition-all duration-300
                                     ${voucher.isDeleted 
-                                        ? 'bg-gradient-to-r from-red-50 via-gray-50 to-red-50 dark:from-red-950/20 dark:via-gray-900/40 dark:to-red-950/20 opacity-60' 
-                                        : 'bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm'
+                                        ? 'bg-red-50 dark:bg-red-950/40 opacity-60' 
+                                        : 'bg-white dark:bg-slate-800'
                                     }
                                     ${selectedVouchers.has(voucher.id) 
-                                        ? 'ring-2 ring-orange-500 shadow-lg shadow-orange-500/20' 
-                                        : 'shadow-[0_4px_20px_rgba(0,0,0,0.12)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.18)] dark:shadow-none'
+                                        ? 'ring-2 ring-orange-500 dark:ring-orange-400 shadow-lg shadow-orange-500/20' 
+                                        : 'shadow-md hover:shadow-lg dark:shadow-slate-900/50'
                                     }
-                                    border-2 border-slate-200 dark:border-white/10 hover:border-orange-400 dark:hover:border-orange-500/50
+                                    border-2 ${voucher.isDeleted ? 'border-red-200 dark:border-red-900/50' : 'border-slate-300 dark:border-slate-600'} hover:border-orange-400 dark:hover:border-orange-500
                                     hover:-translate-y-1
                                 `}
                             >
                                 {/* ✅ Orange Accent Line for Expense */}
-                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 via-red-500 to-orange-400" />
+                                <div className={`absolute top-0 left-0 right-0 h-1 ${
+                                    voucher.isDeleted 
+                                        ? 'bg-gradient-to-r from-red-300 via-red-400 to-red-300' 
+                                        : 'bg-gradient-to-r from-orange-400 via-red-500 to-orange-400'
+                                }`} />
                                 
                                 <div className="p-4 flex items-center gap-4">
                                     {/* ✅ Enhanced Checkbox */}
@@ -3353,8 +3367,8 @@ const ExpenseVouchersTab: React.FC<{
                                                 <div className={`
                                                     w-5 h-5 rounded-lg border-2 transition-all duration-200
                                                     ${selectedVouchers.has(voucher.id)
-                                                        ? 'bg-orange-500 border-orange-500'
-                                                        : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600'
+                                                        ? 'bg-orange-500 dark:bg-orange-600 border-orange-500 dark:border-orange-600'
+                                                        : 'bg-white dark:bg-slate-700 border-slate-400 dark:border-slate-500'
                                                     }
                                                     peer-hover:border-orange-400 peer-focus:ring-2 peer-focus:ring-orange-500/30
                                                     flex items-center justify-center
@@ -3368,9 +3382,9 @@ const ExpenseVouchersTab: React.FC<{
                                     )}
                                     
                                     {/* ✅ Voucher Number Badge */}
-                                    <div className="flex-shrink-0 w-14 h-14 rounded-xl flex flex-col items-center justify-center bg-gradient-to-br from-orange-100 to-red-50 dark:from-orange-900/30 dark:to-red-900/20 border border-orange-200 dark:border-orange-700/50">
-                                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">صرف</span>
-                                        <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                                    <div className="flex-shrink-0 w-14 h-14 rounded-xl flex flex-col items-center justify-center bg-orange-50 dark:bg-orange-900/50 border-2 border-orange-200 dark:border-orange-700">
+                                        <span className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">صرف</span>
+                                        <span className="text-lg font-bold text-orange-700 dark:text-orange-300">
                                             {voucher.voucherNumber || '-'}
                                         </span>
                                                 </div>
@@ -3378,34 +3392,34 @@ const ExpenseVouchersTab: React.FC<{
                                     {/* ✅ Main Info Section */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-bold text-slate-800 dark:text-white truncate">
+                                            <span className="font-bold text-slate-900 dark:text-white truncate">
                                                 {voucher.paidTo}
                                             </span>
                                             {voucher.isDeleted && (
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-700/50">
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800">
                                                     محذوف
                                                 </span>
                                             )}
                                                 </div>
-                                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-700 dark:text-slate-200 font-semibold">
+                                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-700 dark:text-slate-300 font-semibold">
                                             {/* Date - Gregorian + Hijri */}
                                             <span className="flex items-center gap-1">
-                                                <Calendar className="w-3 h-3 text-slate-500" />
+                                                <Calendar className="w-3 h-3 text-slate-600 dark:text-slate-400" />
                                                 <span>
                                                     {new Date(voucher.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
-                                                    <span className="text-slate-400 dark:text-slate-500 font-normal text-[10px] mx-1">|</span>
-                                                    <span className="text-slate-400 dark:text-slate-500 font-normal text-[10px]">
+                                                    <span className="text-slate-500 dark:text-slate-500 font-normal text-[10px] mx-1">|</span>
+                                                    <span className="text-slate-500 dark:text-slate-500 font-normal text-[10px]">
                                                         {new Date(voucher.createdAt).toLocaleDateString('ar-SA-u-ca-islamic', { month: 'short', day: 'numeric' })} هـ
                                                     </span>
                                                 </span>
                                             </span>
                                             {/* Payment Method */}
-                                            <span className="px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-[10px] font-bold border border-orange-200 dark:border-orange-700/50">
+                                            <span className="px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 text-[10px] font-bold border border-orange-300 dark:border-orange-700">
                                                 {paymentMethodLabels[voucher.paymentMethod] || '-'}
                                             </span>
                                                 </div>
                                         {/* Purpose */}
-                                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
+                                        <div className="mt-1 text-xs text-slate-700 dark:text-slate-300 truncate">
                                             {voucher.purpose}
                                             </div>
                                         </div>
@@ -3413,7 +3427,7 @@ const ExpenseVouchersTab: React.FC<{
                                     {/* ✅ Amount & Actions */}
                                     <div className="flex items-center gap-3">
                                         <div className="text-right">
-                                            <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                                            <p className="text-lg font-bold text-orange-700 dark:text-orange-300">
                                                 {voucher.amount.toLocaleString()} ر.س
                                             </p>
                                         </div>
@@ -3424,10 +3438,10 @@ const ExpenseVouchersTab: React.FC<{
                                                     handlePrintSingle(voucherToPrint);
                                                 }
                                             }}
-                                            className="p-2.5 rounded-lg bg-orange-100 hover:bg-orange-200 dark:bg-orange-500/20 dark:hover:bg-orange-500/30 transition-all"
+                                            className="p-2.5 rounded-lg bg-orange-100 hover:bg-orange-200 dark:bg-orange-800 dark:hover:bg-orange-700 transition-all border border-orange-200 dark:border-orange-700"
                                             title="طباعة"
                                         >
-                                            <Printer className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                                            <Printer className="w-4 h-4 text-orange-700 dark:text-orange-300" />
                                         </button>
                                     </div>
                                 </div>
