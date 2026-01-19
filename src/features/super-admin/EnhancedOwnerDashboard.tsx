@@ -541,17 +541,48 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             let active = 0;
             let suspended = 0;
             let expired = 0;
-
+            
+            // ✅ DEBUG: Log manager details for troubleshooting
+            console.log('📊 [ManagerStats] Total managers found:', managers.length);
+            console.log('📊 [ManagerStats] Deleted managers:', deletedManagers.length);
+            
+            const managerDetails: any[] = [];
+            
             managers.forEach((m: any) => {
                 const status = m.status || 'active';
                 const isDeleted = m.isDeleted === true || m.deletedAt;
+                const hasTenantId = m.tenantId && typeof m.tenantId === 'string' && m.tenantId.trim();
 
-                if (isDeleted) return; // Skip soft-deleted in main list
+                // ✅ DEBUG: Collect manager info for logging
+                managerDetails.push({
+                    id: m.id,
+                    name: m.name,
+                    code: m.code,
+                    status,
+                    isDeleted,
+                    hasTenantId: !!hasTenantId,
+                    tenantId: m.tenantId
+                });
+
+                if (isDeleted) {
+                    console.warn(`⚠️ [ManagerStats] Manager ${m.name} (${m.code}) is marked as deleted but still in main list. Consider running softDeleteManager().`);
+                    return; // Skip soft-deleted in main list
+                }
 
                 if (status === 'active') active++;
                 else if (status === 'suspended') suspended++;
                 else if (status === 'expired' || status === 'inactive') expired++;
             });
+            
+            // ✅ DEBUG: Log manager breakdown
+            console.log('📊 [ManagerStats] Breakdown:', {
+                active,
+                suspended,
+                expired,
+                deleted: deletedManagers.length,
+                totalInMainList: managers.length
+            });
+            console.log('📊 [ManagerStats] Manager details:', managerDetails);
 
             // ✅ FIX: Include deleted billing documents (invoices + vouchers) in deleted count
             const deletedBilling = await getDeletedBillingCount().catch(() => 0);

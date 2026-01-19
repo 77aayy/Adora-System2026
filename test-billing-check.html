@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اختبار بيانات السندات - Adora</title>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, query, getDocs, orderBy, where } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCv6qJkZG8W5j5Q5ZJ5Q5ZJ5Q5ZJ5Q5ZJ5",
+            authDomain: "adora-platform2026.firebaseapp.com",
+            projectId: "adora-platform2026",
+            storageBucket: "adora-platform2026.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abc123"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function checkBillingData() {
+            console.log('🔍 [Test] Starting billing data check...');
+            
+            try {
+                // 1. Get all managers
+                console.log('📊 [Test] Loading managers...');
+                const managersQuery = query(collection(db, 'users'), where('role', '==', 'manager'));
+                const managersSnapshot = await getDocs(managersQuery);
+                const managers = managersSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                console.log(`✅ [Test] Found ${managers.length} managers:`, managers);
+                
+                // 2. Get all receipt vouchers
+                console.log('📊 [Test] Loading receipt vouchers...');
+                const vouchersQuery = query(collection(db, 'receiptVouchers'), orderBy('createdAt', 'desc'));
+                const vouchersSnapshot = await getDocs(vouchersQuery);
+                const vouchers = vouchersSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    createdAt: doc.data().createdAt?.toDate?.() || null
+                }));
+                
+                console.log(`✅ [Test] Found ${vouchers.length} receipt vouchers:`, vouchers);
+                
+                // 3. Get all invoices
+                console.log('📊 [Test] Loading invoices...');
+                const invoicesQuery = query(collection(db, 'invoices'), orderBy('issueDate', 'desc'));
+                const invoicesSnapshot = await getDocs(invoicesQuery);
+                const invoices = invoicesSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    issueDate: doc.data().issueDate?.toDate?.() || null
+                }));
+                
+                console.log(`✅ [Test] Found ${invoices.length} invoices:`, invoices);
+                
+                // 4. Check tenantId mapping
+                console.log('📊 [Test] Checking tenantId mapping...');
+                const managerTenantIds = managers.map(m => ({ 
+                    id: m.id, 
+                    name: m.name, 
+                    code: m.code, 
+                    tenantId: m.tenantId 
+                }));
+                console.log('📊 [Test] Manager tenantIds:', managerTenantIds);
+                
+                const voucherTenantIds = [...new Set(vouchers.map(v => v.tenantId).filter(Boolean))];
+                console.log('📊 [Test] Voucher tenantIds:', voucherTenantIds);
+                
+                const invoiceTenantIds = [...new Set(invoices.map(i => i.tenantId).filter(Boolean))];
+                console.log('📊 [Test] Invoice tenantIds:', invoiceTenantIds);
+                
+                // 5. Check manager-voucher mapping
+                console.log('📊 [Test] Checking manager-voucher mapping...');
+                managers.forEach(m => {
+                    const managerVouchers = vouchers.filter(v => v.tenantId === m.tenantId);
+                    const managerInvoices = invoices.filter(i => i.tenantId === m.tenantId);
+                    
+                    if (managerVouchers.length > 0 || managerInvoices.length > 0) {
+                        console.log(`✅ [Test] Manager ${m.name} (${m.code}):`);
+                        console.log(`   - tenantId: ${m.tenantId || 'NO tenantId!'}`);
+                        console.log(`   - Vouchers: ${managerVouchers.length}`);
+                        console.log(`   - Invoices: ${managerInvoices.length}`);
+                    } else if (m.tenantId) {
+                        console.warn(`⚠️ [Test] Manager ${m.name} (${m.code}):`);
+                        console.warn(`   - tenantId: ${m.tenantId}`);
+                        console.warn(`   - NO vouchers or invoices found!`);
+                    } else {
+                        console.error(`❌ [Test] Manager ${m.name} (${m.code}):`);
+                        console.error(`   - NO tenantId!`);
+                    }
+                });
+                
+                // 6. Display results
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = `
+                    <h2>نتائج الفحص:</h2>
+                    <p><strong>عدد المديرين:</strong> ${managers.length}</p>
+                    <p><strong>عدد السندات:</strong> ${vouchers.length}</p>
+                    <p><strong>عدد الفواتير:</strong> ${invoices.length}</p>
+                    <h3>تفاصيل المديرين:</h3>
+                    <pre>${JSON.stringify(managerTenantIds, null, 2)}</pre>
+                    <h3>tenantIds في السندات:</h3>
+                    <pre>${JSON.stringify(voucherTenantIds, null, 2)}</pre>
+                    <h3>tenantIds في الفواتير:</h3>
+                    <pre>${JSON.stringify(invoiceTenantIds, null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                console.error('❌ [Test] Error:', error);
+                document.getElementById('results').innerHTML = `<p style="color: red;">خطأ: ${error.message}</p>`;
+            }
+        }
+        
+        // Run on load
+        window.addEventListener('load', () => {
+            checkBillingData();
+        });
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 اختبار بيانات السندات والفواتير</h1>
+    <p>جارٍ فحص البيانات...</p>
+    <div id="results"></div>
+</body>
+</html>

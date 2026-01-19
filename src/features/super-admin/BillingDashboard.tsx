@@ -267,6 +267,27 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             // ✅ Load receipt vouchers (سندات القبض)
             const vouchers = await getAllReceiptVouchers();
             console.log(`✅ [BillingDashboard] Loaded ${vouchers.length} receipt vouchers`, vouchers);
+            
+            // ✅ DEBUG: Check tenantId mapping for vouchers
+            const managers = await getAllManagers();
+            const managerTenantIds = managers.map(m => ({ id: m.id, name: m.name, code: m.code, tenantId: m.tenantId }));
+            console.log('📊 [BillingDashboard] Manager tenantIds:', managerTenantIds);
+            
+            const voucherTenantIds = [...new Set(vouchers.map(v => v.tenantId))];
+            console.log('📊 [BillingDashboard] Voucher tenantIds:', voucherTenantIds);
+            
+            // ✅ Check if any manager has vouchers
+            managers.forEach(m => {
+                const managerVouchers = vouchers.filter(v => v.tenantId === m.tenantId);
+                if (managerVouchers.length > 0) {
+                    console.log(`✅ [BillingDashboard] Manager ${m.name} (${m.code}) has ${managerVouchers.length} vouchers`);
+                } else if (m.tenantId) {
+                    console.warn(`⚠️ [BillingDashboard] Manager ${m.name} (${m.code}) has tenantId ${m.tenantId} but NO vouchers found!`);
+                } else {
+                    console.error(`❌ [BillingDashboard] Manager ${m.name} (${m.code}) has NO tenantId!`);
+                }
+            });
+            
             setReceiptVouchers(vouchers);
 
             // ✅ Load expense vouchers (سندات الصرف)
@@ -277,6 +298,22 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             // ✅ Load all invoices
             const allInvs = await getAllInvoices();
             console.log(`✅ [BillingDashboard] Loaded ${allInvs.length} invoices`, allInvs);
+            
+            // ✅ DEBUG: Check tenantId mapping for invoices
+            const invoiceTenantIds = [...new Set(allInvs.map(inv => inv.tenantId))];
+            console.log('📊 [BillingDashboard] Invoice tenantIds:', invoiceTenantIds);
+            
+            managers.forEach(m => {
+                const managerInvoices = allInvs.filter(inv => inv.tenantId === m.tenantId);
+                if (managerInvoices.length > 0) {
+                    console.log(`✅ [BillingDashboard] Manager ${m.name} (${m.code}) has ${managerInvoices.length} invoices`);
+                } else if (m.tenantId) {
+                    console.warn(`⚠️ [BillingDashboard] Manager ${m.name} (${m.code}) has tenantId ${m.tenantId} but NO invoices found!`);
+                } else {
+                    console.error(`❌ [BillingDashboard] Manager ${m.name} (${m.code}) has NO tenantId!`);
+                }
+            });
+            
             setInvoices(allInvs);
 
             // Load expiring subscriptions
