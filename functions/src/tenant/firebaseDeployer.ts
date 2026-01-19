@@ -9,6 +9,7 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import { GoogleAuth } from 'google-auth-library';
 
 // ============================================================
 // TYPES
@@ -206,6 +207,16 @@ export const deployTenantFirebase = functions
             result.details!.seedingCompleted = true;
             console.log('✅ Default data seeded');
             
+            // ✅ NEW: Try to enable Anonymous Authentication automatically (BEFORE cleanup)
+            try {
+                await enableAnonymousAuth(serviceAccountJson, validation.projectId!);
+                console.log('✅ Anonymous Authentication enabled successfully');
+                result.message = '✅ تم إعداد المشروع بنجاح! البيانات الأساسية جاهزة.\n✅ تم تفعيل Anonymous Authentication تلقائياً.';
+            } catch (authError: any) {
+                console.warn('⚠️ Failed to enable Anonymous Auth automatically:', authError.message);
+                result.message = '✅ تم إعداد المشروع بنجاح! البيانات الأساسية جاهزة.\n⚠️ تعذر تفعيل Anonymous Authentication تلقائياً - يجب تفعيله يدوياً:\nFirebase Console → Authentication → Sign-in method → Anonymous → Enable';
+            }
+            
             // ✅ Log the deployment in main database
             await mainDb.collection('deployment_logs').add({
                 tenantId,
@@ -217,7 +228,6 @@ export const deployTenantFirebase = functions
             });
             
             result.success = true;
-            result.message = '✅ تم إعداد المشروع بنجاح! البيانات الأساسية جاهزة.';
             
         } catch (error: any) {
             console.error('❌ Deployment error:', error);
@@ -244,6 +254,83 @@ export const deployTenantFirebase = functions
         
         return result;
     });
+
+// ============================================================
+// ANONYMOUS AUTH ENABLEMENT (Identity Platform API)
+// ============================================================
+
+/**
+ * ✅ Enable Anonymous Authentication using Identity Platform REST API
+ * ⚠️ Requires: Project must have Identity Platform enabled (upgraded from Firebase Auth)
+ * 
+ * This function attempts to enable Anonymous Auth automatically when creating a new manager.
+ * If the project is not upgraded to Identity Platform, it will fail gracefully with a helpful message.
+ */
+async function enableAnonymousAuth(serviceAccountJson: string, projectId: string): Promise<void> {
+    try {
+        // Parse Service Account
+        const serviceAccount = JSON.parse(serviceAccountJson);
+        
+        // ✅ Initialize Google Auth with Service Account
+        const auth = new GoogleAuth({
+            credentials: serviceAccount,
+            scopes: [
+                'https://www.googleapis.com/auth/cloud-platform',
+                'https://www.googleapis.com/auth/identitytoolkit'
+            ]
+        });
+        
+        // Get access token
+        const client = await auth.getClient();
+        const accessTokenResponse = await client.getAccessToken();
+        
+        if (!accessTokenResponse.token) {
+            throw new Error('Failed to get access token from Service Account');
+        }
+        
+        // ✅ Enable Anonymous Auth via Identity Platform REST API v2
+        const identityPlatformUrl = `https://identitytoolkit.googleapis.com/v2/projects/${projectId}/config?updateMask=signIn.anonymous.enabled`;
+        
+        // Node.js 18+ has native fetch, no need for node-fetch
+        const response = await fetch(identityPlatformUrl, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${accessTokenResponse.token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                signIn: {
+                    anonymous: {
+                        enabled: true
+                    }
+                }
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.error?.message || response.statusText;
+            
+            // Check if it's because Identity Platform is not enabled
+            if (errorMessage.includes('Identity Platform') || 
+                errorMessage.includes('not enabled') || 
+                response.status === 404) {
+                throw new Error('المشروع غير مترقي لـ Identity Platform. يجب تفعيل Anonymous Auth يدوياً:\nFirebase Console → Authentication → Sign-in method → Anonymous → Enable');
+            }
+            
+            throw new Error(`Failed to enable Anonymous Auth: ${response.status} ${errorMessage}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Anonymous Authentication enabled successfully via Identity Platform API', result);
+    } catch (error: any) {
+        // Re-throw with helpful message
+        if (error.message) {
+            throw error;
+        }
+        throw new Error(`Failed to enable Anonymous Auth: ${error.message || 'Unknown error'}`);
+    }
+}
 
 // ============================================================
 // SEEDING FUNCTION

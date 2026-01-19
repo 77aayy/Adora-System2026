@@ -1,45 +1,62 @@
+"use strict";
 /**
  * Rate Limiting for Cloud Functions
  * Prevents brute force attacks and abuse
  * Adora Hotel Management System
- * 
+ *
  * ⚠️ SETUP REQUIRED:
  * 1. cd functions
  * 2. npm install firebase-functions firebase-admin
  * 3. Deploy: firebase deploy --only functions
  */
-
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
-
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.resetUserRateLimit = exports.secureApiCall = exports.secureLogin = void 0;
+exports.checkRateLimit = checkRateLimit;
+exports.resetRateLimit = resetRateLimit;
+const functions = __importStar(require("firebase-functions"));
+const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin (only once)
 if (!admin.apps.length) {
     admin.initializeApp();
 }
-
 const db = admin.firestore();
-
-// ============================================================
-// TYPES
-// ============================================================
-
-interface RateLimitConfig {
-    windowMs: number; // Time window in milliseconds
-    maxRequests: number; // Max requests per window
-    blockDuration: number; // How long to block after limit exceeded
-}
-
-interface RateLimitRecord {
-    count: number;
-    resetTime: number;
-    blockedUntil?: number;
-}
-
 // ============================================================
 // RATE LIMIT CONFIGS
 // ============================================================
-
-const RATE_LIMITS: { [key: string]: RateLimitConfig } = {
+const RATE_LIMITS = {
     login: {
         windowMs: 15 * 60 * 1000, // 15 minutes
         maxRequests: 5, // 5 attempts
@@ -56,30 +73,23 @@ const RATE_LIMITS: { [key: string]: RateLimitConfig } = {
         blockDuration: 5 * 60 * 1000, // Block for 5 minutes
     },
 };
-
 // ============================================================
 // RATE LIMITER
 // ============================================================
-
 /**
  * Check if request is rate limited
  * Returns { allowed: boolean, remainingAttempts?: number }
  */
-export async function checkRateLimit(
-    identifier: string, // IP address or user ID
-    action: keyof typeof RATE_LIMITS
-): Promise<{ allowed: boolean; remainingAttempts?: number; blockedUntil?: Date }> {
+async function checkRateLimit(identifier, // IP address or user ID
+action) {
     const config = RATE_LIMITS[action];
     if (!config) {
         throw new Error(`Unknown rate limit action: ${action}`);
     }
-
     const now = Date.now();
     const recordRef = db.collection('rateLimits').doc(`${action}_${identifier}`);
-
     try {
         const record = await recordRef.get();
-        
         if (!record.exists) {
             // First request - create record
             await recordRef.set({
@@ -88,9 +98,7 @@ export async function checkRateLimit(
             });
             return { allowed: true, remainingAttempts: config.maxRequests - 1 };
         }
-
-        const data = record.data() as RateLimitRecord;
-
+        const data = record.data();
         // Check if blocked
         if (data.blockedUntil && data.blockedUntil > now) {
             return {
@@ -98,7 +106,6 @@ export async function checkRateLimit(
                 blockedUntil: new Date(data.blockedUntil),
             };
         }
-
         // Check if window expired - reset
         if (data.resetTime < now) {
             await recordRef.set({
@@ -107,10 +114,8 @@ export async function checkRateLimit(
             });
             return { allowed: true, remainingAttempts: config.maxRequests - 1 };
         }
-
         // Increment count
         const newCount = data.count + 1;
-
         // Check if exceeded limit
         if (newCount > config.maxRequests) {
             await recordRef.update({
@@ -122,165 +127,124 @@ export async function checkRateLimit(
                 blockedUntil: new Date(now + config.blockDuration),
             };
         }
-
         // Within limit - increment
         await recordRef.update({ count: newCount });
         return {
             allowed: true,
             remainingAttempts: config.maxRequests - newCount,
         };
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Rate limit check failed:', error);
         // On error, allow request (fail open)
         return { allowed: true };
     }
 }
-
 /**
  * Reset rate limit for a user (admin action)
  */
-export async function resetRateLimit(
-    identifier: string,
-    action: keyof typeof RATE_LIMITS
-): Promise<void> {
+async function resetRateLimit(identifier, action) {
     const recordRef = db.collection('rateLimits').doc(`${action}_${identifier}`);
     await recordRef.delete();
 }
-
 // ============================================================
 // CLOUD FUNCTIONS
 // ============================================================
-
 /**
  * Secure Login with Rate Limiting
- * 
+ *
  * Usage from client:
  * ```typescript
  * const secureLogin = httpsCallable(functions, 'secureLogin');
  * const result = await secureLogin({ pin, branchId });
  * ```
  */
-export const secureLogin = functions.https.onCall(async (data, context) => {
+exports.secureLogin = functions.https.onCall(async (data, context) => {
     // Note: pin and branchId will be used when login logic is implemented
     // const { pin, branchId } = data;
-    
     // Get client IP
     const ip = context.rawRequest.ip || 'unknown';
-    
     // Check rate limit
     const rateLimitResult = await checkRateLimit(ip, 'login');
-    
     if (!rateLimitResult.allowed) {
         const blockedUntil = rateLimitResult.blockedUntil;
-        const minutesRemaining = blockedUntil 
+        const minutesRemaining = blockedUntil
             ? Math.ceil((blockedUntil.getTime() - Date.now()) / 60000)
             : 15;
-        
-        throw new functions.https.HttpsError(
-            'resource-exhausted',
-            `محاولات تسجيل دخول كثيرة. حاول مرة أخرى بعد ${minutesRemaining} دقيقة.`,
-            { blockedUntil, remainingMinutes: minutesRemaining }
-        );
+        throw new functions.https.HttpsError('resource-exhausted', `محاولات تسجيل دخول كثيرة. حاول مرة أخرى بعد ${minutesRemaining} دقيقة.`, { blockedUntil, remainingMinutes: minutesRemaining });
     }
-    
     // Proceed with login (call existing userService logic)
     try {
         // Import your existing login logic
         // const user = await loginWithPin(pin, branchId);
-        
         // For now, return placeholder
         // TODO: Implement actual login logic here
-        
         return {
             success: true,
             message: 'Login successful',
             remainingAttempts: rateLimitResult.remainingAttempts,
         };
-    } catch (error) {
+    }
+    catch (error) {
         // Login failed - attempts still count
-        throw new functions.https.HttpsError(
-            'unauthenticated',
-            'رمز PIN غير صحيح',
-            { remainingAttempts: rateLimitResult.remainingAttempts }
-        );
+        throw new functions.https.HttpsError('unauthenticated', 'رمز PIN غير صحيح', { remainingAttempts: rateLimitResult.remainingAttempts });
     }
 });
-
 /**
  * Secure API endpoint with rate limiting
- * 
+ *
  * Usage:
  * ```typescript
  * const api = httpsCallable(functions, 'secureApiCall');
  * const result = await api({ action: 'getData', params: {...} });
  * ```
  */
-export const secureApiCall = functions.https.onCall(async (data, context) => {
+exports.secureApiCall = functions.https.onCall(async (data, context) => {
     // Require authentication
     if (!context.auth) {
-        throw new functions.https.HttpsError(
-            'unauthenticated',
-            'يجب تسجيل الدخول أولاً'
-        );
+        throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول أولاً');
     }
-    
     const userId = context.auth.uid;
-    
     // Check rate limit
     const rateLimitResult = await checkRateLimit(userId, 'apiCall');
-    
     if (!rateLimitResult.allowed) {
-        throw new functions.https.HttpsError(
-            'resource-exhausted',
-            'طلبات كثيرة جداً. حاول مرة أخرى خلال دقائق.',
-            { blockedUntil: rateLimitResult.blockedUntil }
-        );
+        throw new functions.https.HttpsError('resource-exhausted', 'طلبات كثيرة جداً. حاول مرة أخرى خلال دقائق.', { blockedUntil: rateLimitResult.blockedUntil });
     }
-    
     // Process API call
     const { action } = data;
-    
     // Handle different actions...
     switch (action) {
         case 'getData':
             // Return data
             return { success: true, data: [] };
-        
         default:
-            throw new functions.https.HttpsError(
-                'invalid-argument',
-                'Unknown action'
-            );
+            throw new functions.https.HttpsError('invalid-argument', 'Unknown action');
     }
 });
-
 /**
  * Admin function to reset rate limits
  * Only owner can call this
  */
-export const resetUserRateLimit = functions.https.onCall(async (data, context) => {
+exports.resetUserRateLimit = functions.https.onCall(async (data, context) => {
+    var _a;
     // Security: Only owner
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
     }
-    
     const userDoc = await db.collection('userBindings').doc(context.auth.uid).get();
-    if (!userDoc.exists || userDoc.data()?.role !== 'owner') {
+    if (!userDoc.exists || ((_a = userDoc.data()) === null || _a === void 0 ? void 0 : _a.role) !== 'owner') {
         throw new functions.https.HttpsError('permission-denied', 'Owner access required');
     }
-    
     const { identifier, action } = data;
     await resetRateLimit(identifier, action);
-    
     return { success: true, message: 'Rate limit reset successfully' };
 });
-
 // ============================================================
 // EXPORTS
 // ============================================================
-
-export default {
-    secureLogin,
-    secureApiCall,
-    resetUserRateLimit,
+exports.default = {
+    secureLogin: exports.secureLogin,
+    secureApiCall: exports.secureApiCall,
+    resetUserRateLimit: exports.resetUserRateLimit,
 };
+//# sourceMappingURL=rateLimiter.js.map
