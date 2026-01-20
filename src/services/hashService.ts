@@ -53,25 +53,20 @@ const OWNER_PIN_HASH = import.meta.env.VITE_OWNER_PIN_HASH as string | undefined
 const DEFAULT_OWNER_PIN_HASH = '4e0ca1ba71b351230a9c4fa7e5a224ab955dfc986c04a660053bca16a95990f4';
 
 export const verifyOwnerPin = async (pin: string): Promise<boolean> => {
-    // ✅ Use environment variable hash if available, otherwise use default (development only)
-    const hashToCheck = OWNER_PIN_HASH || (import.meta.env.DEV ? DEFAULT_OWNER_PIN_HASH : null);
+    // ✅ Use environment variable hash if available, otherwise use default fallback
+    // Fallback is used in both DEV and PROD if VITE_OWNER_PIN_HASH is not set
+    const hashToCheck = OWNER_PIN_HASH || DEFAULT_OWNER_PIN_HASH;
     
     if (!hashToCheck) {
-        // In production, this should never happen (validation in main.tsx prevents it)
-        if (import.meta.env.PROD) {
-            logger.error('VITE_OWNER_PIN_HASH not set in production - owner PIN verification disabled', undefined, 'hashService');
-            return false;
-        }
-        // Development: Should not reach here, but just in case
-        logger.warn('VITE_OWNER_PIN_HASH not set - owner PIN verification disabled', undefined, 'hashService');
+        logger.error('No owner PIN hash available - owner PIN verification disabled', undefined, 'hashService');
         return false;
     }
     
     // ✅ Verify against hash (environment variable or default)
     const matchesHash = await verifyPin(pin, hashToCheck);
     
-    if (matchesHash && !OWNER_PIN_HASH && import.meta.env.DEV) {
-        logger.warn('Using default owner PIN hash (development mode only)', undefined, 'hashService');
+    if (matchesHash && !OWNER_PIN_HASH) {
+        logger.warn('Using default owner PIN hash (VITE_OWNER_PIN_HASH not set)', undefined, 'hashService');
     }
     
     return matchesHash;
