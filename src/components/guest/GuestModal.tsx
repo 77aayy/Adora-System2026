@@ -105,7 +105,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             onClick={handleBackdropClick}
         >
             {/* Backdrop - SOLID, NO BLUR per memory */}
-            <div className="absolute inset-0 bg-black/60 animate-fade-in" />
+            <div className="absolute inset-0 animate-fade-in" style={{ backgroundColor: 'var(--theme-bg-overlay)' }} />
 
             {/* Modal - SOLID BACKGROUND per memory */}
             <div
@@ -117,38 +117,26 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                         ? 'rounded-3xl animate-modal-scale-in' 
                         : 'rounded-t-3xl sm:rounded-3xl animate-modal-slide-up'
                     }
-                    ${isDark 
-                        ? 'bg-slate-800 border border-slate-700' 
-                        : 'bg-white border border-slate-200'
-                    }
                     ${className}
                 `}
             >
                 {/* Header */}
                 {(title || showCloseButton) && (
-                    <div className={`
-                        flex items-center justify-between p-5
-                        border-b ${isDark ? 'border-slate-700' : 'border-slate-100'}
-                    `}>
+                    <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--theme-border-primary)' }}>
                         <div className="flex items-center gap-3">
                             {icon && (
-                                <div className={`
-                                    w-11 h-11 rounded-xl 
-                                    bg-gradient-to-br from-teal-400 to-teal-600
-                                    flex items-center justify-center
-                                    shadow-lg shadow-teal-500/30
-                                `}>
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/30">
                                     {icon}
                                 </div>
                             )}
                             <div>
                                 {title && (
-                                    <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                                    <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {title}
                                     </h2>
                                 )}
                                 {subtitle && (
-                                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
                                         {subtitle}
                                     </p>
                                 )}
@@ -160,14 +148,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                                     haptic('light');
                                     onClose();
                                 }}
-                                className={`
-                                    w-10 h-10 rounded-xl flex items-center justify-center
-                                    transition-all duration-200
-                                    ${isDark 
-                                        ? 'bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white' 
-                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800'
-                                    }
-                                `}
+                                className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 hover:opacity-80"
+                                style={{
+                                    background: 'var(--theme-bg-tertiary)',
+                                    color: 'var(--theme-text-secondary)'
+                                }}
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -182,9 +167,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
                 {/* Footer */}
                 {footer && (
-                    <div className={`
-                        p-5 border-t ${isDark ? 'border-slate-700' : 'border-slate-100'}
-                    `}>
+                    <div className="p-5 border-t" style={{ borderColor: 'var(--theme-border-primary)' }}>
                         {footer}
                     </div>
                 )}
@@ -229,11 +212,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                     width: 6px;
                 }
                 .guest-scrollbar::-webkit-scrollbar-track {
-                    background: rgba(148, 163, 184, 0.1);
+                    background: var(--theme-scrollbar-bg);
                     border-radius: 3px;
                 }
                 .guest-scrollbar::-webkit-scrollbar-thumb {
-                    background: rgba(148, 163, 184, 0.3);
+                    background: var(--theme-scrollbar-thumb);
                     border-radius: 3px;
                 }
                 .guest-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -410,11 +393,11 @@ export const GuestSuccessState: React.FC<GuestSuccessStateProps> = ({
                     </svg>
                 )}
             </div>
-            <h3 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                 {title}
             </h3>
             {message && (
-                <p className={`${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                <p style={{ color: 'var(--theme-text-secondary)' }}>
                     {message}
                 </p>
             )}

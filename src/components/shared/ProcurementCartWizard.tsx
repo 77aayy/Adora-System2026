@@ -90,8 +90,7 @@ export const ProcurementCartWizard: React.FC<Props> = ({
 }) => {
     const { user } = useAuth();
     const { success, error: showError, haptic } = useUX();
-    const { theme } = useTheme();
-      const isDark = theme === 'dark';
+    // ✅ Removed isDark - using CSS theme variables exclusively
       const { t } = useTranslation();
 
     // State
@@ -170,11 +169,11 @@ export const ProcurementCartWizard: React.FC<Props> = ({
         );
     }, [dynamicQuickItems, searchQuery]);
 
-    // Theme colors
-    const modalBg = isDark ? '#1e293b' : '#ffffff';
-    const borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
-    const textPrimary = isDark ? '#f8fafc' : '#1e293b';
-    const textSecondary = isDark ? '#94a3b8' : '#64748b';
+    // Theme colors - using CSS variables
+    const modalBg = 'var(--theme-bg-secondary)';
+    const borderColor = 'var(--theme-border-primary)';
+    const textPrimary = 'var(--theme-text-primary)';
+    const textSecondary = 'var(--theme-text-secondary)';
 
     // Add item to cart
     const addToCart = (item: QuickItem) => {

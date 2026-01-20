@@ -153,7 +153,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             aria-labelledby="confirm-title"
             aria-describedby="confirm-message"
         >
-            <div className="absolute inset-0 bg-black/90 animate-fade-in" style={{ backdropFilter: 'none' }} />
+            <div className="absolute inset-0 animate-fade-in" style={{ backdropFilter: 'none', backgroundColor: 'var(--theme-bg-overlay)' }} />
 
             <div
                 className="relative w-full max-w-sm sm:max-w-md rounded-3xl p-6 animate-scale-in shadow-2xl"
@@ -166,12 +166,12 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 </div>
 
                 {/* Title */}
-                <h3 id="confirm-title" className="text-xl font-bold text-white text-center mb-2">
+                <h3 id="confirm-title" className="text-xl font-bold text-center mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                     {title}
                 </h3>
 
                 {/* Message */}
-                <p id="confirm-message" className="text-white/90 text-center mb-6 leading-relaxed"> {/* ✅ Improved contrast (was 70%) */}
+                <p id="confirm-message" className="text-center mb-6 leading-relaxed" style={{ color: 'var(--theme-text-secondary)' }}>
                     {message}
                 </p>
 

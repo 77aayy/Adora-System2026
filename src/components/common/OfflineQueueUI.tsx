@@ -91,6 +91,7 @@ interface OfflineQueuePanelProps {
 }
 
 export const OfflineQueuePanel: React.FC<OfflineQueuePanelProps> = ({ isOpen, onClose }) => {
+    const { t } = useTranslation();
     const [actions, setActions] = useState<QueuedAction[]>([]);
     const [syncing, setSyncing] = useState(false);
     const [online, setOnline] = useState(isOnline());
@@ -143,9 +144,9 @@ export const OfflineQueuePanel: React.FC<OfflineQueuePanelProps> = ({ isOpen, on
                             <CloudOff className="w-6 h-6 text-red-400" />
                         )}
                         <div>
-                            <h3 className="text-lg font-bold text-white">قائمة الانتظار</h3>
+                            <h3 className="text-lg font-bold text-white">{t('common.queue') || 'قائمة الانتظار'}</h3>
                             <p className="text-sm text-white/80"> {/* ✅ Improved contrast (was 50%) */}
-                                {online ? 'متصل بالإنترنت' : 'غير متصل'}
+                                {online ? (t('common.online') || 'متصل بالإنترنت') : (t('common.offline') || 'غير متصل')}
                             </p>
                         </div>
                     </div>
@@ -159,7 +160,7 @@ export const OfflineQueuePanel: React.FC<OfflineQueuePanelProps> = ({ isOpen, on
                     {actions.length === 0 ? (
                         <div className="text-center py-8">
                             <Check className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                            <p className="text-white/80">لا توجد إجراءات معلقة</p> {/* ✅ Improved contrast (was 50%) */}
+                            <p className="text-white/80">{t('common.noPendingActions') || 'لا توجد إجراءات معلقة'}</p> {/* ✅ Improved contrast (was 50%) */}
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -198,7 +199,7 @@ export const OfflineQueuePanel: React.FC<OfflineQueuePanelProps> = ({ isOpen, on
                             ) : (
                                 <>
                                     <Cloud className="w-5 h-5" />
-                                    مزامنة
+                                    {t('common.sync') || 'مزامنة'}
                                 </>
                             )}
                         </button>

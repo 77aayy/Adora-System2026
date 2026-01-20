@@ -363,23 +363,7 @@ const recordLoginAttempt = async (pin: string, success: boolean): Promise<void> 
  * ```
  */
 export const loginWithPin = async (pin: string, branchId?: string): Promise<User & { availableBranches?: Array<{ id: string; code?: string; name: string }> }> => {
-    // ✅ CRITICAL: Sign in anonymously FIRST (required for Cloud Functions)
-    try {
-        if (!auth.currentUser) {
-            const { signInAnonymously } = await import('firebase/auth');
-            await signInAnonymously(auth);
-            console.log('✅ Anonymous auth successful for login');
-        }
-    } catch (authError: unknown) {
-        const error = authError instanceof Error ? authError : new Error(String(authError));
-        logger.warn('Anonymous auth failed during login', error, 'userService');
-        
-        if (error.message?.includes('configuration-not-found') || (error as any)?.code === 'auth/configuration-not-found') {
-            throw new Error('⚠️ Anonymous Authentication غير مفعل في Firebase Console.\n\n📍 الحل:\nFirebase Console → Authentication → Sign-in method → Anonymous → Enable');
-        }
-    }
-    
-    // ✅ SaaS: Check rate limiting (localStorage-based, no Firestore needed)
+    // ✅ SaaS: Check rate limiting FIRST (before any expensive operations)
     const rateLimitCheck = await checkRateLimit(pin);
     if (!rateLimitCheck.allowed) {
         const lockoutMessage = rateLimitCheck.lockoutUntil
@@ -388,9 +372,14 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
         throw new Error(lockoutMessage);
     }
     
-    // ✅ Check if owner code (hashed - no plain text in client bundle)
-    if (await verifyOwnerPin(pin)) {
+    // ✅ CRITICAL: Check owner PIN FIRST (before anonymous auth and Cloud Function)
+    // Owner login is handled client-side only (for security)
+    // Must check BEFORE anonymous auth to avoid unnecessary auth calls
+    const isOwnerPin = await verifyOwnerPin(pin);
+    if (isOwnerPin) {
+        // ✅ Owner doesn't need anonymous auth - return immediately
         await recordLoginAttempt(pin, true);
+        logger.info('Owner PIN verified successfully', { pinLength: pin.length }, 'userService');
         return {
             id: 'owner',
             name: 'مالك المشروع',
@@ -407,7 +396,25 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
         };
     }
 
+    // ✅ CRITICAL: Sign in anonymously (required for Cloud Functions and Firestore Rules)
+    // Only needed for non-owner users
+    try {
+        if (!auth.currentUser) {
+            const { signInAnonymously } = await import('firebase/auth');
+            await signInAnonymously(auth);
+            logger.info('Anonymous auth successful for non-owner login', undefined, 'userService');
+        }
+    } catch (authError: unknown) {
+        const error = authError instanceof Error ? authError : new Error(String(authError));
+        logger.warn('Anonymous auth failed during login', error, 'userService');
+        
+        if (error.message?.includes('configuration-not-found') || (error as any)?.code === 'auth/configuration-not-found') {
+            throw new Error('⚠️ Anonymous Authentication غير مفعل في Firebase Console.\n\n📍 الحل:\nFirebase Console → Authentication → Sign-in method → Anonymous → Enable');
+        }
+    }
+
     // ✅ NEW: Use Cloud Function for login (bypasses client Rules)
+    // Only for non-owner users (manager/employee)
     try {
         const { functions, httpsCallable } = await import('./firebase');
         if (!functions) {
@@ -464,7 +471,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
 
     } catch (error: any) {
         // ✅ Fallback to old method if Functions not available
-        console.warn('Cloud Function failed, using fallback:', error);
+        logger.warn('Cloud Function failed, using fallback method', error, 'userService');
     }
 
     // Fallback: Direct Firestore lookup (old method)

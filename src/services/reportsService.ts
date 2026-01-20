@@ -8,6 +8,7 @@ import { db } from './firebase';
 import {
     collection, getDocs, query, where, orderBy, Timestamp
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES

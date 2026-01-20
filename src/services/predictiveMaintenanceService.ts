@@ -15,6 +15,7 @@ import {
     writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES

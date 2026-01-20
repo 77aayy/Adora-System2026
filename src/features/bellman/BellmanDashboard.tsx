@@ -141,7 +141,7 @@ const RoomCardItem: React.FC<{
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--theme-accent-purple) 0%, var(--theme-accent-indigo) 100%)', opacity: 0.9 }}>
-                        <span className="text-2xl font-bold text-white">{room.roomNumber}</span>
+                        <span className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>{room.roomNumber}</span>
                     </div>
                     <div>
                         <p className="adora-text-primary font-medium">{room.guestName}</p>
@@ -311,7 +311,7 @@ const CheckinModal: React.FC<{
                             <UserPlus className="w-6 h-6 text-green-400" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">تسجيل دخول</h3>
+                            <h3 className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>{t('bellman.checkIn')}</h3>
                             <p className="text-sm text-white/50">
                                 {step === 'room' ? 'اختر الغرفة' : `غرفة ${roomNumber}`}
                             </p>
@@ -352,8 +352,8 @@ const CheckinModal: React.FC<{
                         <div className="space-y-4">
                             {/* Room Selected Badge */}
                             <div className="bg-primary-500/20 border border-primary-500/30 rounded-xl p-3 text-center">
-                                <span className="text-primary-400 text-sm">الغرفة المحددة:</span>
-                                <span className="text-white text-2xl font-bold mr-2">{roomNumber}</span>
+                                <span className="text-primary-400 text-sm">{t('bellman.selectedRoom') || 'الغرفة المحددة'}:</span>
+                                <span className="text-2xl font-bold mr-2" style={{ color: 'var(--theme-text-primary)' }}>{roomNumber}</span>
                             </div>
 
                             {/* ✅ Guest Name Input - Optional */}
@@ -382,7 +382,7 @@ const CheckinModal: React.FC<{
                                         >
                                             <Minus className="w-4 h-4" />
                                         </button>
-                                        <span className={`text-2xl font-bold ${capacityExceeded.exceeded ? 'text-red-400' : 'text-white'}`}>{adults}</span>
+                                        <span className="text-2xl font-bold" style={{ color: capacityExceeded.exceeded ? 'var(--theme-accent-red)' : 'var(--theme-text-primary)' }}>{adults}</span>
                                         <button
                                             onClick={() => setAdults(adults + 1)}
                                             className="adora-btn-ghost w-10 h-10 rounded-xl flex items-center justify-center"
@@ -400,7 +400,7 @@ const CheckinModal: React.FC<{
                                         >
                                             <Minus className="w-4 h-4" />
                                         </button>
-                                        <span className={`text-2xl font-bold ${capacityExceeded.exceeded ? 'text-red-400' : 'text-white'}`}>{children}</span>
+                                        <span className="text-2xl font-bold" style={{ color: capacityExceeded.exceeded ? 'var(--theme-accent-red)' : 'var(--theme-text-primary)' }}>{children}</span>
                                         <button
                                             onClick={() => setChildren(children + 1)}
                                             className="adora-btn-ghost w-10 h-10 rounded-xl flex items-center justify-center"

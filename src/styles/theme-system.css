@@ -1905,3 +1905,532 @@ html[data-theme="light"] [class*="text-white\\/"],
 html.light [class*="text-white\\/"] {
   color: #475569 !important;
 }
+
+/* ============================================================
+   🔧 COMPREHENSIVE DARK MODE FIX - Global Overrides
+   Fixes all remaining hardcoded colors in components
+   ============================================================ */
+
+/* ─────────────────────────────────────────────────────────
+   DARK MODE: Force dark backgrounds to use theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="bg-slate-900"],
+[data-theme="dark"] [class*="bg-slate-800"],
+.dark [class*="bg-slate-900"],
+.dark [class*="bg-slate-800"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+[data-theme="dark"] [class*="from-slate-900"],
+[data-theme="dark"] [class*="via-slate-800"],
+.dark [class*="from-slate-900"],
+.dark [class*="via-slate-800"] {
+  --tw-gradient-from: var(--theme-bg-secondary) !important;
+  --tw-gradient-via: var(--theme-bg-tertiary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   LIGHT MODE: Force white/slate backgrounds in Cards/Modals
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] [class*="bg-slate-900"],
+html[data-theme="light"] [class*="bg-slate-800"],
+html.light [class*="bg-slate-900"],
+html.light [class*="bg-slate-800"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+html[data-theme="light"] [class*="from-slate-900"],
+html[data-theme="light"] [class*="via-slate-800"],
+html.light [class*="from-slate-900"],
+html.light [class*="via-slate-800"] {
+  --tw-gradient-from: var(--theme-bg-secondary) !important;
+  --tw-gradient-via: var(--theme-bg-tertiary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   GLOBAL: All text-white should use theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] .text-white:not([class*="bg-"][class*="primary"] *):not([class*="bg-"][class*="teal"] *):not([class*="bg-"][class*="green"] *):not([class*="bg-"][class*="red"] *):not([class*="bg-"][class*="blue"] *):not([class*="bg-gradient"] *),
+.dark .text-white:not([class*="bg-"][class*="primary"] *):not([class*="bg-"][class*="teal"] *):not([class*="bg-"][class*="green"] *):not([class*="bg-"][class*="red"] *):not([class*="bg-"][class*="blue"] *):not([class*="bg-gradient"] *) {
+  color: var(--theme-text-primary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   GLOBAL: All border-white/* should use theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="border-white/"],
+.dark [class*="border-white/"] {
+  border-color: var(--theme-border-primary) !important;
+}
+
+html[data-theme="light"] [class*="border-white/"],
+html.light [class*="border-white/"] {
+  border-color: var(--theme-border-primary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   GLOBAL: AdvancedLogViewer and similar complex components
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="bg-slate-900/50"],
+[data-theme="dark"] [class*="bg-slate-900/95"],
+.dark [class*="bg-slate-900/50"],
+.dark [class*="bg-slate-900/95"] {
+  background: var(--theme-bg-tertiary) !important;
+}
+
+html[data-theme="light"] [class*="bg-slate-900/50"],
+html[data-theme="light"] [class*="bg-slate-900/95"],
+html.light [class*="bg-slate-900/50"],
+html.light [class*="bg-slate-900/95"] {
+  background: var(--theme-bg-tertiary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   GLOBAL: All backdrop overlays should use theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="bg-black/"],
+.dark [class*="bg-black/"] {
+  background-color: var(--theme-bg-overlay) !important;
+}
+
+html[data-theme="light"] [class*="bg-black/"],
+html.light [class*="bg-black/"] {
+  background-color: var(--theme-bg-overlay) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   GLOBAL: Force all Cards inside Modals to use theme colors
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="fixed"][class*="inset"] [class*="bg-white"],
+.dark [class*="fixed"][class*="inset"] [class*="bg-white"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+html[data-theme="light"] [class*="fixed"][class*="inset"] [class*="bg-slate-900"],
+html.light [class*="fixed"][class*="inset"] [class*="bg-slate-900"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ============================================================
+   🎯 NUCLEAR FIX: Complete Theme Override System
+   Ensures NO hardcoded colors remain in ANY component
+   ============================================================ */
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: bg-white in Light Mode → theme-bg-secondary
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .bg-white:not([class*="gradient"]):not(.bg-white\/):not([style*="background"]),
+html.light .bg-white:not([class*="gradient"]):not(.bg-white\/):not([style*="background"]) {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: All slate backgrounds → theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] .bg-slate-700,
+[data-theme="dark"] .bg-slate-600,
+[data-theme="dark"] .bg-slate-500,
+.dark .bg-slate-700,
+.dark .bg-slate-600,
+.dark .bg-slate-500 {
+  background: var(--theme-bg-tertiary) !important;
+}
+
+html[data-theme="light"] .bg-slate-700,
+html[data-theme="light"] .bg-slate-600,
+html[data-theme="light"] .bg-slate-500,
+html.light .bg-slate-700,
+html.light .bg-slate-600,
+html.light .bg-slate-500 {
+  background: var(--theme-bg-tertiary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: All text-slate colors → theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] .text-slate-800,
+[data-theme="dark"] .text-slate-700,
+[data-theme="dark"] .text-slate-600,
+[data-theme="dark"] .text-slate-500,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: var(--theme-text-primary) !important;
+}
+
+[data-theme="dark"] .text-slate-400,
+[data-theme="dark"] .text-slate-300,
+.dark .text-slate-400,
+.dark .text-slate-300 {
+  color: var(--theme-text-secondary) !important;
+}
+
+html[data-theme="light"] .text-slate-800,
+html[data-theme="light"] .text-slate-700,
+html.light .text-slate-800,
+html.light .text-slate-700 {
+  color: var(--theme-text-primary) !important;
+}
+
+html[data-theme="light"] .text-slate-600,
+html[data-theme="light"] .text-slate-500,
+html[data-theme="light"] .text-slate-400,
+html.light .text-slate-600,
+html.light .text-slate-500,
+html.light .text-slate-400 {
+  color: var(--theme-text-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: All border-slate → theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] .border-slate-700,
+[data-theme="dark"] .border-slate-600,
+.dark .border-slate-700,
+.dark .border-slate-600 {
+  border-color: var(--theme-border-primary) !important;
+}
+
+html[data-theme="light"] .border-slate-200,
+html[data-theme="light"] .border-slate-300,
+html.light .border-slate-200,
+html.light .border-slate-300 {
+  border-color: var(--theme-border-primary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: bg-gray backgrounds → theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] .bg-gray-800,
+[data-theme="dark"] .bg-gray-700,
+.dark .bg-gray-800,
+.dark .bg-gray-700 {
+  background: var(--theme-bg-secondary) !important;
+}
+
+html[data-theme="light"] .bg-gray-100,
+html[data-theme="light"] .bg-gray-50,
+html.light .bg-gray-100,
+html.light .bg-gray-50 {
+  background: var(--theme-bg-tertiary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: All hover states → theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] .hover\:bg-slate-700:hover,
+[data-theme="dark"] .hover\:bg-slate-600:hover,
+.dark .hover\:bg-slate-700:hover,
+.dark .hover\:bg-slate-600:hover {
+  background: var(--theme-bg-tertiary) !important;
+}
+
+html[data-theme="light"] .hover\:bg-slate-100:hover,
+html[data-theme="light"] .hover\:bg-slate-50:hover,
+html.light .hover\:bg-slate-100:hover,
+html.light .hover\:bg-slate-50:hover {
+  background: var(--theme-bg-tertiary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: Glass effect backgrounds → theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="glass"],
+.dark [class*="glass"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: Ensure all nested elements respect theme
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] * .text-white:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([class*="bg-gradient"]),
+.dark * .text-white:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([class*="bg-gradient"]) {
+  color: var(--theme-text-primary) !important;
+}
+
+html[data-theme="light"] * .text-white:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([class*="bg-gradient"]),
+html.light * .text-white:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([class*="bg-gradient"]) {
+  color: var(--theme-text-primary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: Force theme colors in all containers
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] div[class*="p-"]:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([style*="background"]),
+.dark div[class*="p-"]:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([style*="background"]) {
+  color: var(--theme-text-primary);
+}
+
+html[data-theme="light"] div[class*="p-"]:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([style*="background"]),
+html.light div[class*="p-"]:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([style*="background"]) {
+  color: var(--theme-text-primary);
+}
+
+/* ============================================================
+   🎯 FINAL FIX: Absolute Universal Coverage
+   Catches any remaining edge cases
+   ============================================================ */
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: All remaining bg-white occurrences
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] div.bg-white:not([style*="background"]),
+html[data-theme="light"] section.bg-white:not([style*="background"]),
+html[data-theme="light"] article.bg-white:not([style*="background"]),
+html[data-theme="light"] main.bg-white:not([style*="background"]),
+html.light div.bg-white:not([style*="background"]),
+html.light section.bg-white:not([style*="background"]),
+html.light article.bg-white:not([style*="background"]),
+html.light main.bg-white:not([style*="background"]) {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: All remaining slate backgrounds
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] div[class*="bg-slate"],
+[data-theme="dark"] section[class*="bg-slate"],
+[data-theme="dark"] article[class*="bg-slate"],
+.dark div[class*="bg-slate"],
+.dark section[class*="bg-slate"],
+.dark article[class*="bg-slate"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+html[data-theme="light"] div[class*="bg-slate"],
+html[data-theme="light"] section[class*="bg-slate"],
+html[data-theme="light"] article[class*="bg-slate"],
+html.light div[class*="bg-slate"],
+html.light section[class*="bg-slate"],
+html.light article[class*="bg-slate"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: All text-white in any container
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] h1.text-white:not([class*="bg-"]):not([style*="background"]),
+html[data-theme="light"] h2.text-white:not([class*="bg-"]):not([style*="background"]),
+html[data-theme="light"] h3.text-white:not([class*="bg-"]):not([style*="background"]),
+html[data-theme="light"] p.text-white:not([class*="bg-"]):not([style*="background"]),
+html[data-theme="light"] span.text-white:not([class*="bg-"]):not([style*="background"]),
+html.light h1.text-white:not([class*="bg-"]):not([style*="background"]),
+html.light h2.text-white:not([class*="bg-"]):not([style*="background"]),
+html.light h3.text-white:not([class*="bg-"]):not([style*="background"]),
+html.light p.text-white:not([class*="bg-"]):not([style*="background"]),
+html.light span.text-white:not([class*="bg-"]):not([style*="background"]) {
+  color: var(--theme-text-primary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: All border colors → theme variables
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="border-slate"],
+.dark [class*="border-slate"] {
+  border-color: var(--theme-border-primary) !important;
+}
+
+html[data-theme="light"] [class*="border-slate"],
+html.light [class*="border-slate"] {
+  border-color: var(--theme-border-primary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UNIVERSAL: Force theme colors on all semantic elements
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] aside,
+[data-theme="dark"] nav,
+[data-theme="dark"] header,
+[data-theme="dark"] footer,
+.dark aside,
+.dark nav,
+.dark header,
+.dark footer {
+  background: var(--theme-bg-secondary) !important;
+  color: var(--theme-text-primary) !important;
+}
+
+html[data-theme="light"] aside[class*="bg-slate"],
+html[data-theme="light"] nav[class*="bg-slate"],
+html[data-theme="light"] header[class*="bg-slate"],
+html[data-theme="light"] footer[class*="bg-slate"],
+html.light aside[class*="bg-slate"],
+html.light nav[class*="bg-slate"],
+html.light header[class*="bg-slate"],
+html.light footer[class*="bg-slate"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ============================================================
+   🎯 ABSOLUTE FINAL FIX: Universal Theme Coverage
+   Catches ANY remaining hardcoded colors in ANY component
+   ============================================================ */
+
+/* ─────────────────────────────────────────────────────────
+   NUCLEAR: Force ALL bg-white/bg-slate to use theme
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .bg-white,
+html[data-theme="light"] [class*="bg-white"]:not([class*="bg-white/"]):not([class*="bg-white opacity"]):not([style*="background"]),
+html.light .bg-white,
+html.light [class*="bg-white"]:not([class*="bg-white/"]):not([class*="bg-white opacity"]):not([style*="background"]) {
+  background: var(--theme-bg-secondary) !important;
+}
+
+[data-theme="dark"] [class*="bg-slate-"],
+.dark [class*="bg-slate-"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+html[data-theme="light"] [class*="bg-slate-"],
+html.light [class*="bg-slate-"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   NUCLEAR: Force ALL text-white to theme colors
+   ───────────────────────────────────────────────────────── */
+html[data-theme="light"] .text-white:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([class*="bg-yellow"]):not([class*="bg-gradient"]):not(button):not(a):not([style*="background"]),
+html.light .text-white:not([class*="bg-primary"]):not([class*="bg-teal"]):not([class*="bg-green"]):not([class*="bg-red"]):not([class*="bg-blue"]):not([class*="bg-yellow"]):not([class*="bg-gradient"]):not(button):not(a):not([style*="background"]) {
+  color: var(--theme-text-primary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   NUCLEAR: Force ALL text-slate to theme colors
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] .text-slate-900,
+[data-theme="dark"] .text-slate-800,
+.dark .text-slate-900,
+.dark .text-slate-800 {
+  color: var(--theme-text-primary) !important;
+}
+
+html[data-theme="light"] .text-slate-100,
+html[data-theme="light"] .text-slate-50,
+html.light .text-slate-100,
+html.light .text-slate-50 {
+  color: var(--theme-text-tertiary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   NUCLEAR: All rounded cards/pans with hardcoded backgrounds
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="rounded"][class*="bg-slate"],
+[data-theme="dark"] [class*="rounded"][class*="bg-white"],
+.dark [class*="rounded"][class*="bg-slate"],
+.dark [class*="rounded"][class*="bg-white"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+html[data-theme="light"] [class*="rounded"][class*="bg-slate"],
+html[data-theme="light"] [class*="rounded"][class*="bg-black"],
+html.light [class*="rounded"][class*="bg-slate"],
+html.light [class*="rounded"][class*="bg-black"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   NUCLEAR: All flex containers with hardcoded colors
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="flex"][class*="bg-slate"],
+[data-theme="dark"] [class*="flex"][class*="bg-white"],
+.dark [class*="flex"][class*="bg-slate"],
+.dark [class*="flex"][class*="bg-white"] {
+  background: var(--theme-bg-secondary) !important;
+  color: var(--theme-text-primary) !important;
+}
+
+html[data-theme="light"] [class*="flex"][class*="bg-slate"],
+html[data-theme="light"] [class*="flex"][class*="bg-black"],
+html.light [class*="flex"][class*="bg-slate"],
+html.light [class*="flex"][class*="bg-black"] {
+  background: var(--theme-bg-secondary) !important;
+  color: var(--theme-text-primary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   NUCLEAR: All grid containers with hardcoded colors
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="grid"][class*="bg-slate"],
+.dark [class*="grid"][class*="bg-slate"] {
+  background: transparent !important;
+}
+
+[data-theme="dark"] [class*="grid"] > [class*="bg-slate"],
+.dark [class*="grid"] > [class*="bg-slate"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+html[data-theme="light"] [class*="grid"] > [class*="bg-slate"],
+html.light [class*="grid"] > [class*="bg-slate"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   NUCLEAR: All space-y containers
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [class*="space-y"] [class*="bg-slate"],
+.dark [class*="space-y"] [class*="bg-slate"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+html[data-theme="light"] [class*="space-y"] [class*="bg-slate"],
+html.light [class*="space-y"] [class*="bg-slate"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ============================================================
+   🎯 FINAL ABSOLUTE OVERRIDE: Sidebar & Navigation Components
+   Ensures AdminSidebar and similar components are fully theme-aware
+   ============================================================ */
+
+/* ─────────────────────────────────────────────────────────
+   Sidebar backgrounds and borders
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] aside[style*="background"],
+[data-theme="dark"] aside[style*="rgba(15, 23, 42"],
+.dark aside[style*="background"],
+.dark aside[style*="rgba(15, 23, 42"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+html[data-theme="light"] aside[style*="background"],
+html[data-theme="light"] aside[style*="#ffffff"],
+html.light aside[style*="background"],
+html.light aside[style*="#ffffff"] {
+  background: var(--theme-bg-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Force theme colors on all inline style colors
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="rgba(255, 255, 255"],
+[data-theme="dark"] [style*="color: rgba(255"],
+.dark [style*="rgba(255, 255, 255"],
+.dark [style*="color: rgba(255"] {
+  color: var(--theme-text-primary) !important;
+}
+
+html[data-theme="light"] [style*="rgba(255, 255, 255"],
+html[data-theme="light"] [style*="color: rgba(255"],
+html.light [style*="rgba(255, 255, 255"],
+html.light [style*="color: rgba(255"] {
+  color: var(--theme-text-primary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Force theme borders on inline border styles
+   ───────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="border"][style*="rgba(32, 178, 170"],
+[data-theme="dark"] [style*="borderColor"][style*="rgba(32, 178, 170"],
+.dark [style*="border"][style*="rgba(32, 178, 170"],
+.dark [style*="borderColor"][style*="rgba(32, 178, 170"] {
+  border-color: var(--theme-border-primary) !important;
+}
+
+html[data-theme="light"] [style*="border"][style*="#f1f5f9"],
+html[data-theme="light"] [style*="borderColor"][style*="#f1f5f9"],
+html.light [style*="border"][style*="#f1f5f9"],
+html.light [style*="borderColor"][style*="#f1f5f9"] {
+  border-color: var(--theme-border-primary) !important;
+}

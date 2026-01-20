@@ -164,12 +164,12 @@ const RequestCard: React.FC<{
                 )}
                 {isRep && request.status === 'APPROVED' && (
                     <button onClick={onStartPurchase} className="flex-1 py-1.5 px-2 rounded-lg bg-purple-500 text-white text-xs font-bold flex items-center justify-center gap-1">
-                        <ShoppingCart className="w-3 h-3" /> شراء
+                        <ShoppingCart className="w-3 h-3" /> {t('procurement.purchase') || 'شراء'}
                     </button>
                 )}
                 {isRep && request.status === 'PURCHASING' && (
                     <button onClick={onComplete} className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
-                        <Package className="w-3 h-3" /> تم
+                        <Package className="w-3 h-3" /> {t('procurement.completed') || 'تم'}
                     </button>
                 )}
             </div>
@@ -453,10 +453,10 @@ export const ProcurementDashboard: React.FC = () => {
     const handleApprove = async (id: string) => {
         try {
             await approveProcurement(id, user?.id || '', user?.name || '', tenantId);
-            success('تم التعميد بنجاح');
+            success(t('procurement.approvedSuccess') || 'تم التعميد بنجاح');
         } catch (err) {
             console.error('Error approving:', err);
-            error('فشل التعميد');
+            error(t('procurement.approvalFailed') || 'فشل التعميد');
         }
     };
 
@@ -520,9 +520,9 @@ export const ProcurementDashboard: React.FC = () => {
             });
 
             if (hasPartial && newRequestId) {
-                success('تم الشراء الجزئي وإنشاء طلب جديد للكمية المتبقية');
+                success(t('procurement.partialPurchaseSuccess') || 'تم الشراء الجزئي وإنشاء طلب جديد للكمية المتبقية');
             } else {
-                success('تم إكمال الشراء وإرساله للقسم الطالب');
+                success(t('procurement.purchaseCompletedSuccess') || 'تم إكمال الشراء وإرساله للقسم الطالب');
             }
 
             // ✅ Auto-check daily attendance
@@ -635,7 +635,7 @@ export const ProcurementDashboard: React.FC = () => {
                     icon={Clock}
                     iconColor="orange"
                     status={pendingApproval.length > 10 ? 'warning' : 'normal'}
-                    lastUpdate="تم التحديث الآن"
+                    lastUpdate={t('common.updatedNow') || 'تم التحديث الآن'}
                 />
                 <StatCard
                     count={approved.length}
@@ -643,7 +643,7 @@ export const ProcurementDashboard: React.FC = () => {
                     icon={ShoppingCart}
                     iconColor="purple"
                     status="normal"
-                    lastUpdate="تم التحديث الآن"
+                    lastUpdate={t('common.updatedNow') || 'تم التحديث الآن'}
                 />
                 <StatCard
                     count={completed.length}
@@ -651,7 +651,7 @@ export const ProcurementDashboard: React.FC = () => {
                     icon={CheckCircle}
                     iconColor="green"
                     status="success"
-                    lastUpdate="تم التحديث الآن"
+                    lastUpdate={t('common.updatedNow') || 'تم التحديث الآن'}
                 />
                 </div>
             </div>

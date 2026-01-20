@@ -341,7 +341,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-bold adora-text-primary">غ.{order.roomNumber}</p>
-                                        <p className="text-[10px] adora-text-tertiary truncate">{order.guestName || 'نزيل'} • {order.items.length} صنف</p>
+                                        <p className="text-[10px] adora-text-tertiary truncate">{order.guestName || t('common.guest')} • {order.items.length} {t('coffeeshop.items', { count: order.items.length })}</p>
                                     </div>
                                     <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                                         <span className="text-xs font-bold text-teal-500">{order.totalAmount} {t('common.rs')}</span>
@@ -377,7 +377,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                                         {(order.status === 'pending' || order.status === 'confirmed') && (
                                             <button onClick={() => updateOrderStatus(order.id, 'preparing')}
                                                 className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
-                                                <Play className="w-3 h-3" /> تحضير
+                                                <Play className="w-3 h-3" /> {t('coffeeshop.startPreparing')}
                                             </button>
                                         )}
                                         {(order.status === 'preparing' || order.status === 'ready') && (

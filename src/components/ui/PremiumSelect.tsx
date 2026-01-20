@@ -50,50 +50,79 @@ export const PremiumSelect: React.FC<PremiumSelectProps> = ({
 
     return (
         <div className={`relative ${className}`} ref={containerRef}>
-            {label && <label className="block text-sm text-slate-600 dark:text-white/70 mb-1">{label}</label>}
+            {label && <label className="block text-sm mb-1" style={{ color: 'var(--theme-text-secondary)' }}>{label}</label>}
 
             <button
                 type="button"
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 disabled={disabled}
-                className={`w-full flex items-center justify-between p-3 rounded-xl transition-all border-2 ${isOpen
-                        ? 'bg-slate-50 dark:bg-slate-700 border-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.2)]'
-                        : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
-                    } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                className={`w-full flex items-center justify-between p-3 rounded-xl transition-all border-2 ${isOpen ? 'shadow-[0_0_15px_rgba(20,184,166,0.2)]' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                style={{
+                    background: 'var(--theme-input-bg)',
+                    borderColor: isOpen ? 'var(--theme-border-focus)' : 'var(--theme-input-border)',
+                    color: 'var(--theme-text-primary)'
+                }}
+                onMouseEnter={(e) => {
+                    if (!isOpen && !disabled) {
+                        e.currentTarget.style.borderColor = 'var(--theme-border-hover)';
+                    }
+                }}
+                onMouseLeave={(e) => {
+                    if (!isOpen && !disabled) {
+                        e.currentTarget.style.borderColor = 'var(--theme-input-border)';
+                    }
+                }}
             >
-                <div className="flex items-center gap-2 text-slate-800 dark:text-white">
-                    {icon && <span className="text-slate-500 dark:text-white/50">{icon}</span>}
+                <div className="flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
+                    {icon && <span style={{ color: 'var(--theme-text-tertiary)' }}>{icon}</span>}
                     {selectedOption ? (
                         <div className="flex items-center gap-2">
-                            {selectedOption.icon && <span className="text-slate-600 dark:text-white/70">{selectedOption.icon}</span>}
+                            {selectedOption.icon && <span style={{ color: 'var(--theme-text-secondary)' }}>{selectedOption.icon}</span>}
                             <span>{selectedOption.label}</span>
                         </div>
                     ) : (
-                        <span className="text-slate-400 dark:text-white/40">{placeholder}</span>
+                        <span style={{ color: 'var(--theme-input-placeholder)' }}>{placeholder}</span>
                     )}
                 </div>
-                <ChevronDown className={`w-4 h-4 text-slate-500 dark:text-white/50 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--theme-text-tertiary)' }} />
             </button>
 
             {/* Dropdown Menu */}
             {isOpen && (
-                <div className="absolute z-50 w-full mt-2 p-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                <div 
+                    className="absolute z-50 w-full mt-2 p-1 rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+                    style={{
+                        background: 'var(--theme-bg-secondary)',
+                        border: '1px solid var(--theme-border-primary)'
+                    }}
+                >
                     <div className="max-h-60 overflow-y-auto scrollbar-hide space-y-0.5">
                         {options.map((option) => (
                             <button
                                 key={option.value}
                                 onClick={() => handleSelect(option.value)}
-                                className={`w-full flex items-center justify-between p-2.5 rounded-lg transition-colors group ${value === option.value
-                                        ? 'bg-teal-500/20 text-teal-600 dark:text-white'
-                                        : 'text-slate-700 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white'
-                                    }`}
+                                className="w-full flex items-center justify-between p-2.5 rounded-lg transition-colors group"
+                                style={{
+                                    background: value === option.value ? 'var(--theme-primary-100)' : 'transparent',
+                                    color: value === option.value ? 'var(--theme-primary-600)' : 'var(--theme-text-primary)'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (value !== option.value) {
+                                        e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (value !== option.value) {
+                                        e.currentTarget.style.background = 'transparent';
+                                    }
+                                }}
                             >
                                 <div className="flex items-center gap-2">
                                     {option.icon}
                                     <span>{option.label}</span>
                                 </div>
                                 {value === option.value && (
-                                    <Check className="w-4 h-4 text-teal-500" />
+                                    <Check className="w-4 h-4" style={{ color: 'var(--theme-primary-500)' }} />
                                 )}
                             </button>
                         ))}

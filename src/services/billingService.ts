@@ -5,6 +5,7 @@
 
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, onSnapshot, orderBy, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES

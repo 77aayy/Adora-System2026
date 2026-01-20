@@ -208,22 +208,22 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
     };
     
     const handleExportCSV = () => {
-        downloadCSV(logs, `سجل_العمليات_${activeTenant?.name || 'فندق'}`);
+        downloadCSV(logs, `${t('common.operationsLog') || 'سجل_العمليات'}_${activeTenant?.name || t('common.hotel') || 'فندق'}`);
         haptic('success');
-        success('تم تصدير السجل بنجاح');
+        success(t('common.logExportedSuccess') || 'تم تصدير السجل بنجاح');
     };
     
     const handlePrint = () => {
         const { start, end } = getDateRange(period);
-        const dateRange = `من ${start.toLocaleDateString('ar-SA')} إلى ${end.toLocaleDateString('ar-SA')}`;
+        const dateRange = `${t('common.from') || 'من'} ${start.toLocaleDateString('ar-SA')} ${t('common.to') || 'إلى'} ${end.toLocaleDateString('ar-SA')}`;
         
-        const hotelName = activeTenant?.name || 'فندق أدورا';
+        const hotelName = activeTenant?.name || t('common.adoraHotel') || 'فندق أدورا';
         const branchName = branches.find(b => b.id === selectedBranch)?.name;
         const fullName = branchName ? `${hotelName} - ${branchName}` : hotelName;
         
         printLogs(logs, fullName, dateRange);
         haptic('success');
-        success('جاري الطباعة...');
+        success(t('common.printing') || 'جاري الطباعة...');
     };
     
     const clearFilters = () => {
@@ -258,19 +258,19 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
     if (!isOpen) return null;
     
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-2 md:p-4" dir="rtl">
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 w-full max-w-md sm:max-w-lg lg:max-w-2xl xl:max-w-3xl max-h-[95vh] flex flex-col rounded-2xl sm:rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
+            <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-2 md:p-4" dir="rtl" style={{ backgroundColor: 'var(--theme-bg-overlay)' }}>
+                <div className="w-full max-w-md sm:max-w-lg lg:max-w-2xl xl:max-w-3xl max-h-[95vh] flex flex-col rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden" style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}>
                 
                 {/* Header */}
-                <div className="flex-shrink-0 p-4 md:p-6 border-b border-white/10 bg-slate-900/50">
+                <div className="flex-shrink-0 p-4 md:p-6 border-b" style={{ borderColor: 'var(--theme-border-primary)', background: 'var(--theme-bg-tertiary)' }}>
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                         <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-teal-500/30">
                                 <History className="w-6 h-6 text-white" />
                             </div>
                             <div>
-                                <h2 className="text-xl md:text-2xl font-bold text-white">سجل العمليات المتقدم</h2>
-                                <p className="text-white/50 text-sm">{filteredLogs.length} عملية</p>
+                                <h2 className="text-xl md:text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>{t('common.advancedLogViewer') || 'سجل العمليات المتقدم'}</h2>
+                                <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{filteredLogs.length} {t('common.operation') || 'عملية'}</p>
                             </div>
                         </div>
                         

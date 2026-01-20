@@ -971,7 +971,7 @@ export const MaintenanceDashboard: React.FC = () => {
         ];
         const rows = data.map(r => [
             r.roomNumber,
-            r.maintenanceType || 'عام',
+            r.maintenanceType || t('maintenance.general'),
             r.status,
             r.actualCost || r.estimatedCost || 0,
             r.createdAt?.toDate?.()?.toLocaleDateString('ar-SA') || ''
@@ -1011,7 +1011,7 @@ export const MaintenanceDashboard: React.FC = () => {
             <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="text-lg font-bold text-white">غرفة {request.roomNumber}</h3>
+                        <h3 className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>{t('common.room')} {request.roomNumber}</h3>
                         {/* ✅ QR Badge - Show if request is from QR */}
                         {(request as any).source === 'QR' && (
                             <span className="px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 text-[10px] font-bold border border-teal-500/30 flex items-center gap-1">
@@ -1022,25 +1022,25 @@ export const MaintenanceDashboard: React.FC = () => {
                         {/* ✅ Guest Status Badge - Always show */}
                         {request.guestStatus === 'in' ? (
                             <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 text-[10px] font-bold border border-purple-500/30 flex items-center gap-1">
-                                🏠 نزيل داخل
+                                🏠 {t('maintenance.guestIn')}
                             </span>
                         ) : (
                             <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 text-[10px] font-bold border border-green-500/30 flex items-center gap-1">
-                                🚪 نزيل خارج
+                                🚪 {t('maintenance.guestOut')}
                             </span>
                         )}
                         {/* ✅ Priority Badge - Always show */}
                         {request.priority === 'urgent' ? (
                             <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-bold border border-red-500/30 flex items-center gap-1">
-                                🚨 عاجل
+                                🚨 {t('maintenance.urgent')}
                             </span>
                         ) : (
                             <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold border border-blue-500/30 flex items-center gap-1">
-                                ⏱️ عادي
+                                ⏱️ {t('maintenance.normal')}
                             </span>
                         )}
                     </div>
-                    <p className="text-white/60 text-sm line-clamp-2">{request.notes || request.description || t('maintenance.defaultRequest')}</p>
+                    <p className="text-white/60 text-sm line-clamp-2" style={{ color: 'var(--theme-text-secondary)' }}>{request.notes || request.description || t('maintenance.defaultRequest')}</p>
                     {/* ✅ QR Badge - Show if request is from QR */}
                     {(request as any).source === 'QR' && (
                         <div className="flex items-center gap-2 mt-1">
@@ -1338,7 +1338,7 @@ export const MaintenanceDashboard: React.FC = () => {
                 {currentStartRequest && (
                 <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'none' }}>
                     {/* ✅ SOLID Modal - no glass effects */}
-                    <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg">
+                    <div className="rounded-2xl w-full max-w-lg" style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}>
                         <div className="flex justify-between items-center p-4 border-b border-white/10">
                             <h2 className="text-xl font-bold text-white">{t('maintenance.startMaintenance', { roomNumber: currentStartRequest.roomNumber })}</h2>
                             <button onClick={closeStartModal} className="text-white/60 hover:text-white">
@@ -1350,7 +1350,7 @@ export const MaintenanceDashboard: React.FC = () => {
                             {/* Request Details */}
                             <div className="adora-card p-3 rounded-xl">
                                 <p className="adora-text-secondary text-sm mb-1">{t('maintenance.maintenanceType')}</p>
-                                <p className="text-white font-medium">{currentStartRequest.maintenanceType || t('maintenance.general')}</p>
+                                <p className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{currentStartRequest.maintenanceType || t('maintenance.general')}</p>
                             </div>
 
                             <div className="adora-card p-3 rounded-xl">
@@ -1368,7 +1368,7 @@ export const MaintenanceDashboard: React.FC = () => {
                                             onClick={removeBeforePhoto}
                                             className="absolute top-2 right-2 bg-red-500 p-1 rounded-full"
                                         >
-                                            <Trash2 className="w-4 h-4 text-white" />
+                                            <Trash2 className="w-4 h-4" style={{ color: 'var(--theme-text-primary)' }} />
                                         </button>
                                     </div>
                                 ) : (
@@ -1407,7 +1407,7 @@ export const MaintenanceDashboard: React.FC = () => {
             {/* ✅ Complete Modal - Enhanced Design */}
             {currentCompleteRequest && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" style={{ backdropFilter: 'none' }}>
-                    <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl">
+                    <div className="rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl" style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}>
                         {/* Header */}
                         <div className="flex items-center justify-between p-6 border-b border-white/10">
                             <div className="flex items-center gap-3">
@@ -1415,7 +1415,7 @@ export const MaintenanceDashboard: React.FC = () => {
                                     <CheckCircle className="w-6 h-6 text-orange-400" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-white">{t('maintenance.completeWork')}</h2>
+                                    <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>{t('maintenance.completeWork')}</h2>
                                     <p className="text-sm text-white/60">{t('common.room')} {currentCompleteRequest.roomNumber}</p>
                                 </div>
                             </div>
@@ -1433,7 +1433,7 @@ export const MaintenanceDashboard: React.FC = () => {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                 <div className="adora-card p-3 rounded-xl">
                                     <p className="adora-text-secondary text-xs mb-1">نوع الصيانة</p>
-                                    <p className="text-white font-medium text-sm">{currentCompleteRequest.maintenanceType || 'عام'}</p>
+                                    <p className="font-medium text-sm" style={{ color: 'var(--theme-text-primary)' }}>{currentCompleteRequest.maintenanceType || t('maintenance.general')}</p>
                                 </div>
                                 <div className="adora-card p-3 rounded-xl">
                                     <p className="adora-text-secondary text-xs mb-1">{t('common.status')}</p>
@@ -1450,7 +1450,14 @@ export const MaintenanceDashboard: React.FC = () => {
                                     value={completionNotes}
                                     onChange={(e) => setCompletionNotes(e.target.value)}
                                     rows={3}
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                                    className="w-full rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                                    style={{ 
+                                        background: 'var(--theme-input-bg)', 
+                                        border: '1px solid var(--theme-input-border)',
+                                        color: 'var(--theme-text-primary)',
+                                        '--tw-placeholder-opacity': '1'
+                                    } as React.CSSProperties}
+                                    placeholder={t('maintenance.completionNotesPlaceholder')}
                                     placeholder={t('maintenance.completionNotesPlaceholder')}
                                 />
                             </div>
@@ -1472,13 +1479,13 @@ export const MaintenanceDashboard: React.FC = () => {
                                             disabled={uploadingPhoto}
                                             className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 p-1.5 rounded-full transition-colors disabled:opacity-50"
                                         >
-                                            <Trash2 className="w-4 h-4 text-white" />
+                                            <Trash2 className="w-4 h-4" style={{ color: 'var(--theme-text-primary)' }} />
                                         </button>
                                         {/* ✅ Upload Success Indicator */}
                                         {!uploadingPhoto && uploadProgress === 0 && (
-                                            <div className="absolute bottom-2 left-2 bg-green-500/90 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                                            <div className="absolute bottom-2 left-2 bg-green-500/90 text-xs px-2 py-1 rounded-full flex items-center gap-1" style={{ color: 'var(--theme-text-inverse)' }}>
                                                 <CheckCircle className="w-3 h-3" />
-                                                تم الرفع
+                                                {t('maintenance.photoUpload.afterUploaded')}
                                             </div>
                                         )}
                                     </div>
@@ -1522,7 +1529,11 @@ export const MaintenanceDashboard: React.FC = () => {
                         <div className="p-4 border-t border-white/10 flex gap-2">
                             <button
                                 onClick={closeCompleteModal}
-                                className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                                className="px-6 py-3 rounded-xl transition-colors"
+                                style={{ 
+                                    background: 'var(--theme-bg-tertiary)', 
+                                    color: 'var(--theme-text-primary)'
+                                }}
                             >
                                 إلغاء
                             </button>
@@ -1708,9 +1719,9 @@ const RequestDetailsModal: React.FC<{
     const approvedRoomTypes = (currentBranch as any)?.approvedRoomTypes as string[] | undefined;
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'none' }}>
-            <div className="glass-card w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                <div className="flex justify-between items-center p-4 border-b border-white/10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'none', backgroundColor: 'var(--theme-bg-overlay)' }}>
+            <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto" style={{ background: 'var(--theme-bg-secondary)', borderRadius: '1rem', border: '1px solid var(--theme-border-primary)' }}>
+                <div className="flex justify-between items-center p-4 border-b" style={{ borderColor: 'var(--theme-border-primary)' }}>
                     <h2 className="text-xl font-bold text-white">تفاصيل الطلب</h2>
                     <button onClick={onClose} className="text-white/60 hover:text-white">
                         <X className="w-6 h-6" />
@@ -1725,7 +1736,7 @@ const RequestDetailsModal: React.FC<{
                                 <span className="text-xl font-bold text-cyan-400">{request.roomNumber}</span>
                             </div>
                             <div>
-                                <h3 className="text-white font-bold">{request.maintenanceType || t('maintenance.generalMaintenance')}</h3>
+                                <h3 className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>{request.maintenanceType || t('maintenance.generalMaintenance')}</h3>
                                 {/* ✅ Room Type Display (from approvedRoomTypes) */}
                                 {roomInfo?.type && (
                                     <p className="text-teal-400 text-xs mt-1">

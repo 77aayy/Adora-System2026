@@ -286,8 +286,8 @@ export const PremiumHeader: React.FC = () => {
                                             : '0 0 8px rgba(239, 68, 68, 0.5)',
                                         flexShrink: 0,
                                     }}
-                                    title={isOnline ? 'متصل بالإنترنت' : 'غير متصل بالإنترنت'}
-                                    aria-label={isOnline ? 'متصل' : 'غير متصل'}
+                                    title={isOnline ? (t('common.online') || 'متصل بالإنترنت') : (t('common.offline') || 'غير متصل بالإنترنت')}
+                                    aria-label={isOnline ? (t('common.online') || 'متصل') : (t('common.offline') || 'غير متصل')}
                                 />
                             </div>
 

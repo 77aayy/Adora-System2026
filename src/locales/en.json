@@ -181,7 +181,18 @@
         "endDate": "End Date",
         "and": "and",
         "paused": "Paused",
-        "expired": "Expired"
+        "expired": "Expired",
+        "queue": "Queue",
+        "online": "Online",
+        "sync": "Sync",
+        "noPendingActions": "No pending actions",
+        "advancedLogViewer": "Advanced Operations Log",
+        "operation": "operation",
+        "operationsLog": "Operations_Log",
+        "hotel": "Hotel",
+        "adoraHotel": "Adora Hotel",
+        "logExportedSuccess": "Log exported successfully",
+        "printing": "Printing..."
     },
     "status": {
         "pending": "Pending",
@@ -768,6 +779,7 @@
         "inProgressLabel": "In Progress",
         "waitingLabel": "Waiting",
         "all": "All",
+        "general": "General",
         "categories": {
             "electrical": "Electrical",
             "plumbing": "Plumbing",
@@ -831,7 +843,9 @@
         "todayTasks": "Today's Tasks",
         "workDescription": "Work Description",
         "partsUsed": "Parts Used",
-        "timeSpent": "Time Spent"
+        "timeSpent": "Time Spent",
+        "generalMaintenance": "General Maintenance",
+        "requestDetails": "Request Details"
     },
     "bellman": {
         "title": "Bellman Dashboard",
@@ -880,7 +894,14 @@
         "priority": "Priority",
         "cart": "Cart",
         "addToCart": "Add to Cart",
-        "myOrders": "My Orders"
+        "myOrders": "My Orders",
+        "purchase": "Purchase",
+        "completed": "Done",
+        "approvedSuccess": "Approved successfully",
+        "approvalFailed": "Approval failed",
+        "rejectedByManager": "Rejected by manager",
+        "partialPurchaseSuccess": "Partial purchase completed and new request created for remaining quantity",
+        "purchaseCompletedSuccess": "Purchase completed and sent to requesting department"
     },
     "coffeeshop": {
         "title": "Coffee Shop",
@@ -1067,6 +1088,7 @@
         "broadcastSent": "Broadcast Sent",
         "mainDashboard": "Main Dashboard",
         "refresh": "Refresh",
+        "updatedNow": "Updated now",
         "logout": "Logout",
         "logoutTitle": "Logout",
         "overview": "Overview",

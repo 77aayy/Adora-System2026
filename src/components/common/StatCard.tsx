@@ -13,7 +13,7 @@
 import React, { memo } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { ADORA_THEME } from '../../design/adoraTheme';
-import { useTheme } from '../../context/ThemeContext';
+// ✅ Removed useTheme import - using CSS theme variables instead
 
 // Icon color variants
 type IconColorVariant = 'teal' | 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'yellow' | 'pink';
@@ -111,7 +111,7 @@ export const StatCard: React.FC<StatCardProps> = ({
     pulse = false,
     urgency
 }) => {
-    const { isDark } = useTheme(); // ✅ Get dark mode state
+    // ✅ Removed isDark - using CSS theme variables exclusively
     const displayValue = count !== undefined ? count : (value !== undefined ? value : 0);
     const isStringValue = typeof displayValue === 'string';
     
@@ -179,41 +179,34 @@ export const StatCard: React.FC<StatCardProps> = ({
     
     const iconBgColor = iconColorMap[iconColor] || ADORA_THEME.colors.primary;
 
-    // ✅ Enhanced shadows for better visual separation (Light & Dark mode aware)
-    const defaultShadow = '0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.08)';
-    const hoverShadow = '0 12px 28px rgba(0, 0, 0, 0.15), 0 4px 8px rgba(0, 0, 0, 0.12)';
+    // ✅ Theme-aware shadows (using CSS variables)
+    // Shadows are now handled via CSS variables in theme-system.css
 
     return (
         <div 
             className="group relative overflow-hidden transition-all duration-300 ease-out flex items-center justify-between"
             style={{
-                background: isDark ? 'rgba(30, 41, 59, 0.8)' : '#ffffff', // ✅ Dark bg in dark mode, white in light mode
-                border: isDark ? '1px solid rgba(32, 178, 170, 0.2)' : '1px solid #e2e8f0', // ✅ Turquoise border in dark mode
+                background: 'var(--theme-bg-secondary)', // ✅ Theme-aware background
+                border: '1px solid var(--theme-border-primary)', // ✅ Theme-aware border
                 borderRadius: 'clamp(8px, 1.5vw, 12px)', // ✅ Smaller border radius - more compact
                 padding: 'clamp(10px, 1.5vw, 14px) clamp(12px, 1.5vw, 16px)', // ✅ Compact padding - reduced from previous
                 minHeight: 'auto', // ✅ Auto height - no fixed min-height
                 height: 'auto', // ✅ Auto height for flexibility
-                // ✅ Subtle Shadow - No excessive depth
-                boxShadow: isDark 
-                    ? '0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.15)' 
-                    : '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)',
+                // ✅ Subtle Shadow - Theme-aware
+                boxShadow: 'var(--theme-shadow-sm)',
                 gap: 'clamp(8px, 1.5vw, 10px)', // ✅ Compact gap between elements
             } as React.CSSProperties}
             onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = ADORA_THEME.colors.primary; // ✅ Turquoise DNA
+                e.currentTarget.style.borderColor = 'var(--theme-border-focus)'; // ✅ Theme-aware focus color
                 e.currentTarget.style.transform = 'translateY(-2px)'; // ✅ Subtle hover lift - reduced from -4px
-                // ✅ Subtle shadow on hover
-                e.currentTarget.style.boxShadow = isDark 
-                    ? '0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.2)' 
-                    : '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.06)';
+                // ✅ Subtle shadow on hover - Theme-aware
+                e.currentTarget.style.boxShadow = 'var(--theme-shadow-md)';
             }}
             onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = isDark ? 'rgba(32, 178, 170, 0.2)' : '#e2e8f0';
+                e.currentTarget.style.borderColor = 'var(--theme-border-primary)';
                 e.currentTarget.style.transform = 'translateY(0)';
-                // ✅ Restore subtle shadow
-                e.currentTarget.style.boxShadow = isDark 
-                    ? '0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.15)' 
-                    : '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)';
+                // ✅ Restore subtle shadow - Theme-aware
+                e.currentTarget.style.boxShadow = 'var(--theme-shadow-sm)';
             }}
         >
             {/* Content Section - Left (RTL) */}
@@ -222,7 +215,7 @@ export const StatCard: React.FC<StatCardProps> = ({
                 <h2 
                     className="m-0 font-extrabold leading-tight truncate text-base sm:text-lg md:text-xl lg:text-2xl"
                     style={{
-                        color: isDark ? 'rgba(255, 255, 255, 0.95)' : '#1e293b', // ✅ Dark text on light bg, light text on dark bg
+                        color: 'var(--theme-text-primary)', // ✅ Theme-aware text color
                         fontWeight: 800,
                         lineHeight: '1.2',
                         margin: '2px 0 0 0', // ✅ Smaller margin on mobile
@@ -239,7 +232,7 @@ export const StatCard: React.FC<StatCardProps> = ({
                 <p 
                     className="m-0 font-semibold leading-tight truncate text-[10px] sm:text-xs md:text-sm"
                     style={{
-                        color: isDark ? 'rgba(255, 255, 255, 0.7)' : '#64748b', // ✅ Dark text on light bg, light text on dark bg
+                        color: 'var(--theme-text-secondary)', // ✅ Theme-aware text color
                         fontWeight: 600,
                         lineHeight: '1.3',
                         maxWidth: '100%', // ✅ Full width on mobile, truncate on desktop
@@ -254,7 +247,7 @@ export const StatCard: React.FC<StatCardProps> = ({
                     <p 
                         className="m-0 font-medium leading-tight text-[9px] sm:text-[10px] md:text-xs truncate mt-0.5"
                         style={{
-                            color: isDark ? 'rgba(255, 255, 255, 0.5)' : '#94a3b8',
+                            color: 'var(--theme-text-tertiary)', // ✅ Theme-aware text color
                             fontSize: 'clamp(9px, 1.5vw, 12px)', // ✅ Responsive font size
                         }}
                     >

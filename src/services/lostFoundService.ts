@@ -23,6 +23,7 @@ import {
 } from 'firebase/firestore';
 import { uploadFileToImgBB } from './imageUploadService'; // ✅ Use ImgBB instead of Firebase Storage
 import { sendWhatsApp } from './communicationService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES

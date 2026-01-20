@@ -179,7 +179,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
 }) => {
     const { user, branchId, tenantId } = useAuth(); // ✅ Get branchId and tenantId
     const { success, error, haptic } = useUX();
-    const { isDark } = useTheme(); // ✅ Get current theme
+    // ✅ Removed isDark - using CSS theme variables exclusively
     const { t } = useTranslation();
     
     // ✅ Feature Gate: Check if procurement system is enabled
@@ -684,13 +684,13 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
         return null;
     }
 
-    // ✅ Theme-aware colors for modal
-    const modalBg = isDark ? '#1e293b' : '#ffffff';
-    const borderColor = isDark ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0';
-    const tertiaryBg = isDark ? '#334155' : '#f8fafc';
-    const textPrimary = isDark ? '#f8fafc' : '#1e293b';
-    const textSecondary = isDark ? '#e2e8f0' : '#475569';
-    const textTertiary = isDark ? '#94a3b8' : '#64748b';
+    // ✅ Theme-aware colors for modal - using CSS variables
+    const modalBg = 'var(--theme-bg-secondary)';
+    const borderColor = 'var(--theme-border-primary)';
+    const tertiaryBg = 'var(--theme-bg-tertiary)';
+    const textPrimary = 'var(--theme-text-primary)';
+    const textSecondary = 'var(--theme-text-secondary)';
+    const textTertiary = 'var(--theme-text-tertiary)';
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" style={{ backdropFilter: 'none' }}>

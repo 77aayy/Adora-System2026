@@ -111,7 +111,7 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
             }}
         >
             {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/90 animate-fade-in" style={{ backdropFilter: 'none' }} />
+            <div className="absolute inset-0 animate-fade-in" style={{ backdropFilter: 'none', backgroundColor: 'var(--theme-bg-overlay)' }} />
 
             {/* Modal */}
             <div
@@ -131,7 +131,7 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
             >
                 {/* Header */}
                 {(title || showCloseButton) && (
-                    <div className="flex items-center justify-between p-5 border-b border-white/10">
+                    <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--theme-border-primary)' }}>
                         <div className="flex items-center gap-3">
                             {icon && (
                                 <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center">
@@ -140,10 +140,10 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
                             )}
                             <div>
                                 {title && (
-                                    <h2 className="text-xl font-bold text-white">{title}</h2>
+                                    <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>{title}</h2>
                                 )}
                                 {subtitle && (
-                                    <p className="text-sm text-white/80">{subtitle}</p>
+                                    <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{subtitle}</p>
                                 )}
                             </div>
                         </div>
@@ -153,7 +153,11 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
                                     haptic('light');
                                     onClose();
                                 }}
-                                className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all"
+                                className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-80"
+                                style={{ 
+                                    background: 'var(--theme-bg-tertiary)',
+                                    color: 'var(--theme-text-secondary)'
+                                }}
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -168,7 +172,7 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
 
                 {/* Footer */}
                 {footer && (
-                    <div className="p-5 border-t border-white/10">
+                    <div className="p-5 border-t" style={{ borderColor: 'var(--theme-border-primary)' }}>
                         {footer}
                     </div>
                 )}
@@ -200,15 +204,15 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
                     width: 6px;
                 }
                 .custom-scrollbar::-webkit-scrollbar-track {
-                    background: rgba(255,255,255,0.05);
+                    background: var(--theme-scrollbar-bg);
                     border-radius: 3px;
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: rgba(255,255,255,0.1);
+                    background: var(--theme-scrollbar-thumb);
                     border-radius: 3px;
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: rgba(255,255,255,0.2);
+                    background: var(--theme-scrollbar-thumb-hover);
                 }
             `}</style>
         </div>
@@ -230,7 +234,7 @@ export interface ModalButtonProps {
 
 const BUTTON_VARIANTS = {
     primary: 'bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:shadow-lg hover:shadow-primary-500/25',
-    secondary: 'bg-white/10 text-white/80 hover:bg-white/20',
+    secondary: 'hover:opacity-90',
     success: 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:shadow-green-500/25',
     danger: 'bg-gradient-to-r from-red-500 to-rose-600 text-white hover:shadow-lg hover:shadow-red-500/25',
     warning: 'bg-gradient-to-r from-yellow-500 to-amber-600 text-white hover:shadow-lg hover:shadow-yellow-500/25',
@@ -262,6 +266,11 @@ export const ModalButton: React.FC<ModalButtonProps> = ({
                 ${disabled || loading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}
                 ${className}
             `}
+            style={variant === 'secondary' ? {
+                background: 'var(--theme-bg-tertiary)',
+                color: 'var(--theme-text-primary)',
+                border: '1px solid var(--theme-border-primary)'
+            } : {}}
         >
             {loading ? (
                 <span className="flex items-center justify-center gap-2">

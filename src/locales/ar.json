@@ -160,7 +160,18 @@
         "endDate": "تاريخ الانتهاء",
         "and": "و",
         "paused": "متوقف",
-        "expired": "منتهي"
+        "expired": "منتهي",
+        "queue": "قائمة الانتظار",
+        "online": "متصل بالإنترنت",
+        "sync": "مزامنة",
+        "noPendingActions": "لا توجد إجراءات معلقة",
+        "advancedLogViewer": "سجل العمليات المتقدم",
+        "operation": "عملية",
+        "operationsLog": "سجل_العمليات",
+        "hotel": "فندق",
+        "adoraHotel": "فندق أدورا",
+        "logExportedSuccess": "تم تصدير السجل بنجاح",
+        "printing": "جاري الطباعة..."
     },
     "languages": {
         "arabic": "عربي",
@@ -789,6 +800,7 @@
         "inProgressLabel": "قيد التنفيذ",
         "waitingLabel": "انتظار",
         "all": "الكل",
+        "general": "عام",
         "categories": {
             "electrical": "كهرباء",
             "plumbing": "سباكة",
@@ -854,7 +866,9 @@
         "todayTasks": "مهام اليوم",
         "workDescription": "وصف العمل",
         "partsUsed": "قطع مستخدمة",
-        "timeSpent": "الوقت المستغرق"
+        "timeSpent": "الوقت المستغرق",
+        "generalMaintenance": "صيانة عامة",
+        "requestDetails": "تفاصيل الطلب"
     },
     "bellman": {
         "title": "البيلمان",
@@ -973,7 +987,14 @@
         "priority": "الأولوية",
         "cart": "سلة المشتريات",
         "addToCart": "إضافة للسلة",
-        "myOrders": "طلباتي"
+        "myOrders": "طلباتي",
+        "purchase": "شراء",
+        "completed": "تم",
+        "approvedSuccess": "تم التعميد بنجاح",
+        "approvalFailed": "فشل التعميد",
+        "rejectedByManager": "مرفوض من المدير",
+        "partialPurchaseSuccess": "تم الشراء الجزئي وإنشاء طلب جديد للكمية المتبقية",
+        "purchaseCompletedSuccess": "تم إكمال الشراء وإرساله للقسم الطالب"
     },
     "coffeeshop": {
         "title": "كوفي شوب",
@@ -1187,6 +1208,7 @@
         "broadcastSent": "تم البث",
         "mainDashboard": "لوحة التحكم الرئيسية",
         "refresh": "تحديث",
+        "updatedNow": "تم التحديث الآن",
         "logout": "خروج",
         "logoutTitle": "تسجيل الخروج",
         "overview": "الرئيسية",
@@ -1429,7 +1451,14 @@
         "contactDetails": "تفاصيل الاتصال",
         "contactDetailsSubtitle": "تاريخ الطلب، تاريخ الاتصال، والملاحظات",
         "addFollowUp": "إضافة متابعة",
-        "addFollowUpSubtitle": "اكتب ملاحظة متابعة للمشترك المحتمل"
+        "addFollowUpSubtitle": "اكتب ملاحظة متابعة للمشترك المحتمل",
+        "oracle": {
+            "title": "🔮 العراف (The Oracle): توقعات الغد",
+            "description": "نتوقع حركة عالية غداً: {{checkouts}} خروج مؤكد + {{checkins}} دخول متوقع. الذروة: 12:00م - 2:00م.",
+            "action": "مراجعة الجدول",
+            "sendSuccess": "🔮 تم إرسال توصية العراف لرؤساء الأقسام بنجاح!",
+            "sendFailed": "فشل في إرسال التوصية"
+        }
     },
     "reports": {
         "title": "التقارير التفصيلية",

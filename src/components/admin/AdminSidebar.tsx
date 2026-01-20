@@ -58,7 +58,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     const { branchId, setBranch, logout, user } = useAuth(); // ✅ Get logout function & User
     const { branches } = useTenantBranches();
     const { tenantId } = useTenant();
-    const { isDark } = useTheme(); // ✅ Use theme context for live updates
+    // ✅ Removed isDark - using CSS theme variables exclusively
     const [ticketStatus, setTicketStatus] = React.useState<SupportTicketStatus | null>(null);
     const [pendingSubscriptionRequests, setPendingSubscriptionRequests] = React.useState<number>(0);
     const [unrespondedTicketsCount, setUnrespondedTicketsCount] = React.useState<number>(0);
@@ -348,10 +348,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             style={{ 
                 width: isCollapsed ? '80px' : '280px',
                 minHeight: '100vh',
-                background: isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff',
-                backdropFilter: isDark ? 'blur(20px) saturate(180%)' : 'none',
-                borderRight: isDark ? '1px solid rgba(32, 178, 170, 0.2)' : '1px solid #f1f5f9',
-                boxShadow: isDark ? '0 4px 24px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.05)',
+                background: 'var(--theme-bg-secondary)',
+                backdropFilter: 'var(--theme-backdrop-filter, blur(20px) saturate(180%))',
+                borderRight: '1px solid var(--theme-border-primary)',
+                boxShadow: 'var(--theme-shadow-card)',
                 padding: isCollapsed ? '15px 8px' : '15px 16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -364,7 +364,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             <div 
                 className="flex-none border-b relative transition-colors duration-300" 
                 style={{ 
-                    borderColor: isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(241, 245, 249, 1)',
+                    borderColor: 'var(--theme-border-primary)',
                     padding: isCollapsed ? '12px 8px' : '16px 12px',
                     minHeight: '64px',
                 }}
@@ -374,22 +374,24 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full shadow-md flex items-center justify-center z-10 transition-all duration-200"
                     style={{
-                        background: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 1)',
-                        border: isDark ? '1px solid rgba(32, 178, 170, 0.3)' : '1px solid rgba(226, 232, 240, 1)',
-                        boxShadow: isDark ? '0 2px 8px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0,0,0,0.1)',
+                        background: 'var(--theme-bg-secondary)',
+                        border: '1px solid var(--theme-border-primary)',
+                        boxShadow: 'var(--theme-shadow-sm)',
                     }}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.background = isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(241, 245, 249, 1)';
+                        e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
+                        e.currentTarget.style.borderColor = 'var(--theme-border-hover)';
                     }}
                     onMouseLeave={(e) => {
-                        e.currentTarget.style.background = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 1)';
+                        e.currentTarget.style.background = 'var(--theme-bg-secondary)';
+                        e.currentTarget.style.borderColor = 'var(--theme-border-primary)';
                     }}
                     aria-label={isCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
                 >
                     {isCollapsed ? (
-                        <ChevronRight className="w-3.5 h-3.5" style={{ color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(71, 85, 105, 1)' }} />
+                        <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--theme-primary-600)' }} />
                     ) : (
-                        <ChevronRight className="w-3.5 h-3.5 rotate-180" style={{ color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(71, 85, 105, 1)' }} />
+                        <ChevronRight className="w-3.5 h-3.5 rotate-180" style={{ color: 'var(--theme-primary-600)' }} />
                     )}
                 </button>
 
@@ -428,7 +430,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                             <h1 
                                 className="text-base font-bold leading-tight transition-colors duration-300" 
                                 style={{ 
-                                    color: isDark ? 'rgba(255, 255, 255, 0.95)' : 'rgba(30, 41, 59, 1)',
+                                    color: 'var(--theme-text-primary)',
                                     fontSize: '16px',
                                     fontFamily: 'Cairo, sans-serif',
                                     fontWeight: 600,
@@ -439,7 +441,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                             <p 
                                 className="text-[9px] font-bold tracking-wider uppercase opacity-80"
                                 style={{
-                                    color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(20, 184, 166, 1)',
+                                    color: 'var(--theme-primary-600)',
                                     fontFamily: 'Cairo, sans-serif',
                                 }}
                             >
@@ -454,12 +456,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     <div 
                         className="p-1.5 rounded-xl border transition-all duration-300 hover:border-teal-500/50 mt-3" 
                         style={{ 
-                            background: isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 1)', 
-                            borderColor: isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(241, 245, 249, 1)',
+                            background: 'var(--theme-bg-tertiary)',
+                            borderColor: 'var(--theme-border-primary)',
                         }}
                     >
                         <div className="flex items-center gap-2 px-2.5 py-2">
-                            <Building2 className="w-4 h-4 transition-colors duration-300 flex-shrink-0" style={{ color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(100, 116, 139, 1)' }} />
+                            <Building2 className="w-4 h-4 transition-colors duration-300 flex-shrink-0" style={{ color: 'var(--theme-text-secondary)' }} />
                             <select
                                 value={branchId || ''}
                                 onChange={(e) => {
@@ -468,17 +470,17 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                 }}
                                 className="flex-1 bg-transparent text-xs outline-none cursor-pointer appearance-none transition-colors duration-300"
                                 style={{ 
-                                    color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 41, 59, 1)',
+                                    color: 'var(--theme-text-primary)',
                                     fontFamily: 'Cairo, sans-serif',
                                 }}
                             >
                                 {filteredBranches.map(b => (
-                                    <option key={b.id} value={b.id} style={{ background: isDark ? 'rgba(15, 23, 42, 1)' : 'rgba(255, 255, 255, 1)', color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 41, 59, 1)' }}>
+                                    <option key={b.id} value={b.id} style={{ background: 'var(--theme-bg-secondary)', color: 'var(--theme-text-primary)' }}>
                                         {(b as any).name || `فرع ${(b as any).code || b.id}`}
                                     </option>
                                 ))}
                             </select>
-                            <ChevronDown className="w-3.5 h-3.5 transition-colors duration-300 flex-shrink-0" style={{ color: isDark ? 'rgba(32, 178, 170, 0.9)' : 'rgba(100, 116, 139, 1)' }} />
+                            <ChevronDown className="w-3.5 h-3.5 transition-colors duration-300 flex-shrink-0" style={{ color: 'var(--theme-text-secondary)' }} />
                         </div>
                     </div>
                 )}
@@ -489,16 +491,16 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                         onClick={onClose}
                         className="lg:hidden absolute top-2 right-2 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 active:scale-95"
                         style={{ 
-                            background: isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 1)', 
-                            color: isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(100, 116, 139, 1)' 
+                            background: 'var(--theme-bg-tertiary)',
+                            color: 'var(--theme-text-secondary)'
                         }}
                         onMouseEnter={(e) => { 
-                            e.currentTarget.style.color = isDark ? 'rgba(255, 255, 255, 1)' : 'rgba(30, 41, 59, 1)'; 
-                            e.currentTarget.style.background = isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(226, 232, 240, 1)'; 
+                            e.currentTarget.style.color = 'var(--theme-text-primary)';
+                            e.currentTarget.style.background = 'var(--theme-bg-hover, var(--theme-primary-100))';
                         }}
                         onMouseLeave={(e) => { 
-                            e.currentTarget.style.color = isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(100, 116, 139, 1)'; 
-                            e.currentTarget.style.background = isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 1)'; 
+                            e.currentTarget.style.color = 'var(--theme-text-secondary)';
+                            e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
                         }}
                     >
                         <ArrowLeft className="w-4 h-4 flip-rtl" />
@@ -536,12 +538,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                     }}
                                     onMouseEnter={(e) => { 
                                         if (!isExpanded) {
-                                            e.currentTarget.style.background = isDark ? 'rgba(30, 41, 59, 0.6)' : 'rgba(248, 250, 252, 1)'; 
+                                            e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
                                             e.currentTarget.style.color = 'var(--theme-text-primary)';
                                             e.currentTarget.style.transform = 'scale(1.02) translateX(-2px)'; // ✅ Zoom + slight slide
-                                            e.currentTarget.style.boxShadow = isDark 
-                                                ? '0 4px 12px rgba(32, 178, 170, 0.15)' 
-                                                : '0 2px 8px rgba(0, 0, 0, 0.08)';
+                                            e.currentTarget.style.boxShadow = 'var(--theme-shadow-sm)';
                                         } else {
                                             e.currentTarget.style.transform = 'scale(1.01) translateX(-1px)'; // ✅ Subtle zoom for expanded
                                         }
@@ -571,7 +571,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                     overflow: 'hidden',
                                                     textOverflow: 'ellipsis',
                                                     lineHeight: '1.4',
-                                                    color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'var(--theme-text-secondary)',
+                                                    color: 'var(--theme-text-secondary)',
                                                 }}
                                             >
                                                 {section.label}
@@ -630,45 +630,39 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         cursor: 'pointer',
                                                         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', // ✅ Smooth transition with easing
                                                         transform: 'scale(1)', // ✅ Initial scale
-                                                        color: isActive ? '#20B2AA' : '#475569', // ✅ Active: Turquoise | Inactive: Slate gray
-                                                        background: isActive ? 'rgba(32, 178, 170, 0.06)' : 'transparent', // ✅ Active: Light turquoise | Inactive: Transparent
+                                                        color: isActive ? 'var(--theme-primary-600)' : 'var(--theme-text-secondary)', // ✅ Active: Primary color | Inactive: Secondary text
+                                                        background: isActive ? 'var(--theme-primary-100)' : 'transparent', // ✅ Active: Light primary | Inactive: Transparent
                                                         position: 'relative', // ✅ For ActiveBar positioning
                                                         overflow: 'hidden', // ✅ FIX: Prevent text overflow artifacts
-                                                        // ✅ Premium Turquoise Border for Invoices when active
-                                                        border: isActive && isInvoicesItem ? '2px solid #20B2AA' : 'none',
+                                                        // ✅ Premium Primary Border for Invoices when active
+                                                        border: isActive && isInvoicesItem ? '2px solid var(--theme-primary-600)' : 'none',
                                                         borderWidth: isActive && isInvoicesItem ? '2px' : '0',
                                                         borderStyle: isActive && isInvoicesItem ? 'solid' : 'none',
-                                                        borderColor: isActive && isInvoicesItem ? '#20B2AA' : 'transparent',
-                                                        boxShadow: isActive && isInvoicesItem ? '0 0 0 2px rgba(32, 178, 170, 0.2), 0 4px 12px rgba(32, 178, 170, 0.15)' : 'none',
+                                                        borderColor: isActive && isInvoicesItem ? 'var(--theme-primary-600)' : 'transparent',
+                                                        boxShadow: isActive && isInvoicesItem ? '0 0 0 2px var(--theme-primary-200), 0 4px 12px var(--theme-primary-100)' : 'none',
                                                     }}
                                                     onMouseEnter={(e) => {
                                                         if (!isActive) {
-                                                            e.currentTarget.style.background = isDark ? 'rgba(30, 41, 59, 0.6)' : '#f1f5f9'; // ✅ Hover: Dark bg (dark mode) or Light gray (light mode)
-                                                            e.currentTarget.style.color = '#20B2AA'; // ✅ Hover: Turquoise
-                                                            e.currentTarget.style.transform = 'scale(1.02) translateX(-2px)'; // ✅ Zoom + slight slide
-                                                            e.currentTarget.style.boxShadow = isDark 
-                                                                ? '0 4px 12px rgba(32, 178, 170, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1)' 
-                                                                : '0 2px 8px rgba(32, 178, 170, 0.15)'; // ✅ Subtle shadow on hover
-                                                        } else if (isInvoicesItem) {
-                                                            // ✅ Enhanced hover for active invoices item
-                                                            e.currentTarget.style.boxShadow = '0 0 0 2px rgba(32, 178, 170, 0.3), 0 6px 16px rgba(32, 178, 170, 0.2)';
-                                                            e.currentTarget.style.transform = 'scale(1.03) translateX(-2px)'; // ✅ Slightly more zoom for active
-                                                        } else {
-                                                            // ✅ Hover effect for active items (non-invoices)
+                                                            e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
+                                                            e.currentTarget.style.color = 'var(--theme-primary-600)';
                                                             e.currentTarget.style.transform = 'scale(1.02) translateX(-2px)';
-                                                            e.currentTarget.style.boxShadow = isDark 
-                                                                ? '0 4px 12px rgba(32, 178, 170, 0.15)' 
-                                                                : '0 2px 8px rgba(32, 178, 170, 0.1)';
+                                                            e.currentTarget.style.boxShadow = 'var(--theme-shadow-sm)';
+                                                        } else if (isInvoicesItem) {
+                                                            e.currentTarget.style.boxShadow = '0 0 0 2px var(--theme-primary-300), 0 6px 16px var(--theme-primary-200)';
+                                                            e.currentTarget.style.transform = 'scale(1.03) translateX(-2px)';
+                                                        } else {
+                                                            e.currentTarget.style.transform = 'scale(1.02) translateX(-2px)';
+                                                            e.currentTarget.style.boxShadow = 'var(--theme-shadow-sm)';
                                                         }
                                                     }}
                                                     onMouseLeave={(e) => {
                                                         if (!isActive) {
-                                                            e.currentTarget.style.background = 'transparent'; // ✅ Reset to transparent
-                                                            e.currentTarget.style.color = isDark ? 'rgba(255, 255, 255, 0.7)' : '#475569'; // ✅ Reset to white (dark) or slate gray (light)
-                                                            e.currentTarget.style.transform = 'scale(1) translateX(0)'; // ✅ Reset transform
-                                                            e.currentTarget.style.boxShadow = 'none'; // ✅ Reset shadow
+                                                            e.currentTarget.style.background = 'transparent';
+                                                            e.currentTarget.style.color = 'var(--theme-text-secondary)';
+                                                            e.currentTarget.style.transform = 'scale(1) translateX(0)';
+                                                            e.currentTarget.style.boxShadow = 'none';
                                                         } else if (isInvoicesItem) {
-                                                            e.currentTarget.style.boxShadow = '0 0 0 2px rgba(32, 178, 170, 0.2), 0 4px 12px rgba(32, 178, 170, 0.15)';
+                                                            e.currentTarget.style.boxShadow = '0 0 0 2px var(--theme-primary-200), 0 4px 12px var(--theme-primary-100)';
                                                             e.currentTarget.style.transform = 'scale(1) translateX(0)';
                                                         } else {
                                                             e.currentTarget.style.transform = 'scale(1) translateX(0)';
@@ -787,23 +781,23 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         cursor: 'pointer',
                                                         transition: 'all 0.15s ease-in-out', // ✅ Strict transition
                                                         color: isActive 
-                                                            ? '#20B2AA' 
-                                                            : (isDark ? 'rgba(255, 255, 255, 0.7)' : '#475569'), // ✅ Active: Turquoise | Inactive: White (dark) or Slate (light)
+                                                            ? 'var(--theme-primary-600)' 
+                                                            : 'var(--theme-text-secondary)', // ✅ Active: Primary | Inactive: Secondary text
                                                         background: isActive 
-                                                            ? (isDark ? 'rgba(32, 178, 170, 0.15)' : 'rgba(32, 178, 170, 0.06)') 
+                                                            ? 'var(--theme-primary-100)' 
                                                             : 'transparent', // ✅ Active: Turquoise bg | Inactive: Transparent
                                                         position: 'relative', // ✅ For ActiveBar positioning
                                                     })}
                                                     onMouseEnter={(e) => {
                                                         if (!e.currentTarget.classList.contains('bg-teal-500/15')) {
-                                                            e.currentTarget.style.background = isDark ? 'rgba(30, 41, 59, 0.5)' : '#f8fafc'; // ✅ Hover: Dark bg (dark mode) or Light gray (light mode)
-                                                            e.currentTarget.style.color = '#20B2AA'; // ✅ Hover: Turquoise
+                                                            e.currentTarget.style.background = 'var(--theme-bg-tertiary)';
+                                                            e.currentTarget.style.color = 'var(--theme-primary-600)';
                                                         }
                                                     }}
                                                     onMouseLeave={(e) => {
                                                         if (!e.currentTarget.classList.contains('bg-teal-500/15')) {
-                                                            e.currentTarget.style.background = 'transparent'; // ✅ Reset to transparent
-                                                            e.currentTarget.style.color = isDark ? 'rgba(255, 255, 255, 0.7)' : '#475569'; // ✅ Reset to white (dark) or slate gray (light)
+                                                            e.currentTarget.style.background = 'transparent';
+                                                            e.currentTarget.style.color = 'var(--theme-text-secondary)';
                                                         }
                                                     }}
                                                 >
@@ -886,8 +880,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                         <div 
                             className="mt-6 mx-0.5 px-2.5 py-2.5 rounded-xl border flex items-center gap-2.5 transition-all duration-300 hover:border-teal-500/30" 
                             style={{ 
-                                background: isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 1)', 
-                                borderColor: isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(241, 245, 249, 1)',
+                                background: 'var(--theme-bg-tertiary)',
+                                borderColor: 'var(--theme-border-primary)',
                                 marginTop: '16px',
                             }}
                         >
@@ -912,7 +906,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                         100%
                                     </span>
                                 </div>
-                                <div className="h-1 w-full rounded-full overflow-hidden transition-colors duration-300" style={{ background: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(226, 232, 240, 1)' }}>
+                                <div className="h-1 w-full rounded-full overflow-hidden transition-colors duration-300" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                     <div className="h-full w-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full shadow-[0_0_8px_rgba(20,184,166,0.5)]"></div>
                                 </div>
                             </div>

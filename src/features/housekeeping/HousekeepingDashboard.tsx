@@ -181,7 +181,7 @@ const TaskCard: React.FC<{
             <div className="flex items-center gap-2 mb-2">
                 <div className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center" 
                      style={{ background: 'linear-gradient(135deg, var(--theme-accent-cyan) 0%, var(--theme-accent-blue) 100%)' }}>
-                    <span className="text-sm font-bold text-white">{task.roomNumber}</span>
+                    <span className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>{task.roomNumber}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -398,8 +398,8 @@ const InspectionModal: React.FC<{
                         <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-3">
                             <Clipboard className="w-8 h-8 text-purple-400" />
                         </div>
-                        <h3 className="text-xl font-bold text-white">{t('housekeeping.inspectionTitle')} {task.roomNumber}</h3>
-                        <p className="text-white/50 mt-1">{t('housekeeping.selectInspectionResult')}</p>
+                        <h3 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>{t('housekeeping.inspectionTitle')} {task.roomNumber}</h3>
+                        <p className="mt-1" style={{ color: 'var(--theme-text-secondary)' }}>{t('housekeeping.selectInspectionResult')}</p>
                     </div>
 
                     {/* Result Options */}
@@ -459,7 +459,7 @@ const InspectionModal: React.FC<{
                     {/* Photo Upload (Required for damages/missing_items) */}
                     {(selectedResult === 'damages' || selectedResult === 'missing_items') && (
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+                            <label className="block text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--theme-text-secondary)' }}>
                                 <Camera className="w-4 h-4" />
                                 {selectedResult === 'damages' ? t('housekeeping.damagePhoto') : t('housekeeping.lostPhoto')}
                                 <span className="text-red-400 text-xs">{t('housekeeping.required')}</span>
@@ -485,7 +485,7 @@ const InspectionModal: React.FC<{
                     {/* Minibar Section (Always available for checkout inspections) */}
                     {(task.cleaningType === 'checkout' || (task as any).serviceType === 'inspection') && minibarProducts.length > 0 && (
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+                            <label className="block text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--theme-text-secondary)' }}>
                                 <ShoppingCart className="w-4 h-4" />
                                 {t('housekeeping.minibarConsumption')}
                             </label>
@@ -504,7 +504,7 @@ const InspectionModal: React.FC<{
                                             >
                                                 -
                                             </button>
-                                            <span className="text-lg font-bold text-white min-w-[2rem] text-center">
+                                            <span className="text-lg font-bold min-w-[2rem] text-center" style={{ color: 'var(--theme-text-primary)' }}>
                                                 {minibarConsumption[product.id] || 0}
                                             </span>
                                             <button
@@ -520,7 +520,7 @@ const InspectionModal: React.FC<{
                             {minibarTotal > 0 && (
                                 <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-green-500/20 to-primary-500/20 border border-green-500/30">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-white/80">{t('common.total')}:</span>
+                                        <span className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{t('common.total')}:</span>
                                         <span className="text-lg font-bold text-green-400">{minibarTotal} {t('common.rs')}</span>
                                     </div>
                                 </div>
@@ -620,14 +620,14 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
     if (!isOpen || !task) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" style={{ backdropFilter: 'none' }}>
-            <div className="glass rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'none', backgroundColor: 'var(--theme-bg-overlay)' }}>
+            <div className="rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto" style={{ background: 'var(--theme-bg-secondary)', border: '1px solid var(--theme-border-primary)' }}>
                 {/* Header */}
-                <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-white">
+                <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--theme-border-primary)' }}>
+                    <h3 className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                         🧹 {t('housekeeping.startCleaningForRoom', { room: task.roomNumber })}
                     </h3>
-                    <button onClick={onClose} className="text-white/50 hover:text-white">
+                    <button onClick={onClose} style={{ color: 'var(--theme-text-secondary)' }} className="hover:opacity-80">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -637,7 +637,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                     <div className="grid grid-cols-2 gap-4">
                         {/* Cleaning Type */}
                         <div>
-                            <label className="text-sm text-white/60 mb-2 block">{t('housekeeping.cleaningTypeLabel')}</label>
+                            <label className="text-sm mb-2 block" style={{ color: 'var(--theme-text-secondary)' }}>{t('housekeeping.cleaningTypeLabel')}</label>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setCleaningType('occupied')}
@@ -753,7 +753,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-white/10 flex gap-3">
+                <div className="p-4 border-t flex gap-3" style={{ borderColor: 'var(--theme-border-primary)' }}>
                     <button
                         onClick={onClose}
                         className="adora-btn-ghost flex-1 py-3 rounded-xl transition-all"

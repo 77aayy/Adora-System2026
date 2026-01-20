@@ -39,6 +39,7 @@ import { subscribeToActiveRoomCards } from '../../services/roomCardService';
 import { autoCleanupOnAdminLoad } from '../../services/cleanupService';
 import { Room, RoomCard, User } from '../../types';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { createAdminTask } from '../../services/adminTasksService';
 import { db } from '../../services/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -260,13 +261,13 @@ const OverviewPage: React.FC = () => {
         if (totalOps > 5 || confirmedCheckouts > 0) {
             return {
                 type: 'prediction' as const,
-                title: '🔮 العراف (The Oracle): توقعات الغد',
-                description: `نتوقع حركة عالية غداً: ${confirmedCheckouts} خروج مؤكد + ${predictedCheckins} دخول متوقع. الذروة: 12:00م - 2:00م.`,
-                action: 'مراجعة الجدول'
+                title: t('admin.oracle.title') || '🔮 العراف (The Oracle): توقعات الغد',
+                description: t('admin.oracle.description', { checkouts: confirmedCheckouts, checkins: predictedCheckins }) || `نتوقع حركة عالية غداً: ${confirmedCheckouts} خروج مؤكد + ${predictedCheckins} دخول متوقع. الذروة: 12:00م - 2:00م.`,
+                action: t('admin.oracle.action') || 'مراجعة الجدول'
             };
         }
         return null;
-    }, [occupiedRooms, activeCards, totalRooms]);
+    }, [occupiedRooms, activeCards, totalRooms, t]);
 
     const { success, error } = useUX(); // ✅ Use useUX hook
 
@@ -284,12 +285,12 @@ const OverviewPage: React.FC = () => {
             });
 
             if (result.success) {
-                success(`🔮 تم إرسال توصية العراف لرؤساء الأقسام بنجاح!`);
+                success(t('admin.oracle.sendSuccess') || '🔮 تم إرسال توصية العراف لرؤساء الأقسام بنجاح!');
             } else {
-                error(result.error || 'فشل في إرسال التوصية');
+                error(result.error || (t('admin.oracle.sendFailed') || 'فشل في إرسال التوصية'));
             }
         } catch (err: any) {
-            error('فشل في إرسال التوصية');
+            error(t('admin.oracle.sendFailed') || 'فشل في إرسال التوصية');
         }
     };
 

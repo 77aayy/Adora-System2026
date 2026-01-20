@@ -4,6 +4,8 @@
  * Adora Hotel Management System V3
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // HASHING FUNCTIONS
 // ============================================================

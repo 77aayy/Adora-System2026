@@ -287,7 +287,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setLastUsers(getLastUsers());
 
             // ✅ SaaS Security: Bind anonymous UID to Tenant/Role in Firestore
-            if (auth.currentUser && userData.tenantId) {
+            if (auth.currentUser && userData.tenantId && userData.role !== 'owner') {
+                // Owner doesn't need binding (system-owner tenant)
                 await saveUserBinding(auth.currentUser.uid, userData.tenantId, userData.role || 'employee');
             }
 
@@ -311,7 +312,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 { targetName: userData.name, tenantId: userData.tenantId, branchId: branch }
             );
 
-            return { path: getDepartmentPath(userData.department, userData.role) };
+            // ✅ CRITICAL FIX: Return role for navigation logic
+            return { 
+                path: getDepartmentPath(userData.department, userData.role),
+                role: userData.role 
+            };
 
 
         } catch (err: any) {
