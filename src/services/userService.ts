@@ -375,7 +375,10 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     // ✅ CRITICAL: Check owner PIN FIRST (before anonymous auth and Cloud Function)
     // Owner login is handled client-side only (for security)
     // Must check BEFORE anonymous auth to avoid unnecessary auth calls
+    logger.debug(`Checking owner PIN for: ${pin.substring(0, 2)}***`, undefined, 'userService');
     const isOwnerPin = await verifyOwnerPin(pin);
+    logger.debug(`Owner PIN check result: ${isOwnerPin}`, undefined, 'userService');
+    
     if (isOwnerPin) {
         // ✅ Owner doesn't need anonymous auth - return immediately
         await recordLoginAttempt(pin, true);
@@ -395,6 +398,8 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
             activeBranchId: null
         };
     }
+    
+    logger.debug('Owner PIN check failed, continuing with normal login flow', undefined, 'userService');
 
     // ✅ CRITICAL: Sign in anonymously (required for Cloud Functions and Firestore Rules)
     // Only needed for non-owner users

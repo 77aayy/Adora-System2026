@@ -65,6 +65,9 @@ export const verifyOwnerPin = async (pin: string): Promise<boolean> => {
     // ✅ Verify against hash (environment variable or default)
     const matchesHash = await verifyPin(pin, hashToCheck);
     
+    // ✅ Debug logging for troubleshooting
+    logger.debug(`Owner PIN verification: pin=${pin.substring(0, 2)}***, usingHash=${OWNER_PIN_HASH ? 'env' : 'default'}, matches=${matchesHash}`, undefined, 'hashService');
+    
     if (matchesHash && !OWNER_PIN_HASH) {
         logger.warn('Using default owner PIN hash (VITE_OWNER_PIN_HASH not set)', undefined, 'hashService');
     }
