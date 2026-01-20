@@ -847,6 +847,7 @@ const ReceiptVouchersTab: React.FC<{
 }> = ({ receiptVouchers, systemSettings, onStatsUpdate }) => {
     const { success, error } = useUX();
     const { user } = useAuth();
+    const { t } = useTranslation(); // ✅ Add translation hook
     
     // ✅ Handle delete selected vouchers (Password protected)
     const handleDeleteClick = () => {
@@ -2356,6 +2357,7 @@ const ExpenseVouchersTab: React.FC<{
 }> = ({ expenseVouchers, onRefresh, onStatsUpdate }) => {
     const { success, error } = useUX();
     const { user } = useAuth();
+    const { t } = useTranslation(); // ✅ Add translation hook
     const [systemSettings, setSystemSettings] = useState<any>(null);
     
     // ✅ Filters State
@@ -3472,6 +3474,7 @@ const InvoicesTab: React.FC<{
 }> = ({ invoices, overdue }) => {
     const { success, error } = useUX();
     const { user } = useAuth();
+    const { t } = useTranslation(); // ✅ Add translation hook
     const [systemSettings, setSystemSettings] = useState<any>(null);
     
     useEffect(() => {
