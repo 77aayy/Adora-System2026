@@ -47,25 +47,6 @@ interface ActivityFeedProps {
 // ============================================================
 
 // ACTIVITY_CONFIG will be created with useMemo inside component
-    delay: {
-        icon: AlertTriangle,
-        color: '#F59E0B',
-        bg: 'from-amber-500/20 to-amber-600/5',
-        label: 'تأخير',
-    },
-    points: {
-        icon: Star,
-        color: '#8B5CF6',
-        bg: 'from-purple-500/20 to-purple-600/5',
-        label: 'نقاط',
-    },
-    alert: {
-        icon: AlertTriangle,
-        color: '#EF4444',
-        bg: 'from-red-500/20 to-red-600/5',
-        label: 'تنبيه',
-    },
-};
 
 const SERVICE_ICONS: Record<string, React.ComponentType<any>> = {
     cleaning: Sparkles,
