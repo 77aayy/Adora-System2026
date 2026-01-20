@@ -224,8 +224,8 @@ export default defineConfig({
     build: {
         outDir: 'dist',
         sourcemap: false,
-        // ✅ تحسين حجم الـ chunks - increased limit for better chunking strategy
-        chunkSizeWarningLimit: 800,
+        // ✅ تحسين حجم الـ chunks - increased limit to suppress warnings for large chunks
+        chunkSizeWarningLimit: 2000, // Increased from 800 to 2000 KB (2 MB)
         // ✅ Use esbuild for minification (safer than Terser, less aggressive)
         minify: 'esbuild',
         target: 'es2020',
