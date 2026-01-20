@@ -54,7 +54,7 @@ jobs:
           npm install -g firebase-tools
           export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-service-account.json
           firebase use adora-platform2026
-          firebase deploy --only hosting:adora-hotels
+          firebase deploy --only hosting
 
   deploy-functions:
     name: Deploy Cloud Functions
