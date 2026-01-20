@@ -47,24 +47,32 @@ export const generateSecurePin = (length: number = 6): string => {
 
 const OWNER_PIN_HASH = import.meta.env.VITE_OWNER_PIN_HASH as string | undefined;
 
-// 🔐 SECURITY: Backdoor removed - Owner PIN MUST be set via VITE_OWNER_PIN_HASH environment variable
-// In production, VITE_OWNER_PIN_HASH must be set in .env
-// No hardcoded secrets allowed
+// 🔐 SECURITY: Owner PIN hash from environment variable
+// Fallback: In development, use default owner PIN 765255 (hashed)
+// SHA-256 hash of "765255" = "4e0ca1ba71b351230a9c4fa7e5a224ab955dfc986c04a660053bca16a95990f4"
+const DEFAULT_OWNER_PIN_HASH = '4e0ca1ba71b351230a9c4fa7e5a224ab955dfc986c04a660053bca16a95990f4';
 
 export const verifyOwnerPin = async (pin: string): Promise<boolean> => {
-    // ✅ SECURITY: Only check environment variable hash - no hardcoded backdoor
-    if (!OWNER_PIN_HASH) {
+    // ✅ Use environment variable hash if available, otherwise use default (development only)
+    const hashToCheck = OWNER_PIN_HASH || (import.meta.env.DEV ? DEFAULT_OWNER_PIN_HASH : null);
+    
+    if (!hashToCheck) {
         // In production, this should never happen (validation in main.tsx prevents it)
         if (import.meta.env.PROD) {
             logger.error('VITE_OWNER_PIN_HASH not set in production - owner PIN verification disabled', undefined, 'hashService');
             return false;
         }
-        // Development: Allow empty for testing (but warn)
+        // Development: Should not reach here, but just in case
         logger.warn('VITE_OWNER_PIN_HASH not set - owner PIN verification disabled', undefined, 'hashService');
         return false;
     }
     
-    // ✅ SECURITY: Verify against environment variable hash only
-    const matchesEnvHash = await verifyPin(pin, OWNER_PIN_HASH);
-    return matchesEnvHash;
+    // ✅ Verify against hash (environment variable or default)
+    const matchesHash = await verifyPin(pin, hashToCheck);
+    
+    if (matchesHash && !OWNER_PIN_HASH && import.meta.env.DEV) {
+        logger.warn('Using default owner PIN hash (development mode only)', undefined, 'hashService');
+    }
+    
+    return matchesHash;
 };
