@@ -6,6 +6,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { AlertTriangle, CheckCircle, XCircle, HelpCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -99,11 +100,14 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     type = 'confirm',
     title,
     message,
-    confirmText = 'تأكيد',
-    cancelText = 'إلغاء',
+    confirmText,
+    cancelText,
     onConfirm,
     onCancel,
 }) => {
+    const { t } = useTranslation();
+    const finalConfirmText = confirmText || t('common.confirm');
+    const finalCancelText = cancelText || t('common.cancel');
     const iconMap = {
         confirm: <HelpCircle className="w-8 h-8 text-blue-400" />,
         warning: <AlertTriangle className="w-8 h-8 text-yellow-400" />,
@@ -176,16 +180,16 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                     <button
                         onClick={onCancel}
                         className="flex-1 btn-secondary py-3 transition-all hover:scale-105 active:scale-95"
-                        aria-label={cancelText}
+                        aria-label={finalCancelText}
                     >
-                        {cancelText}
+                        {finalCancelText}
                     </button>
                     <button
                         onClick={onConfirm}
                         className={`flex-1 btn py-3 ${buttonMap[type]} transition-all hover:scale-105 active:scale-95`}
-                        aria-label={confirmText}
+                        aria-label={finalConfirmText}
                     >
-                        {confirmText}
+                        {finalConfirmText}
                     </button>
                 </div>
             </div>

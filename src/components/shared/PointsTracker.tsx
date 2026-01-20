@@ -787,7 +787,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
             {/* Transparency Modal (History) */}
             {showHistoryModal && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 animate-fadeIn" style={{ backdropFilter: 'none', zIndex: 9999 }}>
-                    <div className="glass-card w-full max-w-xl max-h-[85vh] flex flex-col rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
+                    <div className="glass-card w-full max-w-xl max-h-[85vh] flex flex-col rounded-[2.5rem] border border-slate-300 dark:border-white/10 overflow-hidden shadow-2xl">
                         {/* Modal Header */}
                         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-blue-500/5 to-transparent">
                             <div className="flex items-center gap-4">
@@ -801,17 +801,17 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                             </div>
                             <button
                                 onClick={() => setShowHistoryModal(false)}
-                                className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/70 hover:text-white hover:bg-red-500/20 transition-all"
+                                className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-600 dark:text-white/70 hover:text-white hover:bg-red-500/20 transition-all"
                             >
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
                         {/* Tab Switcher */}
-                        <div className="flex bg-white/5 mx-6 p-1 rounded-2xl border border-white/5">
+                        <div className="flex bg-slate-100 dark:bg-white/5 mx-6 p-1 rounded-2xl border border-slate-300 dark:border-white/5">
                             <button
                                 onClick={() => setActiveTab('activity')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'activity' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-white/70 hover:text-white hover:bg-white/5'
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'activity' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-slate-600 dark:text-white/70 hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
                                     }`}
                             >
                                 <Zap className="w-4 h-4" />
@@ -838,7 +838,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                             className={`flex flex-col items-center gap-1 p-3 rounded-xl transition-all ${
                                                 activityFilter === 'all' 
                                                     ? 'bg-white/10 border border-white/20' 
-                                                    : 'bg-white/5 border border-transparent hover:bg-white/10'
+                                                    : 'bg-slate-100 dark:bg-white/5 border border-transparent hover:bg-slate-200 dark:hover:bg-white/10'
                                             }`}
                                         >
                                             <div className="text-lg">📊</div>
@@ -915,7 +915,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                             <div key={item.id} className="relative group">
                                                 <div className={`absolute inset-0 bg-gradient-to-r ${isPositive ? 'from-green-500/5' : isNeutral ? 'from-gray-500/5' : 'from-red-500/5'} to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
 
-                                                <div className="relative p-5 glass-dark rounded-3xl border border-white/5 transition-all duration-300 hover:border-white/10">
+                                                <div className="relative p-5 glass-dark rounded-3xl border border-slate-300 dark:border-white/5 transition-all duration-300 hover:border-slate-400 dark:hover:border-white/10">
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex items-start gap-4">
                                                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ${isPositive ? 'bg-green-500/10 text-green-400' :
@@ -968,7 +968,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                                 disabled={redeeming || (points || 0) < minRedemption}
                                                 className={`w-full py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 ${(points || 0) >= minRedemption
                                                     ? 'bg-gradient-to-r from-emerald-600 to-green-500 text-white shadow-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95'
-                                                    : 'bg-white/5 text-white/70 cursor-not-allowed border border-white/5'
+                                                    : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 cursor-not-allowed border border-slate-300 dark:border-white/5'
                                                     }`}
                                             >
                                                 {redeeming ? <AdoraLoaderInline size={20} /> : <DollarSign className="w-5 h-5" />}
@@ -1054,7 +1054,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
             {/* Leaderboard Modal */}
             {showLeaderboardModal && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 animate-fadeIn" style={{ backdropFilter: 'none', zIndex: 9999 }}>
-                    <div className="glass-card w-full max-w-lg max-h-[85vh] flex flex-col rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
+                    <div className="glass-card w-full max-w-lg max-h-[85vh] flex flex-col rounded-[2.5rem] border border-slate-300 dark:border-white/10 overflow-hidden shadow-2xl">
                         <div className="p-6 border-b border-white/5 flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
@@ -1062,7 +1062,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                                 </div>
                                 <h3 className="text-xl font-black text-white">{t('pointsTracker.leaderboard')}</h3>
                             </div>
-                            <button onClick={() => setShowLeaderboardModal(false)} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/70">
+                            <button onClick={() => setShowLeaderboardModal(false)} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-600 dark:text-white/70">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>

@@ -593,7 +593,7 @@ export const AboutUs: React.FC = () => {
                     >
                         <Languages className="w-5 h-5" style={{ color: turquoise }} />
                         <span className="font-semibold">
-                            {currentLang === 'ar' ? 'عربي' : 'English'}
+                            {currentLang === 'ar' ? t('languages.arabic') : t('languages.english')}
                         </span>
                         <ChevronDown 
                             className={`w-4 h-4 transition-transform duration-200 ${showLangMenu ? 'rotate-180' : ''}`}

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import {
     DataHealthReport,
     getRecentHealthReports,
@@ -142,6 +143,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
     tenantId,
     onViewDetails
 }) => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const { success, error, haptic } = useUX();
 
@@ -172,9 +174,9 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                 console.error('Error loading health report:', err);
                 // ✅ Show user-friendly error message
                 if (err?.message?.includes('not initialized')) {
-                    error('Firebase غير متصل - يرجى التحقق من الاتصال');
+                    error(t('healthReport.firebaseNotConnected'));
                 } else {
-                    error('فشل تحميل التقرير - يرجى المحاولة مرة أخرى');
+                    error(t('healthReport.loadFailed'));
                 }
             } finally {
                 setLoading(false);
@@ -194,7 +196,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
             const newReport = await generateWeeklyHealthReport(tenantId);
             await saveAndNotifyReport(newReport, user.id);
             setReport(newReport);
-            success('✅ تم إنشاء التقرير بنجاح');
+            success(t('healthReport.reportGenerated'));
             haptic('success');
         } catch (err: any) {
             console.error('❌ Error generating report:', err);
@@ -208,12 +210,12 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
             if (err?.message?.includes('not initialized')) {
                 error('Firebase غير متصل - يرجى التحقق من الاتصال');
             } else if (err?.code === 'permission-denied') {
-                error('ليس لديك صلاحية لإنشاء التقرير');
+                error(t('healthReport.noPermission'));
             } else if (err?.message?.includes('tenantId')) {
-                error('معرف المستأجر غير صحيح');
+                error(t('healthReport.invalidTenantId'));
             } else {
                 const errorMsg = err?.message || 'خطأ غير معروف';
-                error(`فشل في إنشاء التقرير: ${errorMsg.substring(0, 100)}`);
+                error(`${t('healthReport.generateFailed')}: ${errorMsg.substring(0, 100)}`);
                 console.error('Full error:', err);
             }
             haptic('error');
@@ -256,7 +258,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
         <div className="solid-modal rounded-2xl overflow-hidden" style={{ background: 'var(--theme-bg-secondary)' }}>
             {/* Header */}
             <div
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
                 onClick={() => setExpanded(!expanded)}
                 style={{ borderBottom: expanded ? '1px solid var(--theme-border-primary)' : 'none' }}
             >
@@ -544,7 +546,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                         <button
                             onClick={handleGenerateReport}
                             disabled={generating}
-                            className="w-full py-2 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="w-full py-2 rounded-xl text-sm font-medium hover:bg-slate-100 dark:hover:bg-white/5 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                             style={{ color: 'var(--theme-text-tertiary)' }}
                         >
                             {generating ? (
@@ -825,7 +827,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
             setTimeout(() => setCopied(false), 2000);
         }).catch((err) => {
             console.error('Failed to copy to clipboard:', err);
-            error('فشل نسخ التقرير - يرجى المحاولة مرة أخرى');
+            error(t('healthReport.copyFailed'));
         });
     };
 
@@ -890,7 +892,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                     : (report.reportPeriod.start?.toDate ? report.reportPeriod.start.toDate() : new Date()))
                 : new Date();
             exportToExcel(exportData, `health-report-${startDate.toISOString().split('T')[0]}.xlsx`);
-            success('تم تصدير التقرير إلى Excel بنجاح');
+            success(t('healthReport.exportSuccess'));
         } catch (err: any) {
             console.error('Excel export failed:', err);
             error('فشل تصدير Excel: ' + (err?.message || 'خطأ غير معروف'));
@@ -1043,7 +1045,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                                 onClick={handleCopyJSON}
                                 className={`${isMobile ? 'p-1.5' : 'p-2'} rounded-lg hover:bg-white/10 transition-colors`}
                                 style={{ color: 'var(--theme-text-secondary)' }}
-                                title="نسخ JSON"
+                                title={t('common.copyJSON') || 'نسخ JSON'}
                             >
                                 <Copy className={isMobile ? 'w-4 h-4' : 'w-5 h-5'} style={{ color: copied ? '#4ade80' : undefined }} />
                             </button>
@@ -1053,7 +1055,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                                 onClick={handleDownloadJSON}
                                 className={`${isMobile ? 'p-1.5' : 'p-2'} rounded-lg hover:bg-white/10 transition-colors`}
                                 style={{ color: 'var(--theme-text-secondary)' }}
-                                title="تحميل JSON"
+                                title={t('common.downloadJSON') || 'تحميل JSON'}
                             >
                                 <Download className={isMobile ? 'w-4 h-4' : 'w-5 h-5'} />
                             </button>
@@ -1062,7 +1064,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                             <button
                                 onClick={onClose}
                                 className={`flex items-center justify-center ${isMobile ? 'w-8 h-8' : 'w-10 h-10'} rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 hover:border-red-500/50 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm hover:shadow-md`}
-                                title="إغلاق"
+                                title={t('common.close')}
                             >
                                 <X className={isMobile ? 'w-4 h-4' : 'w-5 h-5'} />
                             </button>
@@ -1091,7 +1093,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                                 className={`${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-1.5 text-xs'} rounded-lg font-medium transition-colors flex items-center ${isMobile ? 'gap-1' : 'gap-1.5'} whitespace-nowrap ${
                                     activeTab === tab.id
                                         ? 'bg-teal-500/20 text-teal-400'
-                                        : 'hover:bg-white/5'
+                                        : 'hover:bg-slate-100 dark:hover:bg-white/5'
                                 }`}
                                 style={{ color: activeTab === tab.id ? undefined : 'var(--theme-text-secondary)' }}
                             >

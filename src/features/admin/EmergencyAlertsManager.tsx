@@ -12,6 +12,7 @@ import {
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import {
     createEmergencyAlert,
     updateEmergencyAlert,
@@ -31,6 +32,7 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
     const { tenantId } = useTenant();
     const { success, error } = useUX();
     const { user } = useAuth();
+    const { t } = useTranslation();
 
     const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
     const [loading, setLoading] = useState(true);
@@ -120,34 +122,34 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
     };
 
     const handleDelete = async (alertId: string) => {
-        if (!confirm('هل أنت متأكد من إلغاء هذا التنبيه الطارئ؟')) return;
+        if (!confirm(t('admin.cancelAlertConfirm') || 'هل أنت متأكد من إلغاء هذا التنبيه الطارئ؟')) return;
         try {
             await deactivateEmergencyAlert(alertId);
-            success('تم إلغاء التنبيه');
+            success(t('admin.cancelSuccess') || 'تم الإلغاء بنجاح');
             loadAlerts();
         } catch (err) {
-            error('فشل إلغاء التنبيه');
+            error(t('admin.cancelError') || 'فشل الإلغاء');
         }
     };
 
     const handleSave = async () => {
         if (!tenantId || !branchId || !user) return;
         if (!formData.titleAr?.trim() || !formData.messageAr?.trim()) {
-            error('يرجى إدخال العنوان والرسالة');
+            error(t('admin.titleAndMessageRequired') || 'يرجى إدخال العنوان والرسالة');
             return;
         }
 
         try {
             if (editingAlert) {
                 await updateEmergencyAlert(editingAlert.id, formData as Partial<EmergencyAlert>, user.id, user.name || '');
-                success('تم تحديث التنبيه الطارئ');
+                success(t('admin.updateSuccess') || 'تم التحديث بنجاح');
             } else {
                 await createEmergencyAlert({
                     ...formData as Omit<EmergencyAlert, 'id' | 'createdAt'>,
                     branchId,
                     tenantId
                 }, user.id, user.name || '');
-                success('تم إرسال التنبيه الطارئ');
+                success(t('admin.sendSuccess') || 'تم الإرسال بنجاح');
             }
             setShowAlertModal(false);
             setFormData({
@@ -167,7 +169,7 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
             });
             loadAlerts();
         } catch (err) {
-            error('فشل حفظ التنبيه');
+            error(t('admin.saveError') || 'فشل الحفظ');
         }
     };
 
@@ -340,7 +342,7 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
                                     <p className="text-white/60 text-sm line-clamp-2 mb-3">{alert.messageAr || alert.message}</p>
                                     <div className="flex items-center gap-4 pt-3 border-t border-white/10 text-xs text-white/40">
                                         <span className={alert.isActive ? 'text-green-400' : 'text-red-400'}>
-                                            {alert.isActive ? 'نشط' : 'ملغي'}
+                                            {alert.isActive ? t('common.active') : t('common.cancelled')}
                                         </span>
                                         {alert.showSound && (
                                             <span className="flex items-center gap-1">
@@ -438,7 +440,7 @@ const AlertModal: React.FC<{
                                     type="text"
                                     value={formData.titleAr || ''}
                                     onChange={e => setFormData({ ...formData, titleAr: e.target.value })}
-                                    placeholder="حالة حريق - إخلاء فوري"
+                                    placeholder={t('emergencyAlerts.fireExample') || 'حالة حريق - إخلاء فوري'}
                                     className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white focus:border-primary-500 focus:outline-none"
                                 />
                             </div>
@@ -466,7 +468,7 @@ const AlertModal: React.FC<{
                             <textarea
                                 value={formData.messageAr || ''}
                                 onChange={e => setFormData({ ...formData, messageAr: e.target.value })}
-                                placeholder="يوجد حالة حريق. يرجى إخلاء المبنى فوراً..."
+                                placeholder={t('emergencyAlerts.fireMessageExample') || 'يوجد حالة حريق. يرجى إخلاء المبنى فوراً...'}
                                 rows={4}
                                 className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white resize-none focus:border-primary-500 focus:outline-none"
                             />
@@ -529,7 +531,7 @@ const AlertModal: React.FC<{
                                             : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 border border-slate-300 dark:border-white/10'
                                         }`}
                                     >
-                                        {formData.showSound ? 'مفعّل' : 'معطّل'}
+                                        {formData.showSound ? t('common.active') : t('common.disabled')}
                                     </button>
                                 </label>
                             </div>
@@ -543,7 +545,7 @@ const AlertModal: React.FC<{
                                             : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 border border-slate-300 dark:border-white/10'
                                         }`}
                                     >
-                                        {formData.showNotification ? 'مفعّل' : 'معطّل'}
+                                        {formData.showNotification ? t('common.active') : t('common.disabled')}
                                     </button>
                                 </label>
                             </div>
@@ -557,7 +559,7 @@ const AlertModal: React.FC<{
                                             : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 border border-slate-300 dark:border-white/10'
                                         }`}
                                     >
-                                        {formData.autoShow ? 'مفعّل' : 'معطّل'}
+                                        {formData.autoShow ? t('common.active') : t('common.disabled')}
                                     </button>
                                 </label>
                             </div>
@@ -571,7 +573,7 @@ const AlertModal: React.FC<{
                                             : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/60 border border-slate-300 dark:border-white/10'
                                         }`}
                                     >
-                                        {formData.dismissible ? 'نعم' : 'لا'}
+                                        {formData.dismissible ? t('common.yes') || 'نعم' : t('common.no') || 'لا'}
                                     </button>
                                 </label>
                             </div>
@@ -621,7 +623,7 @@ const AlertModal: React.FC<{
                                 className="flex-1 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white font-bold hover:shadow-lg hover:shadow-red-500/25 transition-all flex items-center justify-center gap-2"
                             >
                                 <Save className="w-5 h-5" />
-                                {isEditing ? 'تحديث' : 'إرسال'}
+                                {isEditing ? t('common.update') : t('common.submit')}
                             </button>
                         </div>
                     </div>

@@ -72,6 +72,7 @@ import { AnnouncementsManager } from './AnnouncementsManager';
 import { EmergencyAlertsManager } from './EmergencyAlertsManager';
 import { NotificationSettingsManager } from '../../components/admin/NotificationSettingsManager';
 import { QRRoomManager } from './QRRoomManager';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES & PROPS
@@ -90,6 +91,7 @@ interface BranchSettingsProps {
 const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: propTenantId }) => {
     const { tenantId: contextTenantId } = useTenant();
     const { user } = useAuth(); // ✅ Get current user for createdBy
+    const { t } = useTranslation();
     // ✅ Dynamic: Use prop tenantId (for owner) or context tenantId (for manager)
     const tenantId = propTenantId || contextTenantId;
     const [roomNumber, setRoomNumber] = useState('');
@@ -168,9 +170,9 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
 
             if (!snap.exists()) {
                 await customConfirm({
-                    title: 'الغرفة غير موجودة',
-                    message: 'عذراً، هذه الغرفة غير موجودة في النظام. يرجى إضافتها أولاً من صفحة إدارة الغرف.',
-                    confirmText: 'حسناً',
+                    title: t('admin.roomNotFound') || 'الغرفة غير موجودة',
+                    message: t('admin.roomNotFoundMessage') || 'عذراً، هذه الغرفة غير موجودة في النظام. يرجى إضافتها أولاً من صفحة إدارة الغرف.',
+                    confirmText: t('common.ok'),
                     showCancel: false,
                     type: 'warning'
                 });
@@ -182,10 +184,10 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
             const existingToken = existingTokens.find(t => t.roomNumber === roomNumber);
             if (existingToken) {
                 const shouldContinue = await customConfirm({
-                    title: 'تنبيه: QR موجود مسبقاً',
-                    message: `هذه الغرفة (${roomNumber}) لديها QR مولد من قبل. هل تريد توليد QR جديد؟ (سيتم إلغاء تفعيل QR القديم)`,
-                    confirmText: 'نعم، توليد جديد',
-                    cancelText: 'إلغاء',
+                    title: t('admin.qrExistsWarning') || 'تنبيه: QR موجود مسبقاً',
+                    message: t('admin.qrExistsMessage', { roomNumber }) || `هذه الغرفة (${roomNumber}) لديها QR مولد من قبل. هل تريد توليد QR جديد؟ (سيتم إلغاء تفعيل QR القديم)`,
+                    confirmText: t('admin.generateNew') || 'نعم، توليد جديد',
+                    cancelText: t('common.cancel'),
                     showCancel: true,
                     type: 'warning'
                 });
@@ -237,16 +239,16 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
             await customConfirm({
                 title: 'تم توليد الرابط بنجاح',
                 message: 'تم إنشاء رابط آمن للغرفة. يمكنك نسخ الرابط أو طباعة QR code. ملاحظة: QR لن يعمل للنزيل إلا بعد تسجيل دخول البيلمان.',
-                confirmText: 'حسناً',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'success'
             });
         } catch (error) {
             logger.error('Error generating token', error, 'SettingsManager');
             await customConfirm({
-                title: 'خطأ',
-                message: `حدث خطأ أثناء توليد الرابط: ${(error as any).message || 'خطأ غير معروف'}`,
-                confirmText: 'حسناً',
+                title: t('common.error') || 'خطأ',
+                message: `${t('common.error') || 'حدث خطأ'} أثناء توليد الرابط: ${(error as any).message || t('common.error') || 'خطأ غير معروف'}`,
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'danger'
             });
@@ -506,7 +508,7 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
             }
         } catch (err) {
             logger.error('Error loading location settings', err, 'SettingsManager');
-            error('فشل تحميل الإعدادات');
+            error(t('common.loadError') || 'فشل تحميل الإعدادات');
         } finally {
             setLoading(false);
         }
@@ -518,16 +520,16 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
             if (coords) {
                 setLatitude(coords.latitude.toString());
                 setLongitude(coords.longitude.toString());
-                success('تم استخراج الإحداثيات من رابط خرائط جوجل');
+                success(t('admin.coordinatesExtracted') || 'تم استخراج الإحداثيات بنجاح');
             } else {
-                error('لم يتم العثور على إحداثيات صحيحة في الرابط');
+                error(t('admin.coordinatesNotFound') || 'لم يتم العثور على إحداثيات صحيحة في الرابط');
             }
         }
     };
 
     const handleUseCurrentLocation = () => {
         if (!navigator.geolocation) {
-            error('المتصفح لا يدعم تحديد الموقع');
+            error(t('admin.geolocationNotSupported') || 'المتصفح لا يدعم تحديد الموقع');
             return;
         }
 
@@ -536,11 +538,11 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
             (position) => {
                 setLatitude(position.coords.latitude.toFixed(6));
                 setLongitude(position.coords.longitude.toFixed(6));
-                success('تم تحديد موقعك الحالي بنجاح');
+                success(t('admin.locationDetected') || 'تم تحديد موقعك الحالي بنجاح');
                 setLoading(false);
             },
             (err) => {
-                error('فشل تحديد الموقع. يرجى السماح بالوصول للموقع');
+                error(t('admin.locationError') || 'فشل تحديد الموقع. يرجى السماح بالوصول للموقع');
                 setLoading(false);
             },
             {
@@ -580,10 +582,10 @@ const LocationSettingsComponent: React.FC<BranchSettingsProps> = ({ branchId, te
                 updatedAt: serverTimestamp()
             }, { merge: true });
 
-            success('تم حفظ الإعدادات بنجاح');
+            success(t('common.saveSuccess') || 'تم الحفظ بنجاح');
         } catch (err: any) {
             logger.error('Error saving location settings', err, 'SettingsManager');
-            error(err.message || 'فشل الحفظ');
+            error(err.message || t('common.saveError') || 'فشل الحفظ');
         } finally {
             setSaving(false);
         }
@@ -907,10 +909,10 @@ const GuestPortalSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantId
                 enabledServices,
                 updatedAt: serverTimestamp()
             }, { merge: true });
-            success('تم تحديث إعدادات بوابة النزلاء');
+            success(t('admin.guestSettingsUpdated') || 'تم تحديث إعدادات بوابة النزلاء بنجاح');
         } catch (err) {
             logger.error('Error saving guest settings', err, 'SettingsManager');
-            error('فشل الحفظ');
+            error(t('common.saveError') || 'فشل الحفظ');
         } finally {
             setSaving(false);
         }
@@ -1040,10 +1042,10 @@ const ReceptionVerificationSettings: React.FC<BranchSettingsProps> = ({ branchId
                 ...settings,
                 updatedAt: serverTimestamp()
             }, { merge: true });
-            success('تم تحديث إعدادات التحقق من النزلاء');
+            success(t('admin.receptionSettingsUpdated') || 'تم تحديث إعدادات التحقق من النزلاء بنجاح');
         } catch (err) {
             logger.error('Error saving reception settings', err, 'SettingsManager');
-            error('فشل الحفظ');
+            error(t('common.saveError') || 'فشل الحفظ');
         } finally {
             setSaving(false);
         }
@@ -1425,7 +1427,7 @@ const LaundryPriceManager: React.FC<BranchSettingsProps> = ({ branchId, tenantId
                             type="text"
                             value={newItem.name}
                             onChange={e => setNewItem({ ...newItem, name: e.target.value })}
-                            placeholder="اسم المنتج (مثال: ملائة سرير)"
+                            placeholder={t('admin.productNameExample') || 'اسم المنتج (مثال: ملائة سرير)'}
                             className="input flex-1 min-w-[200px]"
                         />
                         <input
@@ -1795,18 +1797,18 @@ const WorkingHoursSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantI
             });
             setHasChanges(false);
             await customConfirm({
-                title: 'تم الحفظ',
-                message: 'تم حفظ أوقات العمل للفرع بنجاح',
-                confirmText: 'حسناً',
+                title: t('common.saveSuccess') || 'تم الحفظ',
+                message: t('admin.workingHoursSaved') || 'تم حفظ أوقات العمل بنجاح',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'success'
             });
         } catch (error) {
             logger.error('Error saving working hours', error, 'SettingsManager');
             await customConfirm({
-                title: 'خطأ',
-                message: 'فشل الحفظ',
-                confirmText: 'حسناً',
+                title: t('common.error') || 'خطأ',
+                message: t('common.saveError') || 'فشل الحفظ',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'danger'
             });
@@ -1840,7 +1842,7 @@ const WorkingHoursSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantI
                             disabled={saving}
                             className="btn-primary py-1 px-3 text-xs"
                         >
-                            {saving ? <AdoraLoaderInline size={16} /> : 'حفظ'}
+                            {saving ? <AdoraLoaderInline size={16} /> : t('common.save')}
                         </button>
                     )}
                     <div className={`p-2 rounded-lg bg-white/5 transition-transform duration-300 ${isCollapsed ? '' : 'rotate-180'}`}>
@@ -1967,10 +1969,10 @@ const BranchContactSettings: React.FC<BranchContactSettingsProps> = ({ branchId,
                 ...contactInfo,
                 updatedAt: serverTimestamp(),
             }, { merge: true });
-            success('تم حفظ إعدادات التواصل');
+            success(t('admin.contactSettingsSaved') || 'تم حفظ إعدادات التواصل بنجاح');
         } catch (err) {
             logger.error('Error saving contact settings', err, 'SettingsManager');
-            showError('فشل حفظ الإعدادات');
+            showError(t('common.saveError') || 'فشل الحفظ');
         } finally {
             setSaving(false);
         }
@@ -2106,9 +2108,9 @@ const CalendarSourcesManager: React.FC = () => {
             setSources(prev => [...prev, added]);
             setNewSource({ name: '', url: '' });
             setShowAddForm(false);
-            success('تم إضافة المصدر');
+            success(t('admin.addSuccess') || 'تم الإضافة بنجاح');
         } catch (error) {
-            showError('فشل في إضافة المصدر');
+            showError(t('admin.addError') || 'فشل الإضافة');
         } finally {
             setSaving(false);
         }
@@ -2116,19 +2118,19 @@ const CalendarSourcesManager: React.FC = () => {
 
     const handleRemoveSource = async (sourceId: string) => {
         if (!tenantId) return;
-        if (!confirm('حذف هذا المصدر؟')) return;
+        if (!confirm(t('admin.deleteSourceConfirm') || 'حذف هذا المصدر؟')) return;
         try {
             await removeCalendarSource(tenantId, sourceId);
             setSources(prev => prev.filter(s => s.id !== sourceId));
-            success('تم حذف المصدر');
+            success(t('admin.deleteSuccess') || 'تم الحذف بنجاح');
         } catch (error) {
-            showError('فشل في حذف المصدر');
+            showError(t('admin.deleteError') || 'فشل الحذف');
         }
     };
 
     const handleResetToDefaults = async () => {
         if (!tenantId) return;
-        if (!confirm('إعادة تعيين المصادر إلى الافتراضية؟ سيتم حذف أي مصادر مخصصة.')) return;
+        if (!confirm(t('admin.resetSourcesConfirm') || 'إعادة تعيين المصادر إلى الافتراضية؟ سيتم حذف أي مصادر مخصصة.')) return;
         setSaving(true);
         try {
             await saveCalendarSources(tenantId, {
@@ -2367,18 +2369,18 @@ const ProductsManager: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
             });
             setHasChanges(false);
             await customConfirm({
-                title: 'تم الحفظ',
-                message: 'تم حفظ المنتجات للفرع بنجاح',
-                confirmText: 'حسناً',
+                title: t('common.saveSuccess') || 'تم الحفظ',
+                message: t('admin.productsSaved') || 'تم حفظ المنتجات بنجاح',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'success'
             });
         } catch (error) {
             logger.error('Error', error, 'SettingsManager');
             await customConfirm({
-                title: 'خطأ',
-                message: 'فشل الحفظ',
-                confirmText: 'حسناً',
+                title: t('common.error') || 'خطأ',
+                message: t('common.saveError') || 'فشل الحفظ',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'danger'
             });
@@ -2657,7 +2659,7 @@ const BranchSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pro
                     </div>
 
                     <button onClick={handleSave} disabled={saving} className="btn-primary w-full">
-                        {saving ? <AdoraLoaderInline size={16} /> : 'حفظ'}
+                        {saving ? <AdoraLoaderInline size={16} /> : t('common.save')}
                     </button>
                 </div>
             </div>
@@ -2704,17 +2706,17 @@ const GeneralSettings: React.FC = () => {
             const docRef = doc(db, 'tenants', tenantId);
             await setDoc(docRef, { info: { name } }, { merge: true });
             await customConfirm({
-                title: 'تم الحفظ',
-                message: 'تم حفظ البيانات العامة بنجاح',
-                confirmText: 'حسناً',
+                title: t('common.saveSuccess') || 'تم الحفظ',
+                message: t('admin.generalDataSaved') || 'تم حفظ البيانات العامة بنجاح',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'success'
             });
         } catch (e) {
             await customConfirm({
-                title: 'خطأ',
-                message: 'فشل الحفظ',
-                confirmText: 'حسناً',
+                title: t('common.error') || 'خطأ',
+                message: t('common.saveError') || 'فشل الحفظ',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'danger'
             });
@@ -2747,7 +2749,7 @@ const GeneralSettings: React.FC = () => {
                             value={name}
                             onChange={e => setName(e.target.value)}
                             className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:bg-white/[0.07] focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-white/10"
-                            placeholder="مثال: فندق أدورا جراند"
+                            placeholder={t('common.exampleHotelName') || 'مثال: فندق أدورا جراند'}
                         />
                     </div>
                 </div>
@@ -2874,6 +2876,7 @@ const SystemSupport: React.FC = () => {
 export const SettingsManager: React.FC = () => {
     // ✅ Sync with Global Auth Context
     const { branchId: globalBranchId, user } = useAuth();
+    const { t } = useTranslation();
     
     // ✅ For owners: Get all branches from all managers
     // ✅ For managers: Get branches from their tenant only

@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { Check, CheckCheck, X, Clock, Users } from 'lucide-react';
 import { Request } from '../../types/request';
+import { useTranslation } from 'react-i18next';
 import { getReadStatus, getViewers, ReadReceiptStatus } from '../../services/requestService';
 
 // ============================================================
@@ -202,6 +203,7 @@ export const RequestStatusLabel: React.FC<RequestStatusLabelProps> = ({
     request,
     showReceipt = true,
 }) => {
+    const { t } = useTranslation();
     const status = getReadStatus(request);
     const config = STATUS_CONFIG[status];
 
@@ -209,19 +211,19 @@ export const RequestStatusLabel: React.FC<RequestStatusLabelProps> = ({
     const getStatusText = (): string => {
         switch (request.status) {
             case 'PENDING_RECEPTION':
-                return 'بانتظار التأكيد';
+                return t('reception.statusLabels.pendingReception') || 'بانتظار التأكيد';
             case 'CONFIRMED':
-                return 'تم التأكيد';
+                return t('reception.statusLabels.confirmed') || 'تم التأكيد';
             case 'IN_PROGRESS':
             case 'CLEANING_IN_PROGRESS':
             case 'MAINTENANCE_IN_PROGRESS':
-                return 'جاري التنفيذ';
+                return t('common.inProgress') || 'قيد التنفيذ';
             case 'COMPLETED':
-                return 'مكتمل';
+                return t('common.completed') || 'مكتمل';
             case 'CANCELLED':
-                return 'ملغي';
+                return t('common.cancelled') || 'ملغي';
             default:
-                return 'قيد المعالجة';
+                return t('common.inProgress') || 'قيد المعالجة';
         }
     };
 

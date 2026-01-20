@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { X, History, MessageSquare, Users, ShoppingCart, Moon, LogOut } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface MenuItem {
     id: string;
@@ -31,6 +32,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
     user,
     onLogout
 }) => {
+    const { t } = useTranslation();
     if (!isOpen) return null;
 
     return (
@@ -61,8 +63,8 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                             <span className="text-xl">🏨</span>
                         </div>
                         <div>
-                            <p className="font-medium text-sm" style={{ color: 'var(--theme-text-primary)' }}>{user?.name || 'مستخدم'}</p>
-                            <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>{user?.role === 'owner' ? 'مالك' : 'موظف'}</p>
+                            <p className="font-medium text-sm" style={{ color: 'var(--theme-text-primary)' }}>{user?.name || t('common.user')}</p>
+                            <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>{user?.role === 'owner' ? t('roles.owner') : t('roles.employee')}</p>
                         </div>
                     </div>
                     <button
@@ -131,7 +133,7 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                             className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/20 text-red-400 transition-all active:scale-95 touch-manipulation"
                         >
                             <LogOut className="w-5 h-5" />
-                            <span className="flex-1 text-right font-medium text-sm">تسجيل الخروج</span>
+                            <span className="flex-1 text-right font-medium text-sm">{t('auth.logout')}</span>
                         </button>
                     </div>
                 )}

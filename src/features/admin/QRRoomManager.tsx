@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { generateQRUrl } from '../../services/qrCodeService';
 // 🔐 Secure Access Service
 import { 
@@ -68,6 +69,7 @@ export const QRRoomManager: React.FC<{ branchId: string; branchName: string; ten
     const { tenantId: contextTenantId } = useTenant();
     const tenantId = propTenantId || contextTenantId;
     const { success, error: showError, haptic } = useUX();
+    const { t } = useTranslation();
 
     // State
     const [rooms, setRooms] = useState<Room[]>([]);
@@ -829,7 +831,7 @@ export const QRRoomManager: React.FC<{ branchId: string; branchName: string; ten
                                                         <button
                                                             onClick={() => printSingleQR(room)}
                                                             className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-                                                            title="طباعة"
+                                                            title={t('common.print') || 'طباعة'}
                                                         >
                                                             <Printer className="w-4 h-4 text-blue-400" />
                                                         </button>

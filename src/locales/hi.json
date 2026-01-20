@@ -87,7 +87,15 @@
         "product": "उत्पाद",
         "rs": "रुपये",
         "team": "टीम",
-        "disabled": "अक्षम"
+        "disabled": "अक्षम",
+        "activate": "सक्रिय करें",
+        "update": "अपडेट करें"
+    },
+    "languages": {
+        "arabic": "अरबी",
+        "english": "अंग्रेज़ी",
+        "hindi": "हिन्दी",
+        "bengali": "बंगाली"
     },
     "time": {
         "today": "आज",

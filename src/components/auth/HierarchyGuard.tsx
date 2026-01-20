@@ -20,6 +20,7 @@ export const HierarchyGuard: React.FC<{ children: React.ReactNode }> = ({ childr
     const { tenantId } = useTenant();
     const navigate = useNavigate();
     const location = useLocation();
+    const { t } = useTranslation();
 
     // ✅ Debug: Log current state
     React.useEffect(() => {
@@ -74,8 +75,8 @@ export const HierarchyGuard: React.FC<{ children: React.ReactNode }> = ({ childr
                     <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                         <LayoutDashboard className="w-10 h-10 text-red-500" />
                     </div>
-                    <h1 className="text-2xl font-bold text-white mb-2">خطأ في النظام</h1>
-                    <p className="text-white/60">لم يتم العثور على بيانات الفندق (Tenant).</p>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{t('branchLocation.systemError')}</h1>
+                    <p className="text-slate-600 dark:text-white/60">{t('branchLocation.tenantOrBranchNotSpecified')}</p>
                 </div>
             </div>
         );
@@ -91,20 +92,19 @@ export const HierarchyGuard: React.FC<{ children: React.ReactNode }> = ({ childr
                         <MapPin className="w-10 h-10 text-primary-500" />
                     </div>
 
-                    <h1 className="text-2xl font-bold text-white mb-2">
-                        مطلوب اختيار فرع
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+                        {t('branchLocation.branchRequired')}
                     </h1>
 
-                    <p className="text-white/60 mb-8 leading-relaxed">
-                        عفواً، لا يمكن الوصول إلى لوحة التحكم دون اختيار فرع نشط.
-                        يرجى اختيار فرع من القائمة العلوية أو إنشاء فرع جديد إذا كنت المدير.
+                    <p className="text-slate-600 dark:text-white/60 mb-8 leading-relaxed">
+                        {t('branchLocation.cannotAccess')}
                     </p>
 
                     <div className="space-y-3">
                         {user?.role === 'manager' ? (
                             <div className="space-y-4">
-                                <p className="text-sm text-white/40 bg-white/5 p-3 rounded-lg border border-white/10">
-                                    تنبيه: لم يتم ربط حسابك بأي فروع نَشِطة حالياً.
+                                <p className="text-sm text-slate-600 dark:text-white/40 bg-slate-100 dark:bg-white/5 p-3 rounded-lg border border-slate-300 dark:border-white/10">
+                                    {t('branchLocation.noActiveBranches')}
                                 </p>
                                 <button
                                     onClick={(e) => {
@@ -116,12 +116,12 @@ export const HierarchyGuard: React.FC<{ children: React.ReactNode }> = ({ childr
                                     className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-green-500/25 transition-all active:scale-95"
                                 >
                                     <Plus className="w-5 h-5" />
-                                    <span>إنشاء أو ربط فرع جديد</span>
+                                    <span>{t('branchLocation.createOrLinkBranch')}</span>
                                 </button>
                             </div>
                         ) : (user?.role as string) === 'owner' ? (
                             <div className="space-y-4">
-                                <p className="text-sm text-white/40 bg-white/5 p-3 rounded-lg border border-white/10">
+                                <p className="text-sm text-slate-600 dark:text-white/40 bg-slate-100 dark:bg-white/5 p-3 rounded-lg border border-slate-300 dark:border-white/10">
                                     تنبيه: لم يتم تحديد فرع للعمل عليه في هذه اللوحة.
                                 </p>
                                 <button

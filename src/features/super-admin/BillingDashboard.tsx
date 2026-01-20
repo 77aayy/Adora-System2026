@@ -395,9 +395,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             {/* Tabs */}
             <div className="glass rounded-2xl p-2 flex gap-2 overflow-x-auto">
                 {[
-                    { id: 'receiptVouchers' as const, label: 'سندات قبض', icon: CreditCard },
-                    { id: 'invoices' as const, label: 'الفواتير', icon: FileText },
-                    { id: 'expenseVouchers' as const, label: 'سندات الصرف', icon: DollarSign }
+                    { id: 'receiptVouchers' as const, label: t('admin.receiptVouchers'), icon: CreditCard },
+                    { id: 'invoices' as const, label: t('admin.invoices'), icon: FileText },
+                    { id: 'expenseVouchers' as const, label: t('admin.expenseVouchers'), icon: DollarSign }
                 ].map(tab => {
                     const Icon = tab.icon;
                     return (
@@ -406,8 +406,8 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all whitespace-nowrap ${
                                 activeTab === tab.id
-                                    ? 'bg-teal-500/20 text-teal-400'
-                                    : 'text-white/60 hover:bg-white/5'
+                                    ? 'bg-teal-500/20 dark:bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/30 dark:border-teal-500/30'
+                                    : 'text-slate-600 dark:text-white/60 hover:bg-slate-100 dark:hover:bg-white/5 border border-transparent'
                             }`}
                         >
                             <Icon className="w-4 h-4" />
@@ -471,7 +471,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
                                     </div>
                                     <div>
                                         <h1 className="text-2xl font-bold text-white">إدارة الفواتير والاشتراكات</h1>
-                                        <p className="text-sm text-white/60">{allBranches.length} فرع نشط • إدارة كاملة للفواتير والمدفوعات</p>
+                                        <p className="text-sm text-slate-600 dark:text-white/60">{allBranches.length} {t('admin.branch')} {t('admin.active')} • {t('admin.manageInvoicesAndSubscriptions')}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -699,7 +699,7 @@ const ReceiptVouchersStats: React.FC<{
                 <StatCard
                     icon={DollarSign}
                     iconColor="green"
-                    label="💵 كاش"
+                    label={t('billing.stats.cash')}
                     value={`${cashAmount.toLocaleString()} ر.س`}
                     lastUpdate="تم التحديث الآن"
                 />
@@ -708,7 +708,7 @@ const ReceiptVouchersStats: React.FC<{
                 <StatCard
                     icon={CreditCard}
                     iconColor="blue"
-                    label="💳 كريديت"
+                    label={t('billing.stats.credit')}
                     value={`${creditAmount.toLocaleString()} ر.س`}
                     lastUpdate="تم التحديث الآن"
                 />
@@ -717,7 +717,7 @@ const ReceiptVouchersStats: React.FC<{
                 <StatCard
                     icon={FileText}
                     iconColor="purple"
-                    label="🏦 تحويل بنكي"
+                    label={t('billing.stats.bankTransfer')}
                     value={`${bankTransferAmount.toLocaleString()} ر.س`}
                     lastUpdate="تم التحديث الآن"
                 />
@@ -726,7 +726,7 @@ const ReceiptVouchersStats: React.FC<{
                 <StatCard
                     icon={Clock}
                     iconColor="orange"
-                    label="⏰ مؤجل الدفع"
+                    label={t('billing.stats.deferred')}
                     value={`${deferredAmount.toLocaleString()} ر.س`}
                     lastUpdate="تم التحديث الآن"
                 />
@@ -790,7 +790,7 @@ const ExpenseVouchersStats: React.FC<{
                 <StatCard
                     icon={DollarSign}
                     iconColor="green"
-                    label="💵 كاش"
+                    label={t('billing.stats.cash')}
                     value={`${cashAmount.toLocaleString()} ر.س`}
                     lastUpdate="تم التحديث الآن"
                 />
@@ -799,7 +799,7 @@ const ExpenseVouchersStats: React.FC<{
                 <StatCard
                     icon={CreditCard}
                     iconColor="blue"
-                    label="💳 كريديت"
+                    label={t('billing.stats.credit')}
                     value={`${creditAmount.toLocaleString()} ر.س`}
                     lastUpdate="تم التحديث الآن"
                 />
@@ -808,7 +808,7 @@ const ExpenseVouchersStats: React.FC<{
                 <StatCard
                     icon={FileText}
                     iconColor="purple"
-                    label="🏦 تحويل بنكي"
+                    label={t('billing.stats.bankTransfer')}
                     value={`${bankTransferAmount.toLocaleString()} ر.س`}
                     lastUpdate="تم التحديث الآن"
                 />
@@ -817,7 +817,7 @@ const ExpenseVouchersStats: React.FC<{
                 <StatCard
                     icon={Clock}
                     iconColor="orange"
-                    label="⏰ مؤجل الدفع"
+                    label={t('billing.stats.deferred')}
                     value={`${deferredAmount.toLocaleString()} ر.س`}
                     lastUpdate="تم التحديث الآن"
                 />
@@ -1021,10 +1021,10 @@ const ReceiptVouchersTab: React.FC<{
         if (vouchersToPrint.length === 0) return '';
         
         const paymentMethodLabels = {
-            'cash': 'كاش',
-            'credit': 'كريديت',
-            'bank_transfer': 'تحويل بنكي',
-            'deferred': 'مؤجل الدفع'
+            'cash': t('billing.paymentMethods.cash'),
+            'credit': t('billing.paymentMethods.credit'),
+            'bank_transfer': t('billing.paymentMethods.bankTransfer'),
+            'deferred': t('billing.paymentMethods.deferred')
         };
         
         // ✅ If multiple vouchers, use table report format (سندات القبض - بدون تفاصيل الضريبة)
@@ -1567,7 +1567,7 @@ const ReceiptVouchersTab: React.FC<{
                     'رقم الفرع': voucher.branchCode,
                     'اسم الفرع': voucher.branchName,
                     'عدد الفروع': voucher.numberOfBranches,
-                    'مدة الاشتراك': voucher.subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين',
+                    'مدة الاشتراك': voucher.subscriptionDuration === 1 ? t('billing.subscription.oneYearFull') : t('billing.subscription.twoYearsFull'),
                     'طريقة الدفع': voucher.paymentMethod ? paymentMethodLabels[voucher.paymentMethod] : '-',
                     'المبلغ': voucher.totalAmount
                 };
@@ -1696,14 +1696,14 @@ const ReceiptVouchersTab: React.FC<{
                         className="px-4 py-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 transition-colors text-sm flex items-center gap-2 border border-white/10"
                     >
                         <Filter className="w-4 h-4" />
-                        {showFilters ? 'إخفاء' : 'إظهار'} الفلاتر والبحث
+                        {showFilters ? t('billing.vouchers.hideFilters') : t('billing.vouchers.showFilters')} {t('billing.vouchers.filtersAndSearch')}
                     </button>
                     {filteredVouchers.filter(v => !v.isDeleted).length > 0 && (
                         <>
                             <button
                                 onClick={handleDeleteClick}
                                 disabled={selectedVouchers.size === 0 || deleting}
-                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Trash2 className="w-4 h-4" />
                                 حذف ({selectedVouchers.size})
@@ -1749,7 +1749,7 @@ const ReceiptVouchersTab: React.FC<{
                                 value={voucherNumberSearch}
                                 onChange={(e) => setVoucherNumberSearch(e.target.value)}
                                 placeholder="رقم السند"
-                                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                             />
                         </div>
                         
@@ -1797,7 +1797,7 @@ const ReceiptVouchersTab: React.FC<{
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value as any)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                             >
                                 <option value="date">التاريخ (الأحدث)</option>
                                 <option value="highest">المبلغ (الأعلى)</option>
@@ -1809,45 +1809,45 @@ const ReceiptVouchersTab: React.FC<{
                         
                         {/* Payment Method Filter */}
                         <div className="space-y-2">
-                            <label className="text-xs text-white/60">طريقة الدفع</label>
+                            <label className="text-xs text-white/60">{t('billing.vouchers.paymentMethod')}</label>
                             <select
                                 value={paymentMethodFilter}
                                 onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                             >
-                                <option value="all">الكل</option>
-                                <option value="cash">كاش</option>
-                                <option value="credit">كريديت</option>
-                                <option value="bank_transfer">تحويل بنكي</option>
-                                <option value="deferred">مؤجل الدفع</option>
+                                <option value="all">{t('common.all')}</option>
+                                <option value="cash">{t('billing.paymentMethods.cash')}</option>
+                                <option value="credit">{t('billing.paymentMethods.credit')}</option>
+                                <option value="bank_transfer">{t('billing.paymentMethods.bankTransfer')}</option>
+                                <option value="deferred">{t('billing.paymentMethods.deferred')}</option>
                             </select>
                         </div>
                         
                         {/* Duration Filter */}
                         <div className="space-y-2">
-                            <label className="text-xs text-white/60">مدة الاشتراك</label>
+                            <label className="text-xs text-white/60">{t('billing.subscription.duration')}</label>
                             <select
                                 value={durationFilter}
                                 onChange={(e) => setDurationFilter(e.target.value as any)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                             >
-                                <option value="all">الكل</option>
-                                <option value="1">سنة واحدة</option>
-                                <option value="2">سنتين</option>
+                                <option value="all">{t('common.all')}</option>
+                                <option value="1">{t('billing.subscription.oneYearFull')}</option>
+                                <option value="2">{t('billing.subscription.twoYearsFull')}</option>
                             </select>
                         </div>
                         
                         {/* Deleted Filter */}
                         <div className="space-y-2">
-                            <label className="text-xs text-white/60">حالة السند</label>
+                            <label className="text-xs text-slate-600 dark:text-white/60">{t('common.status')}</label>
                             <select
                                 value={deletedFilter}
                                 onChange={(e) => setDeletedFilter(e.target.value as any)}
-                                className="w-full px-3 py-2 rounded-lg bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                             >
                                 <option value="not_deleted">النشطة فقط</option>
                                 <option value="deleted">المحذوفة فقط</option>
-                                <option value="all">الكل</option>
+                                <option value="all">{t('common.all')}</option>
                             </select>
                         </div>
                     </div>
@@ -1857,7 +1857,7 @@ const ReceiptVouchersTab: React.FC<{
             {/* ✅ Grouped Vouchers - تجميع السندات حسب المشترك والتاريخ */}
             <div className="space-y-4">
                 {filteredVouchers.length === 0 ? (
-                    <p className="text-center text-slate-600 dark:text-slate-300 py-8">لا توجد سندات قبض</p>
+                    <p className="text-center text-slate-600 dark:text-slate-300 py-8">{t('billing.vouchers.noVouchers')}</p>
                 ) : (
                     <>
                         {/* Select All */}
@@ -1869,7 +1869,7 @@ const ReceiptVouchersTab: React.FC<{
                                 className="w-4 h-4 rounded border-slate-400 dark:border-slate-500 bg-white dark:bg-slate-700 text-teal-500 focus:ring-teal-500/50"
                             />
                             <span className="text-sm text-slate-700 dark:text-slate-200 font-medium">
-                                تحديد الكل ({filteredVouchers.length})
+                                {t('billing.vouchers.selectAll')} ({filteredVouchers.length})
                             </span>
                         </div>
                         
@@ -1977,7 +1977,7 @@ const ReceiptVouchersTab: React.FC<{
                                                 {/* Group Total & Actions */}
                                                 <div className="flex items-center gap-4">
                                                     <div className="text-left">
-                                                        <p className="text-xs text-slate-600 dark:text-slate-300">إجمالي ({groupVouchers.length} {groupVouchers.length === 1 ? 'سند' : 'سندات'})</p>
+                                                        <p className="text-xs text-slate-600 dark:text-slate-300">{t('billing.vouchers.total')} ({groupVouchers.length} {groupVouchers.length === 1 ? t('billing.vouchers.voucher') : t('billing.vouchers.vouchers')})</p>
                                                         <p className="text-xl font-bold text-teal-700 dark:text-teal-400">
                                                             {totalAmount.toLocaleString()} <span className="text-sm">ر.س</span>
                                                         </p>
@@ -2047,19 +2047,19 @@ const ReceiptVouchersTab: React.FC<{
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-semibold text-slate-900 dark:text-white">
-                                                                فرع: {voucher.branchName || '-'}
+                                                                {t('admin.branch')}: {voucher.branchName || '-'}
                                                             </span>
                                                             <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 text-[10px] font-bold border border-slate-300 dark:border-slate-500">
                                                                 #{voucher.branchCode || '-'}
                                                             </span>
                                                             {voucher.isDeleted && (
                                                                 <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
-                                                                    محذوف
+                                                                    {t('billing.vouchers.voucherDeleted')}
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-600 dark:text-slate-300">
-                                                            <span>{voucher.subscriptionDuration === 1 ? 'سنة' : 'سنتين'}</span>
+                                                            <span>{voucher.subscriptionDuration === 1 ? t('billing.subscription.oneYear') : t('billing.subscription.twoYears')}</span>
                                                             <span>•</span>
                                                             <span className={`font-medium ${
                                                                 voucher.paymentMethod === 'cash' ? 'text-emerald-700 dark:text-emerald-300' :
@@ -2067,9 +2067,9 @@ const ReceiptVouchersTab: React.FC<{
                                                                 voucher.paymentMethod === 'bank_transfer' ? 'text-purple-700 dark:text-purple-300' :
                                                                 'text-amber-700 dark:text-amber-300'
                                                             }`}>
-                                                                {voucher.paymentMethod === 'cash' ? 'كاش' :
-                                                                 voucher.paymentMethod === 'credit' ? 'كريديت' :
-                                                                 voucher.paymentMethod === 'bank_transfer' ? 'بنكي' : 'مؤجل'}
+                                                                {voucher.paymentMethod === 'cash' ? t('billing.paymentMethods.cash') :
+                                                                 voucher.paymentMethod === 'credit' ? t('billing.paymentMethods.credit') :
+                                                                 voucher.paymentMethod === 'bank_transfer' ? t('billing.paymentMethods.bankTransfer') : t('billing.paymentMethods.deferred')}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -2087,7 +2087,7 @@ const ReceiptVouchersTab: React.FC<{
                                                         <button
                                                             onClick={() => setPreviewVoucher(voucher)}
                                                             className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-600 dark:hover:bg-slate-500 transition-all border border-slate-300 dark:border-slate-500"
-                                                            title="معاينة"
+                                                            title={t('billing.vouchers.preview')}
                                                         >
                                                             <Eye className="w-3.5 h-3.5 text-slate-700 dark:text-slate-200" />
                                                         </button>
@@ -2103,7 +2103,7 @@ const ReceiptVouchersTab: React.FC<{
                                                                 }
                                                             }}
                                                             className="p-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 dark:bg-teal-800 dark:hover:bg-teal-700 transition-all border border-teal-200 dark:border-teal-700"
-                                                            title="طباعة"
+                                                            title={t('billing.vouchers.print')}
                                                         >
                                                             <Printer className="w-3.5 h-3.5 text-teal-700 dark:text-teal-300" />
                                                         </button>
@@ -2137,11 +2137,11 @@ const ReceiptVouchersTab: React.FC<{
                             {/* التاريخ */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-slate-100 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-300 dark:border-slate-600">
-                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">التاريخ الميلادي</p>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">{t('billing.vouchers.gregorianDate')}</p>
                                     <p className="text-slate-900 dark:text-white font-semibold">{new Date(previewVoucher.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })} م</p>
                                 </div>
                                 <div className="bg-slate-100 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-300 dark:border-slate-600">
-                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">التاريخ الهجري</p>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">{t('billing.vouchers.hijriDate')}</p>
                                     <p className="text-slate-800 dark:text-white font-semibold">{new Date(previewVoucher.createdAt).toLocaleDateString('ar-SA-u-ca-islamic', { year: 'numeric', month: 'short', day: 'numeric' })} هـ</p>
                                 </div>
                             </div>
@@ -2149,31 +2149,31 @@ const ReceiptVouchersTab: React.FC<{
                             {/* المشترك */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-slate-100 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-300 dark:border-slate-600">
-                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">اسم المشترك</p>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">{t('billing.vouchers.managerName')}</p>
                                     <p className="text-slate-900 dark:text-white font-semibold">{previewVoucher.managerName}</p>
                                 </div>
                                 <div className="bg-slate-100 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-300 dark:border-slate-600">
-                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">كود المشترك</p>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-1 font-medium">{t('billing.vouchers.managerCode')}</p>
                                     <p className="text-slate-900 dark:text-white font-bold text-lg">{previewVoucher.managerCode}</p>
                                 </div>
                             </div>
                             
                             {/* الفرع - السند الواحد لفرع واحد فقط! */}
                             <div className="bg-teal-50 dark:bg-teal-900/40 rounded-xl p-4 border border-teal-200 dark:border-teal-700">
-                                <p className="text-xs text-teal-700 dark:text-teal-300 mb-2 font-medium">بيانات الفرع</p>
+                                <p className="text-xs text-teal-700 dark:text-teal-300 mb-2 font-medium">{t('billing.vouchers.branchInfo')}</p>
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-slate-900 dark:text-white font-bold text-lg">{previewVoucher.branchName || 'الفرع الرئيسي'}</p>
-                                        <p className="text-slate-600 dark:text-slate-300 text-sm">كود الفرع: #{previewVoucher.branchCode}</p>
+                                        <p className="text-slate-900 dark:text-white font-bold text-lg">{previewVoucher.branchName || t('billing.vouchers.mainBranch')}</p>
+                                        <p className="text-slate-600 dark:text-slate-300 text-sm">{t('billing.vouchers.branchCode')}: #{previewVoucher.branchCode}</p>
                                     </div>
                                     <div className="text-left">
-                                        <p className="text-xs text-slate-600 dark:text-slate-300">مدة الاشتراك</p>
-                                        <p className="text-teal-700 dark:text-teal-400 font-bold">{previewVoucher.subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'}</p>
+                                        <p className="text-xs text-slate-600 dark:text-slate-300">{t('billing.subscription.duration')}</p>
+                                        <p className="text-teal-700 dark:text-teal-400 font-bold">{previewVoucher.subscriptionDuration === 1 ? t('billing.subscription.oneYearFull') : t('billing.subscription.twoYearsFull')}</p>
                                     </div>
                                 </div>
                             </div>
                             
-                            {/* طريقة الدفع */}
+                            {/* Payment Method */}
                             <div className={`rounded-xl p-3 border ${
                                 previewVoucher.paymentMethod === 'cash' ? 'bg-emerald-50 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-700' :
                                 previewVoucher.paymentMethod === 'credit' ? 'bg-blue-50 dark:bg-blue-900/40 border-blue-200 dark:border-blue-700' :
@@ -2185,22 +2185,22 @@ const ReceiptVouchersTab: React.FC<{
                                     previewVoucher.paymentMethod === 'credit' ? 'text-blue-700 dark:text-blue-300' :
                                     previewVoucher.paymentMethod === 'bank_transfer' ? 'text-purple-700 dark:text-purple-300' :
                                     'text-amber-700 dark:text-amber-300'
-                                }`}>طريقة الدفع</p>
+                                }`}>{t('billing.vouchers.paymentMethod')}</p>
                                 <p className={`text-base font-bold ${
                                     previewVoucher.paymentMethod === 'cash' ? 'text-emerald-700 dark:text-emerald-300' :
                                     previewVoucher.paymentMethod === 'credit' ? 'text-blue-700 dark:text-blue-300' :
                                     previewVoucher.paymentMethod === 'bank_transfer' ? 'text-purple-700 dark:text-purple-300' :
                                     'text-amber-700 dark:text-amber-300'
                                 }`}>
-                                    {previewVoucher.paymentMethod === 'cash' ? '💵 كاش' :
-                                     previewVoucher.paymentMethod === 'credit' ? '💳 كريديت' :
-                                     previewVoucher.paymentMethod === 'bank_transfer' ? '🏦 تحويل بنكي' : '⏳ مؤجل الدفع'}
+                                    {previewVoucher.paymentMethod === 'cash' ? t('billing.stats.cash') :
+                                     previewVoucher.paymentMethod === 'credit' ? t('billing.stats.credit') :
+                                     previewVoucher.paymentMethod === 'bank_transfer' ? t('billing.stats.bankTransfer') : t('billing.stats.deferred')}
                                 </p>
                             </div>
                             
                             {/* المبلغ */}
                             <div className="bg-gradient-to-r from-teal-500 to-emerald-500 rounded-xl p-4 text-center">
-                                <p className="text-teal-100 text-sm mb-1">المبلغ الإجمالي</p>
+                                <p className="text-teal-100 text-sm mb-1">{t('billing.vouchers.totalAmount')}</p>
                                 <p className="text-3xl font-bold text-white">{previewVoucher.totalAmount.toLocaleString()} <span className="text-lg">ر.س</span></p>
                             </div>
                             
@@ -2252,8 +2252,8 @@ const ReceiptVouchersTab: React.FC<{
                         setDeleteReason('');
                     }
                 }}
-                title="حذف السندات (محمي بكلمة مرور)"
-                subtitle={`سيتم حذف ${selectedVouchers.size} سند${selectedVouchers.size > 1 ? 'ات' : ''}. هذا الإجراء لا يمكن التراجع عنه.`}
+                title={t('billing.vouchers.confirmDelete')}
+                subtitle={t('billing.vouchers.deleteVouchersConfirm', { count: selectedVouchers.size, plural: selectedVouchers.size > 1 ? 'ات' : '' })}
                 icon={<Lock className="w-6 h-6 text-red-400" />}
                 size="md"
                 showCloseButton={!deleting}
@@ -2317,8 +2317,8 @@ const ReceiptVouchersTab: React.FC<{
                             }
                         }}
                         onConfirm={handleDeleteConfirm}
-                        cancelText="إلغاء"
-                        confirmText="حذف"
+                        cancelText={t('common.cancel')}
+                        confirmText={t('common.delete')}
                         confirmVariant="danger"
                         loading={deleting}
                         disabled={!deletePassword || !deleteReason.trim() || deleting}
@@ -2490,10 +2490,10 @@ const ExpenseVouchersTab: React.FC<{
         
         const confirmed = await customConfirm({
             type: 'danger',
-            title: 'تأكيد الحذف',
-            message: `هل أنت متأكد من حذف ${selectedVouchers.size} سند${selectedVouchers.size > 1 ? 'ات' : ''}؟\n\nهذا الإجراء لا يمكن التراجع عنه.`,
-            confirmText: 'حذف',
-            cancelText: 'إلغاء'
+            title: t('billing.vouchers.confirmDelete'),
+            message: `${t('billing.vouchers.deleteVouchersQuestion', { count: selectedVouchers.size, plural: selectedVouchers.size > 1 ? 'ات' : '' })}\n\n${t('billing.vouchers.deleteVouchersNote')}`,
+            confirmText: t('billing.vouchers.delete'),
+            cancelText: t('billing.vouchers.cancel')
         });
         
         if (!confirmed) {
@@ -3117,14 +3117,14 @@ const ExpenseVouchersTab: React.FC<{
                         className="px-4 py-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 transition-colors text-sm flex items-center gap-2 border border-white/10"
                     >
                         <Filter className="w-4 h-4" />
-                        {showFilters ? 'إخفاء' : 'إظهار'} الفلاتر والبحث
+                        {showFilters ? t('billing.vouchers.hideFilters') : t('billing.vouchers.showFilters')} {t('billing.vouchers.filtersAndSearch')}
                     </button>
                     {filteredVouchers.filter(v => !v.isDeleted).length > 0 && (
                         <>
                             <button
                                 onClick={handleDelete}
                                 disabled={selectedVouchers.size === 0 || deleting}
-                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Trash2 className="w-4 h-4" />
                                 حذف ({selectedVouchers.size})
@@ -3170,7 +3170,7 @@ const ExpenseVouchersTab: React.FC<{
                                 value={voucherNumberSearch}
                                 onChange={(e) => setVoucherNumberSearch(e.target.value)}
                                 placeholder="رقم السند"
-                                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                             />
                         </div>
                         
@@ -3182,7 +3182,7 @@ const ExpenseVouchersTab: React.FC<{
                                 value={paidToFilter}
                                 onChange={(e) => setPaidToFilter(e.target.value)}
                                 placeholder="اسم المستلم"
-                                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                                className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                             />
                         </div>
                         
@@ -3242,17 +3242,17 @@ const ExpenseVouchersTab: React.FC<{
                         
                         {/* Payment Method Filter */}
                         <div className="space-y-2">
-                            <label className="text-xs text-white/60">طريقة الدفع</label>
+                            <label className="text-xs text-white/60">{t('billing.vouchers.paymentMethod')}</label>
                             <select
                                 value={paymentMethodFilter}
                                 onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
                                 className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all appearance-none cursor-pointer hover:bg-white/10 hover:border-white/20 [&>option]:bg-[#0f172a] [&>option]:text-white"
                             >
-                                <option value="all">الكل</option>
-                                <option value="cash">نقداً</option>
-                                <option value="credit">كريديت</option>
-                                <option value="bank_transfer">تحويل بنكي</option>
-                                <option value="deferred">مؤجل الدفع</option>
+                                <option value="all">{t('common.all')}</option>
+                                <option value="cash">{t('billing.paymentMethods.cashLabel')}</option>
+                                <option value="credit">{t('billing.paymentMethods.credit')}</option>
+                                <option value="bank_transfer">{t('billing.paymentMethods.bankTransfer')}</option>
+                                <option value="deferred">{t('billing.paymentMethods.deferred')}</option>
                             </select>
                         </div>
                         
@@ -3266,7 +3266,7 @@ const ExpenseVouchersTab: React.FC<{
                             >
                                 <option value="not_deleted">النشطة</option>
                                 <option value="deleted">المحذوفة</option>
-                                <option value="all">الكل</option>
+                                <option value="all">{t('common.all')}</option>
                             </select>
                         </div>
                     </div>
@@ -3288,7 +3288,7 @@ const ExpenseVouchersTab: React.FC<{
                             className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2"
                         >
                             <X className="w-4 h-4" />
-                            مسح الفلاتر
+                            {t('common.reset')}
                         </button>
                     </div>
                 </div>
@@ -3319,7 +3319,7 @@ const ExpenseVouchersTab: React.FC<{
             {/* Vouchers List - ✅ Enhanced with better contrast like receipt vouchers */}
             <div className="space-y-3">
                 {filteredVouchers.length === 0 ? (
-                    <p className="text-center text-slate-500 dark:text-white/40 py-8">لا توجد سندات صرف</p>
+                    <p className="text-center text-slate-500 dark:text-white/40 py-8">{t('billing.vouchers.noExpenseVouchers')}</p>
                 ) : (
                     filteredVouchers.map(voucher => {
                         const paymentMethodLabels = {
@@ -3439,7 +3439,7 @@ const ExpenseVouchersTab: React.FC<{
                                                 }
                                             }}
                                             className="p-2.5 rounded-lg bg-orange-100 hover:bg-orange-200 dark:bg-orange-800 dark:hover:bg-orange-700 transition-all border border-orange-200 dark:border-orange-700"
-                                            title="طباعة"
+                                            title={t('common.print') || 'طباعة'}
                                         >
                                             <Printer className="w-4 h-4 text-orange-700 dark:text-orange-300" />
                                         </button>
@@ -3639,10 +3639,10 @@ const InvoicesTab: React.FC<{
         }
         
         const paymentMethodLabels = {
-            'cash': 'كاش',
-            'credit': 'كريديت',
-            'bank_transfer': 'تحويل بنكي',
-            'deferred': 'مؤجل الدفع'
+            'cash': t('billing.paymentMethods.cash'),
+            'credit': t('billing.paymentMethods.credit'),
+            'bank_transfer': t('billing.paymentMethods.bankTransfer'),
+            'deferred': t('billing.paymentMethods.deferred')
         };
         
         // ✅ If multiple invoices, use table report format
@@ -4099,14 +4099,14 @@ const InvoicesTab: React.FC<{
                         className="px-4 py-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 transition-colors text-sm flex items-center gap-2 border border-white/10"
                     >
                         <Filter className="w-4 h-4" />
-                        {showFilters ? 'إخفاء' : 'إظهار'} الفلاتر والبحث
+                        {showFilters ? t('billing.vouchers.hideFilters') : t('billing.vouchers.showFilters')} {t('billing.vouchers.filtersAndSearch')}
                     </button>
                     {filteredInvoices.length > 0 && (
                         <>
                             <button
                                 onClick={handleDeleteClick}
                                 disabled={selectedInvoices.size === 0 || deleting}
-                                className="px-4 py-2 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Trash2 className="w-4 h-4" />
                                 حذف ({selectedInvoices.size})
@@ -4192,37 +4192,37 @@ const InvoicesTab: React.FC<{
                                 <option value="highest">الأعلى قيمة</option>
                                 <option value="lowest">الأقل قيمة</option>
                                 <option value="payment">طريقة الدفع</option>
-                                <option value="duration">مدة الاشتراك</option>
+                                <option value="duration">{t('billing.subscription.duration')}</option>
                             </select>
                         </div>
                         
                         {/* Payment Method Filter */}
                         <div className="space-y-2">
-                            <label className="text-xs text-white/60">طريقة الدفع</label>
+                            <label className="text-xs text-white/60">{t('billing.vouchers.paymentMethod')}</label>
                             <select
                                 value={paymentMethodFilter}
                                 onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
                                 className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all appearance-none cursor-pointer hover:bg-white/10 hover:border-white/20 [&>option]:bg-[#0f172a] [&>option]:text-white"
                             >
-                                <option value="all">الكل</option>
-                                <option value="cash">كاش</option>
-                                <option value="credit">كريديت</option>
-                                <option value="bank_transfer">تحويل بنكي</option>
-                                <option value="deferred">مؤجل الدفع</option>
+                                <option value="all">{t('common.all')}</option>
+                                <option value="cash">{t('billing.paymentMethods.cash')}</option>
+                                <option value="credit">{t('billing.paymentMethods.credit')}</option>
+                                <option value="bank_transfer">{t('billing.paymentMethods.bankTransfer')}</option>
+                                <option value="deferred">{t('billing.paymentMethods.deferred')}</option>
                             </select>
                         </div>
                         
                         {/* Duration Filter */}
                         <div className="space-y-2">
-                            <label className="text-xs text-white/60">مدة الاشتراك</label>
+                            <label className="text-xs text-white/60">{t('billing.subscription.duration')}</label>
                             <select
                                 value={durationFilter}
                                 onChange={(e) => setDurationFilter(e.target.value as any)}
                                 className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all appearance-none cursor-pointer hover:bg-white/10 hover:border-white/20 [&>option]:bg-[#0f172a] [&>option]:text-white"
                             >
-                                <option value="all">الكل</option>
-                                <option value="1">سنة واحدة</option>
-                                <option value="2">سنتين</option>
+                                <option value="all">{t('common.all')}</option>
+                                <option value="1">{t('billing.subscription.oneYearFull')}</option>
+                                <option value="2">{t('billing.subscription.twoYearsFull')}</option>
                             </select>
                         </div>
                         
@@ -4236,7 +4236,7 @@ const InvoicesTab: React.FC<{
                             >
                                 <option value="not_deleted">النشطة</option>
                                 <option value="deleted">المحذوفة</option>
-                                <option value="all">الكل</option>
+                                <option value="all">{t('common.all')}</option>
                             </select>
                         </div>
                         
@@ -4257,7 +4257,7 @@ const InvoicesTab: React.FC<{
                                 className="w-full px-4 py-2.5 rounded-lg dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm shadow-red-500/10 hover:shadow-md hover:shadow-red-500/20"
                             >
                                 <X className="w-4 h-4" />
-                                مسح الفلاتر
+                                {t('common.reset')}
                             </button>
                         </div>
                     </div>
@@ -4396,7 +4396,7 @@ const InvoicesTab: React.FC<{
                                             {/* Group Total & Actions */}
                                             <div className="flex items-center gap-4">
                                                 <div className="text-left">
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">إجمالي ({groupInvoices.length} {groupInvoices.length === 1 ? 'فاتورة' : 'فواتير'})</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('billing.vouchers.total')} ({groupInvoices.length} {groupInvoices.length === 1 ? t('admin.invoice') : t('admin.invoices')})</p>
                                                     <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
                                                         {totalAmount.toLocaleString()} <span className="text-sm">ر.س</span>
                                                     </p>
@@ -4467,7 +4467,7 @@ const InvoicesTab: React.FC<{
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                                        <span>{invoice.subscriptionDuration === 1 ? 'سنة' : 'سنتين'}</span>
+                                                        <span>{invoice.subscriptionDuration === 1 ? t('billing.subscription.oneYear') : t('billing.subscription.twoYears')}</span>
                                                         <span>•</span>
                                                         <span className={`font-medium ${
                                                             invoice.paymentMethod === 'cash' ? 'text-emerald-600 dark:text-emerald-400' :
@@ -4495,7 +4495,7 @@ const InvoicesTab: React.FC<{
                                                         setTimeout(() => handlePrint(), 100);
                                                     }}
                                                     className="p-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 transition-all"
-                                                    title="طباعة"
+                                                    title={t('common.print') || 'طباعة'}
                                                 >
                                                     <Printer className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                                                 </button>
@@ -4584,8 +4584,8 @@ const InvoicesTab: React.FC<{
                             }
                         }}
                         onConfirm={handleDeleteConfirm}
-                        cancelText="إلغاء"
-                        confirmText="حذف"
+                        cancelText={t('common.cancel')}
+                        confirmText={t('common.delete')}
                         confirmVariant="danger"
                         loading={deleting}
                         disabled={!deletePassword || !deleteReason.trim() || deleting}
@@ -4703,10 +4703,10 @@ const AddExpenseVoucherModal: React.FC<{
                                 required
                                 className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 rounded-lg text-slate-800 dark:text-white text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all cursor-pointer hover:border-slate-400 dark:hover:border-white/20"
                             >
-                                <option value="cash">نقداً</option>
-                                <option value="credit">كريديت</option>
-                                <option value="bank_transfer">تحويل بنكي</option>
-                                <option value="deferred">مؤجل الدفع</option>
+                                <option value="cash">{t('billing.paymentMethods.cashLabel')}</option>
+                                <option value="credit">{t('billing.paymentMethods.credit')}</option>
+                                <option value="bank_transfer">{t('billing.paymentMethods.bankTransfer')}</option>
+                                <option value="deferred">{t('billing.paymentMethods.deferred')}</option>
                             </select>
                         </div>
                     </div>
@@ -4728,7 +4728,7 @@ const AddExpenseVoucherModal: React.FC<{
                         <textarea
                             value={comments}
                             onChange={(e) => setComments(e.target.value)}
-                            placeholder="تعليقات إضافية (اختياري)"
+                            placeholder={t('common.additionalCommentsOptional') || 'تعليقات إضافية (اختياري)'}
                             rows={2}
                             className="w-full px-4 py-2 rounded-lg bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-400 resize-none"
                         />

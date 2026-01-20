@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
     createManager,
     toggleLicenseStatus,
@@ -45,6 +46,7 @@ interface TenantWithId extends Tenant {
 export const SuperAdminPanel: React.FC = () => {
     const navigate = useNavigate();
     const { user, authReady, logout } = useAuth();
+    const { t } = useTranslation();
 
     const [tenants, setTenants] = useState<TenantWithId[]>([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -109,7 +111,7 @@ export const SuperAdminPanel: React.FC = () => {
             await customConfirm({
                 title: 'تم إنشاء الفندق بنجاح!',
                 message: `الفندق: ${data.hotelName}\nالمدير: ${data.managerName}\nرمز الدخول: ${managerCode}\n\nاحفظ هذا الرمز للمدير`,
-                confirmText: 'حسناً',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'success'
             });
@@ -118,9 +120,9 @@ export const SuperAdminPanel: React.FC = () => {
             console.error('Error creating hotel:', error);
             haptic('error');
             await customConfirm({
-                title: 'خطأ',
+                title: t('common.error') || 'خطأ',
                 message: error.message || 'حدث خطأ في إنشاء الفندق',
-                confirmText: 'حسناً',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'danger'
             });
@@ -334,7 +336,7 @@ const CreateHotelModal: React.FC<{
                             value={managerName}
                             onChange={(e) => setManagerName(e.target.value)}
                             required
-                            placeholder="مثال: أحمد محمد"
+                            placeholder={t('common.exampleManagerName') || 'مثال: أحمد محمد'}
                             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400"
                         />
                     </div>

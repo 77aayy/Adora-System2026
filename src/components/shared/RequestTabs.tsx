@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Clock, List, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -34,10 +35,11 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
     counts,
     className = '',
 }) => {
+    const { t } = useTranslation();
     const tabs: { key: RequestTabType; label: string; icon: React.ReactNode }[] = [
-        { key: 'active', label: 'جارية', icon: <Clock className="w-4 h-4" /> },
-        { key: 'all', label: 'الكل', icon: <List className="w-4 h-4" /> },
-        { key: 'completed', label: 'مكتملة', icon: <CheckCircle className="w-4 h-4" /> },
+        { key: 'active', label: t('common.active') || 'جارية', icon: <Clock className="w-4 h-4" /> },
+        { key: 'all', label: t('common.all') || 'الكل', icon: <List className="w-4 h-4" /> },
+        { key: 'completed', label: t('common.completed') || 'مكتمل', icon: <CheckCircle className="w-4 h-4" /> },
     ];
 
     return (

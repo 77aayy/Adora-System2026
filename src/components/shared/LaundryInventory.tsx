@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
+import { useTranslation } from 'react-i18next';
 import {
     LaundryItem, LaundryRecord,
     subscribeToLaundryItems,
@@ -43,7 +44,8 @@ export const LaundryInventory: React.FC<LaundryInventoryProps> = ({
     onClose
 }) => {
     const { user, tenantId, branchId } = useAuth(); // ✅ Get tenantId and branchId from AuthContext
-    const { haptic, playSound, success, error, voiceEnabled, toggleVoice } = useUX();
+      const { haptic, playSound, success, error, voiceEnabled, toggleVoice } = useUX();
+      const { t } = useTranslation();
     
     // ✅ Feature Gate: Check if laundry management is enabled
     const { isEnabled: isLaundryEnabled } = useFeatureGate('laundryManagement');
@@ -401,7 +403,7 @@ export const LaundryInventory: React.FC<LaundryInventoryProps> = ({
                                                     ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
                                                     : 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
                                                     }`}
-                                                title="نقص 10"
+                                                title={t('laundry.decrease10') || 'نقص 10'}
                                             >
                                                 -10
                                             </button>
@@ -457,7 +459,7 @@ export const LaundryInventory: React.FC<LaundryInventoryProps> = ({
                                                     ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
                                                     : 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
                                                     }`}
-                                                title="زيادة 10"
+                                                title={t('laundry.increase10') || 'زيادة 10'}
                                             >
                                                 +10
                                             </button>
@@ -491,7 +493,7 @@ export const LaundryInventory: React.FC<LaundryInventoryProps> = ({
                                                     record.status === 'received' ? 'bg-green-500/20 text-green-400' :
                                                         'bg-white/10 text-white/60'
                                                     }`}>
-                                                    {record.status === 'delivered' ? 'بانتظار الاستلام' : 'مكتمل'}
+                                                    {record.status === 'delivered' ? (t('common.pending') || 'بانتظار الاستلام') : t('common.completed') || 'مكتمل'}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-4 text-sm text-white/60">
@@ -564,7 +566,7 @@ export const LaundryInventory: React.FC<LaundryInventoryProps> = ({
                             ) : (
                                 <>
                                     <Check className="w-6 h-6" />
-                                    {viewMode === 'delivery' ? 'تأكيد التسليم' : 'تأكيد الاستلام'}
+                                    {viewMode === 'delivery' ? (t('procurement.markDelivered') || 'تأكيد التسليم') : (t('procurement.confirmReceipt') || 'تأكيد الاستلام')}
                                 </>
                             )}
                         </button>

@@ -214,9 +214,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             label: t('admin.inventoryAndWarehouses') || 'المخزون والمستودعات',
             icon: <Package className="w-4 h-4" style={{ color: 'var(--theme-accent-orange)' }} />,
             items: [
-                ...(isInventoryEnabled ? [{ to: '/admin/inventory', icon: <Package className="w-4 h-4" />, label: t('sidebar.inventory') || 'المخزون' }] : []),
-                ...(isLaundryEnabled ? [{ to: '/admin/laundry', icon: <Shirt className="w-4 h-4" />, label: t('departments.laundry') || 'المغسلة' }] : []),
-                { to: '/admin/lost-found', icon: <Search className="w-4 h-4" />, label: t('admin.lostFound') || 'المفقودات' },
+                ...(isInventoryEnabled ? [{ to: '/admin/inventory', icon: <Package className="w-4 h-4" />, label: t('sidebar.inventory') }] : []),
+                ...(isLaundryEnabled ? [{ to: '/admin/laundry', icon: <Shirt className="w-4 h-4" />, label: t('departments.laundry') }] : []),
+                { to: '/admin/lost-found', icon: <Search className="w-4 h-4" />, label: t('admin.lostFound') },
             ]
         },
         {
@@ -599,8 +599,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                 : location.pathname.startsWith(item.to));
                                             const isActive = isActiveTab || isActiveRoute;
                                             
-                                            // ✅ Check if this is the "الفواتير" (Invoices) item
-                                            const isInvoicesItem = item.label === 'الفواتير' || item.label === t('admin.billing');
+                                            // ✅ Check if this is the "Invoices" item
+                                            const isInvoicesItem = item.label === t('admin.billing');
                                             
                                             // ✅ Handle click for tab links
                                             const handleClick = () => {
@@ -953,8 +953,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                         setSubscriptionRequiredBranches(1);
                     }
                 }}
-                title={isSubscriptionSuccess ? undefined : 'أرغب في الاشتراك الرسمي'}
-                subtitle={isSubscriptionSuccess ? undefined : 'يرجى ملء البيانات التالية وسنتواصل معك قريباً'}
+                title={isSubscriptionSuccess ? undefined : (t('admin.wantToSubscribe') || 'أرغب في الاشتراك الرسمي')}
+                subtitle={isSubscriptionSuccess ? undefined : (t('admin.subscriptionFormMessage') || 'يرجى ملء البيانات التالية وسنتواصل معك قريباً')}
                 icon={isSubscriptionSuccess ? <CheckCircle2 className="w-6 h-6 text-green-400" /> : <Sparkles className="w-6 h-6 text-teal-400" />}
                 size="md"
                 showCloseButton={!isSubscriptionSuccess && !isSubmittingSubscription}
@@ -982,7 +982,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                     value={subscriptionName}
                                     onChange={(e) => setSubscriptionName(e.target.value)}
                                     placeholder={t('placeholder.enterName')}
-                                    className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                                    className="w-full pr-10 pl-4 py-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
                                     dir="rtl"
                                     disabled={isSubmittingSubscription}
                                 />
@@ -1001,7 +1001,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                     value={subscriptionPhone}
                                     onChange={(e) => setSubscriptionPhone(e.target.value.replace(/\D/g, ''))}
                                     placeholder={t('placeholder.phoneNumber')}
-                                    className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                                    className="w-full pr-10 pl-4 py-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
                                     dir="ltr"
                                     disabled={isSubmittingSubscription}
                                     maxLength={15}
@@ -1026,7 +1026,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                             className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
                                                 subscriptionRequiredBranches === num
                                                     ? 'bg-teal-500 text-white border-2 border-teal-400'
-                                                    : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10'
+                                                    : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 border border-slate-300 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10'
                                             }`}
                                         >
                                             {num}
@@ -1045,7 +1045,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                             setSubscriptionRequiredBranches(Math.max(1, Math.min(100, val)));
                                         }}
                                         placeholder={t('placeholder.customBranches')}
-                                        className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                                        className="w-full pr-10 pl-4 py-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
                                         dir="ltr"
                                         disabled={isSubmittingSubscription}
                                     />
@@ -1104,13 +1104,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                         showError(result.error || 'فشل إرسال الطلب');
                                     }
                                 } catch (err: any) {
-                                    showError(err.message || 'حدث خطأ أثناء إرسال الطلب');
+                                    showError(err.message || t('trialForm.error'));
                                 } finally {
                                     setIsSubmittingSubscription(false);
                                 }
                             }}
-                            cancelText="إلغاء"
-                            confirmText="إرسال الطلب"
+                            cancelText={t('common.cancel')}
+                            confirmText={t('common.submit')}
                             confirmVariant="primary"
                             loading={isSubmittingSubscription}
                             disabled={!subscriptionName.trim() || !subscriptionPhone.trim() || isSubmittingSubscription}

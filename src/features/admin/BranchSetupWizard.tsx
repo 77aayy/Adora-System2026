@@ -24,6 +24,7 @@ import {
 import { useTenant } from '../../context/TenantContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantBranches } from '../../hooks/useTenantData';
+import { useTranslation } from 'react-i18next';
 import { addRoomType, getRoomTypes, RoomTypeConfig } from '../../services/pricingRulesService';
 import { addRoom } from '../../services/roomService';
 import { haptic, playSound } from '../../utils/uxEffects';
@@ -136,6 +137,7 @@ export const BranchSetupWizard: React.FC<BranchSetupWizardProps> = ({
     onComplete,
     resumeState
 }) => {
+    const { t } = useTranslation();
     const { tenantId, tenantInfo } = useTenant();
     const { user } = useAuth();
     const { branches } = useTenantBranches();
@@ -1059,7 +1061,7 @@ const Step3AddRooms: React.FC<{
                             type="number"
                             value={batchConfig.startNumber}
                             onChange={(e) => setBatchConfig({ ...batchConfig, startNumber: Number(e.target.value) })}
-                            placeholder="من"
+                            placeholder={t('common.from') || 'من'}
                             className="px-3 py-2 rounded-lg border"
                             style={{
                                 background: 'var(--theme-bg-tertiary)',
@@ -1072,7 +1074,7 @@ const Step3AddRooms: React.FC<{
                             type="number"
                             value={batchConfig.endNumber}
                             onChange={(e) => setBatchConfig({ ...batchConfig, endNumber: Number(e.target.value) })}
-                            placeholder="إلى"
+                            placeholder={t('common.to') || 'إلى'}
                             className="px-3 py-2 rounded-lg border"
                             style={{
                                 background: 'var(--theme-bg-tertiary)',

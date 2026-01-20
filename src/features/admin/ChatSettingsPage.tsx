@@ -28,6 +28,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import {
     ChatSettings,
     QuickOption,
@@ -93,7 +94,7 @@ const QuickOptionEditor: React.FC<QuickOptionEditorProps> = ({
         <form onSubmit={handleSubmit} className="bg-slate-800 rounded-xl p-4 border border-white/10">
             <h4 className="text-white font-bold mb-4 flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-teal-400" />
-                {option ? 'تعديل الخيار' : 'إضافة خيار جديد'}
+                {option ? t('admin.editOption') || 'تعديل الخيار' : t('admin.addNewOption') || 'إضافة خيار جديد'}
             </h4>
 
             <div className="space-y-4">
@@ -126,7 +127,7 @@ const QuickOptionEditor: React.FC<QuickOptionEditorProps> = ({
                             type="text"
                             value={formData.label || ''}
                             onChange={(e) => setFormData(f => ({ ...f, label: e.target.value }))}
-                            placeholder="مثال: خروج متأخر"
+                            placeholder={t('chatSettings.exampleLateCheckout') || 'مثال: خروج متأخر'}
                             className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2
                                        text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50"
                             required
@@ -138,7 +139,7 @@ const QuickOptionEditor: React.FC<QuickOptionEditorProps> = ({
                             type="text"
                             value={formData.labelEn || ''}
                             onChange={(e) => setFormData(f => ({ ...f, labelEn: e.target.value }))}
-                            placeholder="e.g. Late Checkout"
+                            placeholder={t('chatSettings.exampleLateCheckoutEn') || 'e.g. Late Checkout'}
                             className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2
                                        text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50"
                         />
@@ -205,7 +206,7 @@ const QuickOptionEditor: React.FC<QuickOptionEditorProps> = ({
                     <textarea
                         value={formData.autoResponse || ''}
                         onChange={(e) => setFormData(f => ({ ...f, autoResponse: e.target.value }))}
-                        placeholder="مثال: تم استلام طلبكم وسيتم الرد قريباً..."
+                        placeholder={t('chatSettings.exampleAutoResponse') || 'مثال: تم استلام طلبكم وسيتم الرد قريباً...'}
                         className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2
                                    text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50
                                    resize-none h-20"
@@ -253,6 +254,7 @@ const QuickOptionEditor: React.FC<QuickOptionEditorProps> = ({
 
 export const ChatSettingsPage: React.FC<ChatSettingsPageProps> = ({ tenantId }) => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     
     // State
     const [settings, setSettings] = useState<ChatSettings | null>(null);
@@ -336,7 +338,7 @@ export const ChatSettingsPage: React.FC<ChatSettingsPageProps> = ({ tenantId }) 
     };
 
     const handleDeleteOption = async (optionId: string) => {
-        if (!confirm('هل أنت متأكد من حذف هذا الخيار؟')) return;
+        if (!confirm(t('admin.deleteOptionConfirm') || 'هل أنت متأكد من حذف هذا الخيار؟')) return;
 
         try {
             const updatedOptions = (settings?.quickOptions || []).filter(o => o.id !== optionId);
@@ -399,10 +401,10 @@ export const ChatSettingsPage: React.FC<ChatSettingsPageProps> = ({ tenantId }) 
                 <div className="p-4 border-b border-white/10">
                     <h3 className="text-white font-bold flex items-center gap-2">
                         <MessageCircle className="w-5 h-5 text-teal-400" />
-                        رسالة الترحيب
+                        {t('chatSettings.welcomeMessage') || 'رسالة الترحيب'}
                     </h3>
                     <p className="text-white/50 text-sm mt-1">
-                        هذه الرسالة تظهر للنزيل أول ما يفتح الشات
+                        {t('chatSettings.welcomeMessageDescription') || 'هذه الرسالة تظهر للنزيل أول ما يفتح الشات'}
                     </p>
                 </div>
 
@@ -412,7 +414,7 @@ export const ChatSettingsPage: React.FC<ChatSettingsPageProps> = ({ tenantId }) 
                         <textarea
                             value={welcomeMessage}
                             onChange={(e) => setWelcomeMessage(e.target.value)}
-                            placeholder="مرحباً بك في فندق أدورا! كيف يمكننا مساعدتك؟"
+                            placeholder={t('chatSettings.welcomeMessagePlaceholder') || 'مرحباً بك في فندق أدورا! كيف يمكننا مساعدتك؟'}
                             className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3
                                        text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50
                                        resize-none h-24"
@@ -425,7 +427,7 @@ export const ChatSettingsPage: React.FC<ChatSettingsPageProps> = ({ tenantId }) 
                         <textarea
                             value={welcomeMessageEn}
                             onChange={(e) => setWelcomeMessageEn(e.target.value)}
-                            placeholder="Welcome to Adora Hotel! How can we help you?"
+                            placeholder={t('chatSettings.welcomeMessagePlaceholderEn') || 'Welcome to Adora Hotel! How can we help you?'}
                             className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3
                                        text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50
                                        resize-none h-24"

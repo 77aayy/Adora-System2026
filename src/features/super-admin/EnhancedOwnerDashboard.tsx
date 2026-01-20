@@ -993,7 +993,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <h1 className="text-lg sm:text-2xl font-bold text-white truncate">{t('admin.mainDashboard')}</h1>
-                                        <p className="text-xs sm:text-sm text-white/60 truncate">{allBranches.length} {t('sidebar.branch')} {t('auth.activeLabel')} • {t('admin.appManagement')}</p>
+                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-white/60 truncate">{allBranches.length} {t('sidebar.branch')} {t('auth.activeLabel')} • {t('admin.appManagement')}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
@@ -1098,7 +1098,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                                             : 'bg-teal-500/20 text-teal-400 shadow-sm'
                                                         : isHidden
                                                             ? 'hover:bg-red-500/10 opacity-60 hover:opacity-100'
-                                                            : 'hover:bg-white/5'
+                                                            : 'hover:bg-slate-100 dark:hover:bg-white/5'
                                                     }`}
                                                 style={{
                                                     color: isActive
@@ -1235,7 +1235,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             <div className="flex items-center justify-center min-h-[400px]">
                                 <div className="text-center">
                                     <Shield className="w-16 h-16 text-teal-400 mx-auto mb-4 opacity-50" />
-                                    <p className="text-white/60">{t('admin.enterPasswordForConfigMode')}</p>
+                                    <p className="text-slate-600 dark:text-white/60">{t('admin.enterPasswordForConfigMode')}</p>
                                 </div>
                             </div>
                         )}
@@ -3062,10 +3062,10 @@ const TenantsTab: React.FC<{
                                                     <button
                                                         onClick={() => onViewDetails?.(tenant)}
                                                         className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group"
-                                                        title="عرض التفاصيل الكاملة"
+                                                        title={t('common.viewFullDetails') || 'عرض التفاصيل الكاملة'}
                                                     >
                                                         <Eye className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                                        <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">عرض</span>
+                                                        <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">{t('common.view') || 'عرض'}</span>
                                                     </button>
                                                     {/* ✅ Check if manager is deleted before showing action buttons */}
                                                     {(() => {
@@ -3087,10 +3087,10 @@ const TenantsTab: React.FC<{
                                                                         }
                                                                         const confirmed = await customConfirm({
                                                                             type: 'info',
-                                                                            title: 'تأكيد الاستعادة',
-                                                                            message: 'هل أنت متأكد من استعادة هذا المدير؟',
-                                                                            confirmText: 'استعادة',
-                                                                            cancelText: 'إلغاء'
+                                                                            title: t('owner.confirmRestore'),
+                                                                            message: t('owner.confirmRestoreMessage'),
+                                                                            confirmText: t('owner.restore'),
+                                                                            cancelText: t('common.cancel')
                                                                         });
                                                                         if (!confirmed) {
                                                                             return;
@@ -3147,7 +3147,7 @@ const TenantsTab: React.FC<{
                                                                     }}
                                                                     disabled={processing === tenant.tenantId}
                                                                     className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                                                                    title={tenant.status === 'active' ? 'إيقاف مؤقت' : 'تفعيل'}
+                                                                    title={tenant.status === 'active' ? t('owner.suspend') : t('owner.activate')}
                                                                 >
                                                                     {tenant.status === 'active' ? (
                                                                         <Pause className="w-4 h-4 transition-transform group-hover:scale-110" />
@@ -3155,7 +3155,7 @@ const TenantsTab: React.FC<{
                                                                         <Play className="w-4 h-4 transition-transform group-hover:scale-110" />
                                                                     )}
                                                                     <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">
-                                                                        {tenant.status === 'active' ? 'إيقاف' : 'تفعيل'}
+                                                                        {tenant.status === 'active' ? t('owner.suspend') : t('owner.activate')}
                                                                     </span>
                                                                 </button>
                                                                 <button
@@ -3181,9 +3181,9 @@ const TenantsTab: React.FC<{
                                                                             // Show warning if price is below default
                                                                             if (result.warning) {
                                                                                 await customConfirm({
-                                                                                    title: 'تنبيه',
+                                                                                    title: t('common.warning'),
                                                                                     message: result.warning,
-                                                                                    confirmText: 'حسناً',
+                                                                                    confirmText: t('common.ok'),
                                                                                     showCancel: false,
                                                                                     type: 'warning'
                                                                                 });
@@ -3238,7 +3238,7 @@ const TenantsTab: React.FC<{
                                                                     }}
                                                                     disabled={processing === tenant.tenantId}
                                                                     className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                                                                    title="تجديد الاشتراك (سنة)"
+                                                                    title={t('admin.renewSubscriptionYear') || 'تجديد الاشتراك (سنة)'}
                                                                 >
                                                                     {processing === tenant.tenantId ? (
                                                                         <AdoraLoaderInline size={16} />
@@ -3506,7 +3506,7 @@ const SettingsTab: React.FC<{
                                             setLocalPrice(newPrice);
                                         }}
                                         className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
-                                        placeholder="مثال: 1000"
+                                        placeholder={t('common.examplePrice') || 'مثال: 1000'}
                                     />
                                 </div>
 
@@ -3524,7 +3524,7 @@ const SettingsTab: React.FC<{
                                             setLocalTax(isNaN(newTax) ? 0 : newTax);
                                         }}
                                         className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
-                                        placeholder="15"
+                                        placeholder={t('admin.discountPlaceholder') || '15'}
                                     />
                                 </div>
 
@@ -3542,7 +3542,7 @@ const SettingsTab: React.FC<{
                                             setLocalTwoYearDiscount(isNaN(newDiscount) ? 0 : newDiscount);
                                         }}
                                         className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
-                                        placeholder="5"
+                                        placeholder={t('admin.discountPlaceholder2') || '5'}
                                     />
                                 </div>
                             </div>
@@ -3686,7 +3686,7 @@ const SettingsTab: React.FC<{
                                     value={localCompanyName}
                                     onChange={(e) => setLocalCompanyName(e.target.value)}
                                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
-                                    placeholder="مثال: شركة أدورا لإدارة الفنادق"
+                                    placeholder={t('common.exampleCompanyName') || 'مثال: شركة أدورا لإدارة الفنادق'}
                                 />
                             </div>
 
@@ -3700,7 +3700,7 @@ const SettingsTab: React.FC<{
                                     value={localCompanyTaxNumber}
                                     onChange={(e) => setLocalCompanyTaxNumber(e.target.value)}
                                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
-                                    placeholder="مثال: 302003322600003"
+                                    placeholder={t('common.exampleTaxNumber') || 'مثال: 302003322600003'}
                                 />
                             </div>
 
@@ -3714,7 +3714,7 @@ const SettingsTab: React.FC<{
                                     value={localCommercialRegistration}
                                     onChange={(e) => setLocalCommercialRegistration(e.target.value)}
                                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
-                                    placeholder="مثال: 4030284941"
+                                    placeholder={t('owner.exampleCommercialRegistration') || 'مثال: 4030284941'}
                                 />
                             </div>
 
@@ -3728,7 +3728,7 @@ const SettingsTab: React.FC<{
                                     onChange={(e) => setLocalCompanyAddress(e.target.value)}
                                     rows={2}
                                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base resize-none"
-                                    placeholder="مثال: جدة - الرويس، شارع الجزيرة بجوار الأطباء المتحدون"
+                                    placeholder={t('owner.exampleCompanyAddress') || 'مثال: جدة - الرويس، شارع الجزيرة بجوار الأطباء المتحدون'}
                                 />
                             </div>
 
@@ -3742,7 +3742,7 @@ const SettingsTab: React.FC<{
                                     value={localContactPhone}
                                     onChange={(e) => setLocalContactPhone(e.target.value)}
                                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
-                                    placeholder="مثال: +966 12 6076060، +966 570707121"
+                                    placeholder={t('owner.exampleContactPhone') || 'مثال: +966 12 6076060، +966 570707121'}
                                 />
                             </div>
 
@@ -3756,7 +3756,7 @@ const SettingsTab: React.FC<{
                                     value={localContactEmail}
                                     onChange={(e) => setLocalContactEmail(e.target.value)}
                                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
-                                    placeholder="مثال: info@adora.com"
+                                    placeholder={t('owner.exampleContactEmail') || 'مثال: info@adora.com'}
                                 />
                             </div>
 
@@ -3770,7 +3770,7 @@ const SettingsTab: React.FC<{
                                     value={localContactWebsite}
                                     onChange={(e) => setLocalContactWebsite(e.target.value)}
                                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
-                                    placeholder="مثال: https://www.adora.com"
+                                    placeholder={t('owner.exampleWebsite') || 'مثال: https://www.adora.com'}
                                 />
                             </div>
 
@@ -3846,10 +3846,10 @@ const SettingsTab: React.FC<{
                                                         ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                                                         : 'bg-gray-600/20 text-gray-400 border border-gray-600/30'
                                                     }`}>
-                                                    {enabled ? 'مفعّلة' : 'معطّلة'}
+                                                    {enabled ? t('owner.enabled') : t('owner.disabled')}
                                                 </span>
                                             </div>
-                                            <p className="text-xs sm:text-sm text-white/50 leading-relaxed mt-2">{description}</p>
+                                            <p className="text-xs sm:text-sm text-slate-600 dark:text-white/50 leading-relaxed mt-2">{description}</p>
                                         </div>
                                         <button
                                             onClick={() => onToggleFeature(key, !enabled)}
@@ -4038,7 +4038,7 @@ const DynamicBrandingSection: React.FC = () => {
                             value={logoUrl}
                             onChange={(e) => setLogoUrl(e.target.value)}
                             className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-purple-400 transition-colors text-sm sm:text-base"
-                            placeholder="https://example.com/logo.png"
+                            placeholder={t('owner.exampleLogoUrl') || 'https://example.com/logo.png'}
                             dir="ltr"
                         />
                         {logoUrl && (
@@ -4375,10 +4375,10 @@ const DeveloperBrandingSection: React.FC = () => {
                             value={devPhoneSA}
                             onChange={(e) => setDevPhoneSA(e.target.value.replace(/[^0-9]/g, ''))}
                             className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
-                            placeholder="966570707121"
+                            placeholder={t('owner.examplePhoneSA') || '966570707121'}
                             dir="ltr"
                         />
-                        <p className="text-xs text-white/40 mt-1">ادخل الرقم بالمفتاح الدولي بدون + (مثال: 966570707121)</p>
+                        <p className="text-xs text-white/40 mt-1">{t('owner.enterPhoneWithCountryCode') || 'ادخل الرقم بالمفتاح الدولي بدون + (مثال: 966570707121)'}</p>
                     </div>
 
                     {/* Developer Phone - Egypt */}
@@ -4391,7 +4391,7 @@ const DeveloperBrandingSection: React.FC = () => {
                             value={devPhoneEG}
                             onChange={(e) => setDevPhoneEG(e.target.value.replace(/[^0-9]/g, ''))}
                             className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
-                            placeholder="201500000162"
+                            placeholder={t('owner.examplePhoneEG') || '201500000162'}
                             dir="ltr"
                         />
                         <p className="text-xs text-white/40 mt-1">ادخل الرقم بالمفتاح الدولي بدون + (مثال: 201500000162)</p>
@@ -4407,10 +4407,10 @@ const DeveloperBrandingSection: React.FC = () => {
                             value={devEmail}
                             onChange={(e) => setDevEmail(e.target.value)}
                             className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
-                            placeholder="77aayy@gmail.com"
+                            placeholder={t('owner.exampleEmail') || '77aayy@gmail.com'}
                             dir="ltr"
                         />
-                        <p className="text-xs text-white/40 mt-1">يظهر في توقيع المطور أسفل الصفحات</p>
+                        <p className="text-xs text-white/40 mt-1">{t('owner.appearsInDeveloperSignature') || 'يظهر في توقيع المطور أسفل الصفحات'}</p>
                     </div>
 
                     {/* Developer Name */}
@@ -4423,7 +4423,7 @@ const DeveloperBrandingSection: React.FC = () => {
                             value={devName}
                             onChange={(e) => setDevName(e.target.value)}
                             className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
-                            placeholder="Ayman Abu Warda"
+                            placeholder={t('owner.exampleDeveloperName') || 'Ayman Abu Warda'}
                         />
                     </div>
 
@@ -4437,7 +4437,7 @@ const DeveloperBrandingSection: React.FC = () => {
                             value={devSignature}
                             onChange={(e) => setDevSignature(e.target.value)}
                             className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
-                            placeholder="Crafted by Ayman Abu Warda"
+                            placeholder={t('owner.exampleCraftedBy') || 'Crafted by Ayman Abu Warda'}
                         />
                         <p className="text-xs text-white/40 mt-1">يظهر في أسفل صفحات النظام</p>
                     </div>
@@ -4479,9 +4479,9 @@ const UpdatesTab: React.FC<{
     const handleBroadcastUpdate = async () => {
         if (updates.length === 0) {
             await customConfirm({
-                title: 'تنبيه',
+                title: t('common.warning'),
                 message: t('admin.noUpdatesToBroadcast'),
-                confirmText: 'حسناً',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'warning'
             });
@@ -4520,7 +4520,7 @@ const UpdatesTab: React.FC<{
             await customConfirm({
                 title: t('admin.error'),
                 message: t('admin.errorBroadcastingUpdate'),
-                confirmText: 'حسناً',
+                confirmText: t('common.ok'),
                 showCancel: false,
                 type: 'danger'
             });
@@ -4771,14 +4771,14 @@ const UpdateModal: React.FC<{
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
                         type="text"
-                        placeholder="رقم الإصدار (مثال: 3.1.0)"
+                        placeholder={t('admin.versionPlaceholder') || 'رقم الإصدار (مثال: 3.1.0)'}
                         value={version}
                         onChange={(e) => setVersion(e.target.value)}
                         required
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400"
+                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-yellow-400"
                     />
                     <textarea
-                        placeholder="سجل التغييرات"
+                        placeholder={t('admin.changelogPlaceholder') || 'سجل التغييرات'}
                         value={changelog}
                         onChange={(e) => setChangelog(e.target.value)}
                         required
@@ -4968,7 +4968,7 @@ const BroadcastModal: React.FC<{
 
         // ✅ Validate dates before submission
         if (!startDate || !endDate) {
-            alert('يرجى تحديد تاريخ البدء وتاريخ الانتهاء');
+            alert(t('admin.selectStartAndEndDate') || 'يرجى تحديد تاريخ البدء وتاريخ الانتهاء');
             return;
         }
 
@@ -4977,13 +4977,13 @@ const BroadcastModal: React.FC<{
 
         // ✅ Check if dates are valid
         if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
-            alert('تاريخ غير صالح. يرجى التحقق من تنسيق التاريخ');
+            alert(t('admin.invalidDate') || 'تاريخ غير صالح. يرجى التحقق من تنسيق التاريخ');
             return;
         }
 
         // ✅ Ensure end date is after start date
         if (parsedEndDate <= parsedStartDate) {
-            alert('يجب أن يكون تاريخ الانتهاء بعد تاريخ البدء');
+            alert(t('admin.endDateAfterStart') || 'يجب أن يكون تاريخ الانتهاء بعد تاريخ البدء');
             return;
         }
 
@@ -5009,14 +5009,14 @@ const BroadcastModal: React.FC<{
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
                         type="text"
-                        placeholder="العنوان"
+                        placeholder={t('owner.title')}
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         required
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400"
+                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-yellow-400"
                     />
                     <textarea
-                        placeholder="الرسالة"
+                        placeholder={t('owner.message')}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         required
@@ -5035,19 +5035,19 @@ const BroadcastModal: React.FC<{
                     </select>
                     <input
                         type="datetime-local"
-                        placeholder="تاريخ البدء"
+                        placeholder={t('common.startDate') || 'تاريخ البدء'}
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
                         required
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400"
+                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-yellow-400"
                     />
                     <input
                         type="datetime-local"
-                        placeholder="تاريخ الانتهاء"
+                        placeholder={t('common.endDate') || 'تاريخ الانتهاء'}
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
                         required
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400"
+                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-yellow-400"
                     />
 
                     {/* Scheduled Message Option */}
@@ -5088,7 +5088,7 @@ const BroadcastModal: React.FC<{
                                                     className="w-4 h-4 rounded border-white/20 bg-white/5 text-blue-500"
                                                 />
                                                 <span className="text-xs text-white/80">
-                                                    {role === 'manager' ? 'المشتركين' : role === 'employee' ? 'الموظفين' : 'الموظفين'}
+                                                    {role === 'manager' ? t('owner.subscribers') : t('owner.employees')}
                                                 </span>
                                             </label>
                                         ))}
@@ -5577,7 +5577,7 @@ const AddManagerModal: React.FC<{
                                         'bg-gray-300 dark:bg-white/10'
                                 }`} />
                             <span className="text-[9px] block text-center" style={{ color: step <= currentStep ? 'var(--theme-text-primary)' : 'var(--theme-text-disabled)' }}>
-                                {step === 1 ? 'الأساسية' : step === 2 ? 'الفروع' : step === 3 ? 'الاشتراك' : 'المراجعة'}
+                                {step === 1 ? t('owner.stepBasic') : step === 2 ? t('owner.stepBranches') : step === 3 ? t('owner.stepSubscription') : t('owner.stepReview')}
                             </span>
                         </div>
                     ))}
@@ -5594,7 +5594,7 @@ const AddManagerModal: React.FC<{
                                     <label className="flex items-center gap-1.5 text-xs mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
                                         <Users className="w-3.5 h-3.5 text-teal-500" />اسم المشترك <span className="text-red-500">*</span>
                                     </label>
-                                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="input py-2 text-sm" placeholder="أيمن أبو ورده" required />
+                                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="input py-2 text-sm" placeholder={t('owner.exampleName') || 'أيمن أبو ورده'} required />
                                 </div>
                                 <div>
                                     <label className="flex items-center gap-1.5 text-xs mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
@@ -5651,7 +5651,7 @@ const AddManagerModal: React.FC<{
                                         onClick={handleGenerateCode}
                                         disabled={generatingCode}
                                         className="px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                        title="توليد كود عشوائي فريد (4 أرقام)"
+                                        title={t('admin.generateRandomCode') || 'توليد كود عشوائي فريد (4 أرقام)'}
                                     >
                                         {generatingCode ? (
                                             <AdoraLoaderInline size={16} />
@@ -5712,15 +5712,15 @@ const AddManagerModal: React.FC<{
                     {currentStep === 3 && (
                         <div className="space-y-3">
                             <div>
-                                <label className="flex items-center gap-1.5 text-xs mb-1.5" style={{ color: 'var(--theme-text-secondary)' }}><CreditCard className="w-3.5 h-3.5 text-green-500" />طريقة الدفع</label>
+                                <label className="flex items-center gap-1.5 text-xs mb-1.5" style={{ color: 'var(--theme-text-secondary)' }}><CreditCard className="w-3.5 h-3.5 text-green-500" />{t('billing.vouchers.paymentMethod')}</label>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                                    {[{ value: 'cash', label: 'كاش', icon: '💵' }, { value: 'credit', label: 'كريديت', icon: '💳' }, { value: 'bank_transfer', label: 'بنكي', icon: '🏦' }, { value: 'deferred', label: 'مؤجل', icon: '⏳' }].map((m) => (
+                                    {[{ value: 'cash', label: t('billing.paymentMethods.cash'), icon: '💵' }, { value: 'credit', label: t('billing.paymentMethods.credit'), icon: '💳' }, { value: 'bank_transfer', label: t('billing.paymentMethods.bankTransfer'), icon: '🏦' }, { value: 'deferred', label: t('billing.paymentMethods.deferred'), icon: '⏳' }].map((m) => (
                                         <button key={m.value} type="button" onClick={() => setPaymentMethod(m.value as any)} className={`py-2 rounded-lg text-xs font-medium flex flex-col items-center gap-0.5 border ${paymentMethod === m.value ? 'border-teal-500 bg-teal-500/10' : 'border-theme glass'}`} style={{ color: 'var(--theme-text-primary)' }}><span>{m.icon}</span><span>{m.label}</span></button>
                                     ))}
                                 </div>
                             </div>
                             <div>
-                                <label className="flex items-center gap-1.5 text-xs mb-1.5" style={{ color: 'var(--theme-text-secondary)' }}><Calendar className="w-3.5 h-3.5 text-yellow-500" />مدة الاشتراك</label>
+                                <label className="flex items-center gap-1.5 text-xs mb-1.5" style={{ color: 'var(--theme-text-secondary)' }}><Calendar className="w-3.5 h-3.5 text-yellow-500" />{t('owner.subscriptionDuration')}</label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <button type="button" onClick={() => setSubscriptionDuration(1)} className={`py-2.5 rounded-xl flex items-center justify-center gap-2 border text-sm ${subscriptionDuration === 1 ? 'border-teal-500 bg-teal-500/10' : 'border-theme glass'}`} style={{ color: 'var(--theme-text-primary)' }}>📅 سنة</button>
                                     <button type="button" onClick={() => setSubscriptionDuration(2)} className={`py-2.5 rounded-xl flex items-center justify-center gap-2 border text-sm relative ${subscriptionDuration === 2 ? 'border-yellow-500 bg-yellow-500/10' : 'border-theme glass'}`} style={{ color: 'var(--theme-text-primary)' }}><span className="absolute top-0.5 left-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-500 text-white">توفير</span>📅📅 سنتين</button>
@@ -5764,13 +5764,13 @@ const AddManagerModal: React.FC<{
                                         
                                         {/* Subscription Duration Info */}
                                         <div className="flex justify-between items-center text-xs">
-                                            <span style={{ color: 'var(--theme-text-secondary)' }}>عدد الفروع:</span>
-                                            <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{numberOfBranches} {numberOfBranches === 1 ? 'فرع' : 'فروع'}</span>
+                                            <span style={{ color: 'var(--theme-text-secondary)' }}>{t('owner.numberOfBranches')}:</span>
+                                            <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{numberOfBranches} {numberOfBranches === 1 ? t('admin.branch') : t('admin.branches')}</span>
                                         </div>
                                         
                                         <div className="flex justify-between items-center text-xs">
-                                            <span style={{ color: 'var(--theme-text-secondary)' }}>مدة الاشتراك:</span>
-                                            <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'}</span>
+                                            <span style={{ color: 'var(--theme-text-secondary)' }}>{t('owner.subscriptionDuration')}:</span>
+                                            <span className="font-medium" style={{ color: 'var(--theme-text-primary)' }}>{subscriptionDuration === 1 ? t('billing.subscription.oneYearFull') : t('billing.subscription.twoYearsFull')}</span>
                                         </div>
                                         
                                         {/* Original Price (2 years) */}
@@ -5951,7 +5951,7 @@ const AddManagerModal: React.FC<{
                                 return (
                                     <div className="glass rounded-xl p-3 space-y-2">
                                         <div className="flex justify-between items-center text-xs">
-                                            <span style={{ color: 'var(--theme-text-secondary)' }}>{subscriptionDuration===1?'سنة':'سنتين'} • {paymentMethod==='cash'?'كاش':paymentMethod==='credit'?'كريديت':paymentMethod==='bank_transfer'?'بنكي':'مؤجل'}</span>
+                                            <span style={{ color: 'var(--theme-text-secondary)' }}>{subscriptionDuration===1 ? t('billing.subscription.oneYear') : t('billing.subscription.twoYears')} • {paymentMethod==='cash' ? t('billing.paymentMethods.cash') : paymentMethod==='credit' ? t('billing.paymentMethods.credit') : paymentMethod==='bank_transfer' ? t('billing.paymentMethods.bankTransfer') : t('billing.paymentMethods.deferred')}</span>
                                             <span className="font-bold text-primary-500">{Math.round(finalTotal).toLocaleString()} ر.س</span>
                                         </div>
                                         
@@ -6168,7 +6168,7 @@ const ManagerDetailsModal: React.FC<{
                         <button
                             onClick={handlePrint}
                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-500/30 transition-colors border border-teal-300 dark:border-teal-500/30"
-                            title="طباعة تقرير الاشتراك"
+                            title={t('admin.printSubscriptionReport') || 'طباعة تقرير الاشتراك'}
                         >
                             <Printer className="w-5 h-5" />
                             <span className="hidden sm:inline">طباعة</span>
@@ -6853,9 +6853,9 @@ const SubscriptionRequestsTab: React.FC = () => {
                 {/* Status Filters */}
                 <div className="flex gap-2 flex-wrap">
                     {([
-                        { key: 'all', label: 'الكل' },
-                        { key: 'not-contacted', label: 'لم يتم التواصل' },
-                        { key: 'contacted', label: 'تم التواصل' }
+                        { key: 'all', label: t('common.all') },
+                        { key: 'not-contacted', label: t('admin.notContacted') },
+                        { key: 'contacted', label: t('admin.contacted') }
                     ] as const).map((filterOption) => (
                         <button
                             key={filterOption.key}
@@ -6943,14 +6943,14 @@ const SubscriptionRequestsTab: React.FC = () => {
                                                 <button
                                                     onClick={() => handleViewNotes(request)}
                                                     className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-teal-500/30 transition-all"
-                                                    title="عرض الملاحظات"
+                                                    title={t('admin.viewNotes') || 'عرض الملاحظات'}
                                                 >
                                                     <Eye className="w-4 h-4 text-white/60 hover:text-teal-400" />
                                                 </button>
                                                 <button
                                                     onClick={() => handlePrintRequest(request)}
                                                     className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-teal-500/30 transition-all"
-                                                    title="طباعة التفاصيل"
+                                                    title={t('admin.printDetails') || 'طباعة التفاصيل'}
                                                 >
                                                     <Printer className="w-4 h-4 text-white/60 hover:text-teal-400" />
                                                 </button>
@@ -7013,8 +7013,8 @@ const SubscriptionRequestsTab: React.FC = () => {
                     setContactResult('demo');
                     setContactNotes('');
                 }}
-                title="نتيجة الاتصال"
-                subtitle="اختر نوع الطلب وأضف ملاحظات"
+                title={t('admin.contactResult') || 'نتيجة الاتصال'}
+                subtitle={t('admin.selectRequestTypeAndNotes') || 'اختر نوع الطلب وأضف ملاحظات'}
                 icon={<MessageSquare className="w-6 h-6 text-teal-400" />}
                 size="md"
             >
@@ -7076,8 +7076,8 @@ const SubscriptionRequestsTab: React.FC = () => {
                         setContactNotes('');
                     }}
                     onConfirm={handleSubmitContact}
-                    confirmText="حفظ"
-                    cancelText="إلغاء"
+                    confirmText={t('common.save')}
+                    cancelText={t('common.cancel')}
                     confirmVariant="primary"
                 />
             </UnifiedModal>
@@ -7089,8 +7089,8 @@ const SubscriptionRequestsTab: React.FC = () => {
                     setShowNotesModal(false);
                     setSelectedRequest(null);
                 }}
-                title="تفاصيل الاتصال"
-                subtitle="تاريخ الطلب، تاريخ الاتصال، والملاحظات"
+                title={t('admin.contactDetails') || 'تفاصيل الاتصال'}
+                subtitle={t('admin.contactDetailsSubtitle') || 'تاريخ الطلب، تاريخ الاتصال، والملاحظات'}
                 icon={<Eye className="w-6 h-6 text-teal-400" />}
                 size="md"
             >
@@ -7156,7 +7156,7 @@ const SubscriptionRequestsTab: React.FC = () => {
                         setShowNotesModal(false);
                         setSelectedRequest(null);
                     }}
-                    confirmText="إغلاق"
+                    confirmText={t('common.close')}
                     cancelText=""
                     confirmVariant="primary"
                     hideCancel
@@ -7171,8 +7171,8 @@ const SubscriptionRequestsTab: React.FC = () => {
                     setSelectedRequestId(null);
                     setFollowUpNote('');
                 }}
-                title="إضافة متابعة"
-                subtitle="اكتب ملاحظة متابعة للمشترك المحتمل"
+                title={t('admin.addFollowUp') || 'إضافة متابعة'}
+                subtitle={t('admin.addFollowUpSubtitle') || 'اكتب ملاحظة متابعة للمشترك المحتمل'}
                 icon={<MessageSquare className="w-6 h-6 text-teal-400" />}
                 size="md"
             >
@@ -7203,8 +7203,8 @@ const SubscriptionRequestsTab: React.FC = () => {
                         setFollowUpNote('');
                     }}
                     onConfirm={handleSubmitFollowUp}
-                    confirmText="حفظ"
-                    cancelText="إلغاء"
+                    confirmText={t('common.save')}
+                    cancelText={t('common.cancel')}
                     confirmVariant="primary"
                 />
             </UnifiedModal>

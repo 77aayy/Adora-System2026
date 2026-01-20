@@ -31,6 +31,7 @@ import {
 import { seedTenantDatabase, checkMissingCollections } from '../../services/tenantSeedingService';
 import { getDatabaseHealthReport, DatabaseHealthReport } from '../../services/dataDoctorService';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -177,6 +178,7 @@ service cloud.firestore {
 
 export const FirebaseSettingsPage: React.FC = () => {
     const { user } = useAuth();
+    const { t } = useTranslation();
 
     // Form state
     const [config, setConfig] = useState<FirebaseConfig>({
@@ -305,7 +307,7 @@ export const FirebaseSettingsPage: React.FC = () => {
     };
 
     const handleClearConfig = () => {
-        if (window.confirm('هل أنت متأكد من حذف إعدادات Firebase الحالية؟\nسيتم إعادة تشغيل النظام.')) {
+        if (window.confirm(t('admin.deleteFirebaseConfirm') || 'هل أنت متأكد من حذف إعدادات Firebase الحالية؟\nسيتم إعادة تشغيل النظام.')) {
             clearFirebaseConfig();
             window.location.reload();
         }

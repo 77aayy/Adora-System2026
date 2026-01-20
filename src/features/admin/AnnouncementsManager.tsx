@@ -13,6 +13,7 @@ import {
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import {
     getAnnouncements,
     createAnnouncement,
@@ -31,6 +32,7 @@ export const AnnouncementsManager: React.FC<AnnouncementsManagerProps> = ({ bran
     const { tenantId } = useTenant();
     const { success, error } = useUX();
     const { user } = useAuth();
+    const { t } = useTranslation();
 
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ export const AnnouncementsManager: React.FC<AnnouncementsManagerProps> = ({ bran
     };
 
     const handleDelete = async (announcementId: string) => {
-        if (!confirm('هل أنت متأكد من حذف هذا التنبيه؟')) return;
+        if (!confirm(t('admin.deleteAlertConfirm') || 'هل أنت متأكد من حذف هذا التنبيه؟')) return;
         try {
             await deleteAnnouncement(announcementId);
             success('تم حذف التنبيه');
@@ -271,7 +273,7 @@ export const AnnouncementsManager: React.FC<AnnouncementsManagerProps> = ({ bran
                                     <p className="text-white/60 text-sm line-clamp-2">{announcement.contentAr || announcement.content}</p>
                                     <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/10 text-xs text-white/40">
                                         <span className={announcement.isActive ? 'text-green-400' : 'text-red-400'}>
-                                            {announcement.isActive ? 'نشط' : 'غير نشط'}
+                                            {announcement.isActive ? t('common.active') : t('common.inactive')}
                                         </span>
                                         <span>الترتيب: {announcement.order || 0}</span>
                                     </div>
@@ -413,7 +415,7 @@ const AnnouncementModal: React.FC<{
                                     : 'bg-red-500/20 text-red-400 border border-red-500/30'
                                     }`}
                             >
-                                {formData.isActive ? 'نشط' : 'معطّل'}
+                                {formData.isActive ? t('common.active') : t('common.disabled')}
                             </button>
                         </div>
 

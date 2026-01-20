@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export type TabType = 'new' | 'in_progress' | 'completed';
 
@@ -42,12 +43,6 @@ const TAB_STYLES = {
     }
 };
 
-const TAB_LABELS: Record<TabType, string> = {
-    new: 'جديد',
-    in_progress: 'قيد التنفيذ',
-    completed: 'مكتمل'
-};
-
 export const UnifiedRequestTabs: React.FC<UnifiedRequestTabsProps> = ({
     currentTab,
     onTabChange,
@@ -55,6 +50,12 @@ export const UnifiedRequestTabs: React.FC<UnifiedRequestTabsProps> = ({
     inProgressCount,
     completedCount
 }) => {
+    const { t } = useTranslation();
+    const TAB_LABELS: Record<TabType, string> = {
+        new: t('common.new') || 'جديد',
+        in_progress: t('common.inProgress') || 'قيد التنفيذ',
+        completed: t('common.completed') || 'مكتمل'
+    };
     const tabs: Tab[] = [
         { key: 'new', label: TAB_LABELS.new, count: newCount },
         { key: 'in_progress', label: TAB_LABELS.in_progress, count: inProgressCount },

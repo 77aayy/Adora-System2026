@@ -28,6 +28,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { logger } from '../../services/loggerService';
+import { useTranslation } from 'react-i18next';
 import {
     LostFoundItem,
     ItemStatus,
@@ -49,16 +50,25 @@ import {
 // ============================================================
 
 const StatusBadge: React.FC<{ status: ItemStatus }> = ({ status }) => {
+    const { t } = useTranslation();
+    const STATUS_NAMES_TRANSLATED: Record<ItemStatus, string> = {
+        found: t('lostFound.status.found') || STATUS_NAMES.found,
+        claimed: t('lostFound.status.claimed') || STATUS_NAMES.claimed,
+        returned: t('lostFound.status.returned') || STATUS_NAMES.returned,
+        donated: t('lostFound.status.donated') || STATUS_NAMES.donated,
+        disposed: t('lostFound.status.disposed') || STATUS_NAMES.disposed,
+    };
     const colors: Record<ItemStatus, string> = {
         found: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
         claimed: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
         returned: 'bg-green-500/20 text-green-400 border-green-500/30',
         disposed: 'bg-red-500/20 text-red-400 border-red-500/30',
+        donated: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
     };
 
     return (
         <span className={`px-3 py-1 rounded-full text-xs font-medium border ${colors[status]}`}>
-            {STATUS_NAMES[status]}
+            {STATUS_NAMES_TRANSLATED[status]}
         </span>
     );
 };
@@ -273,7 +283,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onSave, br
                                     value={formData.location}
                                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                                     className="w-full pr-10 pl-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-colors"
-                                    placeholder="مثال: اللوبي"
+                                    placeholder={t('common.exampleLocation') || 'مثال: اللوبي'}
                                 />
                             </div>
                         </div>
@@ -284,7 +294,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onSave, br
                                 value={formData.roomNumber}
                                 onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
                                 className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-colors"
-                                placeholder="اختياري"
+                                placeholder={t('common.optional') || 'اختياري'}
                             />
                         </div>
                     </div>
@@ -321,7 +331,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onSave, br
                             value={formData.storageLocation}
                             onChange={(e) => setFormData({ ...formData, storageLocation: e.target.value })}
                             className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-colors"
-                            placeholder="مثال: خزنة الاستقبال"
+                            placeholder={t('common.exampleStorage') || 'مثال: خزنة الاستقبال'}
                         />
                     </div>
 
@@ -645,6 +655,7 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ isOpen, onClose, it
 
 export const LostFoundManagement: React.FC = () => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     const branchId = useMemo(() => (user as any)?.branch || 'default', [user]);
     const tenantId = useMemo(() => (user as any)?.tenantId || '', [user]); // ✅ FIX: Get tenantId
 
@@ -729,7 +740,7 @@ export const LostFoundManagement: React.FC = () => {
         if (!tenantId) {
             throw new Error('tenantId is required');
         }
-        if (confirm('هل أنت متأكد من التخلص من هذا العنصر؟')) {
+        if (confirm(t('lostFound.disposeConfirm') || 'هل أنت متأكد من التخلص من هذا العنصر؟')) {
             await disposeItem(selectedItem.id, tenantId);
             setShowDetailsModal(false);
         }
@@ -780,25 +791,25 @@ export const LostFoundManagement: React.FC = () => {
             {stats && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <StatsCard
-                        title="عناصر موجودة"
+                        title={t('lostFound.itemsFound') || 'عناصر موجودة'}
                         value={stats.found}
                         color="#3B82F6"
                         icon={<Package className="w-6 h-6" />}
                     />
                     <StatsCard
-                        title="مطالب بها"
+                        title={t('lostFound.itemsClaimed') || 'مطالب بها'}
                         value={stats.claimed}
                         color="#F59E0B"
                         icon={<User className="w-6 h-6" />}
                     />
                     <StatsCard
-                        title="تم إرجاعها"
+                        title={t('lostFound.itemsReturned') || 'تم إرجاعها'}
                         value={stats.returned}
                         color="#22C55E"
                         icon={<CheckCircle2 className="w-6 h-6" />}
                     />
                     <StatsCard
-                        title="الإجمالي"
+                        title={t('common.total') || 'الإجمالي'}
                         value={stats.total}
                         color="#8B5CF6"
                         icon={<FileText className="w-6 h-6" />}
@@ -816,7 +827,7 @@ export const LostFoundManagement: React.FC = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pr-12 pl-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                        placeholder="البحث بالوصف أو المكان..."
+                        placeholder={t('lostFound.searchByDescriptionOrLocation') || 'البحث بالوصف أو المكان...'}
                     />
                 </div>
 
@@ -831,7 +842,7 @@ export const LostFoundManagement: React.FC = () => {
                                     : 'bg-white/10 text-white/60 hover:bg-white/20'
                                 }`}
                         >
-                            {status === 'all' ? 'الكل' : STATUS_NAMES[status]}
+                            {status === 'all' ? t('common.all') || 'الكل' : (status === 'found' ? (t('lostFound.status.found') || STATUS_NAMES.found) : status === 'claimed' ? (t('lostFound.status.claimed') || STATUS_NAMES.claimed) : status === 'returned' ? (t('lostFound.status.returned') || STATUS_NAMES.returned) : status === 'disposed' ? (t('lostFound.status.disposed') || STATUS_NAMES.disposed) : STATUS_NAMES[status as ItemStatus])}
                         </button>
                     ))}
                 </div>

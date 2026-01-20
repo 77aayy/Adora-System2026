@@ -346,16 +346,20 @@ export interface GuestModalActionsProps {
 export const GuestModalActions: React.FC<GuestModalActionsProps> = ({
     onCancel,
     onConfirm,
-    cancelText = 'إلغاء',
-    confirmText = 'تأكيد',
+    cancelText,
+    confirmText,
     confirmVariant = 'primary',
     loading = false,
     disabled = false,
-}) => (
+}) => {
+    const { t } = useTranslation();
+    const finalCancelText = cancelText || t('common.cancel');
+    const finalConfirmText = confirmText || t('common.confirm');
+    return (
     <div className="flex gap-3">
         {onCancel && (
             <GuestButton variant="secondary" onClick={onCancel} fullWidth>
-                {cancelText}
+                {finalCancelText}
             </GuestButton>
         )}
         {onConfirm && (
@@ -366,11 +370,12 @@ export const GuestModalActions: React.FC<GuestModalActionsProps> = ({
                 disabled={disabled}
                 fullWidth
             >
-                {confirmText}
+                {finalConfirmText}
             </GuestButton>
         )}
     </div>
-);
+    );
+};
 
 // ============================================================
 // SUCCESS STATE COMPONENT

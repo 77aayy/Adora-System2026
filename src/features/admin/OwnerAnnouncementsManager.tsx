@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useTenant } from '../../context/TenantContext';
 import { useTenantBranches } from '../../hooks/useTenantData';
+import { useTranslation } from 'react-i18next';
 import {
     subscribeToAllOwnerAnnouncements,
     createOwnerAnnouncement,
@@ -28,6 +29,7 @@ export const OwnerAnnouncementsManager: React.FC = () => {
     const { success, error } = useUX();
     const { tenantId } = useTenant();
     const { branches: rawBranches } = useTenantBranches();
+    const { t } = useTranslation();
     
     // ✅ ARCHITECT FIX: Ensure branches is always an array (SaaS Safety)
     const branches = Array.isArray(rawBranches) ? rawBranches : [];
@@ -77,12 +79,12 @@ export const OwnerAnnouncementsManager: React.FC = () => {
     };
 
     const handleDelete = async (announcementId: string) => {
-        if (!confirm('هل أنت متأكد من حذف هذه الرسالة؟')) return;
+        if (!confirm(t('admin.deleteConfirm') || 'هل أنت متأكد من حذف هذه الرسالة؟')) return;
         try {
             await deactivateOwnerAnnouncement(announcementId);
-            success('تم حذف الرسالة');
+            success(t('admin.deleteSuccess') || 'تم الحذف بنجاح');
         } catch (err) {
-            error('فشل حذف الرسالة');
+            error(t('admin.deleteError') || 'فشل الحذف');
         }
     };
 
@@ -93,13 +95,13 @@ export const OwnerAnnouncementsManager: React.FC = () => {
             setSelectedAnnouncement(announcement);
             setShowStats(true);
         } catch (err) {
-            error('فشل تحميل الإحصائيات');
+            error(t('common.loadError') || 'فشل تحميل البيانات');
         }
     };
 
     const handleSave = async () => {
         if (!user || !formData.titleAr?.trim() || !formData.messageAr?.trim()) {
-            error('يرجى إدخال العنوان والرسالة');
+            error(t('admin.titleAndMessageRequired') || 'يرجى إدخال العنوان والرسالة');
             return;
         }
 
@@ -111,14 +113,14 @@ export const OwnerAnnouncementsManager: React.FC = () => {
                     user.id,
                     user.name || ''
                 );
-                success('تم تحديث الرسالة');
+                success(t('admin.updateSuccess') || 'تم التحديث بنجاح');
             } else {
                 await createOwnerAnnouncement(
                     formData as Omit<OwnerAnnouncement, 'id' | 'createdAt' | 'views' | 'dismissals'>,
                     user.id,
                     user.name || ''
                 );
-                success('تم إرسال الرسالة العاجلة');
+                success(t('admin.sendSuccess') || 'تم الإرسال بنجاح');
             }
             setShowModal(false);
             setFormData({
@@ -139,7 +141,7 @@ export const OwnerAnnouncementsManager: React.FC = () => {
                 isActive: true
             });
         } catch (err) {
-            error('فشل حفظ الرسالة');
+            error(t('admin.saveError') || 'فشل الحفظ');
         }
     };
 
@@ -356,7 +358,7 @@ export const OwnerAnnouncementsManager: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-4 pt-3 border-t border-white/10 text-xs text-white/40">
                                     <span className={announcement.isActive ? 'text-green-400' : 'text-red-400'}>
-                                        {announcement.isActive ? 'نشط' : 'غير نشط'}
+                                        {announcement.isActive ? t('common.active') || 'نشط' : t('common.inactive') || 'غير نشط'}
                                     </span>
                                     <span className="flex items-center gap-1">
                                         <Users className="w-3 h-3" />
@@ -590,7 +592,7 @@ const AnnouncementModal: React.FC<{
                                             : 'bg-white/10 text-white/60 border border-white/10'
                                             }`}
                                     >
-                                        {formData.showAsBanner ? 'مفعّل' : 'معطّل'}
+                                        {formData.showAsBanner ? t('common.active') : t('common.disabled')}
                                     </button>
                                 </label>
                             </div>
@@ -604,7 +606,7 @@ const AnnouncementModal: React.FC<{
                                             : 'bg-white/10 text-white/60 border border-white/10'
                                             }`}
                                     >
-                                        {formData.dismissible ? 'نعم' : 'لا'}
+                                        {formData.dismissible ? t('common.yes') : t('common.no')}
                                     </button>
                                 </label>
                             </div>
@@ -657,7 +659,7 @@ const AnnouncementModal: React.FC<{
                                 className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold hover:shadow-lg hover:shadow-amber-500/25 transition-all flex items-center justify-center gap-2"
                             >
                                 <Save className="w-5 h-5" />
-                                {editingAnnouncement ? 'تحديث' : 'إرسال'}
+                                {editingAnnouncement ? t('common.update') : t('common.submit')}
                             </button>
                         </div>
                     </div>

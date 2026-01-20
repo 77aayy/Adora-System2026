@@ -209,7 +209,7 @@ export const RoomManagement: React.FC = () => {
                             <button
                                 onClick={() => setEditingRoom(room)}
                                 className="p-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all"
-                                title="تعديل"
+                                title={t('common.edit')}
                             >
                                 <Edit2 className="w-4 h-4" />
                             </button>

@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { uploadFileToImgBB, validateImageFile } from '../../services/imageUploadService';
 import { subscribeToInventory, InventoryItem } from '../../services/inventoryService';
 import { confirmReceipt as confirmProcurementReceipt } from '../../services/procurementService';
@@ -179,6 +180,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
     const { user, branchId, tenantId } = useAuth(); // ✅ Get branchId and tenantId
     const { success, error, haptic } = useUX();
     const { isDark } = useTheme(); // ✅ Get current theme
+    const { t } = useTranslation();
     
     // ✅ Feature Gate: Check if procurement system is enabled
     const { isEnabled: isProcurementEnabled } = useFeatureGate('procurementSystem');
@@ -442,7 +444,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
         const validation = validateImageFile(file);
         if (!validation.valid) {
             haptic('error');
-            setUploadProgress(validation.error || 'خطأ');
+            setUploadProgress(validation.error || t('common.error'));
             return;
         }
 
@@ -460,11 +462,11 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                 setUploadProgress('');
                 haptic('success');
             } else {
-                setUploadProgress(result.error || 'فشل الرفع');
+                setUploadProgress(result.error || t('common.uploadError') || 'فشل الرفع');
                 haptic('error');
             }
         } catch (error) {
-            setUploadProgress('حدث خطأ');
+            setUploadProgress(t('common.error') || 'حدث خطأ');
             haptic('error');
         } finally {
             setIsUploading(false);
@@ -666,13 +668,13 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
     // Get status label in Arabic
     const getStatusLabel = (status: string) => {
         const labels: Record<string, { text: string; color: string }> = {
-            'PENDING_APPROVAL': { text: 'بانتظار الموافقة', color: 'bg-yellow-500/20 text-yellow-400' },
-            'APPROVED': { text: 'تمت الموافقة', color: 'bg-blue-500/20 text-blue-400' },
-            'PURCHASING': { text: 'جاري الشراء', color: 'bg-purple-500/20 text-purple-400' },
-            'PURCHASED': { text: 'تم الشراء', color: 'bg-green-500/20 text-green-400' },
-            'DELIVERED': { text: 'جاهز للاستلام', color: 'bg-primary-500/20 text-emerald-400' },
-            'RECEIVED': { text: 'تم الاستلام', color: 'bg-gray-500/20 text-gray-400' },
-            'COMPLETED': { text: 'مكتمل', color: 'bg-gray-500/20 text-gray-400' }
+            'PENDING_APPROVAL': { text: t('procurement.pendingApproval') || 'بانتظار الموافقة', color: 'bg-yellow-500/20 text-yellow-400' },
+            'APPROVED': { text: t('procurement.approved') || 'تمت الموافقة', color: 'bg-blue-500/20 text-blue-400' },
+            'PURCHASING': { text: t('procurement.purchasing') || 'جاري الشراء', color: 'bg-purple-500/20 text-purple-400' },
+            'PURCHASED': { text: t('procurement.purchased') || 'تم الشراء', color: 'bg-green-500/20 text-green-400' },
+            'DELIVERED': { text: t('procurement.delivered') || 'تم التسليم', color: 'bg-primary-500/20 text-emerald-400' },
+            'RECEIVED': { text: t('procurement.received') || 'تم الاستلام', color: 'bg-gray-500/20 text-gray-400' },
+            'COMPLETED': { text: t('common.completed') || 'مكتمل', color: 'bg-gray-500/20 text-gray-400' }
         };
         return labels[status] || { text: status, color: 'bg-gray-500/20 text-gray-400' };
     };
@@ -796,7 +798,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                                                 setAllowNewItem(false);
                                             }}
                                             onFocus={() => setShowItemDropdown(true)}
-                                            placeholder="ابحث عن منتج من المخزون..."
+                                            placeholder={t('procurement.searchInventoryProduct') || 'ابحث عن منتج من المخزون...'}
                                             className="input w-full pr-10"
                                         />
                                         {selectedInventoryItem && (
@@ -928,7 +930,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                                         value={quantity}
                                         onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                                         min="1"
-                                        placeholder="الكمية"
+                                        placeholder={t('procurement.quantity') || 'الكمية'}
                                         className="input"
                                     />
                                 </div>
@@ -1005,7 +1007,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                                 <textarea
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
-                                    placeholder="ملاحظات (اختياري)"
+                                    placeholder={t('common.notesOptional') || 'ملاحظات (اختياري)'}
                                     className="input resize-none"
                                     rows={2}
                                 />
@@ -1294,7 +1296,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                                 onClick={confirmPartialReceipt}
                                 className="flex-1 py-3 rounded-xl bg-gradient-to-r from-teal-400 to-teal-500 text-white font-medium"
                             >
-                                تأكيد الاستلام
+                                {t('procurement.confirmReceipt') || 'تأكيد الاستلام'}
                             </button>
                         </div>
                     </div>

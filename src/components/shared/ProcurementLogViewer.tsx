@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { AdoraLoader } from '../common/AdoraLoader';
+import { useTranslation } from 'react-i18next';
 import {
     getProcurementLogs, getDepartmentProcurementLogs, getDepartmentReceipts,
     ProcurementLogEntry, ReceiptRecord, STAGE_CONFIG, ProcurementStage
@@ -229,7 +230,7 @@ export const ProcurementLogViewer: React.FC<ProcurementLogViewerProps> = ({
                         <button
                             onClick={handlePrint}
                             className="p-2.5 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
-                            title="طباعة"
+                            title={t('common.print') || 'طباعة'}
                         >
                             <Printer className="w-5 h-5" />
                         </button>

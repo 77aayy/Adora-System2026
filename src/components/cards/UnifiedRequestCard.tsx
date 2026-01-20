@@ -18,6 +18,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { Request, RequestStatus } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -37,82 +38,8 @@ interface UnifiedRequestCardProps {
 }
 
 // ============================================================
-// STATUS CONFIGURATION
+// STATUS CONFIGURATION - Will be created with useMemo inside component
 // ============================================================
-
-const statusConfig: Record<RequestStatus, {
-    label: string;
-    labelAr: string;
-    badgeClass: string;
-    icon: React.ReactNode;
-}> = {
-    [RequestStatus.PENDING_RECEPTION]: {
-        label: 'Pending',
-        labelAr: 'بانتظار التأكيد',
-        badgeClass: 'badge-pending',
-        icon: <Clock className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.CONFIRMED]: {
-        label: 'Confirmed',
-        labelAr: 'تم التأكيد',
-        badgeClass: 'badge-confirmed',
-        icon: <CheckCircle className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.IN_PROGRESS]: {
-        label: 'In Progress',
-        labelAr: 'قيد التنفيذ',
-        badgeClass: 'badge-progress',
-        icon: <PlayCircle className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.WAITING_PARTS]: {
-        label: 'Waiting for Parts',
-        labelAr: 'بانتظار قطع',
-        badgeClass: 'bg-amber-500/20 text-amber-400 border border-amber-500/50',
-        icon: <PauseCircle className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.COMPLETED]: {
-        label: 'Completed',
-        labelAr: 'مكتمل',
-        badgeClass: 'badge-completed',
-        icon: <CheckCircle className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.MAINTENANCE_PENDING]: {
-        label: 'Maintenance',
-        labelAr: 'بانتظار الصيانة',
-        badgeClass: 'badge-maintenance',
-        icon: <Wrench className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.PENDING_HOUSEKEEPING]: {
-        label: 'Pending Inspection',
-        labelAr: 'بانتظار الفحص',
-        badgeClass: 'badge-maintenance',
-        icon: <Sparkles className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.PENDING_MAINTENANCE]: {
-        label: 'Maintenance Pending',
-        labelAr: 'صيانة معلقة',
-        badgeClass: 'bg-rose-500/20 text-rose-400 border border-rose-500/50',
-        icon: <Wrench className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.CANCELLED]: {
-        label: 'Cancelled',
-        labelAr: 'ملغي',
-        badgeClass: 'badge-cancelled',
-        icon: <XCircle className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.SCHEDULED]: {
-        label: 'Scheduled',
-        labelAr: 'مجدول',
-        badgeClass: 'bg-purple-500/20 text-purple-400 border border-purple-500/50',
-        icon: <Calendar className="w-3.5 h-3.5" />,
-    },
-    [RequestStatus.NEEDS_INSPECTION]: {
-        label: 'Needs Inspection',
-        labelAr: 'يحتاج فحص',
-        badgeClass: 'bg-orange-500/20 text-orange-400 border border-orange-500/50',
-        icon: <AlertTriangle className="w-3.5 h-3.5" />,
-    },
-};
 
 // ============================================================
 // REQUEST TYPE ICONS
@@ -140,6 +67,80 @@ export const UnifiedRequestCard: React.FC<UnifiedRequestCardProps> = ({
     isPotentialDuplicate,
     onMove,
 }) => {
+    const { t } = useTranslation();
+    const statusConfig = React.useMemo<Record<RequestStatus, {
+        label: string;
+        labelAr: string;
+        badgeClass: string;
+        icon: React.ReactNode;
+    }>>(() => ({
+        [RequestStatus.PENDING_RECEPTION]: {
+            label: 'Pending',
+            labelAr: t('reception.statusLabels.pendingReception') || 'بانتظار التأكيد',
+            badgeClass: 'badge-pending',
+            icon: <Clock className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.CONFIRMED]: {
+            label: 'Confirmed',
+            labelAr: t('reception.statusLabels.confirmed') || 'تم التأكيد',
+            badgeClass: 'badge-confirmed',
+            icon: <CheckCircle className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.IN_PROGRESS]: {
+            label: 'In Progress',
+            labelAr: t('reception.statusLabels.inProgress') || 'قيد التنفيذ',
+            badgeClass: 'badge-progress',
+            icon: <PlayCircle className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.WAITING_PARTS]: {
+            label: 'Waiting for Parts',
+            labelAr: t('reception.statusLabels.waitingParts') || 'بانتظار قطع',
+            badgeClass: 'bg-amber-500/20 text-amber-400 border border-amber-500/50',
+            icon: <PauseCircle className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.COMPLETED]: {
+            label: 'Completed',
+            labelAr: t('reception.statusLabels.completed') || 'مكتمل',
+            badgeClass: 'badge-completed',
+            icon: <CheckCircle className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.MAINTENANCE_PENDING]: {
+            label: 'Maintenance',
+            labelAr: t('maintenance.statusLabels.pending') || 'بانتظار الصيانة',
+            badgeClass: 'badge-maintenance',
+            icon: <Wrench className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.PENDING_HOUSEKEEPING]: {
+            label: 'Pending Inspection',
+            labelAr: t('reception.statusLabels.needsInspection') || 'بانتظار الفحص',
+            badgeClass: 'badge-maintenance',
+            icon: <Sparkles className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.PENDING_MAINTENANCE]: {
+            label: 'Maintenance Pending',
+            labelAr: t('maintenance.statusLabels.pending') || 'صيانة معلقة',
+            badgeClass: 'bg-rose-500/20 text-rose-400 border border-rose-500/50',
+            icon: <Wrench className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.CANCELLED]: {
+            label: 'Cancelled',
+            labelAr: t('common.cancelled') || 'ملغي',
+            badgeClass: 'badge-cancelled',
+            icon: <XCircle className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.SCHEDULED]: {
+            label: 'Scheduled',
+            labelAr: t('reception.statusLabels.scheduled') || 'مجدول',
+            badgeClass: 'bg-purple-500/20 text-purple-400 border border-purple-500/50',
+            icon: <Calendar className="w-3.5 h-3.5" />,
+        },
+        [RequestStatus.NEEDS_INSPECTION]: {
+            label: 'Needs Inspection',
+            labelAr: t('reception.statusLabels.needsInspection') || 'يحتاج فحص',
+            badgeClass: 'bg-orange-500/20 text-orange-400 border border-orange-500/50',
+            icon: <AlertTriangle className="w-3.5 h-3.5" />,
+        },
+    }), [t]);
     const statusInfo = statusConfig[request.status];
 
     // Format timestamp
@@ -167,10 +168,10 @@ export const UnifiedRequestCard: React.FC<UnifiedRequestCardProps> = ({
             if (request.status === RequestStatus.PENDING_RECEPTION) {
                 return (<>
                     <button onClick={() => onAction('confirm')} className={btnPrimary}>
-                        <CheckCircle className="w-3 h-3" /> تأكيد
+                        <CheckCircle className="w-3 h-3" /> {t('common.confirm') || 'تأكيد'}
                     </button>
                     {onMove && (
-                        <button onClick={(e) => { e.stopPropagation(); onMove(); }} className={btnSecondary} title="نقل">
+                        <button onClick={(e) => { e.stopPropagation(); onMove(); }} className={btnSecondary} title={t('common.move') || 'نقل'}>
                             <Repeat className="w-3 h-3" />
                         </button>
                     )}
@@ -256,7 +257,7 @@ export const UnifiedRequestCard: React.FC<UnifiedRequestCardProps> = ({
                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                         isDelayed ? 'bg-red-500/20 text-red-500' : statusInfo?.badgeClass || 'bg-gray-500/20 text-gray-400'
                     }`}>
-                        {isDelayed ? 'متأخر' : statusInfo?.labelAr || 'جديد'}
+                        {isDelayed ? t('common.delayed') || 'متأخر' : statusInfo?.labelAr || t('common.new') || 'جديد'}
                     </span>
                     <span className="text-[10px] adora-text-disabled">{formatTime(request.timestamp)}</span>
                 </div>

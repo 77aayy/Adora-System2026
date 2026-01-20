@@ -46,6 +46,7 @@ import {
 import { syncSeasonsFromSources, ParsedSeason } from '../../services/calendarSyncService';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { Timestamp } from 'firebase/firestore';
 import { logger } from '../../services/loggerService';
@@ -55,9 +56,10 @@ import { logger } from '../../services/loggerService';
 // ============================================================
 
 const Tabs: React.FC<{ active: string; onSelect: (id: string) => void }> = ({ active, onSelect }) => {
+    const { t } = useTranslation();
     const tabs = [
-        { id: 'seasons', label: 'التقويم والمواسم', icon: CalendarDays },
-        { id: 'matrix', label: 'مصفوفة الأسعار', icon: Table },
+        { id: 'seasons', label: t('pricing.calendarAndSeasons') || 'التقويم والمواسم', icon: CalendarDays },
+        { id: 'matrix', label: t('pricing.priceMatrix') || 'مصفوفة الأسعار', icon: Table },
     ];
 
     return (
@@ -180,7 +182,7 @@ const PricingSettings: React.FC = () => {
     };
 
     const handleDeleteSeason = async (id: string) => {
-        if (!confirm('حذف هذا الموسم؟')) return;
+        if (!confirm(t('admin.deleteSeasonConfirm') || 'حذف هذا الموسم؟')) return;
         if (!tenantId || !branchId) return;
         await deleteSeason(tenantId, branchId, id);
         success('تم حذف الموسم');
@@ -782,7 +784,7 @@ const PricingSettings: React.FC = () => {
                                                 basePrice: type.basePrice || 0
                                             })}
                                             className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${(type.basePrice || 0) > 0 ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}
-                                            title="تعديل السعر الأساسي"
+                                            title={t('pricing.editBasePrice') || 'تعديل السعر الأساسي'}
                                         >
                                             <DollarSign className="w-3 h-3" />
                                             {(type.basePrice || 0) > 0 ? `${type.basePrice}` : 'غير محدد'}
@@ -800,7 +802,7 @@ const PricingSettings: React.FC = () => {
                                             basePrice: type.basePrice || 0
                                         })}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${(type.basePrice || 0) > 0 ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 animate-pulse'}`}
-                                        title="السعر الأساسي - تعديل"
+                                        title={t('pricing.basePriceEdit') || 'السعر الأساسي - تعديل'}
                                     >
                                         <DollarSign className="w-3.5 h-3.5" />
                                         {(type.basePrice || 0) > 0 ? `${type.basePrice} ر.س` : '❗ غير محدد'}

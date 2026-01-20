@@ -7,10 +7,12 @@ import { deleteRequest } from '../../services/requestService';
 import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useUX } from '../../hooks/useUX';
+import { useTranslation } from 'react-i18next';
 
 export const DeletionRequestsList: React.FC = () => {
     const { requests } = useRequests();
     const { showSuccess, showError } = useUX();
+    const { t } = useTranslation();
 
     // Filter requests that have pending deletion requests
     const deletionRequests = useMemo(() => {
@@ -20,15 +22,15 @@ export const DeletionRequestsList: React.FC = () => {
     if (deletionRequests.length === 0) return null;
 
     const handleApprove = async (req: Request) => {
-        if (!confirm('هل أنت متأكد من الموافقة على الحذف؟ (سيتم أرشفة الطلب ولن يظهر في القوائم النشطة)')) return;
+        if (!confirm(t('admin.approveDeleteConfirm') || 'هل أنت متأكد من الموافقة على الحذف؟ (سيتم أرشفة الطلب ولن يظهر في القوائم النشطة)')) return;
         try {
             // ✅ ARCHITECTURAL FIX: Use Service Layer (Soft Delete) instead of direct Hard Delete
             // This preserves linkage to Inventory/Points logs.
             await deleteRequest(req.id);
-            showSuccess('تمت أرشفة الطلب بنجاح');
+            showSuccess(t('admin.archiveSuccess') || 'تمت الأرشفة بنجاح');
         } catch (error) {
             console.error(error);
-            showError('حدث خطأ أثناء الأرشفة');
+            showError(t('admin.archiveError') || 'حدث خطأ أثناء الأرشفة');
         }
     };
 
@@ -39,10 +41,10 @@ export const DeletionRequestsList: React.FC = () => {
             await updateDoc(doc(db, 'requests', req.id), {
                 deletionRequest: deleteField()
             });
-            showSuccess('تم رفض طلب الحذف');
+            showSuccess(t('admin.rejectDeleteSuccess') || 'تم رفض طلب الحذف');
         } catch (error) {
             console.error(error);
-            showError('حدث خطأ');
+            showError(t('common.error') || 'حدث خطأ');
         }
     };
 
@@ -55,8 +57,8 @@ export const DeletionRequestsList: React.FC = () => {
                             <Trash2 className="w-5 h-5 text-red-400" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">طلبات الحذف المعلقة</h3>
-                            <p className="text-red-300/60 text-sm">يوجد {deletionRequests.length} طلبات بانتظار الموافقة</p>
+                            <h3 className="text-lg font-bold text-white">{t('admin.pendingDeletionRequests') || 'طلبات الحذف المعلقة'}</h3>
+                            <p className="text-red-300/60 text-sm">{t('admin.pendingDeletionCount', { count: deletionRequests.length }) || `يوجد ${deletionRequests.length} طلبات بانتظار الموافقة`}</p>
                         </div>
                     </div>
                 </div>
@@ -69,9 +71,9 @@ export const DeletionRequestsList: React.FC = () => {
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-white font-medium">
-                                            {req.type === 'cleaning' ? 'تنظيف' :
-                                                req.type === 'maintenance' ? 'صيانة' :
-                                                    req.type === 'bellman' ? 'حامل حقائب' : 'طلب'}
+                                            {req.type === 'cleaning' ? (t('departments.housekeeping') || 'تنظيف') :
+                                                req.type === 'maintenance' ? (t('departments.maintenance') || 'صيانة') :
+                                                    req.type === 'bellman' ? (t('departments.bellman') || 'حامل حقائب') : (t('common.request') || 'طلب')}
                                         </span>
                                         <span className="text-xs bg-white/10 px-2 py-0.5 rounded text-white/60">
                                             {req.guestName}
@@ -79,11 +81,11 @@ export const DeletionRequestsList: React.FC = () => {
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className="text-xs text-red-400">
-                                            بواسطة: {req.deletionRequest?.requestedBy}
+                                            {t('common.by') || 'بواسطة'}: {req.deletionRequest?.requestedBy}
                                         </span>
                                         <span className="text-xs text-white/20">•</span>
                                         <span className="text-xs text-white/40">
-                                            {req.deletionRequest?.reason || 'لا يوجد سبب'}
+                                            {req.deletionRequest?.reason || (t('admin.noReason') || 'لا يوجد سبب')}
                                         </span>
                                     </div>
                                 </div>
@@ -93,7 +95,7 @@ export const DeletionRequestsList: React.FC = () => {
                                 <button
                                     onClick={() => handleReject(req)}
                                     className="p-2 hover:bg-white/10 rounded-lg text-white/60 hover:text-white transition-colors"
-                                    title="رفض"
+                                    title={t('common.reject') || 'رفض'}
                                 >
                                     <XCircle className="w-5 h-5" />
                                 </button>
@@ -102,7 +104,7 @@ export const DeletionRequestsList: React.FC = () => {
                                     className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium text-sm"
                                 >
                                     <CheckCircle className="w-4 h-4" />
-                                    موافقة وحذف
+                                    {t('admin.approveAndDelete') || 'موافقة وحذف'}
                                 </button>
                             </div>
                         </div>

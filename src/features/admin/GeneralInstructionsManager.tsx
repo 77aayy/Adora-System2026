@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useTenant } from '../../context/TenantContext';
+import { useTranslation } from 'react-i18next';
 import {
     subscribeToAllInstructions,
     createGeneralInstruction,
@@ -58,6 +59,7 @@ export const GeneralInstructionsManager: React.FC = () => {
     const { user } = useAuth();
     const { success, error } = useUX();
     const { tenantId } = useTenant();
+    const { t } = useTranslation();
     const branchId = (user as any)?.branchId || (user as any)?.branch;
 
     const [instructions, setInstructions] = useState<GeneralInstruction[]>([]);
@@ -102,7 +104,7 @@ export const GeneralInstructionsManager: React.FC = () => {
     };
 
     const handleDelete = async (instructionId: string) => {
-        if (!confirm('هل أنت متأكد من حذف هذه التعليمات؟')) return;
+        if (!confirm(t('admin.deleteInstructionsConfirm') || 'هل أنت متأكد من حذف هذه التعليمات؟')) return;
         if (!tenantId) return;
         try {
             await deactivateGeneralInstruction(tenantId, instructionId);
@@ -415,7 +417,7 @@ export const GeneralInstructionsManager: React.FC = () => {
                                     </div>
                                     <div className="flex items-center gap-4 pt-3 border-t border-white/10 text-xs text-white/40">
                                         <span className={instruction.isActive ? 'text-green-400' : 'text-red-400'}>
-                                            {instruction.isActive ? 'نشط' : 'غير نشط'}
+                                            {instruction.isActive ? t('common.active') : t('common.inactive')}
                                         </span>
                                         <span>الترتيب: {instruction.order || 0}</span>
                                         {instruction.updatedAt && (
@@ -580,7 +582,7 @@ const InstructionModal: React.FC<{
                                         : 'bg-white/10 text-white/60 border border-white/10'
                                         }`}
                                 >
-                                    {formData.isActive ? 'مفعّل' : 'معطّل'}
+                                    {formData.isActive ? t('common.active') : t('common.disabled')}
                                 </button>
                             </label>
                         </div>
@@ -598,7 +600,7 @@ const InstructionModal: React.FC<{
                                 className="flex-1 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold hover:shadow-lg hover:shadow-purple-500/25 transition-all flex items-center justify-center gap-2"
                             >
                                 <Save className="w-5 h-5" />
-                                {formData.id ? 'تحديث' : 'حفظ'}
+                                {formData.id ? t('common.update') : t('common.save')}
                             </button>
                         </div>
                     </div>

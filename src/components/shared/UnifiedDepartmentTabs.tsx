@@ -11,6 +11,7 @@
 
 import React, { useMemo } from 'react';
 import { Inbox, Clock, CheckCircle2, LucideIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -39,37 +40,6 @@ interface UnifiedDepartmentTabsProps {
 }
 
 // ============================================================
-// TABS CONFIGURATION
-// ============================================================
-
-const TABS: Tab[] = [
-    {
-        id: 'new',
-        label: 'جديد',
-        icon: Inbox,
-        color: 'text-orange-500',
-        bgColor: 'bg-orange-500/10',
-        borderColor: 'border-orange-500'
-    },
-    {
-        id: 'in_progress',
-        label: 'قيد التنفيذ',
-        icon: Clock,
-        color: 'text-blue-500',
-        bgColor: 'bg-blue-500/10',
-        borderColor: 'border-blue-500'
-    },
-    {
-        id: 'completed',
-        label: 'مكتملة',
-        icon: CheckCircle2,
-        color: 'text-teal-500',
-        bgColor: 'bg-teal-500/10',
-        borderColor: 'border-teal-500'
-    }
-];
-
-// ============================================================
 // COMPONENT
 // ============================================================
 
@@ -79,6 +49,33 @@ export const UnifiedDepartmentTabs: React.FC<UnifiedDepartmentTabsProps> = ({
     counts,
     className = ''
 }) => {
+    const { t } = useTranslation();
+    const TABS: Tab[] = [
+        {
+            id: 'new',
+            label: t('common.new') || 'جديد',
+            icon: Inbox,
+            color: 'text-orange-500',
+            bgColor: 'bg-orange-500/10',
+            borderColor: 'border-orange-500'
+        },
+        {
+            id: 'in_progress',
+            label: t('common.inProgress') || 'قيد التنفيذ',
+            icon: Clock,
+            color: 'text-blue-500',
+            bgColor: 'bg-blue-500/10',
+            borderColor: 'border-blue-500'
+        },
+        {
+            id: 'completed',
+            label: t('common.completed') || 'مكتمل',
+            icon: CheckCircle2,
+            color: 'text-teal-500',
+            bgColor: 'bg-teal-500/10',
+            borderColor: 'border-teal-500'
+        }
+    ];
     // Calculate total for indicator
     const total = useMemo(() => counts.new + counts.in_progress + counts.completed, [counts]);
 

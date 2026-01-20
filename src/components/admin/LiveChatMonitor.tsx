@@ -264,7 +264,7 @@ const ConversationViewer: React.FC<ConversationViewerProps> = ({
                                             : 'bg-teal-600 text-white'
                                     }`}>
                                         <p className="text-xs text-white/60 mb-1">
-                                            {msg.senderName || (isGuest ? 'النزيل' : 'الاستقبال')}
+                                            {msg.senderName || (isGuest ? t('common.guest') : t('departments.reception'))}
                                         </p>
                                         <p className="whitespace-pre-wrap">{msg.content}</p>
                                         <span className="text-xs opacity-50 block text-left mt-1">{time}</span>

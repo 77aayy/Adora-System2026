@@ -274,7 +274,6 @@ const ToastItem: React.FC<{ toast: Toast }> = ({ toast: t }) => {
                 // ✅ REMOVED: Black box-shadow - replaced with subtle colored shadow
                 boxShadow: `0 4px 12px -2px ${borderColorMap[t.type]}40, 0 2px 4px -1px rgba(0, 0, 0, 0.1)`,
                 // ✅ CRITICAL: Remove any black frame/backdrop
-                outline: 'none',
                 borderImage: 'none',
                 // ✅ CRITICAL: Ensure no black background or wrapper
                 backgroundColor: 'var(--theme-bg-secondary, rgba(15, 23, 42, 0.95))',
@@ -312,7 +311,7 @@ const ToastItem: React.FC<{ toast: Toast }> = ({ toast: t }) => {
                     onClick={handleClose}
                     className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
                 >
-                    <X className="w-4 h-4 text-white/60" />
+                    <X className="w-4 h-4 text-slate-600 dark:text-white/60" />
                 </button>
             )}
         </div>

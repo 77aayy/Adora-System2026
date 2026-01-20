@@ -13,6 +13,7 @@ import {
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import {
     getRatingTemplates,
     createRatingTemplate,
@@ -33,6 +34,7 @@ export const RatingTemplatesManager: React.FC<RatingTemplatesManagerProps> = ({ 
     const { tenantId } = useTenant();
     const { success, error } = useUX();
     const { user } = useAuth();
+    const { t } = useTranslation();
 
     const [templates, setTemplates] = useState<RatingTemplate[]>([]);
     const [loading, setLoading] = useState(true);
@@ -98,7 +100,7 @@ export const RatingTemplatesManager: React.FC<RatingTemplatesManagerProps> = ({ 
     };
 
     const handleDelete = async (templateId: string) => {
-        if (!confirm('هل أنت متأكد من حذف هذا القالب؟')) return;
+        if (!confirm(t('admin.deleteTemplateConfirm') || 'هل أنت متأكد من حذف هذا القالب؟')) return;
         try {
             await deleteRatingTemplate(templateId);
             success('تم حذف القالب');
@@ -269,7 +271,7 @@ export const RatingTemplatesManager: React.FC<RatingTemplatesManagerProps> = ({ 
                                     <div className="flex items-center gap-4 text-xs text-white/60">
                                         <span>التأخير: {template.delaySeconds || 0} ثانية</span>
                                         <span className={template.isActive ? 'text-green-400' : 'text-red-400'}>
-                                            {template.isActive ? 'نشط' : 'غير نشط'}
+                                            {template.isActive ? t('common.active') : t('common.inactive')}
                                         </span>
                                     </div>
                                 </div>
@@ -522,7 +524,7 @@ const TemplateModal: React.FC<{
                                     : 'bg-red-500/20 text-red-400 border border-red-500/30'
                                     }`}
                             >
-                                {formData.isActive ? 'نشط' : 'معطّل'}
+                                {formData.isActive ? t('common.active') : t('common.disabled')}
                             </button>
                         </div>
 

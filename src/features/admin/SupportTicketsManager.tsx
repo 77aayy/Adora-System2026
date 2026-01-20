@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { SupportTicketModal } from '../../components/shared/SupportTicketModal';
 import {
@@ -34,6 +35,7 @@ export const SupportTicketsManager: React.FC = () => {
     const { user, branchId } = useAuth();
     const { tenantId } = useTenant();
     const { success, error } = useUX();
+    const { t } = useTranslation();
 
     const isOwner = user?.role === 'owner';
     const isManager = user?.role === 'manager';
@@ -237,12 +239,12 @@ export const SupportTicketsManager: React.FC = () => {
                 {/* Tabs */}
                 <div className="flex gap-2 mb-6 overflow-x-auto">
                     {[
-                        { id: 'pending', label: 'في الانتظار', count: tickets.filter(t => t.status === 'pending').length },
-                        { id: 'acknowledged', label: 'تم العلم', count: tickets.filter(t => t.status === 'acknowledged').length },
-                        { id: 'in_progress', label: 'جاري العمل', count: tickets.filter(t => t.status === 'in_progress').length },
-                        { id: 'resolved', label: 'تم الحل', count: tickets.filter(t => t.status === 'resolved').length },
-                        { id: 'closed', label: 'مغلق', count: tickets.filter(t => t.status === 'closed').length },
-                        { id: 'all', label: 'الكل', count: tickets.length }
+                        { id: 'pending', label: t('supportTickets.status.pending') || 'في الانتظار', count: tickets.filter(t => t.status === 'pending').length },
+                        { id: 'acknowledged', label: t('supportTickets.status.acknowledged') || 'تم العلم', count: tickets.filter(t => t.status === 'acknowledged').length },
+                        { id: 'in_progress', label: t('supportTickets.status.inProgress') || 'جاري العمل', count: tickets.filter(t => t.status === 'in_progress').length },
+                        { id: 'resolved', label: t('supportTickets.status.resolved') || 'تم الحل', count: tickets.filter(t => t.status === 'resolved').length },
+                        { id: 'closed', label: t('supportTickets.status.closed') || 'مغلق', count: tickets.filter(t => t.status === 'closed').length },
+                        { id: 'all', label: t('common.all') || 'الكل', count: tickets.length }
                     ].map(tab => (
                         <button
                             key={tab.id}

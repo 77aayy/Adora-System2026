@@ -13,6 +13,7 @@ import {
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import {
     getQRServices,
     createQRService,
@@ -33,6 +34,7 @@ export const QRServicesManager: React.FC<QRServicesManagerProps> = ({ branchId, 
     const { tenantId } = useTenant();
     const { success, error } = useUX();
     const { user } = useAuth();
+    const { t } = useTranslation();
 
     const [services, setServices] = useState<QRService[]>([]);
     const [loading, setLoading] = useState(true);
@@ -93,13 +95,13 @@ export const QRServicesManager: React.FC<QRServicesManagerProps> = ({ branchId, 
     };
 
     const handleDelete = async (serviceId: string) => {
-        if (!confirm('هل أنت متأكد من حذف هذه الخدمة؟')) return;
+        if (!confirm(t('admin.deleteServiceConfirm') || 'هل أنت متأكد من حذف هذه الخدمة؟')) return;
         try {
             await deleteQRService(serviceId);
-            success('تم حذف الخدمة');
+            success(t('admin.deleteSuccess') || 'تم الحذف بنجاح');
             loadServices();
         } catch (err) {
-            error('فشل حذف الخدمة');
+            error(t('admin.deleteError') || 'فشل الحذف');
         }
     };
 
@@ -287,7 +289,7 @@ export const QRServicesManager: React.FC<QRServicesManagerProps> = ({ branchId, 
                                             <span className="text-green-400">السعر: {service.price} ر.س</span>
                                         )}
                                         <span className={service.isActive ? 'text-green-400' : 'text-red-400'}>
-                                            {service.isActive ? 'نشط' : 'غير نشط'}
+                                            {service.isActive ? t('common.active') : t('common.inactive')}
                                         </span>
                                     </div>
                                 </div>
@@ -428,7 +430,7 @@ const ServiceModal: React.FC<{
                                         : 'bg-white/10 text-white/60 border border-white/10'
                                         }`}
                                 >
-                                    {formData.hasPricing ? 'مفعّل' : 'معطّل'}
+                                    {formData.hasPricing ? t('common.active') : t('common.disabled')}
                                 </button>
                             </div>
                             {formData.hasPricing && (
@@ -472,7 +474,7 @@ const ServiceModal: React.FC<{
                                         : 'bg-white/10 text-white/60 border border-white/10'
                                         }`}
                                 >
-                                    {formData.timeRestrictions?.enabled ? 'مفعّل' : 'معطّل'}
+                                    {formData.timeRestrictions?.enabled ? t('common.active') : t('common.disabled')}
                                 </button>
                             </div>
                             {formData.timeRestrictions?.enabled && (
@@ -625,7 +627,7 @@ const ServiceModal: React.FC<{
                                     : 'bg-red-500/20 text-red-400 border border-red-500/30'
                                     }`}
                             >
-                                {formData.isActive ? 'نشط' : 'معطّل'}
+                                {formData.isActive ? t('common.active') : t('common.disabled')}
                             </button>
                         </div>
 

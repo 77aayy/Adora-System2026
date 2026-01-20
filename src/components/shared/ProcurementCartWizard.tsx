@@ -19,6 +19,8 @@ import { collection, addDoc, Timestamp, query, where, orderBy, getDocs, limit as
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -89,7 +91,8 @@ export const ProcurementCartWizard: React.FC<Props> = ({
     const { user } = useAuth();
     const { success, error: showError, haptic } = useUX();
     const { theme } = useTheme();
-    const isDark = theme === 'dark';
+      const isDark = theme === 'dark';
+      const { t } = useTranslation();
 
     // State
     const [step, setStep] = useState<Step>('select');
@@ -296,7 +299,7 @@ export const ProcurementCartWizard: React.FC<Props> = ({
     const steps = [
         { key: 'select', label: 'اختيار', icon: '🛒' },
         { key: 'review', label: 'مراجعة', icon: '📋' },
-        { key: 'confirm', label: 'إرسال', icon: '✅' }
+        { key: 'confirm', label: t('common.submit') || 'إرسال', icon: '✅' }
     ];
 
     const currentStepIndex = steps.findIndex(s => s.key === step);
@@ -377,7 +380,7 @@ export const ProcurementCartWizard: React.FC<Props> = ({
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="بحث..."
+                                    placeholder={t('common.search') || 'بحث...'}
                                     className="w-full py-2 px-8 text-sm rounded-lg"
                                     style={{ 
                                         background: isDark ? '#334155' : '#f1f5f9',

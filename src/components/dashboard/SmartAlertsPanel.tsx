@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Bell, X, RefreshCw, AlertTriangle, Clock, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AdoraLoader, AdoraLoaderInline } from '../common/AdoraLoader';
+import { useTranslation } from 'react-i18next';
 import {
     SmartAlert,
     getSmartAlerts,
@@ -21,6 +22,7 @@ import {
 
 export const SmartAlertsPanel: React.FC = () => {
     const { user, branchId: contextBranchId } = useAuth();
+    const { t } = useTranslation();
     const branchId = contextBranchId || (user as any)?.branchId || (user as any)?.branch;
     const tenantId = (user as any)?.tenantId;
 
@@ -155,7 +157,7 @@ export const SmartAlertsPanel: React.FC = () => {
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                                 <span className={`px-1.5 py-0.5 rounded text-xs ${getSeverityColor(alert.severity)}`}>
-                                    {alert.severity === 'critical' ? 'حرج' : 'تحذير'}
+                                    {alert.severity === 'critical' ? t('common.critical') || 'حرج' : t('common.warning') || 'تحذير'}
                                 </span>
                                 <span className="text-sm font-medium truncate transition-colors duration-300" style={{ color: 'var(--theme-text-primary)' }}>{alert.title}</span>
                             </div>

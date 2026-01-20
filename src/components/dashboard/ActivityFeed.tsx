@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     CheckCircle,
     Clock,
@@ -45,19 +46,7 @@ interface ActivityFeedProps {
 // ACTIVITY CONFIG
 // ============================================================
 
-const ACTIVITY_CONFIG = {
-    new: {
-        icon: Bell,
-        color: '#3B82F6',
-        bg: 'from-blue-500/20 to-blue-600/5',
-        label: 'جديد',
-    },
-    complete: {
-        icon: CheckCircle,
-        color: '#10B981',
-        bg: 'from-emerald-500/20 to-emerald-600/5',
-        label: 'مكتمل',
-    },
+// ACTIVITY_CONFIG will be created with useMemo inside component
     delay: {
         icon: AlertTriangle,
         color: '#F59E0B',
@@ -211,6 +200,39 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({
     maxItems = 20,
     autoScroll = true,
 }) => {
+    const { t } = useTranslation();
+    const ACTIVITY_CONFIG = {
+        new: {
+            icon: Bell,
+            color: '#3B82F6',
+            bg: 'from-blue-500/20 to-blue-600/5',
+            label: t('common.new') || 'جديد',
+        },
+        complete: {
+            icon: CheckCircle,
+            color: '#10B981',
+            bg: 'from-emerald-500/20 to-emerald-600/5',
+            label: t('common.completed') || 'مكتمل',
+        },
+        delay: {
+            icon: AlertTriangle,
+            color: '#F59E0B',
+            bg: 'from-amber-500/20 to-amber-600/5',
+            label: t('common.delayed') || 'تأخير',
+        },
+        points: {
+            icon: Star,
+            color: '#8B5CF6',
+            bg: 'from-purple-500/20 to-purple-600/5',
+            label: t('common.points') || 'نقاط',
+        },
+        alert: {
+            icon: AlertTriangle,
+            color: '#EF4444',
+            bg: 'from-red-500/20 to-red-600/5',
+            label: t('common.warning') || 'تنبيه',
+        },
+    };
     const [displayedActivities, setDisplayedActivities] = useState<ActivityItem[]>([]);
     const [newIds, setNewIds] = useState<Set<string>>(new Set());
     const containerRef = useRef<HTMLDivElement>(null);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, CheckCircle, ArrowRight, RefreshCw } from 'lucide-react';
 import { AdoraLoaderInline } from '../../components/common/AdoraLoader';
+import { useTranslation } from 'react-i18next';
 import { getRoomStatsByType } from '../../services/roomService';
 import { getPricingRecommendation, PricingRecommendation } from '../../services/ai/pricingService';
 import { getRoomTypes, updateRoomType, getEffectiveBasePrice } from '../../services/pricingRulesService';
@@ -23,6 +24,7 @@ interface RoomTypeAnalysis {
 }
 
 export const AIRevenueWidget: React.FC<AIRevenueWidgetProps> = ({ tenantId, branchId }) => {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [analyzedTypes, setAnalyzedTypes] = useState<RoomTypeAnalysis[]>([]);
     const [applyingId, setApplyingId] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export const AIRevenueWidget: React.FC<AIRevenueWidgetProps> = ({ tenantId, bran
             // alert('تم تحديث السعر لهذه الفئة بنجاح');
         } catch (err) {
             console.error('Apply Price Error:', err);
-            alert('فشل تحديث السعر');
+            alert(t('admin.updatePriceError') || 'فشل تحديث السعر');
         } finally {
             setApplyingId(null);
         }

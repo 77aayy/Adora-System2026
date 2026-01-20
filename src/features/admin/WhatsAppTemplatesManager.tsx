@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { useTenant } from '../../context/TenantContext';
+import { useTranslation } from 'react-i18next';
 import {
     subscribeToAllTemplates,
     createWhatsAppTemplate,
@@ -71,11 +72,11 @@ export const WhatsAppTemplatesManager: React.FC = () => {
     };
 
     const handleDelete = async (templateId: string) => {
-        if (!confirm('هل أنت متأكد من حذف هذا النموذج؟')) return;
+        if (!confirm(t('admin.deleteTemplateConfirm') || 'هل أنت متأكد من حذف هذا النموذج؟')) return;
         if (!tenantId) return;
         try {
             await deactivateWhatsAppTemplate(tenantId, templateId);
-            success('تم حذف النموذج');
+            success(t('admin.deleteSuccess') || 'تم الحذف بنجاح');
         } catch (err) {
             error('فشل حذف النموذج');
         }
@@ -279,7 +280,7 @@ export const WhatsAppTemplatesManager: React.FC = () => {
                                     </div>
                                     <div className="flex items-center gap-4 pt-3 border-t border-white/10 text-xs text-white/40">
                                         <span className={template.isActive ? 'text-green-400' : 'text-red-400'}>
-                                            {template.isActive ? 'نشط' : 'غير نشط'}
+                                            {template.isActive ? t('common.active') : t('common.inactive')}
                                         </span>
                                         {template.variables && template.variables.length > 0 && (
                                             <span>متغيرات: {template.variables.length}</span>
@@ -503,7 +504,7 @@ const TemplateModal: React.FC<{
                                         : 'bg-white/10 text-white/60 border border-white/10'
                                         }`}
                                 >
-                                    {formData.isActive ? 'مفعّل' : 'معطّل'}
+                                    {formData.isActive ? t('common.active') : t('common.disabled')}
                                 </button>
                             </label>
                         </div>
@@ -521,7 +522,7 @@ const TemplateModal: React.FC<{
                                 className="flex-1 py-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold hover:shadow-lg hover:shadow-green-500/25 transition-all flex items-center justify-center gap-2"
                             >
                                 <Save className="w-5 h-5" />
-                                {formData.id ? 'تحديث' : 'حفظ'}
+                                {formData.id ? t('common.update') : t('common.save')}
                             </button>
                         </div>
                     </div>

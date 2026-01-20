@@ -5,10 +5,11 @@
  * Adora Hotel Management System V2
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { X, Clock, Send, Bell, Check, AlertTriangle, Info, Calendar, Users, Eye, CheckCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import {
     GoldenAlert,
     subscribeToGoldenAlerts,
@@ -83,6 +84,7 @@ interface ViewersPopupProps {
 }
 
 const ViewersPopup: React.FC<ViewersPopupProps> = ({ isOpen, onClose, alertId, alertTitle }) => {
+    const { t } = useTranslation();
     const [viewers, setViewers] = useState<{ id: string; name: string; time: Date }[]>([]);
 
     useEffect(() => {
@@ -138,7 +140,7 @@ const ViewersPopup: React.FC<ViewersPopupProps> = ({ isOpen, onClose, alertId, a
 
                     <div className="mt-4 text-center text-sm text-white/50">
                         <CheckCheck className="w-4 h-4 inline text-blue-400" />
-                        {' '}{viewers.length} شاهد الكرت
+                        {' '}{t('goldenAlert.viewedCount', { count: viewers.length }) || `${viewers.length} شاهد الكرت`}
                     </div>
                 </div>
             </div>
@@ -156,6 +158,7 @@ interface GoldenAlertDisplayProps {
 
 export const GoldenAlertDisplay: React.FC<GoldenAlertDisplayProps> = ({ department }) => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     const branchId = (user as any)?.branch || 'default';
 
     const [alerts, setAlerts] = useState<GoldenAlert[]>([]);
@@ -184,7 +187,7 @@ export const GoldenAlertDisplay: React.FC<GoldenAlertDisplayProps> = ({ departme
     const handleView = async (alertId: string) => {
         if (!user?.id || viewedIds.has(alertId)) return;
 
-        await markAlertViewed(alertId, user.id, user.name || 'موظف');
+        await markAlertViewed(alertId, user.id, user.name || t('common.employee') || 'موظف');
         setViewedIds(prev => new Set([...prev, alertId]));
     };
 
@@ -228,7 +231,7 @@ export const GoldenAlertDisplay: React.FC<GoldenAlertDisplayProps> = ({ departme
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                                     <span className={`text-xs px-2 py-0.5 rounded-full bg-yellow-500/30 text-yellow-300 font-bold border border-yellow-400/50`}>
-                                        🏆 الكرت الذهبي
+                                        🏆 {t('goldenAlert.goldenCard') || 'الكرت الذهبي'}
                                     </span>
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${config.bgClass} ${config.textColor}`}>
                                         {config.label}
@@ -239,10 +242,10 @@ export const GoldenAlertDisplay: React.FC<GoldenAlertDisplayProps> = ({ departme
                                 <div className="flex items-center gap-4 mt-3 text-sm text-white/60">
                                     <div className="flex items-center gap-1">
                                         <Clock className="w-4 h-4" />
-                                        باقي {timeLeft} دقيقة
+                                        {t('goldenAlert.timeLeft', { minutes: timeLeft }) || `باقي ${timeLeft} دقيقة`}
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        من {alert.createdBy.name}
+                                        {t('common.from') || 'من'} {alert.createdBy.name}
                                     </div>
                                 </div>
                             </div>
@@ -283,6 +286,7 @@ interface GoldenAlertCreatorProps {
 export const GoldenAlertCreator: React.FC<GoldenAlertCreatorProps> = ({ isOpen, onClose }) => {
     const { user } = useAuth();
     const { success, error: showError, haptic } = useUX();
+    const { t } = useTranslation();
     const branchId = (user as any)?.branch || 'default';
 
     const [title, setTitle] = useState('');
@@ -295,25 +299,25 @@ export const GoldenAlertCreator: React.FC<GoldenAlertCreatorProps> = ({ isOpen, 
     const [scheduleTime, setScheduleTime] = useState('09:00');
     const [sending, setSending] = useState(false);
 
-    const deptOptions = [
-        { value: 'all', label: 'الكل', icon: '🌐' },
-        { value: 'bellman', label: 'البيلمان', icon: '🛎️' },
-        { value: 'housekeeping', label: 'الهاوس كيبنج', icon: '🧹' },
-        { value: 'maintenance', label: 'الصيانة', icon: '🔧' },
-        { value: 'reception', label: 'الاستقبال', icon: '🏨' },
-        { value: 'procurement', label: 'المشتريات', icon: '🛒' },
-    ];
+    const deptOptions = useMemo(() => [
+        { value: 'all', label: t('common.all') || 'الكل', icon: '🌐' },
+        { value: 'bellman', label: t('departments.bellman') || 'البيلمان', icon: '🛎️' },
+        { value: 'housekeeping', label: t('departments.housekeeping') || 'النظافة', icon: '🧹' },
+        { value: 'maintenance', label: t('departments.maintenance') || 'الصيانة', icon: '🔧' },
+        { value: 'reception', label: t('departments.reception') || 'الاستقبال', icon: '🏨' },
+        { value: 'procurement', label: t('departments.procurement') || 'المشتريات', icon: '🛒' },
+    ], [t]);
 
-    const durationOptions = [
-        { value: 5, label: '5 دقائق' },
-        { value: 15, label: '15 دقيقة' },
-        { value: 30, label: '30 دقيقة' },
-        { value: 60, label: 'ساعة' },
-        { value: 120, label: 'ساعتين' },
-        { value: 240, label: '4 ساعات' },
-        { value: 480, label: '8 ساعات' },
-        { value: 1440, label: 'يوم كامل' },
-    ];
+    const durationOptions = useMemo(() => [
+        { value: 5, label: t('common.minutes5') || '5 دقائق' },
+        { value: 15, label: t('common.minutes15') || '15 دقيقة' },
+        { value: 30, label: t('common.minutes30') || '30 دقيقة' },
+        { value: 60, label: t('common.hour1') || 'ساعة' },
+        { value: 120, label: t('common.hours2') || 'ساعتين' },
+        { value: 240, label: t('common.hours4') || '4 ساعات' },
+        { value: 480, label: t('common.hours8') || '8 ساعات' },
+        { value: 1440, label: t('common.fullDay') || 'يوم كامل' },
+    ], [t]);
 
     // Set default date to today
     useEffect(() => {
@@ -417,9 +421,9 @@ export const GoldenAlertCreator: React.FC<GoldenAlertCreatorProps> = ({ isOpen, 
                         <label className="text-sm text-white/60 mb-2 block">نوع التنبيه</label>
                         <div className="grid grid-cols-3 gap-2">
                             {[
-                                { value: 'info', label: 'معلومة', icon: <Info className="w-5 h-5" />, color: 'blue' },
-                                { value: 'warning', label: 'تحذير', icon: <AlertTriangle className="w-5 h-5" />, color: 'yellow' },
-                                { value: 'urgent', label: 'عاجل', icon: <Bell className="w-5 h-5" />, color: 'red' },
+                                { value: 'info', label: t('common.info') || 'معلومة', icon: <Info className="w-5 h-5" />, color: 'blue' },
+                                { value: 'warning', label: t('common.warning') || 'تحذير', icon: <AlertTriangle className="w-5 h-5" />, color: 'yellow' },
+                                { value: 'urgent', label: t('common.urgent') || 'عاجل', icon: <Bell className="w-5 h-5" />, color: 'red' },
                             ].map(opt => (
                                 <button
                                     key={opt.value}
@@ -440,23 +444,23 @@ export const GoldenAlertCreator: React.FC<GoldenAlertCreatorProps> = ({ isOpen, 
 
                     {/* Title */}
                     <div>
-                        <label className="text-sm text-white/60 mb-2 block">العنوان</label>
+                        <label className="text-sm text-white/60 mb-2 block">{t('goldenAlert.titleLabel') || 'العنوان'}</label>
                         <input
                             type="text"
                             value={title}
                             onChange={e => setTitle(e.target.value)}
-                            placeholder="مثال: تنبيه مهم"
+                            placeholder={t('common.exampleTitle') || 'مثال: تنبيه مهم'}
                             className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:border-yellow-500/50 focus:outline-none"
                         />
                     </div>
 
                     {/* Message */}
                     <div>
-                        <label className="text-sm text-white/60 mb-2 block">الرسالة</label>
+                        <label className="text-sm text-white/60 mb-2 block">{t('goldenAlert.messageLabel') || 'الرسالة'}</label>
                         <textarea
                             value={message}
                             onChange={e => setMessage(e.target.value)}
-                            placeholder="مثال: اليوم عندكم تنظيف سطح فما حدش يطلع على السطح"
+                            placeholder={t('common.exampleMessage') || 'مثال: اليوم عندكم تنظيف سطح فما حدش يطلع على السطح'}
                             rows={3}
                             className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:border-yellow-500/50 focus:outline-none resize-none"
                         />
@@ -464,7 +468,7 @@ export const GoldenAlertCreator: React.FC<GoldenAlertCreatorProps> = ({ isOpen, 
 
                     {/* Schedule Type */}
                     <div>
-                        <label className="text-sm text-white/60 mb-2 block">وقت الإرسال</label>
+                        <label className="text-sm text-white/60 mb-2 block">{t('goldenAlert.sendTimeLabel') || 'وقت الإرسال'}</label>
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 onClick={() => setScheduleType('now')}
@@ -527,7 +531,7 @@ export const GoldenAlertCreator: React.FC<GoldenAlertCreatorProps> = ({ isOpen, 
 
                     {/* Departments */}
                     <div>
-                        <label className="text-sm text-white/60 mb-2 block">الأقسام المستهدفة</label>
+                        <label className="text-sm text-white/60 mb-2 block">{t('goldenAlert.targetDepartments') || 'الأقسام المستهدفة'}</label>
                         <div className="flex flex-wrap gap-2">
                             {deptOptions.map(opt => (
                                 <button

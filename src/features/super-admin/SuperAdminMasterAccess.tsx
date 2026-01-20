@@ -20,6 +20,7 @@ import { collection, getDocs, doc, updateDoc, query, where, Timestamp } from 'fi
 import { db } from '../../services/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { PageTransition } from '../../components/common/PageTransition';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
 
@@ -202,7 +203,7 @@ export const SuperAdminMasterAccess: React.FC = () => {
     // Status badge component
     const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
         const config = {
-            active: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'نشط' },
+            active: { bg: 'bg-green-500/20', text: 'text-green-400', label: t('common.active') || 'نشط' },
             suspended: { bg: 'bg-red-500/20', text: 'text-red-400', label: 'موقوف' },
             expired: { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'منتهي' }
         }[status] || { bg: 'bg-gray-500/20', text: 'text-gray-400', label: 'غير معروف' };

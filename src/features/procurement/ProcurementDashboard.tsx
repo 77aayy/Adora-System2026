@@ -69,29 +69,15 @@ import { GeneralInstructionsView } from '../../components/shared/GeneralInstruct
 import { useBrandName } from '../../hooks/useBrandName';
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline'; // ✅ Commitment Timeline
 import { PurchaseCompleteModal } from '../../components/procurement/PurchaseCompleteModal'; // ✅ Purchase Complete Modal
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // STATUS CONFIG
 // ============================================================
 
-const STATUS_CONFIG: Record<ProcurementStatus, { label: string; color: string; icon: React.ElementType }> = {
-    PENDING_APPROVAL: { label: 'بانتظار الموافقة', color: 'text-yellow-400 bg-yellow-500/20', icon: Clock },
-    APPROVED: { label: 'تم التعميد', color: 'text-blue-400 bg-blue-500/20', icon: Check },
-    REJECTED: { label: 'مرفوض', color: 'text-red-400 bg-red-500/20', icon: X },
-    PURCHASING: { label: 'جاري الشراء', color: 'text-purple-400 bg-purple-500/20', icon: ShoppingCart },
-    PURCHASED: { label: 'تم الشراء', color: 'text-cyan-400 bg-cyan-500/20', icon: Package },
-    DELIVERED: { label: 'تم التسليم', color: 'text-orange-400 bg-orange-500/20', icon: Truck },
-    RECEIVED: { label: 'تم الاستلام', color: 'text-green-400 bg-green-500/20', icon: CheckCircle },
-    COMPLETED: { label: 'مكتمل', color: 'text-green-400 bg-green-500/20', icon: CheckCircle }
-};
+// STATUS_CONFIG will be created with useMemo inside component
 
-const DEPARTMENT_NAMES: Record<string, string> = {
-    reception: 'الاستقبال',
-    bellman: 'البيلمان',
-    housekeeping: 'الهاوس كيبنج',
-    maintenance: 'الصيانة',
-    dashboard: 'الإدارة'
-};
+// DEPARTMENT_NAMES will be created with useMemo inside component
 
 type TabType = 'new' | 'in_progress' | 'completed';
 
@@ -113,8 +99,10 @@ const RequestCard: React.FC<{
     isManager: boolean;
     isRep: boolean;
     currentUserId?: string;
-}> = ({ request, onApprove, onReject, onStartPurchase, onComplete, isManager, isRep, currentUserId }) => {
-    const status = STATUS_CONFIG[request.status] || STATUS_CONFIG.PENDING_APPROVAL;
+    statusConfig: Record<ProcurementStatus, { label: string; color: string; icon: React.ElementType }>;
+}> = ({ request, onApprove, onReject, onStartPurchase, onComplete, isManager, isRep, currentUserId, statusConfig }) => {
+    const { t } = useTranslation();
+    const status = statusConfig[request.status] || statusConfig.PENDING_APPROVAL;
     const StatusIcon = status.icon;
     const isUrgent = request.items.some(i => i.priority === 'urgent');
 
@@ -122,10 +110,10 @@ const RequestCard: React.FC<{
         if (!request.createdAt) return '';
         const date = request.createdAt.toDate ? request.createdAt.toDate() : new Date(request.createdAt);
         const diff = Math.floor((Date.now() - date.getTime()) / 60000);
-        if (diff < 1) return 'الآن';
-        if (diff < 60) return `${diff}د`;
-        if (diff < 1440) return `${Math.floor(diff / 60)}س`;
-        return `${Math.floor(diff / 1440)}ي`;
+        if (diff < 1) return t('common.now') || 'الآن';
+        if (diff < 60) return `${diff}${t('common.minuteShort') || 'د'}`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}${t('common.hourShort') || 'س'}`;
+        return `${Math.floor(diff / 1440)}${t('common.dayShort') || 'ي'}`;
     })();
 
     return (
@@ -155,7 +143,7 @@ const RequestCard: React.FC<{
 
             {/* Row 2: Items Summary */}
             <div className="text-[10px] adora-text-secondary mb-2 px-2 py-1 rounded adora-bg-tertiary">
-                <span className="font-medium">{request.items.length} عناصر:</span> {request.items.slice(0, 2).map(i => `${i.itemName} (${i.quantity})`).join(' • ')}
+                <span className="font-medium">{request.items.length} {t('common.items') || 'عناصر'}:</span> {request.items.slice(0, 2).map(i => `${i.itemName} (${i.quantity})`).join(' • ')}
                 {request.items.length > 2 && ` +${request.items.length - 2}`}
             </div>
 
@@ -164,15 +152,15 @@ const RequestCard: React.FC<{
                 {isManager && request.status === 'PENDING_APPROVAL' && request.requestedBy.id !== currentUserId && (
                     <>
                         <button onClick={onApprove} className="flex-1 py-1.5 px-2 rounded-lg bg-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1">
-                            <Check className="w-3 h-3" /> تعميد
+                            <Check className="w-3 h-3" /> {t('common.approve') || 'موافقة'}
                         </button>
-                        <button onClick={onReject} className="py-1.5 px-2 rounded-lg bg-red-500/20 text-red-500 text-xs font-bold" title="رفض">
+                        <button onClick={onReject} className="py-1.5 px-2 rounded-lg bg-red-500/20 text-red-500 text-xs font-bold" title={t('common.reject') || 'رفض'}>
                             <X className="w-3 h-3" />
                         </button>
                     </>
                 )}
                 {isManager && request.status === 'PENDING_APPROVAL' && request.requestedBy.id === currentUserId && (
-                    <div className="flex-1 text-center text-[10px] adora-text-secondary py-1.5">بانتظار تعميد</div>
+                    <div className="flex-1 text-center text-[10px] adora-text-secondary py-1.5">{t('procurement.pendingApproval') || 'بانتظار الموافقة'}</div>
                 )}
                 {isRep && request.status === 'APPROVED' && (
                     <button onClick={onStartPurchase} className="flex-1 py-1.5 px-2 rounded-lg bg-purple-500 text-white text-xs font-bold flex items-center justify-center gap-1">
@@ -198,9 +186,29 @@ export const ProcurementDashboard: React.FC = () => {
     const { user, logout } = useAuth();
     const { success, error, haptic, playSound } = useUX();
     const brandName = useBrandName();
+    const { t } = useTranslation();
     
     // ✅ Feature Gate: Check if procurement system is enabled
     const { isEnabled: isProcurementEnabled } = useFeatureGate('procurementSystem');
+    
+    const STATUS_CONFIG = React.useMemo<Record<ProcurementStatus, { label: string; color: string; icon: React.ElementType }>>(() => ({
+        PENDING_APPROVAL: { label: t('procurement.pendingApproval') || 'بانتظار الموافقة', color: 'text-yellow-400 bg-yellow-500/20', icon: Clock },
+        APPROVED: { label: t('procurement.approved') || 'تم التعميد', color: 'text-blue-400 bg-blue-500/20', icon: Check },
+        REJECTED: { label: t('procurement.rejected') || 'مرفوض', color: 'text-red-400 bg-red-500/20', icon: X },
+        PURCHASING: { label: t('procurement.purchasing') || 'جاري الشراء', color: 'text-purple-400 bg-purple-500/20', icon: ShoppingCart },
+        PURCHASED: { label: t('procurement.purchased') || 'تم الشراء', color: 'text-cyan-400 bg-cyan-500/20', icon: Package },
+        DELIVERED: { label: t('procurement.delivered') || 'تم التسليم', color: 'text-orange-400 bg-orange-500/20', icon: Truck },
+        RECEIVED: { label: t('procurement.received') || 'تم الاستلام', color: 'text-green-400 bg-green-500/20', icon: CheckCircle },
+        COMPLETED: { label: t('common.completed') || 'مكتمل', color: 'text-green-400 bg-green-500/20', icon: CheckCircle }
+    }), [t]);
+    
+    const DEPARTMENT_NAMES = React.useMemo<Record<string, string>>(() => ({
+        reception: t('departments.reception') || 'الاستقبال',
+        bellman: t('departments.bellman') || 'البيلمان',
+        housekeeping: t('departments.housekeeping') || 'النظافة',
+        maintenance: t('departments.maintenance') || 'الصيانة',
+        dashboard: t('departments.admin') || 'الإدارة'
+    }), [t]);
     
     const [requests, setRequests] = useState<ProcurementRequest[]>([]);
     const [loading, setLoading] = useState(true);
@@ -574,7 +582,7 @@ export const ProcurementDashboard: React.FC = () => {
             <div className="min-h-screen p-3 sm:p-4 lg:p-6 pb-16 sm:pb-20 md:pb-24 overflow-x-hidden transition-colors duration-300" style={{ background: 'var(--theme-gradient-page)' }}>
                 {/* Flexible Header */}
                 <FlexibleHeader
-                title="المشتريات"
+                title={t('departments.procurement') || 'المشتريات'}
                 titleIcon={<ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 flex-shrink-0" />}
                 showGreeting={false}
                 brandName={brandName}
@@ -707,6 +715,7 @@ export const ProcurementDashboard: React.FC = () => {
                             isManager={isManager}
                             isRep={isRep}
                             currentUserId={user?.id}
+                            statusConfig={STATUS_CONFIG}
                             onApprove={() => handleApprove(request.id)}
                             onReject={() => handleReject(request.id)}
                             onStartPurchase={() => handleStartPurchase(request.id)}

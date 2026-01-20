@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { StatCard } from '../../components/common/StatCard';
 import { responsiveClasses } from '../../utils/mobileOptimization';
@@ -58,6 +59,7 @@ export const OwnerPanel: React.FC = () => {
     // ✅ Auth Context - Strict Readiness
     const { user, authReady, logout } = useAuth();
     const { success, error } = useUX();
+    const { t } = useTranslation();
 
     const [managers, setManagers] = useState<User[]>([]);
     const [deletedManagers, setDeletedManagers] = useState<any[]>([]);
@@ -162,11 +164,11 @@ export const OwnerPanel: React.FC = () => {
             setShowAddModal(false);
             haptic('success');
             playSound('success');
-            success('تم إنشاء المدير بنجاح');
+            success(t('system.managerCreated'));
         } catch (error: any) {
             logger.error('Error creating manager', error, 'OwnerPanel');
             haptic('error');
-            error('حدث خطأ أثناء إنشاء المدير');
+            error(t('system.managerCreatedError'));
         }
     };
 
@@ -174,7 +176,7 @@ export const OwnerPanel: React.FC = () => {
         // 🛡️ SECURITY: Prevent Self-Deletion
         if (user?.id === managerId) {
             haptic('error');
-            error('⚠️ إجراء مرفوض: لا يمكنك حذف حسابك الشخصي!');
+            error(t('system.cannotDeleteSelf'));
             return;
         }
 
@@ -190,11 +192,11 @@ export const OwnerPanel: React.FC = () => {
                 await loadData(); // Reload to update lists
                 haptic('success');
                 playSound('success');
-                success('تم حذف المدير بنجاح ونقله للأرشيف');
+                success(t('system.managerDeleted'));
             } catch (err: any) {
                 logger.error('Error deleting manager', err, 'OwnerPanel');
                 haptic('error');
-                error('فشل الحذف: ' + (err.message || 'خطأ في الاتصال'));
+                error(t('system.deleteFailed', { error: err.message || t('system.connectionError') }));
             } finally {
                 setDataLoading(false);
             }
@@ -202,7 +204,7 @@ export const OwnerPanel: React.FC = () => {
     };
 
     const handleRestoreManager = async (managerId: string) => {
-        if (window.confirm('هل أنت متأكد من استعادة هذا المدير؟')) {
+        if (window.confirm(t('admin.restoreConfirmMessage') || 'هل أنت متأكد من استعادة هذا المدير؟')) {
             try {
                 await restoreManager(managerId);
                 loadData(); // Reload to update lists
@@ -217,13 +219,13 @@ export const OwnerPanel: React.FC = () => {
 
     const handleToggleLicense = async (managerId: string, tenantId: string | undefined, currentStatus: string) => {
         if (!tenantId) {
-            alert('خطأ: لم يتم العثور على معرف المستأجر');
+            alert(t('admin.tenantIdNotFound') || 'خطأ: لم يتم العثور على معرف المستأجر');
             return;
         }
         const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
-        const action = newStatus === 'active' ? 'تنشيط' : 'إيقاف';
+        const action = newStatus === 'active' ? t('system.activate') : t('system.deactivate');
 
-        if (window.confirm(`هل أنت متأكد من ${action} ترخيص هذا المدير؟`)) {
+        if (window.confirm(t('admin.confirmToggleLicense', { action }) || `هل أنت متأكد من ${action} ترخيص هذا المدير؟`)) {
             try {
                 await toggleLicenseStatus(managerId, tenantId, newStatus === 'suspended');
                 loadData();
@@ -237,10 +239,10 @@ export const OwnerPanel: React.FC = () => {
 
     const handleRenewLicense = async (managerId: string, tenantId: string | undefined) => {
         if (!tenantId) {
-            alert('خطأ: لم يتم العثور على معرف المستأجر');
+            alert(t('admin.tenantIdNotFound') || 'خطأ: لم يتم العثور على معرف المستأجر');
             return;
         }
-        if (window.confirm('هل أنت متأكد من تجديد الترخيص لمدة عام إضافي؟')) {
+        if (window.confirm(t('admin.renewLicenseConfirm') || 'هل أنت متأكد من تجديد الترخيص لمدة عام إضافي؟')) {
             try {
                 await renewLicense(managerId, tenantId);
                 loadData();
@@ -255,7 +257,7 @@ export const OwnerPanel: React.FC = () => {
 
     const handleSyncPermissions = async () => {
         if (!user?.tenantId || !user?.role) {
-            error('بيانات المستخدم غير مكتملة');
+            error(t('system.userDataIncomplete'));
             return;
         }
 
@@ -269,13 +271,13 @@ export const OwnerPanel: React.FC = () => {
                 logger.info('Syncing permissions', { uid: auth.currentUser.uid }, 'OwnerPanel');
                 await saveUserBinding(auth.currentUser.uid, user.tenantId, user.role);
                 haptic('success');
-                success('تم تحديث الصلاحيات بنجاح');
+                success(t('system.permissionsUpdated'));
             } else {
-                error('لم يتم العثور على جلسة نشطة');
+                error(t('system.noActiveSession'));
             }
         } catch (err) {
             logger.error('Sync failed', err, 'OwnerPanel');
-            error('فشل التحديث');
+            error(t('system.updateFailed'));
         } finally {
             setDataLoading(false);
         }
@@ -304,7 +306,7 @@ export const OwnerPanel: React.FC = () => {
 
         if (!user.id) {
             logger.error('No user ID found', null, 'OwnerPanel');
-            error("⚠️ خطأ تقني: لم يتم التعرف على هوية المالك. يرجى تسجيل الخروج والدخول مرة أخرى.");
+            error(t('system.ownerIdentityNotRecognized'));
             return;
         }
 
@@ -320,7 +322,7 @@ export const OwnerPanel: React.FC = () => {
     const handleConfirmPurge = async () => {
         // Validate RESET code
         if (resetCode.trim() !== 'RESET') {
-            error('⚠️ لم تكتب الكلمة الصحيحة. يرجى كتابة (RESET) باللغة الإنجليزية.');
+            error(t('system.wrongResetCode'));
             return;
         }
 
@@ -333,15 +335,15 @@ export const OwnerPanel: React.FC = () => {
         setDataLoading(true);
         setAuditLoading(true);
         setAuditStatus('loading');
-        setAuditProgress('☢️ جاري المسح الكامل...');
+        setAuditProgress(`☢️ ${t('system.purging')}`);
 
         try {
             logger.info('Initializing Nuclear Purge via Deep Audit', null, 'OwnerPanel');
-            setAuditProgress('🔥 جاري حذف جميع البيانات...');
+            setAuditProgress(`🔥 ${t('system.deletingAllData')}`);
             // ✅ MERGED: Use executeDeepAudit with nuclearMode=true
             const report = await executeDeepAudit({ nuclearMode: true, ownerId: user!.id });
             
-            setAuditProgress('✅ اكتمل المسح بنجاح!');
+            setAuditProgress(`✅ ${t('system.purgeCompleted')}`);
             setAuditStatus('success');
             
             haptic('success');
@@ -350,7 +352,7 @@ export const OwnerPanel: React.FC = () => {
             // Re-fetch all data to clear the UI
             await loadData();
 
-            success(`✅ تم المسح الكامل بنجاح!\n\n🗑️ تم حذف: ${report.summary.totalDeleted} سجل\n✨ النظام الآن نظيف وجاهز للبدء من جديد`);
+            success(`${t('system.purgeSuccess')}\n\n${t('system.purgeSuccessDetails', { count: report.summary.totalDeleted })}`);
 
             // Forced reload to clear any cached states in services
             setTimeout(() => {
@@ -366,8 +368,8 @@ export const OwnerPanel: React.FC = () => {
             });
             const errorMsg = err.message || 'خطأ غير معروف';
             setAuditStatus('error');
-            setAuditProgress('❌ فشل المسح');
-            error(`❌ فشل المسح الكامل\n\n${errorMsg}\n\n💡 جرب زر "مزامنة الأمان" ثم أعد المحاولة`);
+            setAuditProgress(`❌ ${t('system.purgeFailed')}`);
+            error(`${t('system.purgeFailed')}\n\n${t('system.purgeFailedDetails', { error: errorMsg })}`);
             haptic('error');
             playSound('error');
             
@@ -412,9 +414,9 @@ export const OwnerPanel: React.FC = () => {
         logger.info('User ID found', { userId: user.id }, 'OwnerPanel');
 
         const confirm1 = window.confirm(
-            '🔍 Deep Audit Protocol\n\n' +
-            'سيتم فحص النظام بالكامل (Firestore, Auth, Storage) وحذف أي بيانات تجريبية.\n\n' +
-            'هل أنت متأكد؟'
+            t('admin.deepAuditProtocol') || '🔍 Deep Audit Protocol\n\n' +
+            (t('admin.deepAuditMessage') || 'سيتم فحص النظام بالكامل (Firestore, Auth, Storage) وحذف أي بيانات تجريبية.\n\n') +
+            (t('common.areYouSure') || 'هل أنت متأكد؟')
         );
         if (!confirm1) {
             logger.info('User cancelled Deep Audit', null, 'OwnerPanel');
@@ -424,14 +426,14 @@ export const OwnerPanel: React.FC = () => {
         logger.info('User confirmed Deep Audit - starting', null, 'OwnerPanel');
         setAuditLoading(true);
         setAuditStatus('loading');
-        setAuditProgress('🔍 جاري فحص Firestore...');
+            setAuditProgress(t('admin.scanningFirestore') || '🔍 جاري فحص Firestore...');
 
         try {
             logger.info('Starting Deep Audit Protocol', null, 'OwnerPanel');
             
-            setAuditProgress('📊 جاري فحص Firestore...');
+            setAuditProgress(t('admin.scanningFirestore') || '📊 جاري فحص Firestore...');
             const report = await executeDeepAudit();
-            setAuditProgress('✅ اكتمل الفحص بنجاح!');
+            setAuditProgress(t('admin.auditCompleted') || '✅ اكتمل الفحص بنجاح!');
 
             // Log audit report
             logger.info('DEEP AUDIT REPORT - TOTAL PURGE', {
@@ -484,14 +486,14 @@ export const OwnerPanel: React.FC = () => {
                 logger.error('System Status: ERROR', null, 'OwnerPanel');
                 const totalErrors = report.firestore.errors.length + report.auth.errors.length + report.storage.errors.length;
                 setAuditStatus('error');
-                error(`❌ فشل الفحص\n\nعدد الأخطاء: ${totalErrors}\n\nراجع Console للتفاصيل`);
+                error(t('admin.deepAuditFailedWithErrors', { totalErrors }) || `❌ فشل الفحص\n\nعدد الأخطاء: ${totalErrors}\n\nراجع Console للتفاصيل`);
                 if (totalErrors > 0) {
                     const errorDetails = [
                         ...report.firestore.errors.slice(0, 3),
                         ...report.auth.errors.slice(0, 2),
                         ...report.storage.errors.slice(0, 2)
                     ].join('\n');
-                    alert(`❌ Deep Audit فشل:\n\nعدد الأخطاء: ${totalErrors}\n\nالأخطاء:\n${errorDetails}\n\nتفاصيل إضافية في Console.`);
+                    alert(t('admin.deepAuditFailed', { totalErrors, errorDetails }) || `❌ Deep Audit فشل:\n\nعدد الأخطاء: ${totalErrors}\n\nالأخطاء:\n${errorDetails}\n\nتفاصيل إضافية في Console.`);
                 }
             }
 
@@ -517,15 +519,15 @@ export const OwnerPanel: React.FC = () => {
             const errorCode = err.code || '';
             
             setAuditStatus('error');
-            setAuditProgress('❌ فشل العملية');
+            setAuditProgress(t('common.operationFailed') || '❌ فشل العملية');
             
             // Check for permission errors
             if (errorCode === 'permission-denied' || errorMsg.includes('permission') || errorMsg.includes('Access denied')) {
-                error(`❌ فشل الفحص - صلاحيات غير كافية\n\n${errorMsg}\n\n💡 الحل:\n1. تأكد إنك Owner\n2. جرب زر "مزامنة الأمان"\n3. تحقق من Firebase Security Rules`);
-                alert(`❌ Deep Audit فشل - صلاحيات غير كافية:\n\n${errorMsg}\n\nالحل:\n1. تأكد إنك Owner\n2. جرب زر "مزامنة الأمان"\n3. تحقق من Firebase Security Rules\n\nتفاصيل في Console.`);
+                error(t('admin.deepAuditPermissionDeniedError', { errorMsg }) || `❌ فشل الفحص - صلاحيات غير كافية\n\n${errorMsg}\n\n💡 الحل:\n1. تأكد إنك Owner\n2. جرب زر "مزامنة الأمان"\n3. تحقق من Firebase Security Rules`);
+                alert(t('admin.deepAuditPermissionDenied', { errorMsg }) || `❌ Deep Audit فشل - صلاحيات غير كافية:\n\n${errorMsg}\n\nالحل:\n1. تأكد إنك Owner\n2. جرب زر "مزامنة الأمان"\n3. تحقق من Firebase Security Rules\n\nتفاصيل في Console.`);
             } else {
-                error(`❌ فشل الفحص\n\n${errorMsg}\n\nراجع Console للتفاصيل`);
-                alert(`❌ Deep Audit فشل:\n\n${errorMsg}\n\nتفاصيل إضافية في Console.`);
+                error(t('admin.deepAuditFailedError', { errorMsg }) || `❌ فشل الفحص\n\n${errorMsg}\n\nراجع Console للتفاصيل`);
+                alert(t('admin.deepAuditFailedGeneric', { errorMsg }) || `❌ Deep Audit فشل:\n\n${errorMsg}\n\nتفاصيل إضافية في Console.`);
             }
             
             haptic('error');
@@ -595,7 +597,7 @@ export const OwnerPanel: React.FC = () => {
                     <button
                         onClick={handleSyncPermissions}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30 transition-all"
-                        title="تحديث صلاحيات Cloud Firestore"
+                        title={t('admin.updateCloudFirestorePermissions') || 'تحديث صلاحيات Cloud Firestore'}
                     >
                         {dataLoading ? <AdoraLoaderInline size={14} /> : <RefreshCw className="w-4 h-4" />}
                         <span>مزامنة الأمان</span>
@@ -613,7 +615,7 @@ export const OwnerPanel: React.FC = () => {
                                 ? 'bg-red-500/30 text-red-300 border-red-400/50 shadow-lg shadow-red-500/30'
                                 : 'bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/30'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
-                        title={auditProgress || "فحص شامل أو مسح كامل للنظام"}
+                        title={auditProgress || (t('admin.fullSystemScanOrPurge') || 'فحص شامل أو مسح كامل للنظام')}
                     >
                         {/* Pulsing ring animation when loading */}
                         {auditStatus === 'loading' && (
@@ -658,7 +660,7 @@ export const OwnerPanel: React.FC = () => {
                     <button
                         onClick={logout}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-white/40 hover:bg-red-500/10 hover:text-red-400 transition-all border border-white/10"
-                        title="تسجيل الخروج"
+                        title={t('common.logout') || 'تسجيل الخروج'}
                     >
                         <LogOut className="w-4 h-4 flip-rtl" />
                     </button>
@@ -743,7 +745,7 @@ export const OwnerPanel: React.FC = () => {
                                                     ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
                                                     : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
                                                     }`}
-                                                title={licenseStatus === 'active' ? 'تجميد الترخيص' : 'تنشيط الترخيص'}
+                                                title={licenseStatus === 'active' ? (t('admin.freezeLicense') || 'تجميد الترخيص') : (t('admin.activateLicense') || 'تنشيط الترخيص')}
                                             >
                                                 {licenseStatus === 'active' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                                             </button>
@@ -751,7 +753,7 @@ export const OwnerPanel: React.FC = () => {
                                             <button
                                                 onClick={() => handleRenewLicense(manager.id, manager.tenantId)}
                                                 className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
-                                                title="تجديد الترخيص (سنة)"
+                                                title={t('admin.renewLicenseYear') || 'تجديد الترخيص (سنة)'}
                                             >
                                                 <Calendar className="w-4 h-4" />
                                             </button>
@@ -759,7 +761,7 @@ export const OwnerPanel: React.FC = () => {
                                             <button
                                                 onClick={() => handleDeleteManager(manager.id, manager.tenantId)}
                                                 className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
-                                                title="حذف (نقل للأرشيف)"
+                                                title={t('admin.deleteToArchive') || 'حذف (نقل للأرشيف)'}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -893,7 +895,7 @@ export const OwnerPanel: React.FC = () => {
                                         }}
                                         className="w-full px-4 py-3 rounded-xl border transition-all text-center font-mono text-lg tracking-wider input"
                                         style={{ background: 'var(--theme-bg-tertiary)', borderColor: 'var(--theme-border-primary)', color: 'var(--theme-text-primary)' }}
-                                        placeholder="••••••••"
+                                        placeholder={t('common.passwordPlaceholder') || '••••••••'}
                                         autoFocus
                                     />
                                     {scanPassword && scanPassword.trim().toLowerCase() !== 'adora' && (
@@ -1082,7 +1084,7 @@ export const OwnerPanel: React.FC = () => {
                                             </p>
                                             <p className="flex items-start gap-2">
                                                 <span className="text-red-400 mt-1">•</span>
-                                                <span>سيتم حذف جميع <strong>الطلبات</strong> (Requests) و<strong>السجلات</strong></span>
+                                                <span>{t('admin.willDeleteAllRequestsAndRecords') || 'سيتم حذف جميع '}<strong>{t('admin.requests') || 'الطلبات'}</strong> (Requests) {t('common.and') || 'و'}<strong>{t('admin.records') || 'السجلات'}</strong></span>
                                             </p>
                                             <p className="flex items-start gap-2">
                                                 <span className="text-red-400 mt-1">•</span>
@@ -1094,7 +1096,7 @@ export const OwnerPanel: React.FC = () => {
                                     {/* RESET Code Input */}
                                     <div>
                                         <label className="block text-sm font-medium text-white/80 mb-2">
-                                            لتأكيد المسح الشامل، اكتب كلمة <span className="font-bold text-red-400">RESET</span> باللغة الإنجليزية:
+                                            {t('admin.confirmFullPurgeInstructions') || 'لتأكيد المسح الشامل، اكتب كلمة '}<span className="font-bold text-red-400">RESET</span>{t('admin.inEnglish') || ' باللغة الإنجليزية:'}
                                         </label>
                                         <input
                                             type="text"
@@ -1106,7 +1108,7 @@ export const OwnerPanel: React.FC = () => {
                                                 }
                                             }}
                                             className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-red-500/50 focus:bg-white/10 transition-all text-center font-mono text-lg tracking-wider"
-                                            placeholder="اكتب RESET هنا"
+                                            placeholder={t('admin.typeResetHere') || 'اكتب RESET هنا'}
                                             autoFocus
                                         />
                                         {resetCode && resetCode.trim() !== 'RESET' && (
@@ -1386,17 +1388,17 @@ const AddManagerModal: React.FC<AddManagerModalProps> = ({ onClose, onSuccess })
                     <div className="grid grid-cols-2 gap-2">
                         <div>
                             <label className="block text-xs text-white/60 mb-1">اسم المدير (اختياري)</label>
-                            <input type="text" value={name} onChange={e => setName(e.target.value)} className="input py-2 text-sm" placeholder="محمد أحمد" />
+                            <input type="text" value={name} onChange={e => setName(e.target.value)} className="input py-2 text-sm" placeholder={t('owner.managerNameExample') || 'محمد أحمد'} />
                         </div>
                         <div>
                             <label className="block text-xs text-white/60 mb-1">اسم الفندق / البراند</label>
-                            <input type="text" value={hotelName} onChange={e => setHotelName(e.target.value)} className="input py-2 text-sm" placeholder="سلسلة فنادق الأهرام" />
+                            <input type="text" value={hotelName} onChange={e => setHotelName(e.target.value)} className="input py-2 text-sm" placeholder={t('owner.hotelNameExample') || 'سلسلة فنادق الأهرام'} />
                         </div>
                     </div>
                     <div>
                         <label className="block text-xs text-white/60 mb-1">كود المدير (4 أرقام) *</label>
                         <div className="relative">
-                            <input type="text" value={code} onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))} className={`input py-2 text-center text-xl tracking-widest ${conflictingCodes.has(code) ? 'border-yellow-500/50 text-yellow-500' : ''}`} placeholder="0000" maxLength={4} />
+                            <input type="text" value={code} onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))} className={`input py-2 text-center text-xl tracking-widest ${conflictingCodes.has(code) ? 'border-yellow-500/50 text-yellow-500' : ''}`} placeholder={t('owner.codePlaceholder') || '0000'} maxLength={4} />
                             {checkingCodes && <div className="absolute left-2 top-1/2 -translate-y-1/2"><AdoraLoaderInline size={14} /></div>}
                         </div>
                         {error && (error.includes(code) || error.includes('المدير')) && <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{error}</p>}
@@ -1404,9 +1406,9 @@ const AddManagerModal: React.FC<AddManagerModalProps> = ({ onClose, onSuccess })
                     <div>
                         <label className="block text-xs text-white/60 mb-1">الفروع (كود + اسم) *</label>
                         <div className="flex gap-2">
-                            <input type="text" value={currentBranchCode} onChange={e => setCurrentBranchCode(e.target.value.replace(/\D/g, '').slice(0, 4))} className={`input py-2 w-16 text-center text-sm ${conflictingCodes.has(currentBranchCode) ? 'border-yellow-500/50' : ''}`} placeholder="كود" />
+                                    <input type="text" value={currentBranchCode} onChange={e => setCurrentBranchCode(e.target.value.replace(/\D/g, '').slice(0, 4))} className={`input py-2 w-16 text-center text-sm ${conflictingCodes.has(currentBranchCode) ? 'border-yellow-500/50' : ''}`} placeholder={t('owner.branchCode')} />
                             <input type="text" value={currentBranchName} onChange={e => setCurrentBranchName(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleAddBranch()} className="input py-2 flex-1 text-sm" placeholder="اسم الفرع" />
-                            <button type="button" onClick={handleAddBranch} disabled={loading || !currentBranchCode.trim() || !currentBranchName.trim()} className="px-3 py-2 rounded-xl bg-primary-500 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-1"><Plus className="w-4 h-4" />إضافة</button>
+                            <button type="button" onClick={handleAddBranch} disabled={loading || !currentBranchCode.trim() || !currentBranchName.trim()} className="px-3 py-2 rounded-xl bg-primary-500 text-white text-sm font-medium disabled:opacity-50 flex items-center gap-1"><Plus className="w-4 h-4" />{t('common.add') || 'إضافة'}</button>
                         </div>
                         <div className="flex flex-wrap gap-1.5 mt-2">
                             {branchCodes.length > 0 ? branchCodes.map((b) => (

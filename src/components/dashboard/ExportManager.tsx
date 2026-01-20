@@ -17,6 +17,7 @@ import {
     Filter,
     X,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -38,45 +39,8 @@ interface ExportManagerProps {
 type ExportType = 'pdf' | 'excel' | 'print' | 'share';
 
 // ============================================================
-// EXPORT OPTIONS
+// EXPORT OPTIONS - Will be created with useMemo inside component
 // ============================================================
-
-const EXPORT_OPTIONS: {
-    type: ExportType;
-    icon: React.ComponentType<any>;
-    label: string;
-    color: string;
-    gradient: string;
-}[] = [
-        {
-            type: 'pdf',
-            icon: FileText,
-            label: 'PDF',
-            color: '#EF4444',
-            gradient: 'from-red-500 to-rose-600',
-        },
-        {
-            type: 'excel',
-            icon: FileSpreadsheet,
-            label: 'Excel',
-            color: '#10B981',
-            gradient: 'from-emerald-500 to-green-600',
-        },
-        {
-            type: 'print',
-            icon: Printer,
-            label: 'طباعة',
-            color: '#6366F1',
-            gradient: 'from-indigo-500 to-purple-600',
-        },
-        {
-            type: 'share',
-            icon: Share2,
-            label: 'مشاركة',
-            color: '#3B82F6',
-            gradient: 'from-blue-500 to-cyan-600',
-        },
-    ];
 
 // ============================================================
 // EXPORT BUTTON COMPONENT
@@ -243,6 +207,43 @@ export const ExportManager: React.FC<ExportManagerProps> = ({
     filename = 'report',
     onExportComplete,
 }) => {
+    const { t } = useTranslation();
+    const EXPORT_OPTIONS: {
+        type: ExportType;
+        icon: React.ComponentType<any>;
+        label: string;
+        color: string;
+        gradient: string;
+    }[] = [
+        {
+            type: 'pdf',
+            icon: FileText,
+            label: 'PDF',
+            color: '#EF4444',
+            gradient: 'from-red-500 to-rose-600',
+        },
+        {
+            type: 'excel',
+            icon: FileSpreadsheet,
+            label: 'Excel',
+            color: '#10B981',
+            gradient: 'from-emerald-500 to-green-600',
+        },
+        {
+            type: 'print',
+            icon: Printer,
+            label: t('common.print') || 'طباعة',
+            color: '#6366F1',
+            gradient: 'from-indigo-500 to-purple-600',
+        },
+        {
+            type: 'share',
+            icon: Share2,
+            label: t('common.share') || 'مشاركة',
+            color: '#3B82F6',
+            gradient: 'from-blue-500 to-cyan-600',
+        },
+    ];
     const [loadingType, setLoadingType] = useState<ExportType | null>(null);
     const [completeType, setCompleteType] = useState<ExportType | null>(null);
     const [isOpen, setIsOpen] = useState(false);

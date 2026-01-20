@@ -26,6 +26,7 @@ import {
     ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import {
     GuestProfile,
     getGuestsForMessaging,
@@ -77,6 +78,7 @@ export const GuestMessagingDashboard: React.FC<GuestMessagingDashboardProps> = (
     onClose
 }) => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     
     // State
     const [guests, setGuests] = useState<GuestProfile[]>([]);
@@ -167,7 +169,7 @@ export const GuestMessagingDashboard: React.FC<GuestMessagingDashboardProps> = (
 
     const handleSendMessage = async (guest: GuestProfile) => {
         if (weeklySentCount >= WEEKLY_LIMIT) {
-            alert('⚠️ تم الوصول للحد الأقصى من الرسائل هذا الأسبوع (40 رسالة)');
+            alert(`⚠️ ${t('guestMessaging.weeklyLimitReached') || 'تم الوصول للحد الأقصى من الرسائل هذا الأسبوع (40 رسالة)'}`);
             return;
         }
 
@@ -295,7 +297,7 @@ export const GuestMessagingDashboard: React.FC<GuestMessagingDashboardProps> = (
                 <textarea
                     value={customMessage || selectedTemplate.template}
                     onChange={(e) => setCustomMessage(e.target.value)}
-                    placeholder="اكتب رسالتك هنا..."
+                    placeholder={t('guestMessaging.writeYourMessage') || 'اكتب رسالتك هنا...'}
                     className="w-full bg-slate-800 border border-white/10 rounded-xl p-3 text-white text-sm
                                placeholder:text-white/30 focus:outline-none focus:border-green-500/50
                                resize-none h-24"
@@ -359,7 +361,7 @@ export const GuestMessagingDashboard: React.FC<GuestMessagingDashboardProps> = (
                             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <input
                                 type="text"
-                                placeholder="بحث بالاسم أو الرقم..."
+                                placeholder={t('common.searchByNameOrNumber') || 'بحث بالاسم أو الرقم...'}
                                 value={filters.searchQuery}
                                 onChange={(e) => setFilters(f => ({ ...f, searchQuery: e.target.value }))}
                                 className="w-full bg-slate-800 border border-white/10 rounded-xl pr-10 pl-4 py-2
@@ -374,7 +376,7 @@ export const GuestMessagingDashboard: React.FC<GuestMessagingDashboardProps> = (
                                 {[
                                     { value: 'week', label: 'هذا الأسبوع' },
                                     { value: 'month', label: 'هذا الشهر' },
-                                    { value: 'all', label: 'الكل' }
+                                    { value: 'all', label: t('common.all') || 'الكل' }
                                 ].map(opt => (
                                     <button
                                         key={opt.value}
@@ -520,7 +522,7 @@ export const GuestMessagingDashboard: React.FC<GuestMessagingDashboardProps> = (
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="text-white font-medium truncate">
-                                                {guest.name || guest.firstName || 'نزيل'}
+                                                {guest.name || guest.firstName || (t('common.guest') || 'نزيل')}
                                             </span>
                                             <span className={`px-2 py-0.5 rounded text-xs ${badge.bgColor} ${badge.color}`}>
                                                 {badge.icon} {badge.labelAr}
@@ -542,7 +544,7 @@ export const GuestMessagingDashboard: React.FC<GuestMessagingDashboardProps> = (
                                         <button
                                             onClick={() => copyPhoneNumber(guest.phone)}
                                             className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                                            title="نسخ الرقم"
+                                            title={t('common.copyNumber') || 'نسخ الرقم'}
                                         >
                                             <Copy className="w-4 h-4 text-white/60" />
                                         </button>

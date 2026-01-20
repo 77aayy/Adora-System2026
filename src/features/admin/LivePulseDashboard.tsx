@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { subscribeToLivePulse } from '../../services/dashboardStatsService';
 import { useLiveTimer, getElapsedMinutes, getElapsedWithColor } from '../../services/liveTimerService';
 import { haptic, playSound } from '../../utils/uxEffects';
@@ -69,14 +70,7 @@ const DEFAULT_THRESHOLDS: Record<string, number> = {
     other: 30            // 30 min default
 };
 
-const TYPE_CONFIG: Record<string, { icon: React.FC<any>; label: string; color: string; bg: string }> = {
-    cleaning: { icon: Sparkles, label: 'تنظيف', color: 'text-blue-400', bg: 'bg-blue-500/20' },
-    maintenance: { icon: Wrench, label: 'صيانة', color: 'text-orange-400', bg: 'bg-orange-500/20' },
-    bellman: { icon: BellRing, label: 'بيلمان', color: 'text-purple-400', bg: 'bg-purple-500/20' },
-    coffee: { icon: Coffee, label: 'كوفي شوب', color: 'text-amber-400', bg: 'bg-amber-500/20' },
-    reception: { icon: Users, label: 'استقبال', color: 'text-teal-400', bg: 'bg-teal-500/20' },
-    other: { icon: Package, label: 'أخرى', color: 'text-gray-400', bg: 'bg-gray-500/20' }
-};
+// TYPE_CONFIG will be created with useMemo inside component
 
 // ============================================================
 // HELPER COMPONENTS
@@ -259,6 +253,7 @@ export const LivePulseDashboard: React.FC = () => {
     const { user, branchId } = useAuth();
     const { tenantId } = useTenant();
     const { haptic: triggerHaptic } = useUX();
+    const { t } = useTranslation();
 
     const [pulseItems, setPulseItems] = useState<PulseItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -439,7 +434,7 @@ export const LivePulseDashboard: React.FC = () => {
                     id: doc.id,
                     type: 'coffee',
                     roomNumber: data.roomNumber,
-                    description: `${itemCount} صنف - ${data.status === 'pending' ? 'بانتظار' : 'قيد التحضير'}`,
+                    description: `${itemCount} ${t('common.product') || 'صنف'} - ${data.status === 'pending' ? (t('common.pending') || 'بانتظار') : (t('coffeeshop.preparing') || 'قيد التحضير')}`,
                     status: data.status,
                     startTime: data.createdAt,
                     assignedTo: data.preparedBy?.name,
@@ -610,12 +605,12 @@ export const LivePulseDashboard: React.FC = () => {
             {/* Filters */}
             <div className="flex flex-wrap gap-2">
                 {[
-                    { id: 'all', label: 'الكل', count: pulseItems.length },
-                    { id: 'delayed', label: '⚠️ متأخر', count: stats.delayed },
-                    { id: 'cleaning', label: '🧹 تنظيف', count: stats.byType.cleaning || 0 },
-                    { id: 'maintenance', label: '🔧 صيانة', count: stats.byType.maintenance || 0 },
-                    { id: 'coffee', label: '☕ كوفي', count: stats.byType.coffee || 0 },
-                    { id: 'bellman', label: '🛎️ بيلمان', count: stats.byType.bellman || 0 },
+                    { id: 'all', label: t('common.all') || 'الكل', count: pulseItems.length },
+                    { id: 'delayed', label: `⚠️ ${t('common.delayed') || 'متأخر'}`, count: stats.delayed },
+                    { id: 'cleaning', label: `🧹 ${t('departments.housekeeping') || 'تنظيف'}`, count: stats.byType.cleaning || 0 },
+                    { id: 'maintenance', label: `🔧 ${t('departments.maintenance') || 'صيانة'}`, count: stats.byType.maintenance || 0 },
+                    { id: 'coffee', label: `☕ ${t('departments.coffeeshop') || 'كوفي'}`, count: stats.byType.coffee || 0 },
+                    { id: 'bellman', label: `🛎️ ${t('departments.bellman') || 'بيلمان'}`, count: stats.byType.bellman || 0 },
                 ].map(f => (
                     <button
                         key={f.id}

@@ -87,7 +87,15 @@
         "product": "পণ্য",
         "rs": "টাকা",
         "team": "দল",
-        "disabled": "নিষ্ক্রিয়"
+        "disabled": "নিষ্ক্রিয়",
+        "activate": "সক্রিয় করুন",
+        "update": "আপডেট করুন"
+    },
+    "languages": {
+        "arabic": "আরবি",
+        "english": "ইংরেজি",
+        "hindi": "হিন্দি",
+        "bengali": "বাংলা"
     },
     "time": {
         "today": "আজ",

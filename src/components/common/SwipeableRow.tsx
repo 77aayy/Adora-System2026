@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface SwipeableRowProps {
     children: React.ReactNode;
@@ -19,8 +20,8 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
     children,
     onSwipeRight,
     onSwipeLeft,
-    rightLabel = 'إكمال',
-    leftLabel = 'حذف',
+    rightLabel,
+    leftLabel,
     rightColor = 'bg-green-500',
     leftColor = 'bg-red-500',
     rightIcon = <Check className="w-6 h-6 text-white" />,
@@ -28,6 +29,9 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
     threshold = 100,
     disabled = false
 }) => {
+    const { t } = useTranslation();
+    const finalRightLabel = rightLabel || t('common.complete');
+    const finalLeftLabel = leftLabel || t('common.delete');
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const startX = useRef(0);
@@ -95,14 +99,14 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({
             <div className={`absolute inset-y-0 left-0 w-full flex items-center justify-start px-8 ${rightColor} ${offsetX > 0 ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="flex items-center gap-2 transform translate-x-[-20%]">
                     {rightIcon}
-                    <span className="text-white font-bold">{rightLabel}</span>
+                    <span className="text-white font-bold">{finalRightLabel}</span>
                 </div>
             </div>
 
             {/* Left Background (Swipe Left) */}
             <div className={`absolute inset-y-0 right-0 w-full flex items-center justify-end px-8 ${leftColor} ${offsetX < 0 ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="flex items-center gap-2 transform translate-x-[20%]">
-                    <span className="text-white font-bold">{leftLabel}</span>
+                    <span className="text-white font-bold">{finalLeftLabel}</span>
                     {leftIcon}
                 </div>
             </div>

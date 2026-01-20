@@ -87,6 +87,7 @@ import { VIPGuestTheme, VIPWelcomeBanner } from '../../components/guest/VIPGuest
 import { QuickIssueReporter } from '../../components/guest/QuickIssueReporter';
 import { MicroFeedback } from '../../components/guest/MicroFeedback';
 import { logger } from '../../services/loggerService';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================
 // TYPES
@@ -187,6 +188,7 @@ const SERVICES: ServiceItem[] = [
 // ============================================================
 
 export const GuestDashboard: React.FC = () => {
+    const { t } = useTranslation();
     console.log('🚀 [GuestDashboard] Component rendered!');
     // 🌙 Theme Support
     const { theme, toggleTheme, isDark } = useTheme();
@@ -1579,7 +1581,7 @@ export const GuestDashboard: React.FC = () => {
             // Validate required fields
             for (const field of selectedQRService.fields || []) {
                 if (field.required && !qrServiceFormData[field.key]) {
-                    alert(`يرجى ملء حقل: ${field.label}`);
+                    alert(t('guest.fillFieldRequired', { field: field.label }) || `يرجى ملء حقل: ${field.label}`);
                     setIsSubmitting(false);
                     return;
                 }
@@ -1600,14 +1602,14 @@ export const GuestDashboard: React.FC = () => {
             // 🔐 Record the action for rate limiting
             await recordRateLimitedAction('request');
             
-            alert('✅ تم إرسال الطلب بنجاح!');
+            alert(`✅ ${t('guest.requestSentSuccess') || 'تم إرسال الطلب بنجاح!'}`);
             setShowQRServiceModal(false);
             setSelectedQRService(null);
             setQRServiceFormData({});
             await loadRecentRequests(session);
         } catch (error) {
             console.error('Error submitting QR service request:', error);
-            alert('❌ فشل إرسال الطلب. يرجى المحاولة مرة أخرى.');
+            alert(`❌ ${t('guest.requestSentError') || 'فشل إرسال الطلب. يرجى المحاولة مرة أخرى.'}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -1867,14 +1869,14 @@ export const GuestDashboard: React.FC = () => {
         if (template.requireAllQuestions) {
             const allRequired = template.questions.filter(q => q.required).every(q => ratingResponses[q.id]);
             if (!allRequired) {
-                alert('يرجى الإجابة على جميع الأسئلة المطلوبة');
+                alert(t('guest.answerAllRequiredQuestions') || 'يرجى الإجابة على جميع الأسئلة المطلوبة');
                 return;
             }
         } else {
             // At least first question must be answered
             const firstQuestion = template.questions[0];
             if (firstQuestion.required && !ratingResponses[firstQuestion.id]) {
-                alert('يرجى الإجابة على السؤال الأول على الأقل');
+                alert(t('guest.answerFirstQuestionAtLeast') || 'يرجى الإجابة على السؤال الأول على الأقل');
                 return;
             }
         }
@@ -1891,13 +1893,13 @@ export const GuestDashboard: React.FC = () => {
                 feedback
             );
 
-            alert('شكراً لك! تم إرسال تقييمك بنجاح.');
+            alert(t('guest.ratingSentSuccess') || 'شكراً لك! تم إرسال تقييمك بنجاح.');
             setShowRatingModal(false);
             setRatingInvitation(null);
             setRatingResponses({});
         } catch (error) {
             console.error('Error submitting dynamic rating:', error);
-            alert('حدث خطأ أثناء إرسال التقييم. يرجى المحاولة مرة أخرى.');
+            alert(t('guest.ratingSentError') || 'حدث خطأ أثناء إرسال التقييم. يرجى المحاولة مرة أخرى.');
         } finally {
             setRatingSubmitting(false);
         }
@@ -2424,7 +2426,7 @@ export const GuestDashboard: React.FC = () => {
     const requestExtension = async () => {
         if (!session) return;
 
-        if (!confirm('سوف يتم إرسال طلب تمديد الإقامة للاستقبال لبحث الإمكانية.\n\nهل تريد المتابعة؟')) {
+        if (!confirm(t('guest.extensionRequestConfirm') || 'سوف يتم إرسال طلب تمديد الإقامة للاستقبال لبحث الإمكانية.\n\nهل تريد المتابعة؟')) {
             return;
         }
 
@@ -2479,10 +2481,10 @@ export const GuestDashboard: React.FC = () => {
             });
 
             await logGuestActivity('extension_request', {});
-            alert('تم إرسال طلب التمديد بنجاح! سيتم التواصل معك.');
+            alert(t('guest.extensionSentSuccess') || 'تم إرسال طلب التمديد بنجاح! سيتم التواصل معك.');
         } catch (error) {
             console.error('Extension error:', error);
-            alert('فشل إرسال الطلب');
+            alert(t('guest.extensionSentError') || 'فشل إرسال الطلب');
         }
     };
 
@@ -2510,10 +2512,10 @@ export const GuestDashboard: React.FC = () => {
 
     const getStatusLabel = (status: string): string => {
         switch (status) {
-            case 'PENDING': return 'قيد الإنتظار';
-            case 'CONFIRMED': return 'مؤكد';
-            case 'IN_PROGRESS': return 'قيد التنفيذ';
-            case 'COMPLETED': return 'مكتمل';
+            case 'PENDING': return t('common.pending') || 'قيد الإنتظار';
+            case 'CONFIRMED': return t('reception.statusLabels.confirmed') || 'مؤكد';
+            case 'IN_PROGRESS': return t('common.inProgress') || 'قيد التنفيذ';
+            case 'COMPLETED': return t('common.completed') || 'مكتمل';
             default: return status;
         }
     };
@@ -4183,7 +4185,7 @@ export const GuestDashboard: React.FC = () => {
                                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                         }`}
                                 >
-                                    {doNotDisturb ? 'إلغاء' : 'تفعيل'}
+                                    {doNotDisturb ? t('common.cancel') : t('common.activate')}
                                 </button>
                             </div>
                         </div>
@@ -5133,7 +5135,7 @@ export const GuestDashboard: React.FC = () => {
                                         <textarea
                                             value={emergencyNotes}
                                             onChange={(e) => setEmergencyNotes(e.target.value)}
-                                            placeholder={emergencyServiceType === 'maintenance' ? 'مثال: التكييف لا يعمل' : 'مثال: طلب خاص'}
+                                            placeholder={emergencyServiceType === 'maintenance' ? (t('guest.exampleMaintenance') || 'مثال: التكييف لا يعمل') : (t('guest.exampleSpecialRequest') || 'مثال: طلب خاص')}
                                             rows={3}
                                             className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white resize-none"
                                         />

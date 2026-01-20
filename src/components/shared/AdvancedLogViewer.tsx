@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { AdoraLoader } from '../common/AdoraLoader';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { useTenantData, useTenantBranches } from '../../hooks/useTenantData';
 import {
     getLogs, getLogStats, subscribeToLogs, downloadCSV, printLogs,
@@ -70,6 +71,7 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
     const { haptic, success } = useUX();
     const { activeTenant } = useTenantData();
     const { branches } = useTenantBranches();
+    const { t } = useTranslation();
     
     const tenantId = (user as any)?.tenantId || '';
     const branchId = (user as any)?.branch || '';
@@ -285,7 +287,7 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
                                                 : 'text-white/60 hover:text-white'
                                         }`}
                                     >
-                                        {mode === 'list' ? 'قائمة' : mode === 'timeline' ? 'خط زمني' : 'إحصائيات'}
+                                        {mode === 'list' ? (t('common.list') || 'قائمة') : mode === 'timeline' ? (t('common.timeline') || 'خط زمني') : (t('common.statistics') || 'إحصائيات')}
                                     </button>
                                 ))}
                             </div>
@@ -294,7 +296,7 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
                             <button
                                 onClick={handleExportCSV}
                                 className="p-2.5 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
-                                title="تصدير Excel"
+                                title={t('common.exportExcel') || 'تصدير Excel'}
                             >
                                 <FileSpreadsheet className="w-5 h-5" />
                             </button>
@@ -302,7 +304,7 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
                             <button
                                 onClick={handlePrint}
                                 className="p-2.5 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
-                                title="طباعة"
+                                title={t('common.print') || 'طباعة'}
                             >
                                 <Printer className="w-5 h-5" />
                             </button>
@@ -310,7 +312,7 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
                             <button
                                 onClick={loadData}
                                 className="p-2.5 rounded-xl bg-white/10 text-white/60 hover:text-white hover:bg-white/20 transition-colors"
-                                title="تحديث"
+                                title={t('common.refresh') || 'تحديث'}
                             >
                                 <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
                             </button>
@@ -353,10 +355,10 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
                                             : 'text-white/60 hover:text-white'
                                     }`}
                                 >
-                                    {p === 'today' ? 'اليوم' :
-                                     p === 'yesterday' ? 'أمس' :
-                                     p === 'week' ? 'أسبوع' :
-                                     p === 'month' ? 'شهر' : 'مخصص'}
+                                    {p === 'today' ? (t('common.today') || 'اليوم') :
+                                     p === 'yesterday' ? (t('common.yesterday') || 'أمس') :
+                                     p === 'week' ? (t('common.week') || 'أسبوع') :
+                                     p === 'month' ? (t('common.month') || 'شهر') : (t('common.custom') || 'مخصص')}
                                 </button>
                             ))}
                         </div>
@@ -479,7 +481,7 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
                                         type="text"
                                         value={selectedRoom}
                                         onChange={(e) => setSelectedRoom(e.target.value)}
-                                        placeholder="مثال: 101"
+                                        placeholder={t('common.exampleRoomNumber') || 'مثال: 101'}
                                         className="w-full px-3 py-2 rounded-xl bg-white/5 text-white placeholder-white/40 border border-white/10 focus:border-teal-500 focus:outline-none"
                                     />
                                 </div>

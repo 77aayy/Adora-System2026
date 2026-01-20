@@ -20,6 +20,7 @@ import {
 import { Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { useTranslation } from 'react-i18next';
 import { testFirebaseConnection, FirebaseConfig } from '../../services/firebaseMulti';
 import { formatDualDate } from '../../utils/dateUtils';
 import { isPinAvailable } from '../../services/ownerService';
@@ -60,6 +61,7 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
 }) => {
     const { success, error } = useUX();
     const { user, authReady } = useAuth();
+    const { t } = useTranslation();
     
     // ============ State ============
     const [links, setLinks] = useState<DemoLinkConfig[]>([]);
@@ -166,14 +168,14 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
                     <div className="bg-white/5 rounded-xl p-3 border border-white/10">
                         <div className="flex items-center gap-2 text-white/60 text-xs mb-1">
                             <LinkIcon className="w-3.5 h-3.5" />
-                            إجمالي الروابط
+                            {t('demoLink.totalLinks') || 'إجمالي الروابط'}
                         </div>
                         <p className="text-xl font-bold text-white">{links.length}</p>
                     </div>
                     <div className="bg-teal-500/10 rounded-xl p-3 border border-teal-500/20">
                         <div className="flex items-center gap-2 text-teal-400 text-xs mb-1">
                             <Play className="w-3.5 h-3.5" />
-                            نشط
+                            {t('common.active') || 'نشط'}
                         </div>
                         <p className="text-xl font-bold text-teal-400">
                             {links.filter(l => l.isActive && !l.isPaused).length}
@@ -182,7 +184,7 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
                     <div className="bg-amber-500/10 rounded-xl p-3 border border-amber-500/20">
                         <div className="flex items-center gap-2 text-amber-400 text-xs mb-1">
                             <Pause className="w-3.5 h-3.5" />
-                            متوقف
+                            {t('common.paused') || 'متوقف'}
                         </div>
                         <p className="text-xl font-bold text-amber-400">
                             {links.filter(l => l.isPaused).length}
@@ -191,7 +193,7 @@ export const DemoLinkManager: React.FC<DemoLinkManagerProps> = ({
                     <div className="bg-red-500/10 rounded-xl p-3 border border-red-500/20">
                         <div className="flex items-center gap-2 text-red-400 text-xs mb-1">
                             <Clock className="w-3.5 h-3.5" />
-                            منتهي
+                            {t('common.expired') || 'منتهي'}
                         </div>
                         <p className="text-xl font-bold text-red-400">
                             {links.filter(l => l.expiresAt && l.expiresAt.toDate() < new Date()).length}
@@ -304,7 +306,7 @@ const DemoLinkCard: React.FC<{
                     <button
                         onClick={onCopy}
                         className="p-2 text-white/50 hover:text-teal-400 transition-colors"
-                        title="نسخ الرابط"
+                        title={t('common.copyLink') || 'نسخ الرابط'}
                     >
                         <Copy className="w-5 h-5" />
                     </button>
@@ -312,7 +314,7 @@ const DemoLinkCard: React.FC<{
                     <button
                         onClick={() => window.open(link.linkUrl, '_blank')}
                         className="p-2 text-white/50 hover:text-blue-400 transition-colors"
-                        title="فتح الرابط"
+                        title={t('common.openLink') || 'فتح الرابط'}
                     >
                         <ExternalLink className="w-5 h-5" />
                     </button>
@@ -320,7 +322,7 @@ const DemoLinkCard: React.FC<{
                     <button
                         onClick={onTogglePause}
                         className={`p-2 ${link.isPaused ? 'text-green-400' : 'text-amber-400'} hover:opacity-80 transition-colors`}
-                        title={link.isPaused ? 'تفعيل' : 'إيقاف'}
+                        title={link.isPaused ? (t('common.activate') || 'تفعيل') : (t('common.deactivate') || 'إيقاف')}
                     >
                         {link.isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
                     </button>
@@ -333,7 +335,7 @@ const DemoLinkCard: React.FC<{
                                 ? 'text-red-400 animate-pulse cursor-wait' 
                                 : 'text-white/50 hover:text-red-400'
                         }`}
-                        title={isDeleting ? 'جاري حذف البيانات...' : 'حذف'}
+                        title={isDeleting ? (t('admin.deleting') || 'جاري حذف البيانات...') : t('common.delete')}
                     >
                         {isDeleting ? (
                             <Loader2 className="w-5 h-5 animate-spin" />
@@ -662,7 +664,7 @@ const CreateDemoManagerModal: React.FC<{
                                     value={name} 
                                     onChange={e => setName(e.target.value)} 
                                     className="input" 
-                                    placeholder="عميل تجريبي"
+                                    placeholder={t('demoLink.demoClient') || 'عميل تجريبي'}
                                 />
                             </div>
                             
@@ -678,7 +680,7 @@ const CreateDemoManagerModal: React.FC<{
                                     value={phone} 
                                     onChange={e => setPhone(e.target.value.replace(/[^0-9+]/g, ''))} 
                                     className="input text-left" 
-                                    placeholder="05xxxxxxxx" 
+                                    placeholder={t('demoLink.phonePlaceholder') || '05xxxxxxxx'} 
                                     dir="ltr"
                                 />
                             </div>
@@ -698,7 +700,7 @@ const CreateDemoManagerModal: React.FC<{
                                     className={`input text-center text-2xl font-mono tracking-[0.4em] ${
                                         code.length === 4 ? '!border-green-500 !bg-green-500/10' : ''
                                     }`}
-                                    placeholder="• • • •"
+                                    placeholder={t('demoLink.codePlaceholder') || '• • • •'}
                                     maxLength={4}
                                 />
                             </div>
@@ -749,7 +751,7 @@ const CreateDemoManagerModal: React.FC<{
                                         }}
                                         maxLength={4}
                                         className="input w-20 text-center font-mono text-lg tracking-wider"
-                                        placeholder="كود"
+                                        placeholder={t('common.code') || 'كود'}
                                     />
                                     <input
                                         type="text"
@@ -757,7 +759,7 @@ const CreateDemoManagerModal: React.FC<{
                                         onChange={e => setCurrentBranchName(e.target.value)}
                                         onKeyPress={(e) => e.key === 'Enter' && handleAddBranch()}
                                         className="input flex-1"
-                                        placeholder="اسم الفرع"
+                                        placeholder={t('common.branchName') || 'اسم الفرع'}
                                     />
                                 </div>
                                 <button
@@ -844,7 +846,7 @@ const CreateDemoManagerModal: React.FC<{
                                 
                                 {/* Paste Area */}
                                 <textarea
-                                    placeholder="الصق كود Firebase Config هنا..."
+                                    placeholder={t('demoLink.pasteFirebaseConfig') || 'الصق كود Firebase Config هنا...'}
                                     className="w-full p-3 rounded-xl bg-black/30 border border-white/10 text-white placeholder-white/30 text-sm font-mono resize-none h-20"
                                     dir="ltr"
                                     onPaste={(e) => {
@@ -867,7 +869,7 @@ const CreateDemoManagerModal: React.FC<{
                                             }}
                                             className="w-full p-2 rounded-lg bg-black/30 border border-white/10 text-white text-sm font-mono"
                                             dir="ltr"
-                                            placeholder="AIzaSy..."
+                                            placeholder={t('demoLink.apiKeyPlaceholder') || 'AIzaSy...'}
                                         />
                                     </div>
                                     <div>
@@ -881,7 +883,7 @@ const CreateDemoManagerModal: React.FC<{
                                             }}
                                             className="w-full p-2 rounded-lg bg-black/30 border border-white/10 text-white text-sm font-mono"
                                             dir="ltr"
-                                            placeholder="my-project"
+                                            placeholder={t('demoLink.projectIdPlaceholder') || 'my-project'}
                                         />
                                     </div>
                                 </div>
@@ -943,7 +945,7 @@ const CreateDemoManagerModal: React.FC<{
                                     value={salesWhatsApp}
                                     onChange={(e) => setSalesWhatsApp(e.target.value.replace(/[^0-9]/g, ''))}
                                     className="input text-left"
-                                    placeholder="966501234567"
+                                    placeholder={t('demoLink.whatsappPlaceholder') || '966501234567'}
                                     dir="ltr"
                                 />
                                 <p className="text-xs mt-1" style={{ color: 'var(--theme-text-disabled)' }}>

@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cloud, CloudOff, Check, AlertTriangle, WifiOff } from 'lucide-react';
 import { AdoraLoaderInline } from './AdoraLoader';
+import { useTranslation } from 'react-i18next';
 import {
     isOnline,
     getQueuedActions,
@@ -20,6 +21,7 @@ import {
 // ============================================================
 
 export const OfflineIndicator: React.FC = () => {
+    const { t } = useTranslation();
     const [online, setOnline] = useState(isOnline());
     const [queueCount, setQueueCount] = useState(0);
 
@@ -62,12 +64,12 @@ export const OfflineIndicator: React.FC = () => {
             {online ? (
                 <>
                     <AdoraLoaderInline size={16} />
-                    <span className="text-sm">{queueCount} إجراء في الانتظار</span>
+                    <span className="text-sm">{queueCount} {t('common.actionsPending') || 'إجراء في الانتظار'}</span>
                 </>
             ) : (
                 <>
                     <WifiOff className="w-4 h-4" />
-                    <span className="text-sm">غير متصل</span>
+                    <span className="text-sm">{t('common.offline') || 'غير متصل'}</span>
                     {queueCount > 0 && (
                         <span className="px-2 py-0.5 rounded-full bg-white/20 text-xs">
                             {queueCount}
@@ -119,7 +121,7 @@ export const OfflineQueuePanel: React.FC<OfflineQueuePanelProps> = ({ isOpen, on
     };
 
     const handleClear = () => {
-        if (confirm('هل أنت متأكد من حذف جميع الإجراءات المعلقة؟')) {
+        if (confirm(t('admin.clearQueueConfirm') || 'هل أنت متأكد من حذف جميع الإجراءات المعلقة؟')) {
             clearQueue();
             setActions([]);
         }
