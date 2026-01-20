@@ -308,9 +308,14 @@ const recordLoginAttempt = async (pin: string, success: boolean): Promise<void> 
                     timestamp: serverTimestamp(),
                     ip: 'client',
                 });
-            } catch (firestoreError) {
-                // Ignore Firestore errors - localStorage is enough
-                logger.warn('Failed to record login attempt in Firestore (using localStorage only)', firestoreError, 'userService');
+            } catch (firestoreError: any) {
+                // ✅ Handle Firestore internal errors gracefully
+                if (firestoreError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                    logger.warn('Firestore internal error in recordLoginAttempt (likely cache issue)', firestoreError, 'userService');
+                } else {
+                    // Ignore Firestore errors - localStorage is enough
+                    logger.warn('Failed to record login attempt in Firestore (using localStorage only)', firestoreError, 'userService');
+                }
             }
         }
     } catch (error) {

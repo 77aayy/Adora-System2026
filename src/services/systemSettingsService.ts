@@ -336,8 +336,13 @@ const _fetchSystemSettings = async (): Promise<SystemSettings> => {
         
         // If no settings exist anywhere, return defaults (don't create via client)
         return DEFAULT_SETTINGS;
-    } catch (error) {
-        console.error('Error getting system settings:', error);
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error in _fetchSystemSettings (likely cache issue)', error);
+        } else {
+            console.error('Error getting system settings:', error);
+        }
         // ✅ FIX: Return localStorage settings on Firebase error (not defaults!)
         if (localSettings) {
             console.log('📦 Firebase error, using localStorage backup (price=' + localSettings.defaultSubscriptionPrice + ')');

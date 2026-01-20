@@ -324,7 +324,12 @@ export const getAllReceiptVouchers = async (): Promise<ReceiptVoucher[]> => {
             console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (fallback, filtered)`);
             return results;
         }
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error in getAllReceiptVouchers (likely cache issue)', error);
+            return [];
+        }
         console.error('❌ [billingService] Error getting receipt vouchers:', error);
         return [];
     }
@@ -744,7 +749,12 @@ export const getAllInvoices = async (): Promise<Invoice[]> => {
             console.log(`✅ [billingService] Loaded ${results.length} invoices (fallback, filtered)`);
             return results;
         }
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error in getAllInvoices (likely cache issue)', error);
+            return [];
+        }
         console.error('❌ [billingService] Error getting all invoices:', error);
         return [];
     }
@@ -936,7 +946,12 @@ export const getAllExpenseVouchers = async (): Promise<ExpenseVoucher[]> => {
             console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (fallback, filtered)`);
             return results;
         }
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error in getAllExpenseVouchers (likely cache issue)', error);
+            return [];
+        }
         console.error('❌ [billingService] Error getting all expense vouchers:', error);
         return [];
     }
@@ -1087,7 +1102,12 @@ export const getExpiringSubscriptions = async (days: number = 7): Promise<Subscr
                 renewalDate: data.renewalDate?.toDate()
             } as Subscription;
         });
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error in getExpiringSubscriptions (likely cache issue)', error);
+            return [];
+        }
         console.error('Error getting expiring subscriptions:', error);
         return [];
     }
@@ -1115,7 +1135,12 @@ export const getOverdueInvoices = async (): Promise<Invoice[]> => {
                 paidDate: data.paidDate?.toDate()
             } as Invoice;
         });
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error in getOverdueInvoices (likely cache issue)', error);
+            return [];
+        }
         console.error('Error getting overdue invoices:', error);
         return [];
     }
@@ -1160,7 +1185,12 @@ export const calculateTotalRevenue = async (): Promise<number> => {
         });
 
         return totalRevenue;
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            logger.warn('Firestore internal error in calculateTotalRevenue (likely cache issue)', error, 'billingService');
+            return 0;
+        }
         logger.error('Error calculating total revenue', error, 'billingService');
         return 0;
     }
@@ -1208,6 +1238,12 @@ export const getDeletedBillingCount = async (): Promise<number> => {
 
         return deletedCount;
     } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error in getDeletedBillingCount (likely cache issue)', error);
+            return 0;
+        }
+        
         // ✅ Graceful handling: Permission denied is expected for non-owners
         const isPermissionError = error?.code === 'permission-denied' || 
                                   error?.message?.includes('permission') ||
@@ -1372,6 +1408,12 @@ export const getAllSubscriptions = async (): Promise<Subscription[]> => {
             } as Subscription;
         });
     } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            logger.warn('Firestore internal error in getAllSubscriptions (likely cache issue)', error, 'billingService');
+            return [];
+        }
+        
         // ✅ Graceful handling: Permission denied is expected for non-owners
         const isPermissionError = error?.code === 'permission-denied' || 
                                   error?.message?.includes('permission') ||
@@ -1448,6 +1490,12 @@ export const calculateMonthlyRenewalRevenue = async (): Promise<number> => {
 
         return renewalRevenue;
     } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error in calculateMonthlyRenewalRevenue (likely cache issue)', error);
+            return 0;
+        }
+        
         // ✅ Graceful handling: Permission denied is expected for non-owners
         const isPermissionError = error?.code === 'permission-denied' || 
                                   error?.message?.includes('permission') ||

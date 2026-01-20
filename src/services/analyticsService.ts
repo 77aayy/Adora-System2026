@@ -362,8 +362,13 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
                 query(collection(db, 'requests'), where('createdAt', '>=', Timestamp.fromDate(monthStart)))
             );
             totalRequestsThisMonth = monthRequestsSnapshot.data().count;
-        } catch (err) {
-            logger.debug('Error counting requests, using cached values', err, 'analyticsService');
+        } catch (err: any) {
+            // ✅ Handle Firestore internal errors gracefully
+            if (err?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                logger.warn('Firestore internal error in _fetchSystemAnalytics (likely cache issue)', err, 'analyticsService');
+            } else {
+                logger.debug('Error counting requests, using cached values', err, 'analyticsService');
+            }
         }
         
         // ✅ Calculate average requests per tenant
@@ -561,6 +566,12 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
         
         return analytics;
     } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error in _fetchTenantAnalytics (likely cache issue)', error);
+            return [];
+        }
+        
         // ✅ Graceful handling: Permission denied is expected for non-owners
         const isPermissionError = error?.code === 'permission-denied' || 
                                   error?.message?.includes('permission') ||

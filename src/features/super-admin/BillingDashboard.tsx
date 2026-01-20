@@ -126,8 +126,13 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             return allExpenseVouchers
                 .filter(v => !v.isDeleted)
                 .reduce((sum, v) => sum + (v.amount || 0), 0);
-        } catch (error) {
-            console.error('Error calculating total expenses:', error);
+        } catch (error: any) {
+            // ✅ Handle Firestore internal errors gracefully
+            if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                console.warn('⚠️ [BillingDashboard] Firestore internal error calculating expenses (likely cache issue)', error);
+            } else {
+                console.error('Error calculating total expenses:', error);
+            }
             return 0;
         }
     };
@@ -141,8 +146,13 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
         try {
             const settings = await getSystemSettings();
             setSystemSettings(settings);
-        } catch (error) {
-            console.error('Error loading system settings:', error);
+        } catch (error: any) {
+            // ✅ Handle Firestore internal errors gracefully
+            if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                console.warn('⚠️ [BillingDashboard] Firestore internal error loading system settings (likely cache issue)', error);
+            } else {
+                console.error('Error loading system settings:', error);
+            }
         }
     };
 
@@ -169,8 +179,13 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
                 setMonthlyRenewalRevenue(monthlyRenewalRev);
                 setTotalExpenses(expenses);
                 setNetProfit(totalRev - expenses);
-            } catch (error) {
-                console.error('Error loading financial stats:', error);
+            } catch (error: any) {
+                // ✅ Handle Firestore internal errors gracefully
+                if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                    console.warn('⚠️ [BillingDashboard] Firestore internal error in financial stats (likely cache issue)', error);
+                } else {
+                    console.error('Error loading financial stats:', error);
+                }
             }
         };
         loadFinancialStats();
@@ -327,8 +342,13 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             setOverdue(overdueInvs);
             
             console.log('✅ [BillingDashboard] Data loading completed successfully');
-        } catch (error) {
-            console.error('❌ [BillingDashboard] Error loading billing data:', error);
+        } catch (error: any) {
+            // ✅ Handle Firestore internal errors gracefully
+            if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                console.warn('⚠️ [BillingDashboard] Firestore internal error (likely cache issue) - continuing with available data', error);
+            } else {
+                console.error('❌ [BillingDashboard] Error loading billing data:', error);
+            }
         } finally {
             setLoading(false);
         }

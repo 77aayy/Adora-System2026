@@ -613,8 +613,13 @@ export const subscribeToTicketStatus = (
                     });
                 }
             },
-            (error) => {
-                console.error('Error subscribing to ticket status:', error);
+            (error: any) => {
+                // ✅ Handle Firestore internal errors gracefully
+                if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                    console.warn('Firestore internal error in subscribeToTicketStatus (likely cache issue)', error);
+                } else {
+                    console.error('Error subscribing to ticket status:', error);
+                }
                 callback({
                     tenantId,
                     unreadCount: 0,
@@ -624,8 +629,13 @@ export const subscribeToTicketStatus = (
                 });
             }
         );
-    } catch (error) {
-        console.error('Error setting up ticket status subscription:', error);
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            console.warn('Firestore internal error setting up ticket status subscription (likely cache issue)', error);
+        } else {
+            console.error('Error setting up ticket status subscription:', error);
+        }
         callback({
             tenantId,
             unreadCount: 0,

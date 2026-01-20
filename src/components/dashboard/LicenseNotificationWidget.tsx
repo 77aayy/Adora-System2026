@@ -44,68 +44,85 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
                     try {
                         const { collection, query, getDocs, orderBy, limit } = await import('firebase/firestore');
                         const { db } = await import('../../services/firebase');
-                        const notificationsRef = collection(db, 'licenseNotifications');
                         
-                        // ✅ Try to get notifications with orderBy, fallback if index missing
-                        let snapshot;
-                        try {
-                            snapshot = await Promise.race([
-                                getDocs(
-                                    query(
-                                        notificationsRef,
-                                        orderBy('notifiedAt', 'desc'),
-                                        limit(maxNotifications * 2)
-                                    )
-                                ),
-                                new Promise((_, reject) => 
-                                    setTimeout(() => reject(new Error('Timeout')), 3000)
-                                ) as Promise<any>
-                            ]);
-                        } catch (indexError: any) {
-                            // ✅ Fallback: Get without orderBy if index doesn't exist or timeout
-                            if (indexError.code === 'failed-precondition' || indexError.message === 'Timeout') {
-                                logger.warn('Using fallback query (no orderBy)', indexError, 'LicenseNotificationWidget');
-                                snapshot = await getDocs(
-                                    query(notificationsRef, limit(maxNotifications * 2))
-                                );
-                            } else {
-                                throw indexError;
-                            }
-                        }
-                        
-                        result = snapshot.docs
-                            .map((doc) => {
-                                const data = doc.data();
-                                if (!data.managerId || !data.tenantId) return null;
-                                
-                                // Generate message if missing
-                                let message = data.message || '';
-                                if (!message && data.daysUntilExpiry !== undefined) {
-                                    const days = data.daysUntilExpiry;
-                                    if (days <= 0) message = '⚠️ انتهت صلاحية الترخيص!';
-                                    else if (days === 1) message = '🔴 ينتهي الترخيص غداً!';
-                                    else if (days === 7) message = '⚠️ سينتهي الترخيص خلال 7 أيام';
-                                    else if (days === 30) message = 'ℹ️ سينتهي الترخيص خلال 30 يوم';
+                        if (!db) {
+                            logger.warn('Firestore db not available in loadNotifications', null, 'LicenseNotificationWidget');
+                            result = [];
+                        } else {
+                            const notificationsRef = collection(db, 'licenseNotifications');
+                            
+                            // ✅ Try to get notifications with orderBy, fallback if index missing
+                            let snapshot;
+                            try {
+                                snapshot = await Promise.race([
+                                    getDocs(
+                                        query(
+                                            notificationsRef,
+                                            orderBy('notifiedAt', 'desc'),
+                                            limit(maxNotifications * 2)
+                                        )
+                                    ),
+                                    new Promise((_, reject) => 
+                                        setTimeout(() => reject(new Error('Timeout')), 3000)
+                                    ) as Promise<any>
+                                ]);
+                            } catch (indexError: any) {
+                                // ✅ Handle Firestore internal errors gracefully
+                                if (indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                                    logger.warn('Firestore internal error in loadNotifications (likely cache issue)', indexError, 'LicenseNotificationWidget');
+                                    result = [];
+                                    return;
                                 }
                                 
-                                return {
-                                    tenantId: data.tenantId,
-                                    managerId: data.managerId,
-                                    managerName: data.managerName || 'غير معروف',
-                                    daysUntilExpiry: data.daysUntilExpiry ?? 0,
-                                    notificationType: data.notificationType || '30days',
-                                    message: message || 'إشعار انتهاء ترخيص',
-                                    notifiedAt: data.notifiedAt?.toDate() || new Date(),
-                                    notified: data.notified !== false,
-                                } as LicenseNotification;
-                            })
-                            .filter((n): n is LicenseNotification => n !== null)
-                            // Sort by notifiedAt if we couldn't use orderBy
-                            .sort((a, b) => b.notifiedAt.getTime() - a.notifiedAt.getTime())
-                            .slice(0, maxNotifications);
+                                // ✅ Fallback: Get without orderBy if index doesn't exist or timeout
+                                if (indexError.code === 'failed-precondition' || indexError.message === 'Timeout') {
+                                    logger.warn('Using fallback query (no orderBy)', indexError, 'LicenseNotificationWidget');
+                                    snapshot = await getDocs(
+                                        query(notificationsRef, limit(maxNotifications * 2))
+                                    );
+                                } else {
+                                    throw indexError;
+                                }
+                            }
+                            
+                            result = snapshot.docs
+                                .map((doc) => {
+                                    const data = doc.data();
+                                    if (!data.managerId || !data.tenantId) return null;
+                                    
+                                    // Generate message if missing
+                                    let message = data.message || '';
+                                    if (!message && data.daysUntilExpiry !== undefined) {
+                                        const days = data.daysUntilExpiry;
+                                        if (days <= 0) message = '⚠️ انتهت صلاحية الترخيص!';
+                                        else if (days === 1) message = '🔴 ينتهي الترخيص غداً!';
+                                        else if (days === 7) message = '⚠️ سينتهي الترخيص خلال 7 أيام';
+                                        else if (days === 30) message = 'ℹ️ سينتهي الترخيص خلال 30 يوم';
+                                    }
+                                    
+                                    return {
+                                        tenantId: data.tenantId,
+                                        managerId: data.managerId,
+                                        managerName: data.managerName || 'غير معروف',
+                                        daysUntilExpiry: data.daysUntilExpiry ?? 0,
+                                        notificationType: data.notificationType || '30days',
+                                        message: message || 'إشعار انتهاء ترخيص',
+                                        notifiedAt: data.notifiedAt?.toDate() || new Date(),
+                                        notified: data.notified !== false,
+                                    } as LicenseNotification;
+                                })
+                                .filter((n): n is LicenseNotification => n !== null)
+                                // Sort by notifiedAt if we couldn't use orderBy
+                                .sort((a, b) => b.notifiedAt.getTime() - a.notifiedAt.getTime())
+                                .slice(0, maxNotifications);
+                        }
                     } catch (err: any) {
-                        // ✅ Don't block UI - just log error and return empty
-                        logger.error('Failed to load notifications from Firestore', err, 'LicenseNotificationWidget');
+                        // ✅ Handle Firestore internal errors gracefully
+                        if (err?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                            logger.warn('Firestore internal error in loadNotifications (likely cache issue)', err, 'LicenseNotificationWidget');
+                        } else {
+                            logger.error('Failed to load notifications from Firestore', err, 'LicenseNotificationWidget');
+                        }
                         result = [];
                     }
                 } else if (user.tenantId && user.id) {

@@ -1077,8 +1077,8 @@
         "urgentMessages": "الرسائل العاجلة للأقسام",
         "generalInstructions": "التعليمات العامة",
         "technicalSupport": "الدعم الفني",
-        "supportTickets": "تذاكر الدعم",
         "supportTickets": {
+            "title": "تذاكر الدعم",
             "status": {
                 "pending": "في الانتظار",
                 "acknowledged": "تم العلم",

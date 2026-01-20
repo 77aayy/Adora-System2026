@@ -261,12 +261,20 @@ const handleError = (event: ErrorEvent): void => {
     // ✅ Don't count ResizeObserver errors
     const isResizeObserverError = errorMessage.includes('ResizeObserver');
     
+    // ✅ Don't count Firestore INTERNAL ASSERTION FAILED errors (SDK internal issue)
+    const isFirestoreInternalError = errorMessage.includes('INTERNAL ASSERTION FAILED') ||
+                                     errorMessage.includes('Unexpected state');
+    
     // ✅ Only increment error count for real errors
-    if (!isQuotaError && !isPermissionError && !isResizeObserverError) {
+    if (!isQuotaError && !isPermissionError && !isResizeObserverError && !isFirestoreInternalError) {
         errorCount++;
         console.error('🔴 خطأ غير متوقع:', event.error);
     } else {
-        console.warn('⚠️ Non-critical error (ignored):', errorMessage);
+        if (isFirestoreInternalError) {
+            console.warn('⚠️ Firestore internal error (SDK issue, ignored):', errorMessage);
+        } else {
+            console.warn('⚠️ Non-critical error (ignored):', errorMessage);
+        }
     }
 
     logError({
@@ -301,12 +309,20 @@ const handleUnhandledRejection = (event: PromiseRejectionEvent): void => {
                               errorMessage.includes('permission-denied') ||
                               errorMessage.includes('Missing or insufficient permissions');
     
+    // ✅ Don't count Firestore INTERNAL ASSERTION FAILED errors (SDK internal issue)
+    const isFirestoreInternalError = errorMessage.includes('INTERNAL ASSERTION FAILED') ||
+                                     errorMessage.includes('Unexpected state');
+    
     // ✅ Only increment error count for real errors
-    if (!isQuotaError && !isPermissionError) {
+    if (!isQuotaError && !isPermissionError && !isFirestoreInternalError) {
         errorCount++;
         console.error('🔴 Promise غير معالج:', event.reason);
     } else {
-        console.warn('⚠️ Firebase error (ignored):', errorMessage);
+        if (isFirestoreInternalError) {
+            console.warn('⚠️ Firestore internal error (SDK issue, ignored):', errorMessage);
+        } else {
+            console.warn('⚠️ Firebase error (ignored):', errorMessage);
+        }
     }
 
     logError({

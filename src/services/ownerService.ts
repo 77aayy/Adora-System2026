@@ -444,6 +444,11 @@ export const getAllManagers = async (forceRefresh: boolean = false): Promise<Use
         'owners:all_managers',
         async () => {
             try {
+                if (!db) {
+                    logger.warn('Firestore db not available in getAllManagers', null, 'ownerService');
+                    return [];
+                }
+                
                 const usersRef = collection(db, 'users');
                 // ✅ Simplified query to ensure all managers are visible
                 const q = query(
@@ -456,8 +461,13 @@ export const getAllManagers = async (forceRefresh: boolean = false): Promise<Use
                     id: doc.id,
                     ...doc.data(),
                 })) as User[];
-            } catch (error) {
-                console.error("Failed to load managers. This might be a missing index or permission issue:", error);
+            } catch (error: any) {
+                // ✅ Handle Firestore internal errors gracefully
+                if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                    logger.warn('Firestore internal error in getAllManagers (likely cache issue)', error, 'ownerService');
+                } else {
+                    logger.error("Failed to load managers. This might be a missing index or permission issue:", error, 'ownerService');
+                }
                 return [];
             }
         },
@@ -1118,6 +1128,11 @@ export const getDeletedManagers = async (): Promise<Array<User & { deletedAt: Da
     }
 
     try {
+        if (!db) {
+            logger.warn('Firestore db not available in getDeletedManagers', null, 'ownerService');
+            return [];
+        }
+        
         const deletedManagersRef = collection(db, 'deleted_managers');
         // ✅ Owner can read all deleted managers (no filter needed - Firestore Rules handle it)
         const q = query(deletedManagersRef);
@@ -1134,7 +1149,12 @@ export const getDeletedManagers = async (): Promise<Array<User & { deletedAt: Da
             } as User & { deletedAt: Date; canRecover: boolean };
         });
     } catch (error: any) {
-        logger.error('Error getting deleted managers', error, 'ownerService');
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            logger.warn('Firestore internal error in getDeletedManagers (likely cache issue)', error, 'ownerService');
+        } else {
+            logger.error('Error getting deleted managers', error, 'ownerService');
+        }
         // ✅ Return empty array instead of throwing to prevent UI crash
         return [];
     }

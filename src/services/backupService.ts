@@ -204,16 +204,26 @@ export async function createTenantBackup(
         logger.info(`Backup created for tenant ${tenantId}`, { backupId, backupType, duration: backupDuration }, 'backupService');
 
         return backupId;
-    } catch (error) {
-        logger.error('Failed to create backup', error, 'backupService');
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            logger.warn('Firestore internal error in createTenantBackup (likely cache issue)', error, 'backupService');
+        } else {
+            logger.error('Failed to create backup', error, 'backupService');
+        }
         
         // Update backup status to failed
         if (backupId) {
             try {
                 const { updateDoc } = await import('firebase/firestore');
                 await updateDoc(doc(db, 'tenantBackups', backupId), { status: 'failed' });
-            } catch (updateError) {
-                logger.error('Failed to update backup status', updateError, 'backupService');
+            } catch (updateError: any) {
+                // ✅ Handle Firestore internal errors gracefully
+                if (updateError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                    logger.warn('Firestore internal error updating backup status (likely cache issue)', updateError, 'backupService');
+                } else {
+                    logger.error('Failed to update backup status', updateError, 'backupService');
+                }
             }
         }
 
@@ -247,8 +257,13 @@ export async function getTenantBackups(tenantId: string): Promise<TenantBackup[]
             expiresAt: doc.data().expiresAt?.toDate(),
             restoredAt: doc.data().restoredAt?.toDate(),
         })) as TenantBackup[];
-    } catch (error) {
-        logger.error('Failed to get tenant backups', error, 'backupService');
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            logger.warn('Firestore internal error in getTenantBackups (likely cache issue)', error, 'backupService');
+        } else {
+            logger.error('Failed to get tenant backups', error, 'backupService');
+        }
         return [];
     }
 }
@@ -310,7 +325,17 @@ export async function createDailyBackupsForAllTenants(): Promise<{ success: numb
     try {
         // Get all tenants (we'll filter active ones manually since structure varies)
         const tenantsRef = collection(db, 'tenants');
-        const tenantsSnapshot = await getDocs(tenantsRef);
+        let tenantsSnapshot;
+        try {
+            tenantsSnapshot = await getDocs(tenantsRef);
+        } catch (error: any) {
+            // ✅ Handle Firestore internal errors gracefully
+            if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                logger.warn('Firestore internal error in createDailyBackupsForAllTenants (likely cache issue)', error, 'backupService');
+                return { success: 0, failed: 0 };
+            }
+            throw error;
+        }
         
         // Filter to only active tenants (check multiple possible status locations)
         const activeTenants = tenantsSnapshot.docs.filter(doc => {

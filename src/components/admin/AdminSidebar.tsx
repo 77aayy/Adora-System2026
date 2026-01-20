@@ -168,7 +168,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 { 
                     to: '/admin/support-tickets', 
                     icon: <Mail className="w-4 h-4" />, 
-                    label: t('admin.supportTickets') || 'تذاكر الدعم',
+                    label: t('admin.supportTickets.title') || t('admin.supportTickets') || 'تذاكر الدعم',
                     badge: isOwner 
                         ? (unrespondedTicketsCount > 0 ? unrespondedTicketsCount : undefined)
                         : (ticketStatus && ticketStatus.unreadCount > 0 ? ticketStatus.unreadCount : undefined)
@@ -260,7 +260,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                 { 
                     to: '/admin/support-tickets', 
                     icon: <Mail className="w-4 h-4" />, 
-                    label: t('admin.supportTickets') || 'تذاكر الدعم',
+                    label: t('admin.supportTickets.title') || t('admin.supportTickets') || 'تذاكر الدعم',
                     badge: unrespondedTicketsCount > 0 ? unrespondedTicketsCount : undefined
                 }
             ]
@@ -274,11 +274,24 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     useEffect(() => {
         if (!isOwner || !tenantId) return;
 
-        const unsub = subscribeToTicketStatus(tenantId, (status) => {
-            setTicketStatus(status);
-        });
+        let unsub: (() => void) | null = null;
+        try {
+            unsub = subscribeToTicketStatus(tenantId, (status) => {
+                setTicketStatus(status);
+            });
+        } catch (error) {
+            console.error('Error setting up ticket status subscription:', error);
+        }
 
-        return () => unsub();
+        return () => {
+            if (unsub) {
+                try {
+                    unsub();
+                } catch (error) {
+                    console.warn('Error cleaning up ticket status subscription:', error);
+                }
+            }
+        };
     }, [isOwner, tenantId]);
 
     // ✅ Fetch pending subscription requests count (for owner only)
