@@ -658,6 +658,7 @@ const ReceiptVouchersStats: React.FC<{
     receiptVouchers: ReceiptVoucher[];
     selectedVouchers?: Set<string>;
 }> = ({ receiptVouchers, selectedVouchers }) => {
+    const { t } = useTranslation(); // ✅ Add translation hook
     // ✅ Use selected vouchers if provided, otherwise use all
     const vouchersToCalculate = React.useMemo(() => {
         if (selectedVouchers && selectedVouchers.size > 0) {
@@ -749,6 +750,7 @@ const ExpenseVouchersStats: React.FC<{
     expenseVouchers: ExpenseVoucher[];
     selectedVouchers?: Set<string>;
 }> = ({ expenseVouchers, selectedVouchers }) => {
+    const { t } = useTranslation(); // ✅ Add translation hook
     // ✅ Use selected vouchers if provided, otherwise use all
     const vouchersToCalculate = React.useMemo(() => {
         if (selectedVouchers && selectedVouchers.size > 0) {
