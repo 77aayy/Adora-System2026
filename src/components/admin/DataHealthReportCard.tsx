@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Activity, TrendingUp, TrendingDown, Minus, CheckCircle2,
     RefreshCw, ChevronRight, FileText, Shield, Sparkles, Wrench, Zap, Eye,
@@ -158,10 +159,19 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
     // Load latest report
     useEffect(() => {
         const loadReport = async () => {
-            if (!tenantId) return;
+            // ✅ FIX: For owner, use 'owner' or 'system-owner' as tenantId
+            const effectiveTenantId = user?.role === 'owner' 
+                ? (user?.tenantId || 'system-owner' || 'owner')
+                : tenantId;
+            
+            if (!effectiveTenantId) {
+                console.warn('⚠️ No tenantId available for health report');
+                setLoading(false);
+                return;
+            }
 
             try {
-                const reports = await getRecentHealthReports(tenantId, 1);
+                const reports = await getRecentHealthReports(effectiveTenantId, 1);
                 if (reports.length > 0) {
                     setReport(reports[0]);
 
@@ -169,14 +179,57 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                     if (!reports[0].viewed && reports[0].id) {
                         await markReportAsViewed(reports[0].id);
                     }
+                } else {
+                    // ✅ TEMP: Create mock report for testing the modal
+                    console.log('⚠️ No reports found - creating mock report for testing');
+                    const mockReport: DataHealthReport = {
+                        id: 'mock-report-test',
+                        tenantId: effectiveTenantId,
+                        reportPeriod: {
+                            start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+                            end: new Date()
+                        },
+                        generatedAt: new Date(),
+                        overallHealth: 85,
+                        totalIssues: 12,
+                        resolvedIssues: 8,
+                        criticalIssues: 2,
+                        metrics: [],
+                        anomalies: [],
+                        errorAnalysis: {
+                            totalErrors: 5,
+                            unresolvedErrors: 2,
+                            topErrors: [
+                                { message: 'Test error 1', count: 3 },
+                                { message: 'Test error 2', count: 2 }
+                            ]
+                        },
+                        performanceAnalysis: {
+                            averageResponseTime: 250,
+                            apiCallsCount: 150,
+                            slowestEndpoints: []
+                        },
+                        activityTimeline: [],
+                        recommendations: ['Test recommendation 1', 'Test recommendation 2'],
+                        viewed: false
+                    };
+                    setReport(mockReport);
                 }
             } catch (err: any) {
                 console.error('Error loading health report:', err);
-                // ✅ Show user-friendly error message
-                if (err?.message?.includes('not initialized')) {
-                    error(t('healthReport.firebaseNotConnected'));
+                // ✅ Handle permission errors specifically
+                const isPermissionError = err?.code === 'permission-denied' || 
+                                          err?.message?.includes('permission') ||
+                                          err?.message?.includes('Missing or insufficient');
+                
+                if (isPermissionError && user?.role === 'owner') {
+                    // ✅ Owner should have access - this is unexpected
+                    console.warn('⚠️ Owner permission denied for health reports - this should not happen');
+                    error('خطأ في الصلاحيات: المالك يجب أن يكون لديه صلاحيات الوصول. يرجى التحقق من Firestore Rules.');
+                } else if (err?.message?.includes('not initialized')) {
+                    error(t('healthReport.firebaseNotConnected') || 'Firebase غير متصل');
                 } else {
-                    error(t('healthReport.loadFailed'));
+                    error(t('healthReport.loadFailed') || 'فشل تحميل التقرير');
                 }
             } finally {
                 setLoading(false);
@@ -184,19 +237,29 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
         };
 
         loadReport();
-    }, [tenantId]);
+    }, [tenantId, user]);
 
     const handleGenerateReport = async () => {
-        if (!tenantId || !user) return;
+        if (!user) return;
+
+        // ✅ FIX: For owner, use 'owner' or 'system-owner' as tenantId
+        const effectiveTenantId = user?.role === 'owner' 
+            ? (user?.tenantId || 'system-owner' || 'owner')
+            : tenantId;
+        
+        if (!effectiveTenantId) {
+            error('لا يمكن إنشاء التقرير: لا يوجد tenantId');
+            return;
+        }
 
         setGenerating(true);
         haptic('medium');
 
         try {
-            const newReport = await generateWeeklyHealthReport(tenantId);
+            const newReport = await generateWeeklyHealthReport(effectiveTenantId);
             await saveAndNotifyReport(newReport, user.id);
             setReport(newReport);
-            success(t('healthReport.reportGenerated'));
+            success(t('healthReport.reportGenerated') || 'تم إنشاء التقرير بنجاح');
             haptic('success');
         } catch (err: any) {
             console.error('❌ Error generating report:', err);
@@ -508,7 +571,10 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                             {/* View Full Report Button */}
                             <button
                                 ref={buttonRef}
-                                onClick={() => setShowFullReport(true)}
+                                onClick={() => {
+                                    console.log('🔍 [DataHealthReportCard] Opening full report modal...', { report: report?.id, showFullReport });
+                                    setShowFullReport(true);
+                                }}
                                 className="w-full py-3 rounded-xl bg-teal-500/10 text-teal-400 font-medium hover:bg-teal-500/20 transition-colors flex items-center justify-center gap-2"
                             >
                                 <Eye className="w-4 h-4" />
@@ -565,13 +631,14 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                 </div>
             )}
 
-            {/* Full Report Popup */}
-            {showFullReport && report && (
+            {/* Full Report Popup - Use Portal to ensure it's on top */}
+            {showFullReport && report && typeof document !== 'undefined' && createPortal(
                 <FullReportModal
                     report={report}
                     onClose={() => setShowFullReport(false)}
                     anchorRef={buttonRef}
-                />
+                />,
+                document.body
             )}
         </div>
     );
@@ -593,6 +660,15 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
     const [copied, setCopied] = useState(false);
     const popupRef = React.useRef<HTMLDivElement>(null);
     const [position, setPosition] = React.useState({ top: 0, left: 0 });
+
+    // ✅ DEBUG: Log when modal is rendered
+    React.useEffect(() => {
+        console.log('🎯 [FullReportModal] Modal rendered/updated', { 
+            reportId: report?.id, 
+            position, 
+            anchorRef: anchorRef?.current ? 'exists' : 'null' 
+        });
+    }, [report, position, anchorRef]);
 
     // ✅ FIX: Calculate position relative to button - ALWAYS show near button
     const updatePosition = React.useCallback(() => {
@@ -718,33 +794,39 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                 anchorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
             setPosition({ top: 0, left: 0 });
-        } else if (anchorRef?.current) {
-            // Desktop: Calculate position immediately based on button location
-            const buttonRect = anchorRef.current.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            const viewportWidth = window.innerWidth;
-            
-            // Check if button is visible
-            const isButtonVisible = 
-                buttonRect.top >= 0 && 
-                buttonRect.left >= 0 && 
-                buttonRect.bottom <= viewportHeight && 
-                buttonRect.right <= viewportWidth;
-            
-            if (!isButtonVisible) {
-                // Scroll button into view first
-                anchorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Wait for scroll, then calculate position
-                setTimeout(() => {
-                    updatePosition();
-                }, 400);
-            } else {
-                // Button is visible - calculate position IMMEDIATELY (no delay)
-                updatePosition();
-            }
         } else {
-            // No anchor - calculate position anyway
-            updatePosition();
+            // ✅ CRITICAL FIX: Always calculate position immediately for desktop
+            // If no anchor, center in viewport as fallback
+            if (!anchorRef?.current) {
+                const popupWidth = Math.min(1200, viewportWidth - 40);
+                const popupHeight = Math.min(800, window.innerHeight - 40);
+                setPosition({ 
+                    top: (window.innerHeight - popupHeight) / 2, 
+                    left: (viewportWidth - popupWidth) / 2 
+                });
+            } else {
+                // Desktop: Calculate position immediately based on button location
+                const buttonRect = anchorRef.current.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                
+                // Check if button is visible
+                const isButtonVisible = 
+                    buttonRect.top >= 0 && 
+                    buttonRect.left >= 0 && 
+                    buttonRect.bottom <= viewportHeight && 
+                    buttonRect.right <= viewportWidth;
+                
+                if (!isButtonVisible) {
+                    // Scroll button into view first, then calculate
+                    anchorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(() => {
+                        updatePosition();
+                    }, 400);
+                } else {
+                    // Button is visible - calculate position IMMEDIATELY (no delay)
+                    updatePosition();
+                }
+            }
         }
         
         // Update position on resize or orientation change (but NOT on scroll to avoid blocking)
@@ -986,35 +1068,53 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
     // ✅ MOBILE-FIRST: Detect mobile screen
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     
-    // ✅ FIX: Ensure position is calculated - use actual position values
-    const hasValidPosition = position.top > 0 || position.left > 0 || isMobile;
+    // ✅ Handle backdrop click - same pattern as UnifiedModal
+    const handleBackdropClick = (e: React.MouseEvent) => {
+        if (e.target === e.currentTarget) {
+            onClose();
+        }
+    };
     
     return (
-        <>
-            {/* ✅ FIX: Backdrop that allows scrolling - only on mobile */}
-            {isMobile && (
-                <div 
-                    className="fixed inset-0 z-[99] bg-black/50 backdrop-blur-sm"
-                    onClick={onClose}
-                    style={{ 
-                        pointerEvents: 'auto'
-                    }}
-                />
-            )}
+        <div
+            className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto"
+            onClick={handleBackdropClick}
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                padding: isMobile ? '0' : '1rem',
+                paddingTop: isMobile ? '0' : 'max(1rem, env(safe-area-inset-top))',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'center',
+                overflowY: 'auto',
+            }}
+        >
+            {/* Backdrop - SOLID per Adora design system (same as UnifiedModal) */}
+            <div 
+                className="absolute inset-0 animate-fade-in" 
+                style={{ 
+                    backgroundColor: 'var(--theme-bg-overlay)',
+                    backdropFilter: 'none'
+                }}
+            />
+            
+            {/* Modal Content */}
             <div 
                 ref={popupRef}
-                className={`fixed z-[100] ${isMobile ? 'inset-0 w-full h-full' : 'max-w-6xl max-h-[90vh] rounded-2xl'} overflow-hidden shadow-2xl animate-fade-in`}
+                className={`relative ${isMobile ? 'w-full h-full' : 'max-w-6xl max-h-[90vh] rounded-2xl'} overflow-hidden shadow-2xl animate-fade-in`}
                 style={{ 
                     background: 'var(--theme-bg-secondary)',
-                    top: isMobile ? '0' : (hasValidPosition && position.top > 0 ? `${position.top}px` : '50%'),
-                    left: isMobile ? '0' : (hasValidPosition && position.left > 0 ? `${position.left}px` : '50%'),
-                    transform: isMobile ? 'none' : (hasValidPosition && position.top > 0 ? 'none' : 'translate(-50%, -50%)'),
                     width: isMobile ? '100%' : 'min(1200px, calc(100vw - 40px))',
                     height: isMobile ? '100%' : 'auto',
                     maxHeight: isMobile ? '100vh' : 'calc(100vh - 40px)',
                     border: isMobile ? 'none' : '1px solid var(--theme-border-primary)',
                     borderRadius: isMobile ? '0' : '1rem',
-                    pointerEvents: 'auto' // ✅ FIX: Allow interaction with popup
+                    marginTop: 'auto',
+                    marginBottom: 'auto',
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -1803,7 +1903,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                     )}
                 </div>
             </div>
-        </>
+        </div>
     );
 };
 

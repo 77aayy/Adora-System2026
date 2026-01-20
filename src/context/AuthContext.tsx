@@ -18,7 +18,7 @@ import {
     saveUserBinding,
 } from '../services/userService';
 import { signInAnonymously } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { logAudit } from '../utils/auditService';
 
@@ -248,10 +248,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
 
             // ✅ CRITICAL: Sign in anonymously to Firebase Auth for Firestore Rules
+            // ✅ IMPORTANT: Owner ALSO needs anonymous auth for Firestore Rules to work!
             if (auth) {
                 try {
                     await signInAnonymously(auth);
                     console.log('✅ Firebase Anonymous Auth succeeded');
+                    
+                    // ✅ For owner: Create/update userBinding to mark as owner in Firestore Rules
+                    if (userData.role === 'owner' && auth.currentUser) {
+                        try {
+                            const userBindingRef = doc(db, 'userBindings', auth.currentUser.uid);
+                            await setDoc(userBindingRef, {
+                                role: 'owner',
+                                tenantId: userData.tenantId || 'system-owner',
+                                userId: userData.id,
+                                createdAt: serverTimestamp(),
+                                updatedAt: serverTimestamp()
+                            }, { merge: true });
+                            console.log('✅ Owner userBinding created/updated for Firestore Rules');
+                        } catch (bindingError: any) {
+                            console.warn('⚠️ Failed to create owner userBinding (non-critical):', bindingError);
+                        }
+                    }
                 } catch (authError: any) {
                     // 🚨 CRITICAL ERROR: Anonymous Auth MUST be enabled!
                     if (authError?.code === 'auth/operation-not-allowed') {

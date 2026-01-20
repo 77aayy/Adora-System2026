@@ -283,6 +283,11 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             const vouchers = await getAllReceiptVouchers();
             console.log(`✅ [BillingDashboard] Loaded ${vouchers.length} receipt vouchers`, vouchers);
             
+            // ✅ DEBUG: Check if vouchers are deleted
+            const deletedCount = vouchers.filter(v => v.isDeleted).length;
+            const activeCount = vouchers.filter(v => !v.isDeleted).length;
+            console.log(`📊 [BillingDashboard] Vouchers breakdown: ${activeCount} active, ${deletedCount} deleted, ${vouchers.length} total`);
+            
             // ✅ DEBUG: Check tenantId mapping for vouchers
             const managers = await getAllManagers();
             const managerTenantIds = managers.map(m => ({ id: m.id, name: m.name, code: m.code, tenantId: m.tenantId }));
@@ -294,8 +299,11 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             // ✅ Check if any manager has vouchers
             managers.forEach(m => {
                 const managerVouchers = vouchers.filter(v => v.tenantId === m.tenantId);
-                if (managerVouchers.length > 0) {
-                    console.log(`✅ [BillingDashboard] Manager ${m.name} (${m.code}) has ${managerVouchers.length} vouchers`);
+                const activeManagerVouchers = managerVouchers.filter(v => !v.isDeleted);
+                if (activeManagerVouchers.length > 0) {
+                    console.log(`✅ [BillingDashboard] Manager ${m.name} (${m.code}) has ${activeManagerVouchers.length} active vouchers (${managerVouchers.length} total)`);
+                } else if (managerVouchers.length > 0) {
+                    console.warn(`⚠️ [BillingDashboard] Manager ${m.name} (${m.code}) has ${managerVouchers.length} vouchers but ALL are deleted!`);
                 } else if (m.tenantId) {
                     console.warn(`⚠️ [BillingDashboard] Manager ${m.name} (${m.code}) has tenantId ${m.tenantId} but NO vouchers found!`);
                 } else {
@@ -307,7 +315,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
 
             // ✅ Load expense vouchers (سندات الصرف)
             const expenseVouchersData = await getAllExpenseVouchers();
-            console.log(`✅ [BillingDashboard] Loaded ${expenseVouchersData.length} expense vouchers`, expenseVouchersData);
+            const deletedExpenseCount = expenseVouchersData.filter(v => v.isDeleted).length;
+            const activeExpenseCount = expenseVouchersData.filter(v => !v.isDeleted).length;
+            console.log(`✅ [BillingDashboard] Loaded ${expenseVouchersData.length} expense vouchers (${activeExpenseCount} active, ${deletedExpenseCount} deleted)`, expenseVouchersData);
             setExpenseVouchers(expenseVouchersData);
 
             // ✅ Load all invoices
@@ -721,8 +731,8 @@ const ReceiptVouchersStats: React.FC<{
                     icon={DollarSign}
                     iconColor="green"
                     label={t('billing.stats.cash')}
-                    value={`${cashAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    value={`${cashAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
@@ -730,8 +740,8 @@ const ReceiptVouchersStats: React.FC<{
                     icon={CreditCard}
                     iconColor="blue"
                     label={t('billing.stats.credit')}
-                    value={`${creditAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    value={`${creditAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
@@ -739,8 +749,8 @@ const ReceiptVouchersStats: React.FC<{
                     icon={FileText}
                     iconColor="purple"
                     label={t('billing.stats.bankTransfer')}
-                    value={`${bankTransferAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    value={`${bankTransferAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
@@ -748,17 +758,17 @@ const ReceiptVouchersStats: React.FC<{
                     icon={Clock}
                     iconColor="orange"
                     label={t('billing.stats.deferred')}
-                    value={`${deferredAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    value={`${deferredAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
                     icon={CheckCircle}
                     iconColor="teal"
-                    label="✅ الإجمالي"
-                    value={`${totalAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    label={`✅ ${t('common.total')}`}
+                    value={`${totalAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
         </div>
@@ -813,8 +823,8 @@ const ExpenseVouchersStats: React.FC<{
                     icon={DollarSign}
                     iconColor="green"
                     label={t('billing.stats.cash')}
-                    value={`${cashAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    value={`${cashAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
@@ -822,8 +832,8 @@ const ExpenseVouchersStats: React.FC<{
                     icon={CreditCard}
                     iconColor="blue"
                     label={t('billing.stats.credit')}
-                    value={`${creditAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    value={`${creditAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
@@ -831,8 +841,8 @@ const ExpenseVouchersStats: React.FC<{
                     icon={FileText}
                     iconColor="purple"
                     label={t('billing.stats.bankTransfer')}
-                    value={`${bankTransferAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    value={`${bankTransferAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
@@ -840,17 +850,17 @@ const ExpenseVouchersStats: React.FC<{
                     icon={Clock}
                     iconColor="orange"
                     label={t('billing.stats.deferred')}
-                    value={`${deferredAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    value={`${deferredAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
                     icon={CheckCircle}
                     iconColor="teal"
-                    label="✅ الإجمالي"
-                    value={`${totalAmount.toLocaleString()} ر.س`}
-                    lastUpdate="تم التحديث الآن"
+                    label={`✅ ${t('common.total')}`}
+                    value={`${totalAmount.toLocaleString()} ${t('common.rs')}`}
+                    lastUpdate={t('common.lastUpdate')}
                 />
             </div>
         </div>
@@ -2002,7 +2012,7 @@ const ReceiptVouchersTab: React.FC<{
                                                     <div className="text-left">
                                                         <p className="text-xs text-slate-600 dark:text-slate-300">{t('billing.vouchers.total')} ({groupVouchers.length} {groupVouchers.length === 1 ? t('billing.vouchers.voucher') : t('billing.vouchers.vouchers')})</p>
                                                         <p className="text-xl font-bold text-teal-700 dark:text-teal-400">
-                                                            {totalAmount.toLocaleString()} <span className="text-sm">ر.س</span>
+                                                            {totalAmount.toLocaleString()} <span className="text-sm">{t('common.rs')}</span>
                                                         </p>
                                                     </div>
                                                     <button
@@ -2102,7 +2112,7 @@ const ReceiptVouchersTab: React.FC<{
                                                         <span className="text-base font-bold text-slate-900 dark:text-white">
                                                             {voucher.totalAmount.toLocaleString()}
                                                         </span>
-                                                        <span className="text-[10px] text-slate-600 dark:text-slate-300 mr-1">ر.س</span>
+                                                        <span className="text-[10px] text-slate-600 dark:text-slate-300 mr-1">{t('common.rs')}</span>
                                                     </div>
                                                     
                                                     {/* Actions */}
@@ -2224,7 +2234,7 @@ const ReceiptVouchersTab: React.FC<{
                             {/* المبلغ */}
                             <div className="bg-gradient-to-r from-teal-500 to-emerald-500 rounded-xl p-4 text-center">
                                 <p className="text-teal-100 text-sm mb-1">{t('billing.vouchers.totalAmount')}</p>
-                                <p className="text-3xl font-bold text-white">{previewVoucher.totalAmount.toLocaleString()} <span className="text-lg">ر.س</span></p>
+                                <p className="text-3xl font-bold text-white">{previewVoucher.totalAmount.toLocaleString()} <span className="text-lg">{t('common.rs')}</span></p>
                             </div>
                             
                             {previewVoucher.notes && (
@@ -3452,7 +3462,7 @@ const ExpenseVouchersTab: React.FC<{
                                     <div className="flex items-center gap-3">
                                         <div className="text-right">
                                             <p className="text-lg font-bold text-orange-700 dark:text-orange-300">
-                                                {voucher.amount.toLocaleString()} ر.س
+                                                {voucher.amount.toLocaleString()} {t('common.rs')}
                                             </p>
                                         </div>
                                         <button
@@ -4423,7 +4433,7 @@ const InvoicesTab: React.FC<{
                                                 <div className="text-left">
                                                     <p className="text-xs text-slate-500 dark:text-slate-400">{t('billing.vouchers.total')} ({groupInvoices.length} {groupInvoices.length === 1 ? t('admin.invoice') : t('admin.invoices')})</p>
                                                     <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                                                        {totalAmount.toLocaleString()} <span className="text-sm">ر.س</span>
+                                                        {totalAmount.toLocaleString()} <span className="text-sm">{t('common.rs')}</span>
                                                     </p>
                                                 </div>
                                                 <button
@@ -4510,7 +4520,7 @@ const InvoicesTab: React.FC<{
                                                     <span className="text-base font-bold text-slate-800 dark:text-white">
                                                         {(invoice.totalAmount || invoice.amount).toLocaleString()}
                                                     </span>
-                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 mr-1">ر.س</span>
+                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 mr-1">{t('common.rs')}</span>
                                                 </div>
                                                 
                                                 {/* Actions */}
@@ -4707,7 +4717,7 @@ const AddExpenseVoucherModal: React.FC<{
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-sm text-slate-700 dark:text-white/80 font-medium">المبلغ (ر.س) *</label>
+                            <label className="text-sm text-slate-700 dark:text-white/80 font-medium">{t('billing.amount')} ({t('common.rs')}) *</label>
                             <input
                                 type="number"
                                 step="0.01"

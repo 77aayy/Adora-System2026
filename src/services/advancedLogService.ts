@@ -495,8 +495,13 @@ export const getLogs = async (
         }
         
         return { logs, hasMore };
-    } catch (error) {
-        logger.error('Error fetching logs:', error, 'advancedLogService');
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            logger.warn('Firestore internal error in getLogs (likely cache issue)', error, 'advancedLogService');
+        } else {
+            logger.error('Error fetching logs:', error, 'advancedLogService');
+        }
         return { logs: [], hasMore: false };
     }
 };
@@ -587,8 +592,13 @@ export const subscribeToLogs = (
             }
             
             callback(logs);
-        }, (error) => {
-            logger.error('Error in subscribeToLogs:', error, 'advancedLogService');
+        }, (error: any) => {
+            // ✅ Handle Firestore internal errors gracefully
+            if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                logger.warn('Firestore internal error in subscribeToLogs (likely cache issue)', error, 'advancedLogService');
+            } else {
+                logger.error('Error in subscribeToLogs:', error, 'advancedLogService');
+            }
             callback([]);
         });
     } catch (error) {

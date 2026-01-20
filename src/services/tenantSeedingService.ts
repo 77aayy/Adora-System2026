@@ -695,8 +695,18 @@ export const seedTenantDatabase = async (
                 await new Promise(resolve => setTimeout(resolve, 200)); // Delay between collections
             }
         } catch (e: any) {
-            result.errors.push(`settings: ${e.message}`);
-            console.error('❌ Error seeding settings:', e);
+            // ✅ Handle permission errors gracefully
+            const isPermissionError = e?.code === 'permission-denied' || 
+                                      e?.message?.includes('permission') ||
+                                      e?.message?.includes('Missing or insufficient');
+            
+            if (isPermissionError) {
+                result.errors.push(`settings: Permission denied (expected)`);
+                console.warn('⚠️ Permission denied for seeding settings (expected)', e);
+            } else {
+                result.errors.push(`settings: ${e.message}`);
+                console.error('❌ Error seeding settings:', e);
+            }
         }
 
         // Room Statuses

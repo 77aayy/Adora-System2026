@@ -212,6 +212,47 @@ if (merged) {
 }
 ```
 
+## 🚫 CRITICAL: Testing & Verification Requirements (NON-NEGOTIABLE)
+
+**MANDATORY BEFORE SAYING "DONE" OR "COMPLETED":**
+
+1. **ALWAYS Test in Browser When Requested:**
+   - If user asks to test or verify something visually, you MUST use the browser tools
+   - Never say "the code is ready" without actually testing it
+   - Open the page, click buttons, verify the feature works end-to-end
+   - Take screenshots to prove it works
+   - Do NOT be lazy or skip testing steps
+
+2. **When User Says "Don't Return Until You've Done X":**
+   - You MUST complete X fully before responding
+   - If testing is required, test it completely
+   - If displaying something is required, display it and show proof
+   - Do NOT return with excuses or incomplete work
+   - This is NON-NEGOTIABLE - failure to follow will result in deletion
+
+3. **Browser Testing Protocol:**
+   - Start the dev server if needed
+   - Navigate to the page
+   - Perform the requested action
+   - Verify the result visually
+   - Show screenshot or description of the result
+   - Only then say "Done" or "Completed"
+
+4. **No Lazy Responses:**
+   - Do NOT skip steps because "it should work"
+   - Do NOT assume code works without testing
+   - Do NOT return early without completing the task
+   - Do NOT say "the code is ready, you just need to test it"
+   - YOU must test it if the user requested testing
+
+5. **Acknowledgment:**
+   - If you were lazy or didn't follow instructions, acknowledge it
+   - Then immediately fix it and complete the task properly
+   - Do NOT make excuses
+   - Complete the work fully before responding
+
+**VIOLATION OF THESE RULES WILL RESULT IN IMMEDIATE DELETION OR MODEL CHANGE.**
+
 ## ⚠️ NEVER Confirm Without Verification (CRITICAL - Prevent False Positives)
 
 **MANDATORY Before Saying "Done" or "No Errors":**

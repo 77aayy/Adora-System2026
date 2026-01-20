@@ -10,7 +10,7 @@ import {
     Coffee, Clock, CheckCircle2, AlertCircle,
     Package, Search, Filter, X, User, Building2, ShoppingCart,
     QrCode, Check, Eye, LogOut, MessageSquare, BookOpen, Play,
-    Headphones // ✅ Support ticket icon
+    Headphones, History // ✅ Support ticket icon, History icon
 } from 'lucide-react';
 import { HeaderButton } from '../../components/common/HeaderButton';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
@@ -40,6 +40,7 @@ import { TransferNotificationBadge } from '../../components/guest/TransferNotifi
 import { useBrandName } from '../../hooks/useBrandName';
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline'; // ✅ Challenge Timeline
 import { UnifiedRequestTabs } from '../../components/shared/UnifiedRequestTabs'; // ✅ Unified tabs
+import { UnifiedHistoryModal } from '../../components/shared/UnifiedHistoryModal'; // ✅ History modal
 
 // ============================================================
 // TYPES
@@ -71,6 +72,7 @@ export const CoffeeShopDashboard: React.FC = () => {
     const [showProcurement, setShowProcurement] = useState(false); // ✅ Procurement cart modal
     const [showSupportTicket, setShowSupportTicket] = useState(false); // ✅ Support ticket modal
     const [showGeneralInstructions, setShowGeneralInstructions] = useState(false); // ✅ General instructions modal
+    const [showHistory, setShowHistory] = useState(false); // ✅ History modal
     
     // ✅ FAST UI: Force show page after 2 seconds max
     useEffect(() => {
@@ -228,6 +230,13 @@ export const CoffeeShopDashboard: React.FC = () => {
                     subtitle={undefined}
                     actions={[
                         {
+                            id: 'history',
+                            icon: <History className="w-5 h-5" />,
+                            label: t('coffeeshop.operationsHistory') || t('common.operationsHistory') || 'سجل العمليات',
+                            onClick: () => setShowHistory(true),
+                            variant: 'primary'
+                        },
+                        {
                             id: 'procurement',
                             icon: <ShoppingCart className="w-5 h-5" />,
                             label: t('coffeeshop.procurement'),
@@ -236,7 +245,7 @@ export const CoffeeShopDashboard: React.FC = () => {
                         {
                             id: 'instructions',
                             icon: <BookOpen className="w-5 h-5" />,
-                            label: 'تعليمات عامة',
+                            label: t('coffeeshop.generalInstructions') || 'تعليمات عامة',
                             onClick: () => setShowGeneralInstructions(true),
                             variant: 'primary'
                         },
@@ -417,6 +426,13 @@ export const CoffeeShopDashboard: React.FC = () => {
                     department="coffee_shop"
                     isOpen={showGeneralInstructions}
                     onClose={() => setShowGeneralInstructions(false)}
+                />
+
+                {/* History Modal */}
+                <UnifiedHistoryModal 
+                    isOpen={showHistory} 
+                    onClose={() => setShowHistory(false)} 
+                    defaultDepartment="all" 
                 />
 
                 {/* ✅ Onboarding Tour */}

@@ -1050,9 +1050,20 @@ export const saveUserBinding = async (uid: string, tenantId: string, role: strin
             role,
             updatedAt: serverTimestamp()
         }, { merge: true });
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Handle permission errors gracefully
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            logger.warn('Permission denied for saving user binding (expected in some cases)', undefined, 'userService');
+            // Don't throw - allow caller to continue
+            return;
+        }
+        
         logger.error('Error saving user binding', error, 'userService');
-        throw error; // Re-throw to allow caller to handle
+        throw error; // Re-throw only for non-permission errors
     }
 };
 

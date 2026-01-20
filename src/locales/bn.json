@@ -112,6 +112,7 @@
         "day": "দিন",
         "days": "দিন",
         "week": "সপ্তাহ",
+        "unknown": "অজানা",
         "weeks": "সপ্তাহ",
         "month": "মাস",
         "months": "মাস",
@@ -1710,5 +1711,16 @@
         },
         "performanceLevel": "কর্মক্ষমতা স্তর",
         "noRedemptionRequestsYet": "এখনও কোন মুক্তির অনুরোধ নেই"
+    },
+    "licenseNotification": {
+        "licenseNotification": "লাইসেন্স বিজ্ঞপ্তি",
+        "licenseNotifications": "লাইসেন্স বিজ্ঞপ্তি",
+        "expired": "লাইসেন্স মেয়াদ শেষ!",
+        "expiresTomorrow": "লাইসেন্স আগামীকাল মেয়াদ শেষ হবে!",
+        "expiresIn7Days": "লাইসেন্স 7 দিনের মধ্যে মেয়াদ শেষ হবে",
+        "expiresIn30Days": "লাইসেন্স 30 দিনের মধ্যে মেয়াদ শেষ হবে",
+        "expiryNotification": "লাইসেন্স মেয়াদ শেষ বিজ্ঞপ্তি",
+        "remaining": "অবশিষ্ট",
+        "moreNotifications": "এবং {{count}} আরও বিজ্ঞপ্তি"
     }
 }

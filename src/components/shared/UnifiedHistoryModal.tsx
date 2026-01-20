@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     X, Filter, Calendar, History, RefreshCw, Printer, Download,
-    Clock, User, MapPin, ChevronDown, ChevronUp
+    Clock, User, MapPin, ChevronDown, ChevronUp, Search
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AdoraLoader } from '../common/AdoraLoader';
@@ -76,6 +76,11 @@ export const UnifiedHistoryModal: React.FC<UnifiedHistoryModalProps> = ({
     const [customStartDate, setCustomStartDate] = useState('');
     const [customEndDate, setCustomEndDate] = useState('');
     const [expandedItem, setExpandedItem] = useState<string | null>(null);
+    const [searchText, setSearchText] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('');
+    const [roomFilter, setRoomFilter] = useState<string>('');
+    const [sortBy, setSortBy] = useState<'timestamp' | 'department' | 'status'>('timestamp');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
     // Get date range based on period
     const getDateRange = useCallback((p: PeriodType): { start: Date; end: Date } => {
@@ -116,16 +121,52 @@ export const UnifiedHistoryModal: React.FC<UnifiedHistoryModalProps> = ({
                 startDate: start,
                 endDate: end,
                 department: department === 'all' ? undefined : department,
-                maxResults: 200,
+                status: statusFilter || undefined,
+                roomNumber: roomFilter || undefined,
+                maxResults: 500, // ✅ Increased for better filtering
             };
 
-            const data = await getUnifiedHistory(branchId, tenantId, filter);
+            let data = await getUnifiedHistory(branchId, tenantId, filter);
+            
+            // ✅ Apply client-side search filter
+            if (searchText.trim()) {
+                const query = searchText.toLowerCase();
+                data = data.filter(item =>
+                    item.description.toLowerCase().includes(query) ||
+                    item.employeeName?.toLowerCase().includes(query) ||
+                    item.roomNumber?.toLowerCase().includes(query) ||
+                    item.action.toLowerCase().includes(query)
+                );
+            }
+
+            // ✅ Apply sorting
+            data.sort((a, b) => {
+                let comparison = 0;
+                switch (sortBy) {
+                    case 'timestamp':
+                        comparison = a.timestamp.getTime() - b.timestamp.getTime();
+                        break;
+                    case 'department':
+                        comparison = a.type.localeCompare(b.type);
+                        break;
+                    case 'status':
+                        comparison = (a.status || '').localeCompare(b.status || '');
+                        break;
+                }
+                return sortOrder === 'asc' ? comparison : -comparison;
+            });
+
             setItems(data);
-        } catch (err) {
-            console.error('Error loading history:', err);
+        } catch (err: any) {
+            // ✅ Handle Firestore internal errors gracefully
+            if (err?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                console.warn('Firestore internal error in loadData (likely cache issue)', err);
+            } else {
+                console.error('Error loading history:', err);
+            }
         }
         setLoading(false);
-    }, [branchId, tenantId, period, department, getDateRange]);
+    }, [branchId, tenantId, period, department, searchText, statusFilter, roomFilter, sortBy, sortOrder, getDateRange]);
 
     useEffect(() => {
         if (isOpen) {
@@ -300,8 +341,8 @@ export const UnifiedHistoryModal: React.FC<UnifiedHistoryModalProps> = ({
                             <History className="w-5 h-5 text-blue-400" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold text-white">سجل العمليات</h3>
-                            <p className="text-sm text-white/60">{summary.totalItems} عملية</p>
+                            <h3 className="text-lg font-semibold text-white">{t('common.operationsHistory') || 'سجل العمليات'}</h3>
+                            <p className="text-sm text-white/60">{summary.totalItems} {t('common.operation') || 'عملية'}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -310,7 +351,7 @@ export const UnifiedHistoryModal: React.FC<UnifiedHistoryModalProps> = ({
                             className="px-3 py-2 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30 flex items-center gap-2"
                         >
                             <Printer className="w-4 h-4" />
-                            طباعة
+                            {t('common.print') || 'طباعة'}
                         </button>
                         <button
                             onClick={onClose}
@@ -323,6 +364,25 @@ export const UnifiedHistoryModal: React.FC<UnifiedHistoryModalProps> = ({
 
                 {/* Filters */}
                 <div className="p-4 border-b border-white/10 space-y-3">
+                    {/* Search Bar */}
+                    <div className="relative">
+                        <input
+                            type="text"
+                            value={searchText}
+                            onChange={(e) => setSearchText(e.target.value)}
+                            placeholder={t('common.searchInLogs') || 'بحث في السجل...'}
+                            className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+                        />
+                        {searchText && (
+                            <button
+                                onClick={() => setSearchText('')}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+
                     {/* Period Pills */}
                     <div className="flex flex-wrap gap-2">
                         {(['today', 'yesterday', 'week', 'month', 'custom'] as PeriodType[]).map(p => (
@@ -346,7 +406,7 @@ export const UnifiedHistoryModal: React.FC<UnifiedHistoryModalProps> = ({
                     {period === 'custom' && (
                         <div className="flex gap-3">
                             <div className="flex-1">
-                                <label className="text-xs text-white/40 mb-1 block">من تاريخ</label>
+                                <label className="text-xs text-white/40 mb-1 block">{t('common.fromDate') || 'من تاريخ'}</label>
                                 <input
                                     type="date"
                                     value={customStartDate}
@@ -367,7 +427,7 @@ export const UnifiedHistoryModal: React.FC<UnifiedHistoryModalProps> = ({
                                 onClick={loadData}
                                 className="self-end px-4 py-2 rounded-xl bg-blue-500 text-white"
                             >
-                                تطبيق
+                                {t('common.apply') || 'تطبيق'}
                             </button>
                         </div>
                     )}

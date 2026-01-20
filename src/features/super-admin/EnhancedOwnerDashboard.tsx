@@ -2254,7 +2254,7 @@ const OverviewTab: React.FC<{
 
                 {/* ✅ Data Health Report - Weekly System Health */}
                 <DataHealthReportCard
-                    tenantId={user?.id || ''}
+                    tenantId={user?.role === 'owner' ? (user?.tenantId || 'system-owner' || 'owner') : (user?.id || '')}
                     onViewDetails={(report) => {
                         console.log('View report details:', report.id);
                         // Could open a detailed modal here

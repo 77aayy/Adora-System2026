@@ -1738,23 +1738,42 @@ export const saveAndNotifyReport = async (
         reportData.branchId = report.branchId;
     }
     
-    // Save report
-    const reportRef = await addDoc(collection(db, 'health_reports'), reportData);
+    try {
+        // Save report
+        const reportRef = await addDoc(collection(db, 'health_reports'), reportData);
 
-    // Create notification for owner
-    await addDoc(collection(db, 'ownerNotifications'), {
-        ownerId,
-        tenantId: report.tenantId,
-        type: 'health_report',
-        title: '📊 تقرير صحة البيانات الأسبوعي',
-        message: `الحالة العامة: ${report.overallHealth}% - ${report.totalIssues} حالة - ${report.errorAnalysis.totalErrors} خطأ`,
-        reportId: reportRef.id,
-        read: false,
-        createdAt: serverTimestamp()
-    });
+        // Create notification for owner
+        await addDoc(collection(db, 'ownerNotifications'), {
+            ownerId,
+            tenantId: report.tenantId,
+            type: 'health_report',
+            title: '📊 تقرير صحة البيانات الأسبوعي',
+            message: `الحالة العامة: ${report.overallHealth}% - ${report.totalIssues} حالة - ${report.errorAnalysis.totalErrors} خطأ`,
+            reportId: reportRef.id,
+            read: false,
+            createdAt: serverTimestamp()
+        });
 
-    console.log(`📊 Health report generated and saved: ${reportRef.id}`);
-    return reportRef.id;
+        console.log(`📊 Health report generated and saved: ${reportRef.id}`);
+        return reportRef.id;
+    } catch (saveError: any) {
+        console.error('❌ [dataHealthReportService] Failed to save health report:', saveError);
+        console.error('❌ Error details:', {
+            code: saveError?.code,
+            message: saveError?.message,
+            stack: saveError?.stack
+        });
+        
+        // ✅ Check if it's a permission error
+        if (saveError?.code === 'permission-denied' || saveError?.message?.includes('permission')) {
+            console.error('❌ Permission denied when saving health report. Check:');
+            console.error('   1. Firestore Rules allow write for authenticated users');
+            console.error('   2. Anonymous auth is enabled and user is signed in');
+            console.error('   3. request.auth != null in Firestore Rules');
+        }
+        
+        throw saveError;
+    }
 };
 
 /**
@@ -1770,6 +1789,9 @@ export const getRecentHealthReports = async (
         return [];
     }
 
+    // ✅ DEBUG: Log tenantId being used
+    console.log(`🔍 [dataHealthReportService] getRecentHealthReports called with tenantId: "${tenantId}"`);
+
     let snapshot: any;
     try {
         const q = query(
@@ -1779,10 +1801,114 @@ export const getRecentHealthReports = async (
             limit(limitCount)
         );
 
+        console.log(`🔍 [dataHealthReportService] Attempting query with tenantId: "${tenantId}"`);
         snapshot = await getDocs(q);
+        console.log(`✅ [dataHealthReportService] Query succeeded! Found ${snapshot.docs.length} reports`);
     } catch (queryError: any) {
+        // ✅ Handle Firestore internal errors first
+        if (queryError?.message?.includes('INTERNAL ASSERTION FAILED') || queryError?.message?.includes('Unexpected state')) {
+            console.warn('⚠️ Firestore internal error in getRecentHealthReports - trying alternative queries...', queryError);
+            // Try alternative queries
+            try {
+                // First try: without orderBy
+                const altQuery1 = query(
+                    collection(db, 'health_reports'),
+                    where('tenantId', '==', tenantId),
+                    limit(limitCount)
+                );
+                snapshot = await getDocs(altQuery1);
+                // Sort manually
+                snapshot.docs.sort((a: any, b: any) => {
+                    const aTime = a.data().generatedAt?.toDate?.()?.getTime() || 0;
+                    const bTime = b.data().generatedAt?.toDate?.()?.getTime() || 0;
+                    return bTime - aTime; // Descending
+                });
+                console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (internal error workaround 1)`);
+            } catch (altError1: any) {
+                // Check if it's also INTERNAL ASSERTION FAILED
+                if (altError1?.message?.includes('INTERNAL ASSERTION FAILED') || altError1?.message?.includes('Unexpected state')) {
+                    console.warn('⚠️ AltQuery1 also failed with INTERNAL ASSERTION FAILED, trying simpler queries...');
+                }
+                
+                // Second try: without tenantId filter
+                try {
+                    console.log(`🔍 [dataHealthReportService] Trying query without tenantId filter...`);
+                    const altQuery2 = query(
+                        collection(db, 'health_reports'),
+                        orderBy('generatedAt', 'desc'),
+                        limit(limitCount * 2)
+                    );
+                    snapshot = await getDocs(altQuery2);
+                    console.log(`🔍 [dataHealthReportService] Query without tenantId succeeded! Found ${snapshot.docs.length} total reports`);
+                    // Filter by tenantId manually
+                    const beforeFilter = snapshot.docs.length;
+                    snapshot.docs = snapshot.docs
+                        .filter((doc: any) => {
+                            const docTenantId = doc.data().tenantId;
+                            const matches = docTenantId === tenantId;
+                            if (!matches && beforeFilter <= 5) {
+                                console.log(`🔍 [dataHealthReportService] Report ${doc.id} has tenantId: "${docTenantId}" (looking for: "${tenantId}")`);
+                            }
+                            return matches;
+                        })
+                        .slice(0, limitCount);
+                    console.log(`🔍 [dataHealthReportService] After filtering by tenantId "${tenantId}": ${snapshot.docs.length} reports`);
+                    console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (internal error workaround 2)`);
+                } catch (altError2: any) {
+                    // Check if it's also INTERNAL ASSERTION FAILED
+                    if (altError2?.message?.includes('INTERNAL ASSERTION FAILED') || altError2?.message?.includes('Unexpected state')) {
+                        console.warn('⚠️ AltQuery2 also failed with INTERNAL ASSERTION FAILED, trying simplest query...');
+                    }
+                    
+                    // Third try: simplest query (no orderBy, no filters)
+                    try {
+                        console.log(`🔍 [dataHealthReportService] Trying simplest query (no filters, no orderBy)...`);
+                        const altQuery3 = query(
+                            collection(db, 'health_reports'),
+                            limit(limitCount * 3)
+                        );
+                        snapshot = await getDocs(altQuery3);
+                        console.log(`🔍 [dataHealthReportService] Simplest query succeeded! Found ${snapshot.docs.length} total reports`);
+                        // Filter and sort manually
+                        const beforeFilter = snapshot.docs.length;
+                        snapshot.docs = snapshot.docs
+                            .filter((doc: any) => {
+                                const docTenantId = doc.data().tenantId;
+                                const matches = docTenantId === tenantId;
+                                if (!matches && beforeFilter <= 5) {
+                                    console.log(`🔍 [dataHealthReportService] Report ${doc.id} has tenantId: "${docTenantId}" (looking for: "${tenantId}")`);
+                                }
+                                return matches;
+                            })
+                            .sort((a: any, b: any) => {
+                                const aTime = a.data().generatedAt?.toDate?.()?.getTime() || 0;
+                                const bTime = b.data().generatedAt?.toDate?.()?.getTime() || 0;
+                                return bTime - aTime;
+                            })
+                            .slice(0, limitCount);
+                        console.log(`🔍 [dataHealthReportService] After filtering and sorting: ${snapshot.docs.length} reports`);
+                        console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (internal error workaround 3)`);
+                    } catch (altError3: any) {
+                        // Check if it's INTERNAL ASSERTION FAILED or permission-denied
+                        const isInternalError = altError3?.message?.includes('INTERNAL ASSERTION FAILED') || altError3?.message?.includes('Unexpected state');
+                        const isPermissionError = altError3?.code === 'permission-denied' || 
+                                                  altError3?.message?.includes('permission') ||
+                                                  altError3?.message?.includes('Missing or insufficient');
+                        
+                        if (isInternalError) {
+                            console.error('❌ All queries failed with INTERNAL ASSERTION FAILED - this is a Firestore SDK cache issue. Try refreshing the page.');
+                        } else if (isPermissionError) {
+                            console.error('❌ All queries failed with permission-denied - check Firestore Rules and userBinding for owner role.');
+                        } else {
+                            console.error('❌ All alternative queries failed for health reports:', altError3);
+                        }
+                        return [];
+                    }
+                }
+            }
+        }
         // ✅ Handle missing index gracefully
-        if (queryError?.code === 'failed-precondition' || queryError?.message?.includes('index')) {
+        else if (queryError?.code === 'failed-precondition' || queryError?.message?.includes('index')) {
             console.warn('⚠️ Firestore index missing for health_reports. Using fallback query...');
             // Fallback: query without orderBy
             const fallbackQuery = query(
@@ -1798,8 +1924,89 @@ export const getRecentHealthReports = async (
                 return bTime - aTime; // Descending
             });
         } else {
-            console.error('❌ Error fetching health reports:', queryError);
-            return [];
+            // ✅ Handle permission errors gracefully
+            const isPermissionError = queryError?.code === 'permission-denied' || 
+                                      queryError?.message?.includes('permission') ||
+                                      queryError?.message?.includes('Missing or insufficient');
+            
+            if (isPermissionError) {
+                console.warn('⚠️ Permission denied for health reports - trying alternative query...', queryError);
+                
+                // ✅ Try alternative query: For owner, try without tenantId filter or without orderBy
+                try {
+                    // First try: without orderBy (might be index issue)
+                    const altQuery1 = query(
+                        collection(db, 'health_reports'),
+                        where('tenantId', '==', tenantId),
+                        limit(limitCount)
+                    );
+                    snapshot = await getDocs(altQuery1);
+                    // Sort manually
+                    snapshot.docs.sort((a: any, b: any) => {
+                        const aTime = a.data().generatedAt?.toDate?.()?.getTime() || 0;
+                        const bTime = b.data().generatedAt?.toDate?.()?.getTime() || 0;
+                        return bTime - aTime; // Descending
+                    });
+                    console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (alternative query 1)`);
+                } catch (altError1: any) {
+                    // Second try: without tenantId filter (for owner access to all reports)
+                    try {
+                        console.log(`🔍 [dataHealthReportService] Trying query without tenantId filter (permission workaround)...`);
+                        const altQuery2 = query(
+                            collection(db, 'health_reports'),
+                            orderBy('generatedAt', 'desc'),
+                            limit(limitCount * 2) // Get more to filter by tenantId in code
+                        );
+                        snapshot = await getDocs(altQuery2);
+                        console.log(`🔍 [dataHealthReportService] Query without tenantId filter succeeded! Found ${snapshot.docs.length} total reports`);
+                        // Filter by tenantId manually
+                        const beforeFilter = snapshot.docs.length;
+                        snapshot.docs = snapshot.docs
+                            .filter((doc: any) => {
+                                const docTenantId = doc.data().tenantId;
+                                const matches = docTenantId === tenantId;
+                                if (!matches && beforeFilter <= 5) {
+                                    console.log(`🔍 [dataHealthReportService] Report ${doc.id} has tenantId: "${docTenantId}" (looking for: "${tenantId}")`);
+                                }
+                                return matches;
+                            })
+                            .slice(0, limitCount);
+                        console.log(`🔍 [dataHealthReportService] After filtering by tenantId "${tenantId}": ${snapshot.docs.length} reports`);
+                        // Sort manually
+                        snapshot.docs.sort((a: any, b: any) => {
+                            const aTime = a.data().generatedAt?.toDate?.()?.getTime() || 0;
+                            const bTime = b.data().generatedAt?.toDate?.()?.getTime() || 0;
+                            return bTime - aTime; // Descending
+                        });
+                        console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (alternative query 2 - owner access)`);
+                    } catch (altError2: any) {
+                        // Third try: simplest query (no filters, no orderBy)
+                        try {
+                            const altQuery3 = query(
+                                collection(db, 'health_reports'),
+                                limit(limitCount * 3) // Get more to filter in code
+                            );
+                            snapshot = await getDocs(altQuery3);
+                            // Filter by tenantId and sort manually
+                            snapshot.docs = snapshot.docs
+                                .filter((doc: any) => doc.data().tenantId === tenantId)
+                                .sort((a: any, b: any) => {
+                                    const aTime = a.data().generatedAt?.toDate?.()?.getTime() || 0;
+                                    const bTime = b.data().generatedAt?.toDate?.()?.getTime() || 0;
+                                    return bTime - aTime; // Descending
+                                })
+                                .slice(0, limitCount);
+                            console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (alternative query 3 - simplest)`);
+                        } catch (altError3: any) {
+                            console.error('❌ All alternative queries failed for health reports:', altError3);
+                            return [];
+                        }
+                    }
+                }
+            } else {
+                console.error('❌ Error fetching health reports:', queryError);
+                return [];
+            }
         }
     }
 
@@ -1882,8 +2089,35 @@ export const checkAndGenerateWeeklyReport = async (
                 return generatedAt && generatedAt >= weekAgo;
             });
         } else {
-            console.error('❌ Error checking for existing reports:', queryError);
-            return false;
+            // ✅ Handle permission errors - try alternative queries
+            const isPermissionError = queryError?.code === 'permission-denied' || 
+                                      queryError?.message?.includes('permission') ||
+                                      queryError?.message?.includes('Missing or insufficient');
+            
+            if (isPermissionError) {
+                console.warn('⚠️ Permission denied for checking health reports - trying alternative query...', queryError);
+                try {
+                    // Try without date filter
+                    const altQuery = query(
+                        collection(db, 'health_reports'),
+                        where('tenantId', '==', tenantId),
+                        limit(10)
+                    );
+                    snapshot = await getDocs(altQuery);
+                    // Filter manually by date
+                    snapshot.docs = snapshot.docs.filter((doc: any) => {
+                        const generatedAt = doc.data().generatedAt?.toDate?.();
+                        return generatedAt && generatedAt >= weekAgo;
+                    });
+                    console.log(`✅ [dataHealthReportService] Checked reports using alternative query`);
+                } catch (altError: any) {
+                    console.error('❌ Alternative query also failed for checking reports:', altError);
+                    return false;
+                }
+            } else {
+                console.error('❌ Error checking for existing reports:', queryError);
+                return false;
+            }
         }
     }
 

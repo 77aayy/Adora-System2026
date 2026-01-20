@@ -193,6 +193,7 @@
         "hours": "ساعات",
         "day": "يوم",
         "days": "أيام",
+        "day": "يوم",
         "week": "أسبوع",
         "weeks": "أسابيع",
         "month": "شهر",
@@ -202,6 +203,7 @@
         "ago": "مضت",
         "remaining": "متبقي",
         "elapsed": "منقضي",
+        "unknown": "غير معروف",
         "from": "من",
         "to": "إلى"
     },
@@ -2533,5 +2535,16 @@
     "guest": {
         "answerAllRequiredQuestions": "يرجى الإجابة على جميع الأسئلة المطلوبة",
         "answerFirstQuestionAtLeast": "يرجى الإجابة على السؤال الأول على الأقل"
+    },
+    "licenseNotification": {
+        "licenseNotification": "إشعار الترخيص",
+        "licenseNotifications": "إشعارات التراخيص",
+        "expired": "انتهت صلاحية الترخيص!",
+        "expiresTomorrow": "ينتهي الترخيص غداً!",
+        "expiresIn7Days": "سينتهي الترخيص خلال 7 أيام",
+        "expiresIn30Days": "سينتهي الترخيص خلال 30 يوم",
+        "expiryNotification": "إشعار انتهاء ترخيص",
+        "remaining": "متبقي",
+        "moreNotifications": "و {{count}} إشعار آخر"
     }
 }

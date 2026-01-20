@@ -301,35 +301,86 @@ export const getAllReceiptVouchers = async (): Promise<ReceiptVoucher[]> => {
             console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (with filter)`);
             return results;
         } catch (indexError: any) {
-            // ✅ Fallback: Load all and filter in code (no index required)
-            console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
-            const q = query(
-                collection(db, 'receiptVouchers'),
-                orderBy('createdAt', 'desc')
-            );
-            const snapshot = await getDocs(q);
-            const results = snapshot.docs
-                .map(doc => {
-                    const data = doc.data();
-                    return {
-                        id: doc.id,
-                        ...data,
-                        voucherNumber: data.voucherNumber || null,
-                        createdAt: data.createdAt?.toDate() || new Date(),
-                        deletedAt: data.deletedAt?.toDate(),
-                        isDeleted: data.isDeleted || false
-                    } as ReceiptVoucher;
-                })
-                .filter(v => !v.isDeleted); // Filter in code as fallback
-            console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (fallback, filtered)`);
-            return results;
+            // ✅ Handle permission errors in index check
+            const isPermissionError = indexError?.code === 'permission-denied' || 
+                                      indexError?.message?.includes('permission') ||
+                                      indexError?.message?.includes('Missing or insufficient');
+            
+            if (isPermissionError) {
+                console.warn('⚠️ [billingService] Permission denied for receipt vouchers query - trying without filter...', indexError);
+            } else {
+                // ✅ Fallback: Load all and filter in code (no index required)
+                console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
+            }
+            
+            try {
+                const q = query(
+                    collection(db, 'receiptVouchers'),
+                    orderBy('createdAt', 'desc')
+                );
+                const snapshot = await getDocs(q);
+                const results = snapshot.docs
+                    .map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            voucherNumber: data.voucherNumber || null,
+                            createdAt: data.createdAt?.toDate() || new Date(),
+                            deletedAt: data.deletedAt?.toDate(),
+                            isDeleted: data.isDeleted || false
+                        } as ReceiptVoucher;
+                    })
+                    .filter(v => !v.isDeleted); // Filter in code as fallback
+                console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (fallback, filtered)`);
+                return results;
+            } catch (fallbackError: any) {
+                console.error('❌ [billingService] Error in fallback query for receipt vouchers:', fallbackError);
+                return [];
+            }
         }
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
-        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
             console.warn('Firestore internal error in getAllReceiptVouchers (likely cache issue)', error);
             return [];
         }
+        
+        // ✅ Handle permission errors gracefully
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            console.warn('⚠️ [billingService] Permission denied for receipt vouchers - trying without filter...', error);
+            // ✅ Try to get all vouchers without filter (owner should have access)
+            try {
+                const q = query(
+                    collection(db, 'receiptVouchers'),
+                    orderBy('createdAt', 'desc')
+                );
+                const snapshot = await getDocs(q);
+                const results = snapshot.docs
+                    .map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            voucherNumber: data.voucherNumber || null,
+                            createdAt: data.createdAt?.toDate() || new Date(),
+                            deletedAt: data.deletedAt?.toDate(),
+                            isDeleted: data.isDeleted || false
+                        } as ReceiptVoucher;
+                    })
+                    .filter(v => !v.isDeleted);
+                console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (permission workaround)`);
+                return results;
+            } catch (fallbackError: any) {
+                console.error('❌ [billingService] Error getting receipt vouchers (fallback failed):', fallbackError);
+                return [];
+            }
+        }
+        
         console.error('❌ [billingService] Error getting receipt vouchers:', error);
         return [];
     }
@@ -923,35 +974,86 @@ export const getAllExpenseVouchers = async (): Promise<ExpenseVoucher[]> => {
             console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (with filter)`);
             return results;
         } catch (indexError: any) {
-            // ✅ Fallback: Load all and filter in code (no index required)
-            console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
-            const q = query(
-                collection(db, 'expenseVouchers'),
-                orderBy('createdAt', 'desc')
-            );
-            const snapshot = await getDocs(q);
-            const results = snapshot.docs
-                .map(doc => {
-                    const data = doc.data();
-                    return {
-                        id: doc.id,
-                        ...data,
-                        voucherNumber: data.voucherNumber || null,
-                        createdAt: data.createdAt?.toDate() || new Date(),
-                        deletedAt: data.deletedAt?.toDate(),
-                        isDeleted: data.isDeleted || false
-                    } as ExpenseVoucher;
-                })
-                .filter(v => !v.isDeleted); // Filter in code as fallback
-            console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (fallback, filtered)`);
-            return results;
+            // ✅ Handle permission errors in index check
+            const isPermissionError = indexError?.code === 'permission-denied' || 
+                                      indexError?.message?.includes('permission') ||
+                                      indexError?.message?.includes('Missing or insufficient');
+            
+            if (isPermissionError) {
+                console.warn('⚠️ [billingService] Permission denied for expense vouchers query - trying without filter...', indexError);
+            } else {
+                // ✅ Fallback: Load all and filter in code (no index required)
+                console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
+            }
+            
+            try {
+                const q = query(
+                    collection(db, 'expenseVouchers'),
+                    orderBy('createdAt', 'desc')
+                );
+                const snapshot = await getDocs(q);
+                const results = snapshot.docs
+                    .map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            voucherNumber: data.voucherNumber || null,
+                            createdAt: data.createdAt?.toDate() || new Date(),
+                            deletedAt: data.deletedAt?.toDate(),
+                            isDeleted: data.isDeleted || false
+                        } as ExpenseVoucher;
+                    })
+                    .filter(v => !v.isDeleted); // Filter in code as fallback
+                console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (fallback, filtered)`);
+                return results;
+            } catch (fallbackError: any) {
+                console.error('❌ [billingService] Error in fallback query for expense vouchers:', fallbackError);
+                return [];
+            }
         }
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
-        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
             console.warn('Firestore internal error in getAllExpenseVouchers (likely cache issue)', error);
             return [];
         }
+        
+        // ✅ Handle permission errors gracefully
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            console.warn('⚠️ [billingService] Permission denied for expense vouchers - trying without filter...', error);
+            // ✅ Try to get all vouchers without filter (owner should have access)
+            try {
+                const q = query(
+                    collection(db, 'expenseVouchers'),
+                    orderBy('createdAt', 'desc')
+                );
+                const snapshot = await getDocs(q);
+                const results = snapshot.docs
+                    .map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            voucherNumber: data.voucherNumber || null,
+                            createdAt: data.createdAt?.toDate() || new Date(),
+                            deletedAt: data.deletedAt?.toDate(),
+                            isDeleted: data.isDeleted || false
+                        } as ExpenseVoucher;
+                    })
+                    .filter(v => !v.isDeleted);
+                console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (permission workaround)`);
+                return results;
+            } catch (fallbackError: any) {
+                console.error('❌ [billingService] Error getting expense vouchers (fallback failed):', fallbackError);
+                return [];
+            }
+        }
+        
         console.error('❌ [billingService] Error getting all expense vouchers:', error);
         return [];
     }

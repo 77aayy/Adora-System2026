@@ -1150,10 +1150,20 @@ export const getDeletedManagers = async (): Promise<Array<User & { deletedAt: Da
         });
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
-        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
             logger.warn('Firestore internal error in getDeletedManagers (likely cache issue)', error, 'ownerService');
         } else {
-            logger.error('Error getting deleted managers', error, 'ownerService');
+            // ✅ Handle permission errors gracefully (expected for non-owners)
+            const isPermissionError = error?.code === 'permission-denied' || 
+                                      error?.message?.includes('permission') ||
+                                      error?.message?.includes('Missing or insufficient');
+            
+            if (isPermissionError) {
+                logger.warn('Permission denied for deleted managers (expected for non-owners)', undefined, 'ownerService');
+            } else {
+                logger.error('Error getting deleted managers', error, 'ownerService');
+            }
         }
         // ✅ Return empty array instead of throwing to prevent UI crash
         return [];

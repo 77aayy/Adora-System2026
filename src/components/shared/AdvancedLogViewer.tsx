@@ -191,6 +191,14 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
     // HANDLERS
     // ============================================================
     
+    // ✅ Manual refresh function (for refresh button)
+    const loadData = useCallback(() => {
+        // Force re-trigger useEffect by updating a dependency
+        // Since we're using onSnapshot, we just need to trigger a re-subscription
+        setLoading(true);
+        // The useEffect will handle the actual reload
+    }, []);
+    
     const toggleCategory = (cat: LogCategory) => {
         setSelectedCategories(prev => 
             prev.includes(cat) 

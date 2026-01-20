@@ -23,6 +23,7 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
     maxNotifications = 5,
 }) => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     const [notifications, setNotifications] = useState<LicenseNotification[]>([]);
     const [loading, setLoading] = useState(true);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -94,19 +95,20 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
                                     let message = data.message || '';
                                     if (!message && data.daysUntilExpiry !== undefined) {
                                         const days = data.daysUntilExpiry;
-                                        if (days <= 0) message = '⚠️ انتهت صلاحية الترخيص!';
-                                        else if (days === 1) message = '🔴 ينتهي الترخيص غداً!';
-                                        else if (days === 7) message = '⚠️ سينتهي الترخيص خلال 7 أيام';
-                                        else if (days === 30) message = 'ℹ️ سينتهي الترخيص خلال 30 يوم';
+                                        // ✅ Use translation keys instead of hardcoded Arabic
+                                        if (days <= 0) message = `⚠️ ${t('licenseNotification.expired')}`;
+                                        else if (days === 1) message = `🔴 ${t('licenseNotification.expiresTomorrow')}`;
+                                        else if (days === 7) message = `⚠️ ${t('licenseNotification.expiresIn7Days')}`;
+                                        else if (days === 30) message = `ℹ️ ${t('licenseNotification.expiresIn30Days')}`;
                                     }
                                     
                                     return {
                                         tenantId: data.tenantId,
                                         managerId: data.managerId,
-                                        managerName: data.managerName || 'غير معروف',
+                                        managerName: data.managerName || t('common.unknown'),
                                         daysUntilExpiry: data.daysUntilExpiry ?? 0,
                                         notificationType: data.notificationType || '30days',
-                                        message: message || 'إشعار انتهاء ترخيص',
+                                        message: message || t('licenseNotification.expiryNotification'),
                                         notifiedAt: data.notifiedAt?.toDate() || new Date(),
                                         notified: data.notified !== false,
                                     } as LicenseNotification;
@@ -118,10 +120,19 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
                         }
                     } catch (err: any) {
                         // ✅ Handle Firestore internal errors gracefully
-                        if (err?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                        if (err?.message?.includes('INTERNAL ASSERTION FAILED') || err?.message?.includes('Unexpected state')) {
                             logger.warn('Firestore internal error in loadNotifications (likely cache issue)', err, 'LicenseNotificationWidget');
                         } else {
-                            logger.error('Failed to load notifications from Firestore', err, 'LicenseNotificationWidget');
+                            // ✅ Handle permission errors gracefully (expected for non-owners)
+                            const isPermissionError = err?.code === 'permission-denied' || 
+                                                      err?.message?.includes('permission') ||
+                                                      err?.message?.includes('Missing or insufficient');
+                            
+                            if (isPermissionError) {
+                                logger.warn('Permission denied for license notifications (expected for non-owners)', undefined, 'LicenseNotificationWidget');
+                            } else {
+                                logger.error('Failed to load notifications from Firestore', err, 'LicenseNotificationWidget');
+                            }
                         }
                         result = [];
                     }
@@ -156,7 +167,7 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
             <div className={`p-4 rounded-xl glass ${className}`}>
                 <div className="flex items-center gap-2 text-white/60">
                     <Clock className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">جاري التحميل...</span>
+                    <span className="text-sm">{t('common.loading')}</span>
                 </div>
             </div>
         );
@@ -204,7 +215,7 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
                 <div className="flex items-center gap-2">
                     <Bell className="w-5 h-5 text-primary-400" />
                     <h3 className="text-sm font-bold text-white">
-                        {forOwner ? 'إشعارات التراخيص' : 'إشعار الترخيص'}
+                        {forOwner ? t('licenseNotification.licenseNotifications') : t('licenseNotification.licenseNotification')}
                     </h3>
                 </div>
                 {visibleNotifications.length > 0 && (
@@ -235,7 +246,7 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
                                     <p className="text-xs leading-relaxed">{notification.message}</p>
                                     {notification.daysUntilExpiry !== null && (
                                         <p className="text-xs text-white/50 mt-1">
-                                            متبقي: {notification.daysUntilExpiry} {notification.daysUntilExpiry === 1 ? 'يوم' : 'يوم'}
+                                            {t('licenseNotification.remaining')}: {notification.daysUntilExpiry} {notification.daysUntilExpiry === 1 ? t('common.day') : t('common.days')}
                                         </p>
                                     )}
                                 </div>
@@ -254,7 +265,7 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
 
             {visibleNotifications.length >= maxNotifications && (
                 <p className="text-xs text-white/50 text-center mt-3">
-                    و {notifications.length - maxNotifications} إشعار آخر
+                    {t('licenseNotification.moreNotifications', { count: notifications.length - maxNotifications })}
                 </p>
             )}
         </div>

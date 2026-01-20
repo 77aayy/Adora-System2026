@@ -185,12 +185,36 @@ const fetchReceptionHistory = async (
     const items: UnifiedHistoryItem[] = [];
 
     try {
-        let q = query(
-            collection(db, 'requests'),
-            where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
-            where('originDepartment', '==', 'reception')
-        );
+        if (!db) {
+            logger.warn('Firestore db not available in fetchReceptionHistory', null, 'unifiedHistoryService');
+            return [];
+        }
+
+        let q;
+        try {
+            // ✅ Try with orderBy for better performance
+            q = query(
+                collection(db, 'requests'),
+                where('branch', '==', branchId),
+                where('tenantId', '==', tenantId),
+                where('originDepartment', '==', 'reception'),
+                orderBy('timestamp', 'desc'),
+                limit(maxResults * 2) // Get more to filter by date range
+            );
+        } catch (indexError: any) {
+            // ✅ Fallback if index doesn't exist
+            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                logger.warn('Using fallback query (no orderBy) in fetchReceptionHistory', indexError, 'unifiedHistoryService');
+                q = query(
+                    collection(db, 'requests'),
+                    where('branch', '==', branchId),
+                    where('tenantId', '==', tenantId),
+                    where('originDepartment', '==', 'reception')
+                );
+            } else {
+                throw indexError;
+            }
+        }
 
         const snapshot = await getDocs(q);
         snapshot.forEach(doc => {
@@ -237,12 +261,36 @@ const fetchBellmanHistory = async (
     const items: UnifiedHistoryItem[] = [];
 
     try {
-        let q = query(
-            collection(db, 'requests'),
-            where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
-            where('type', '==', 'bellman')
-        );
+        if (!db) {
+            logger.warn('Firestore db not available in fetchBellmanHistory', null, 'unifiedHistoryService');
+            return [];
+        }
+
+        let q;
+        try {
+            // ✅ Try with orderBy for better performance
+            q = query(
+                collection(db, 'requests'),
+                where('branch', '==', branchId),
+                where('tenantId', '==', tenantId),
+                where('type', '==', 'bellman'),
+                orderBy('timestamp', 'desc'),
+                limit(maxResults * 2) // Get more to filter by date range
+            );
+        } catch (indexError: any) {
+            // ✅ Fallback if index doesn't exist
+            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                logger.warn('Using fallback query (no orderBy) in fetchBellmanHistory', indexError, 'unifiedHistoryService');
+                q = query(
+                    collection(db, 'requests'),
+                    where('branch', '==', branchId),
+                    where('tenantId', '==', tenantId),
+                    where('type', '==', 'bellman')
+                );
+            } else {
+                throw indexError;
+            }
+        }
 
         const snapshot = await getDocs(q);
         snapshot.forEach(doc => {
@@ -290,12 +338,36 @@ const fetchHousekeepingHistory = async (
     const items: UnifiedHistoryItem[] = [];
 
     try {
-        let q = query(
-            collection(db, 'requests'),
-            where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
-            where('type', 'in', ['cleaning', 'inspection'])
-        );
+        if (!db) {
+            logger.warn('Firestore db not available in fetchHousekeepingHistory', null, 'unifiedHistoryService');
+            return [];
+        }
+
+        let q;
+        try {
+            // ✅ Try with orderBy for better performance
+            q = query(
+                collection(db, 'requests'),
+                where('branch', '==', branchId),
+                where('tenantId', '==', tenantId),
+                where('type', 'in', ['cleaning', 'inspection']),
+                orderBy('timestamp', 'desc'),
+                limit(maxResults * 2) // Get more to filter by date range
+            );
+        } catch (indexError: any) {
+            // ✅ Fallback if index doesn't exist
+            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                logger.warn('Using fallback query (no orderBy) in fetchHousekeepingHistory', indexError, 'unifiedHistoryService');
+                q = query(
+                    collection(db, 'requests'),
+                    where('branch', '==', branchId),
+                    where('tenantId', '==', tenantId),
+                    where('type', 'in', ['cleaning', 'inspection'])
+                );
+            } else {
+                throw indexError;
+            }
+        }
 
         const snapshot = await getDocs(q);
         snapshot.forEach(doc => {
@@ -347,12 +419,36 @@ const fetchMaintenanceHistory = async (
     const items: UnifiedHistoryItem[] = [];
 
     try {
-        let q = query(
-            collection(db, 'requests'),
-            where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
-            where('type', '==', 'maintenance')
-        );
+        if (!db) {
+            logger.warn('Firestore db not available in fetchMaintenanceHistory', null, 'unifiedHistoryService');
+            return [];
+        }
+
+        let q;
+        try {
+            // ✅ Try with orderBy for better performance
+            q = query(
+                collection(db, 'requests'),
+                where('branch', '==', branchId),
+                where('tenantId', '==', tenantId),
+                where('type', '==', 'maintenance'),
+                orderBy('timestamp', 'desc'),
+                limit(maxResults * 2) // Get more to filter by date range
+            );
+        } catch (indexError: any) {
+            // ✅ Fallback if index doesn't exist
+            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                logger.warn('Using fallback query (no orderBy) in fetchMaintenanceHistory', indexError, 'unifiedHistoryService');
+                q = query(
+                    collection(db, 'requests'),
+                    where('branch', '==', branchId),
+                    where('tenantId', '==', tenantId),
+                    where('type', '==', 'maintenance')
+                );
+            } else {
+                throw indexError;
+            }
+        }
 
         const snapshot = await getDocs(q);
         snapshot.forEach(doc => {
@@ -405,17 +501,49 @@ const fetchProcurementHistory = async (
         // ✅ FIX: Use tenant-scoped collection
         const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
         
-        if (targetDepartment && targetDepartment !== 'all') {
-            q = query(
-                requestsRef,
-                where('branch', '==', branchId),
-                where('department', '==', targetDepartment)
-            );
-        } else {
-            q = query(
-                requestsRef,
-                where('branch', '==', branchId)
-            );
+        if (!db) {
+            logger.warn('Firestore db not available in fetchProcurementHistory', null, 'unifiedHistoryService');
+            return [];
+        }
+
+        let q;
+        try {
+            // ✅ Try with orderBy for better performance
+            if (targetDepartment && targetDepartment !== 'all') {
+                q = query(
+                    requestsRef,
+                    where('branch', '==', branchId),
+                    where('department', '==', targetDepartment),
+                    orderBy('createdAt', 'desc'),
+                    limit(maxResults * 2) // Get more to filter by date range
+                );
+            } else {
+                q = query(
+                    requestsRef,
+                    where('branch', '==', branchId),
+                    orderBy('createdAt', 'desc'),
+                    limit(maxResults * 2) // Get more to filter by date range
+                );
+            }
+        } catch (indexError: any) {
+            // ✅ Fallback if index doesn't exist
+            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                logger.warn('Using fallback query (no orderBy) in fetchProcurementHistory', indexError, 'unifiedHistoryService');
+                if (targetDepartment && targetDepartment !== 'all') {
+                    q = query(
+                        requestsRef,
+                        where('branch', '==', branchId),
+                        where('department', '==', targetDepartment)
+                    );
+                } else {
+                    q = query(
+                        requestsRef,
+                        where('branch', '==', branchId)
+                    );
+                }
+            } else {
+                throw indexError;
+            }
         }
 
         const snapshot = await getDocs(q);
@@ -469,11 +597,34 @@ const fetchLaundryHistory = async (
     const items: UnifiedHistoryItem[] = [];
 
     try {
-        let q = query(
-            collection(db, 'laundryRecords'),
-            where('branch', '==', branchId),
-            where('tenantId', '==', tenantId)
-        );
+        if (!db) {
+            logger.warn('Firestore db not available in fetchLaundryHistory', null, 'unifiedHistoryService');
+            return [];
+        }
+
+        let q;
+        try {
+            // ✅ Try with orderBy for better performance (using date field if available)
+            q = query(
+                collection(db, 'laundryRecords'),
+                where('branch', '==', branchId),
+                where('tenantId', '==', tenantId),
+                orderBy('date', 'desc'),
+                limit(maxResults * 2) // Get more to filter by date range
+            );
+        } catch (indexError: any) {
+            // ✅ Fallback if index doesn't exist
+            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                logger.warn('Using fallback query (no orderBy) in fetchLaundryHistory', indexError, 'unifiedHistoryService');
+                q = query(
+                    collection(db, 'laundryRecords'),
+                    where('branch', '==', branchId),
+                    where('tenantId', '==', tenantId)
+                );
+            } else {
+                throw indexError;
+            }
+        }
 
         const snapshot = await getDocs(q);
         snapshot.forEach(doc => {

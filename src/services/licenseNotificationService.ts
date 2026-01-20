@@ -187,8 +187,17 @@ export async function getLastNotification(
             daysUntilExpiry: mostRecent.daysUntilExpiry || null,
             notifiedAt: mostRecent.notifiedAt || null,
         };
-    } catch (error) {
-        logger.error('Failed to get last notification', error, 'licenseNotificationService');
+    } catch (error: any) {
+        // ✅ Handle permission errors gracefully (expected when not logged in as owner)
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            logger.warn('Permission denied for license notifications (expected for non-owners)', undefined, 'licenseNotificationService');
+        } else {
+            logger.error('Failed to get last notification', error, 'licenseNotificationService');
+        }
         return null;
     }
 }

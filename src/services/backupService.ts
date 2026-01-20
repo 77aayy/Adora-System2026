@@ -206,10 +206,39 @@ export async function createTenantBackup(
         return backupId;
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
-        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
             logger.warn('Firestore internal error in createTenantBackup (likely cache issue)', error, 'backupService');
+            // Don't throw for internal errors - just return a failure indicator
+            if (backupId) {
+                try {
+                    const { updateDoc } = await import('firebase/firestore');
+                    await updateDoc(doc(db, 'tenantBackups', backupId), { status: 'failed' });
+                } catch (updateError: any) {
+                    // Silently fail - already logged above
+                }
+            }
+            return 'FAILED_INTERNAL_ERROR';
         } else {
-            logger.error('Failed to create backup', error, 'backupService');
+            // ✅ Handle permission errors gracefully (expected for non-owners)
+            const isPermissionError = error?.code === 'permission-denied' || 
+                                      error?.message?.includes('permission') ||
+                                      error?.message?.includes('Missing or insufficient');
+            
+            if (isPermissionError) {
+                logger.warn('Permission denied for creating backup (expected for non-owners)', undefined, 'backupService');
+                // Don't throw for permission errors - just return a failure indicator
+                if (backupId) {
+                    try {
+                        const { updateDoc } = await import('firebase/firestore');
+                        await updateDoc(doc(db, 'tenantBackups', backupId), { status: 'failed' });
+                    } catch (updateError: any) {
+                        // Silently fail - already logged above
+                    }
+                }
+                return 'FAILED_PERMISSION_DENIED';
+            } else {
+                logger.error('Failed to create backup', error, 'backupService');
+            }
         }
         
         // Update backup status to failed
@@ -219,7 +248,7 @@ export async function createTenantBackup(
                 await updateDoc(doc(db, 'tenantBackups', backupId), { status: 'failed' });
             } catch (updateError: any) {
                 // ✅ Handle Firestore internal errors gracefully
-                if (updateError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                if (updateError?.message?.includes('INTERNAL ASSERTION FAILED') || updateError?.message?.includes('Unexpected state')) {
                     logger.warn('Firestore internal error updating backup status (likely cache issue)', updateError, 'backupService');
                 } else {
                     logger.error('Failed to update backup status', updateError, 'backupService');
@@ -259,10 +288,19 @@ export async function getTenantBackups(tenantId: string): Promise<TenantBackup[]
         })) as TenantBackup[];
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
-        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
             logger.warn('Firestore internal error in getTenantBackups (likely cache issue)', error, 'backupService');
         } else {
-            logger.error('Failed to get tenant backups', error, 'backupService');
+            // ✅ Handle permission errors gracefully (expected for non-owners)
+            const isPermissionError = error?.code === 'permission-denied' || 
+                                      error?.message?.includes('permission') ||
+                                      error?.message?.includes('Missing or insufficient');
+            
+            if (isPermissionError) {
+                logger.warn('Permission denied for tenant backups (expected for non-owners)', undefined, 'backupService');
+            } else {
+                logger.error('Failed to get tenant backups', error, 'backupService');
+            }
         }
         return [];
     }
@@ -371,13 +409,23 @@ export async function createDailyBackupsForAllTenants(): Promise<{ success: numb
                 } else {
                     logger.info(`[BackupScheduler] Skipped tenant ${tenantId} - backup already exists today`, null, 'backupService');
                 }
-            } catch (error) {
-                logger.error(`Failed to create daily backup for tenant ${tenantId}`, error, 'backupService');
+            } catch (error: any) {
+                // ✅ Handle Firestore internal errors gracefully
+                if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
+                    logger.warn(`Firestore internal error creating backup for tenant ${tenantId} (likely cache issue)`, error, 'backupService');
+                } else {
+                    logger.error(`Failed to create daily backup for tenant ${tenantId}`, error, 'backupService');
+                }
                 failed++;
             }
         }
-    } catch (error) {
-        logger.error('Failed to create daily backups', error, 'backupService');
+    } catch (error: any) {
+        // ✅ Handle Firestore internal errors gracefully
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
+            logger.warn('Firestore internal error in createDailyBackupsForAllTenants (likely cache issue)', error, 'backupService');
+        } else {
+            logger.error('Failed to create daily backups', error, 'backupService');
+        }
     }
 
     logger.info(`[BackupScheduler] Completed: ${success} succeeded, ${failed} failed`, null, 'backupService');

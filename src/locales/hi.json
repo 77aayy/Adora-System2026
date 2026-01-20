@@ -112,6 +112,7 @@
         "day": "दिन",
         "days": "दिन",
         "week": "सप्ताह",
+        "unknown": "अज्ञात",
         "weeks": "सप्ताह",
         "month": "महीना",
         "months": "महीने",
@@ -1695,5 +1696,16 @@
         },
         "performanceLevel": "प्रदर्शन स्तर",
         "noRedemptionRequestsYet": "अभी तक कोई मोचन अनुरोध नहीं"
+    },
+    "licenseNotification": {
+        "licenseNotification": "लाइसेंस सूचना",
+        "licenseNotifications": "लाइसेंस सूचनाएं",
+        "expired": "लाइसेंस समाप्त हो गया!",
+        "expiresTomorrow": "लाइसेंस कल समाप्त होगा!",
+        "expiresIn7Days": "लाइसेंस 7 दिनों में समाप्त होगा",
+        "expiresIn30Days": "लाइसेंस 30 दिनों में समाप्त होगा",
+        "expiryNotification": "लाइसेंस समाप्ति सूचना",
+        "remaining": "शेष",
+        "moreNotifications": "और {{count}} और सूचनाएं"
     }
 }

@@ -615,10 +615,19 @@ export const subscribeToTicketStatus = (
             },
             (error: any) => {
                 // ✅ Handle Firestore internal errors gracefully
-                if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+                if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
                     console.warn('Firestore internal error in subscribeToTicketStatus (likely cache issue)', error);
                 } else {
-                    console.error('Error subscribing to ticket status:', error);
+                    // ✅ Handle permission errors gracefully (expected for non-owners)
+                    const isPermissionError = error?.code === 'permission-denied' || 
+                                              error?.message?.includes('permission') ||
+                                              error?.message?.includes('Missing or insufficient');
+                    
+                    if (isPermissionError) {
+                        console.warn('Permission denied for ticket status subscription (expected for non-owners)', error);
+                    } else {
+                        console.error('Error subscribing to ticket status:', error);
+                    }
                 }
                 callback({
                     tenantId,
@@ -631,10 +640,19 @@ export const subscribeToTicketStatus = (
         );
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
-        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
             console.warn('Firestore internal error setting up ticket status subscription (likely cache issue)', error);
         } else {
-            console.error('Error setting up ticket status subscription:', error);
+            // ✅ Handle permission errors gracefully (expected for non-owners)
+            const isPermissionError = error?.code === 'permission-denied' || 
+                                      error?.message?.includes('permission') ||
+                                      error?.message?.includes('Missing or insufficient');
+            
+            if (isPermissionError) {
+                console.warn('Permission denied for ticket status subscription (expected for non-owners)', error);
+            } else {
+                console.error('Error setting up ticket status subscription:', error);
+            }
         }
         callback({
             tenantId,
@@ -736,7 +754,17 @@ export const getUnrespondedTicketsCount = async (): Promise<number> => {
         ).length;
         
         return unrespondedCount;
-    } catch (error) {
+    } catch (error: any) {
+        // ✅ Handle permission errors gracefully
+        const isPermissionError = error?.code === 'permission-denied' || 
+                                  error?.message?.includes('permission') ||
+                                  error?.message?.includes('Missing or insufficient');
+        
+        if (isPermissionError) {
+            // Permission denied is expected for non-admins
+            return 0;
+        }
+        
         console.error('Error getting unresponded tickets count:', error);
         return 0;
     }
