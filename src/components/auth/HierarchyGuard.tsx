@@ -14,6 +14,7 @@ import { useTenant } from '../../context/TenantContext';
 import { MapPin, Plus, LayoutDashboard } from 'lucide-react';
 import { AdoraLoader } from '../../components/common/AdoraLoader';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export const HierarchyGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user, branchId } = useAuth();
