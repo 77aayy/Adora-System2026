@@ -1458,7 +1458,6 @@ export const MaintenanceDashboard: React.FC = () => {
                                         '--tw-placeholder-opacity': '1'
                                     } as React.CSSProperties}
                                     placeholder={t('maintenance.completionNotesPlaceholder')}
-                                    placeholder={t('maintenance.completionNotesPlaceholder')}
                                 />
                             </div>
 

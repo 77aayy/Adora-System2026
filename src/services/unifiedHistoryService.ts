@@ -496,8 +496,6 @@ const fetchProcurementHistory = async (
     const items: UnifiedHistoryItem[] = [];
 
     try {
-        let q;
-
         // ✅ FIX: Use tenant-scoped collection
         const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
         
