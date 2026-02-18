@@ -88,6 +88,7 @@ import { QuickIssueReporter } from '../../components/guest/QuickIssueReporter';
 import { MicroFeedback } from '../../components/guest/MicroFeedback';
 import { logger } from '../../services/loggerService';
 import { useTranslation } from 'react-i18next';
+import { formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -189,7 +190,7 @@ const SERVICES: ServiceItem[] = [
 
 export const GuestDashboard: React.FC = () => {
     const { t } = useTranslation();
-    console.log('🚀 [GuestDashboard] Component rendered!');
+    logger.info('🚀 [GuestDashboard] Component rendered!', undefined, 'GuestDashboard');
     // 🌙 Theme Support
     const { theme, toggleTheme, isDark } = useTheme();
     
@@ -332,9 +333,9 @@ export const GuestDashboard: React.FC = () => {
     // ============================================================
 
     useEffect(() => {
-        console.log('🚀 [GuestDashboard] useEffect triggered - calling initGuestPage');
+        logger.info('🚀 [GuestDashboard] useEffect triggered - calling initGuestPage', undefined, 'GuestDashboard');
         initGuestPage().catch((error) => {
-            console.error('❌ [GuestDashboard] initGuestPage failed:', error);
+            logger.error('❌ [GuestDashboard] initGuestPage failed:', error, 'GuestDashboard');
         });
     }, []);
 
@@ -356,21 +357,21 @@ export const GuestDashboard: React.FC = () => {
     }, [session]); // Re-subscribe when session changes
 
     const initGuestPage = async () => {
-        console.log('🚀 [GuestDashboard] initGuestPage started');
-        console.log('🚀 [GuestDashboard] Current URL:', window.location.href);
+        logger.info('🚀 [GuestDashboard] initGuestPage started', undefined, 'GuestDashboard');
+        logger.debug('🚀 [GuestDashboard] Current URL:', window.location.href, 'GuestDashboard');
         updateDynamicGreeting();
 
         // 🔐 STEP 1: Ensure Anonymous Authentication (Budget Protection!)
         // This prevents unauthorized API reads and enables rate limiting
-        console.log('🔐 Initializing guest session with Anonymous Auth...');
+        logger.info('🔐 Initializing guest session with Anonymous Auth...', undefined, 'GuestDashboard');
         const anonUser = await ensureAnonymousAuth();
         if (!anonUser) {
-            console.error('❌ Failed to create anonymous session');
+            logger.error('❌ Failed to create anonymous session', undefined, 'GuestDashboard');
             setAuthError('فشل في إنشاء جلسة آمنة. تأكد من تفعيل Anonymous Auth في Firebase Console.');
             setLoading(false);
             return;
         }
-        console.log('✅ Anonymous session created:', anonUser.uid);
+        logger.info('✅ Anonymous session created:', anonUser.uid, 'GuestDashboard');
 
         // Helper to get param from search or hash
         const getParam = (key: string) => {
@@ -401,14 +402,14 @@ export const GuestDashboard: React.FC = () => {
         const demo = getParam('demo');
         if (demo === 'true') {
             setIsDemoMode(true);
-            console.log('🎮 Demo Mode Activated - Requests will NOT be sent');
+            logger.info('🎮 Demo Mode Activated - Requests will NOT be sent', undefined, 'GuestDashboard');
         }
 
         // 🛡️ SECURITY CHECK: Detect legacy insecure access (IDOR vulnerability)
         // Block access if room/branch/tenant are in URL but NO token (insecure direct access)
         const searchParams = new URLSearchParams(window.location.search);
         if (isLegacyInsecureAccess(searchParams) && !demo) {
-            console.warn('🚨 [GuestDashboard] SECURITY: Legacy insecure access detected - blocking');
+            logger.warn('🚨 [GuestDashboard] SECURITY: Legacy insecure access detected - blocking', undefined, 'GuestDashboard');
             
             // Log suspicious activity
             const fingerprint = getSavedDeviceFingerprint() || generateDeviceFingerprint();
@@ -442,7 +443,7 @@ export const GuestDashboard: React.FC = () => {
                 logger.debug(`Token validation result: ${validationResult.valid ? 'VALID' : 'INVALID'}`, { errorCode: validationResult.errorCode }, 'GuestDashboard');
                 
                 if (!validationResult.valid) {
-                    console.warn(`🔐 Token validation failed: ${validationResult.errorCode}`);
+                    logger.warn(`🔐 Token validation failed: ${validationResult.errorCode}`, undefined, 'GuestDashboard');
                     
                     // ✅ Map error codes to user-friendly, polite, and very clear messages
                     const errorMessages: Record<string, string> = {
@@ -468,7 +469,7 @@ export const GuestDashboard: React.FC = () => {
                 // 🛡️ DOUBLE VALIDATION: If URL has room param, verify it matches token data
                 // This detects IDOR (Insecure Direct Object Reference) attacks
                 if (urlRoomNum && urlRoomNum !== roomNum) {
-                    console.error('🚨 [GuestDashboard] SECURITY BREACH DETECTED: Room mismatch!', {
+                    logger.error('🚨 [GuestDashboard] SECURITY BREACH DETECTED: Room mismatch!', {
                         urlRoom: urlRoomNum,
                         tokenRoom: roomNum,
                         action: 'BLOCKED'
@@ -492,7 +493,7 @@ export const GuestDashboard: React.FC = () => {
                 
                 // 🛡️ DOUBLE VALIDATION: If URL has branch param, verify it matches token data
                 if (urlBranchId && urlBranchId !== branchId) {
-                    console.error('🚨 [GuestDashboard] SECURITY BREACH DETECTED: Branch mismatch!', {
+                    logger.error('🚨 [GuestDashboard] SECURITY BREACH DETECTED: Branch mismatch!', {
                         urlBranch: urlBranchId,
                         tokenBranch: branchId,
                         action: 'BLOCKED'
@@ -514,7 +515,7 @@ export const GuestDashboard: React.FC = () => {
                 
                 // 🛡️ DOUBLE VALIDATION: If URL has tenant param, verify it matches token data
                 if (urlTenantId && urlTenantId !== tenantId) {
-                    console.error('🚨 [GuestDashboard] SECURITY BREACH DETECTED: Tenant mismatch!', {
+                    logger.error('🚨 [GuestDashboard] SECURITY BREACH DETECTED: Tenant mismatch!', {
                         urlTenant: urlTenantId,
                         tokenTenant: tenantId,
                         action: 'BLOCKED'
@@ -546,7 +547,7 @@ export const GuestDashboard: React.FC = () => {
                 logger.info('Secure token validated', undefined, 'GuestDashboard');
                 
             } catch (error) {
-                console.error("Token resolution error:", error);
+                logger.error("Token resolution error:", error, 'GuestDashboard');
                 setAuthError('عذراً، حدث خطأ تقني أثناء التحقق من رابط الوصول.\n\nيرجى المحاولة مرة أخرى بعد قليل. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك فوراً.');
                 setLoading(false);
                 return;
@@ -557,7 +558,7 @@ export const GuestDashboard: React.FC = () => {
             // Allow existing session to continue (for page refresh)
             const existingSession = checkExistingSession();
             if (!existingSession) {
-                console.log('⚠️ [GuestDashboard] No existing session found - showing default message');
+                logger.info('⚠️ [GuestDashboard] No existing session found - showing default message', undefined, 'GuestDashboard');
                 setAuthError('مرحباً بك في فندق أدورا 🌟\n\nيرجى مسح رمز QR الموجود في غرفتك للوصول إلى خدمات الفندق.\n\nإذا كنت ترى هذه الرسالة بعد المسح، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك فوراً.');
                 setLoading(false);
                 return;
@@ -574,7 +575,7 @@ export const GuestDashboard: React.FC = () => {
             if (existingSession?.hotelId) {
                 tenantId = existingSession.hotelId;
             } else {
-                console.error("🚨 Critical Error: Missing Tenant Context (tenantId)");
+                logger.error("🚨 Critical Error: Missing Tenant Context (tenantId)", undefined, 'GuestDashboard');
                 setAuthError('خطأ في النظام: لا يوجد سياق للفندق (Missing Context)');
                 setLoading(false);
                 return;
@@ -582,7 +583,7 @@ export const GuestDashboard: React.FC = () => {
         }
 
         // Context is valid, proceed
-        console.log(`✅ Tenant Context Verified: ${tenantId} | Branch: ${branchId || 'Main'}`);
+        logger.info(`✅ Tenant Context Verified: ${tenantId} | Branch: ${branchId || 'Main'}`, undefined, 'GuestDashboard');
 
         const existingSession = checkExistingSession();
         if (existingSession) {
@@ -619,7 +620,7 @@ export const GuestDashboard: React.FC = () => {
                             setRoomStatusError(null);
                         }
                     } catch (error) {
-                        console.error('Error performing comprehensive check:', error);
+                        logger.error('Error performing comprehensive check:', error, 'GuestDashboard');
                         // On error, don't block access but log it
                     }
                 }
@@ -847,7 +848,7 @@ export const GuestDashboard: React.FC = () => {
                 verifiedAt: new Date()
             });
         } catch (error) {
-            console.error('Error completing guest login:', error);
+            logger.error('Error completing guest login:', error, 'GuestDashboard');
             triggerHaptic('error');
             setVerifyError('عذراً، حدث خطأ أثناء إتمام عملية الدخول.\nيرجى المحاولة مرة أخرى، وإذا استمرت المشكلة يرجى التواصل مع الاستقبال.');
         }
@@ -857,7 +858,7 @@ export const GuestDashboard: React.FC = () => {
         try {
             // 🎮 DEMO MODE BYPASS - Allow access without real roomCard
             if (isDemoMode) {
-                console.log('🎮 Demo Mode: Bypassing verification - allowing access');
+                logger.info('🎮 Demo Mode: Bypassing verification - allowing access', undefined, 'GuestDashboard');
                 // Create a mock session for demo mode
                 setSession({
                     roomNumber: room,
@@ -879,13 +880,18 @@ export const GuestDashboard: React.FC = () => {
                 return false;
             }
             
-            const roomCardsRef = collection(db, 'roomCards');
+            const urlParams = new URLSearchParams(window.location.search);
+            const tenantIdForVerify = urlParams.get('tenantId') || urlParams.get('hotelId') || urlParams.get('hotel') || '';
+            const roomCardsRef = tenantIdForVerify
+                ? collection(db, `tenants/${tenantIdForVerify}/roomCards`)
+                : collection(db, 'roomCards');
             const q = query(
                 roomCardsRef,
                 where('roomNumber', '==', room),
                 where('status', '==', 'active')
             );
             const snapshot = await getDocs(q);
+            const branchId = urlParams.get('branch') || '';
 
             if (snapshot.empty) {
                 // ✅ Record failed attempt
@@ -893,11 +899,8 @@ export const GuestDashboard: React.FC = () => {
                 if (attemptResult.shouldBlock) {
                     setVerifyError('🚫 تم حظر هذا الجهاز مؤقتاً لمدة 30 دقيقة.\n\nيرجى التواصل مع الاستقبال للمساعدة.');
                     // 📢 إشعار الاستقبال
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const tenantId = urlParams.get('tenantId') || '';
-                    const branchId = urlParams.get('branch') || '';
-                    if (tenantId && branchId) {
-                        notifyReceptionOfSuspiciousActivity(tenantId, branchId, room, 'unknown', attemptResult.attempts);
+                    if (tenantIdForVerify && branchId) {
+                        notifyReceptionOfSuspiciousActivity(tenantIdForVerify, branchId, room, 'unknown', attemptResult.attempts);
                     }
                 } else {
                     setVerifyError(`عذراً، لا يوجد حجز نشط مسجل لهذه الغرفة حالياً.\nيرجى التأكد من رقم الغرفة أو التواصل مع الاستقبال للمساعدة.\n\n⚠️ المحاولة ${attemptResult.attempts} من 3`);
@@ -941,7 +944,7 @@ export const GuestDashboard: React.FC = () => {
             // Ensure the room belongs to the requested branch (from URL)
             const urlBranch = extractBranchFromURL();
             if (urlBranch && roomCard.branch !== urlBranch) {
-                console.error(`Branch Mismatch: Room belongs to ${roomCard.branch}, but URL requested ${urlBranch}`);
+                logger.error(`Branch Mismatch: Room belongs to ${roomCard.branch}, but URL requested ${urlBranch}`, undefined, 'GuestDashboard');
                 setVerifyError('عذراً، يبدو أن رابط الوصول غير صحيح لهذه الغرفة.\nيرجى مسح رمز QR الموجود داخل غرفتك أو التواصل مع الاستقبال.');
                 return false;
             }
@@ -979,9 +982,9 @@ export const GuestDashboard: React.FC = () => {
             await logGuestActivity('login', { type, verificationId: verificationRef.id });
             
             // ✅ Perform comprehensive QR checks after successful verification (Location + Device + Room Status)
-            const tenantId = roomCard.hotelId || 'default';
-            const branchId = roomCard.branch || 'default';
-            const checkResult = await performComprehensiveCheck(tenantId, branchId, room);
+            const cardTenantId = roomCard.hotelId || 'default';
+            const cardBranchId = roomCard.branch || 'default';
+            const checkResult = await performComprehensiveCheck(cardTenantId, cardBranchId, room);
             
             if (!checkResult.allowed) {
                 // Set specific errors (but don't block access completely)
@@ -1006,7 +1009,7 @@ export const GuestDashboard: React.FC = () => {
             
             return true;
         } catch (error: any) {
-            console.error('Verification error:', error);
+            logger.error('Verification error:', error, 'GuestDashboard');
             
             // ✅ تحديد نوع الخطأ وعرض رسالة مناسبة
             let errorMessage = 'عذراً، حدث خطأ تقني أثناء التحقق من البيانات.';
@@ -1022,7 +1025,7 @@ export const GuestDashboard: React.FC = () => {
             errorMessage += '\n\nيرجى المحاولة مرة أخرى أو التواصل مع الاستقبال للمساعدة.';
             
             // Log detailed error for debugging
-            console.error('Error details:', {
+            logger.error('Error details:', {
                 code: error?.code,
                 message: error?.message,
                 room: room,
@@ -1036,7 +1039,10 @@ export const GuestDashboard: React.FC = () => {
 
     const verifyActiveRoomCard = async (existingSession: GuestSession): Promise<boolean> => {
         try {
-            const roomCardsRef = collection(db, 'roomCards');
+            const tenantId = existingSession.hotelId;
+            const roomCardsRef = tenantId
+                ? collection(db, `tenants/${tenantId}/roomCards`)
+                : collection(db, 'roomCards');
             const q = query(
                 roomCardsRef,
                 where('roomNumber', '==', existingSession.roomNumber),
@@ -1053,7 +1059,7 @@ export const GuestDashboard: React.FC = () => {
                 // This handles the "Room Move" scenario where room 101 becomes occupied by NEW guest,
                 // preventing the OLD guest (who moved to 202) from accessing 101.
                 if (data.guestIdentity !== existingSession.guestIdentity) {
-                    console.warn(`Session Invalidated: Room ${existingSession.roomNumber} is now occupied by ${data.guestName}, but session belongs to ${existingSession.guestName}`);
+                    logger.warn(`Session Invalidated: Room ${existingSession.roomNumber} is now occupied by ${data.guestName}, but session belongs to ${existingSession.guestName}`, undefined, 'GuestDashboard');
                     return false;
                 }
 
@@ -1108,7 +1114,7 @@ export const GuestDashboard: React.FC = () => {
                     }
                 }
             } catch (e) {
-                console.error('Error with guest profile:', e);
+                logger.error('Error with guest profile:', e, 'GuestDashboard');
                 // Continue even if guest profile fails
             }
 
@@ -1134,7 +1140,7 @@ export const GuestDashboard: React.FC = () => {
                 createdAt: Timestamp.now()
             });
         } catch (error) {
-            console.error('Error logging activity:', error);
+            logger.error('Error logging activity:', error, 'GuestDashboard');
         }
     };
 
@@ -1197,7 +1203,7 @@ export const GuestDashboard: React.FC = () => {
 
             setBranchSettings(settings);
         } catch (error) {
-            console.error('Error loading branch settings:', error);
+            logger.error('Error loading branch settings:', error, 'GuestDashboard');
         }
     };
 
@@ -1485,7 +1491,7 @@ export const GuestDashboard: React.FC = () => {
             const requests = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as GuestRequest));
             setRecentRequests(requests.slice(0, 10));
         } catch (error) {
-            console.error('Error loading recent requests:', error);
+            logger.error('Error loading recent requests:', error, 'GuestDashboard');
         }
     };
 
@@ -1608,7 +1614,7 @@ export const GuestDashboard: React.FC = () => {
             setQRServiceFormData({});
             await loadRecentRequests(session);
         } catch (error) {
-            console.error('Error submitting QR service request:', error);
+            logger.error('Error submitting QR service request:', error, 'GuestDashboard');
             alert(`❌ ${t('guest.requestSentError') || 'فشل إرسال الطلب. يرجى المحاولة مرة أخرى.'}`);
         } finally {
             setIsSubmitting(false);
@@ -1736,11 +1742,11 @@ export const GuestDashboard: React.FC = () => {
                         requestData.photo = uploadResult.url; // ✅ ImgBB URL (not base64!)
                         requestData.photoThumb = uploadResult.thumbUrl; // ✅ Thumbnail for faster loading
                     } else {
-                        console.warn('Photo upload failed, sending without photo:', uploadResult.error);
+                        logger.warn('Photo upload failed, sending without photo:', uploadResult.error, 'GuestDashboard');
                         // Don't block the request - just send without photo
                     }
                 } catch (photoError) {
-                    console.error('Photo upload error:', photoError);
+                    logger.error('Photo upload error:', photoError, 'GuestDashboard');
                     // Don't block the request - just send without photo
                 }
             }
@@ -1763,7 +1769,7 @@ export const GuestDashboard: React.FC = () => {
             setSelectedService(null);
             showRequestTracker(docRef.id, selectedService.type);
         } catch (error) {
-            console.error('Error submitting request:', error);
+            logger.error('Error submitting request:', error, 'GuestDashboard');
         } finally {
             setIsSubmitting(false);
         }
@@ -1783,24 +1789,30 @@ export const GuestDashboard: React.FC = () => {
 
     const toggleDoNotDisturb = async () => {
         if (!session) return;
+        const tenantId = session.hotelId;
+        if (!tenantId) {
+            logger.error('Missing tenantId for DND toggle', undefined, 'GuestDashboard');
+            return;
+        }
         const newValue = !doNotDisturb;
 
         try {
             setDoNotDisturb(newValue);
 
-            // Save DND status to roomCards for staff visibility
-            const roomCardsRef = collection(db, 'roomCards');
+            // Save DND status to tenant-scoped roomCards for staff visibility
+            const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
             const q = query(
                 roomCardsRef,
                 where('roomNumber', '==', session.roomNumber),
-                where('branch', '==', session.branch),
                 where('status', '==', 'active')
             );
             const snapshot = await getDocs(q);
+            const roomCardDoc = snapshot.docs.find(
+                d => (d.data().branchId === session.branch || d.data().branch === session.branch)
+            );
 
-            if (!snapshot.empty) {
-                const roomCardDoc = snapshot.docs[0];
-                await updateDoc(doc(db, 'roomCards', roomCardDoc.id), {
+            if (roomCardDoc) {
+                await updateDoc(doc(db, `tenants/${tenantId}/roomCards`, roomCardDoc.id), {
                     doNotDisturb: newValue,
                     dndUpdatedAt: Timestamp.now()
                 });
@@ -1808,7 +1820,7 @@ export const GuestDashboard: React.FC = () => {
 
             await logGuestActivity('dnd_toggle', { enabled: newValue });
         } catch (error) {
-            console.error('Error toggling DND:', error);
+            logger.error('Error toggling DND:', error, 'GuestDashboard');
             // Revert on error
             setDoNotDisturb(!newValue);
         }
@@ -1834,8 +1846,10 @@ export const GuestDashboard: React.FC = () => {
 
     const submitRating = async () => {
         if (!ratingRequest || !ratingValue) return;
+        const tenantId = session?.hotelId;
+        if (!tenantId) return;
         try {
-            await updateDoc(doc(db, 'requests', ratingRequest.id), {
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, ratingRequest.id), {
                 rating: ratingValue,
                 ratedAt: Timestamp.now()
             });
@@ -1845,7 +1859,7 @@ export const GuestDashboard: React.FC = () => {
             });
             closeRatingModal();
         } catch (error) {
-            console.error('Error submitting rating:', error);
+            logger.error('Error submitting rating:', error, 'GuestDashboard');
         }
     };
 
@@ -1898,7 +1912,7 @@ export const GuestDashboard: React.FC = () => {
             setRatingInvitation(null);
             setRatingResponses({});
         } catch (error) {
-            console.error('Error submitting dynamic rating:', error);
+            logger.error('Error submitting dynamic rating:', error, 'GuestDashboard');
             alert(t('guest.ratingSentError') || 'حدث خطأ أثناء إرسال التقييم. يرجى المحاولة مرة أخرى.');
         } finally {
             setRatingSubmitting(false);
@@ -1938,7 +1952,7 @@ export const GuestDashboard: React.FC = () => {
             const unreadCountValue = getUnreadAnnouncementsCount(announcements, statuses);
             setUnreadCount(unreadCountValue);
         } catch (error) {
-            console.error('Error marking announcement as read:', error);
+            logger.error('Error marking announcement as read:', error, 'GuestDashboard');
         }
     };
 
@@ -1966,7 +1980,7 @@ export const GuestDashboard: React.FC = () => {
             const statuses = await getAlertReadStatus(session.roomNumber, session.branch, session.hotelId);
             setAlertReadStatuses(statuses);
         } catch (error) {
-            console.error('Error marking alert as read:', error);
+            logger.error('Error marking alert as read:', error, 'GuestDashboard');
         }
     };
 
@@ -1982,7 +1996,7 @@ export const GuestDashboard: React.FC = () => {
             const statuses = await getAlertReadStatus(session.roomNumber, session.branch, session.hotelId);
             setAlertReadStatuses(statuses);
         } catch (error) {
-            console.error('Error dismissing alert:', error);
+            logger.error('Error dismissing alert:', error, 'GuestDashboard');
         }
     };
 
@@ -2019,7 +2033,7 @@ export const GuestDashboard: React.FC = () => {
                 { id: 'tea', name: 'شاي', price: 10, icon: '🍵' }
             ]);
         } catch (error) {
-            console.error('Error loading coffee menu:', error);
+            logger.error('Error loading coffee menu:', error, 'GuestDashboard');
         }
     };
 
@@ -2036,17 +2050,17 @@ export const GuestDashboard: React.FC = () => {
 
         if (!branchId || !tenantId) return;
 
-        console.log('🔄 Subscribing to dynamic QR services...', { branchId, tenantId });
+        logger.info('🔄 Subscribing to dynamic QR services...', { branchId, tenantId }, 'GuestDashboard');
 
         // Subscribe to real-time updates
         const unsubscribe = subscribeToQRServices(branchId, tenantId, (services) => {
-            console.log('📱 Dynamic QR services updated:', services.length, 'services');
+            logger.info('📱 Dynamic QR services updated:', services.length, 'GuestDashboard');
             setDynamicServices(services);
         });
 
         // Cleanup on unmount or when session changes
         return () => {
-            console.log('🔌 Unsubscribing from dynamic QR services');
+            logger.info('🔌 Unsubscribing from dynamic QR services', undefined, 'GuestDashboard');
             unsubscribe();
         };
     }, [session?.branch, session?.hotelId]);
@@ -2061,11 +2075,11 @@ export const GuestDashboard: React.FC = () => {
 
         if (!branchId || !tenantId || !roomNumber) return;
 
-        console.log('⭐ Subscribing to rating invitations...', { roomNumber, branchId, tenantId });
+        logger.info('⭐ Subscribing to rating invitations...', { roomNumber, branchId, tenantId }, 'GuestDashboard');
 
         // Subscribe to real-time updates
         const unsubscribe = subscribeToRatingInvitations(roomNumber, branchId, tenantId, (invitations) => {
-            console.log('⭐ Rating invitations updated:', invitations.length, 'invitations');
+            logger.info('⭐ Rating invitations updated:', invitations.length, 'GuestDashboard');
             
             // Show first pending invitation
             const pendingInvitation = invitations.find(inv => inv.status === 'pending');
@@ -2087,7 +2101,7 @@ export const GuestDashboard: React.FC = () => {
 
         // Cleanup on unmount or when session changes
         return () => {
-            console.log('🔌 Unsubscribing from rating invitations');
+            logger.info('🔌 Unsubscribing from rating invitations', undefined, 'GuestDashboard');
             unsubscribe();
         };
     }, [session?.branch, session?.hotelId, session?.roomNumber]);
@@ -2102,7 +2116,7 @@ export const GuestDashboard: React.FC = () => {
 
         if (!branchId || !tenantId || !roomNumber) return;
 
-        console.log('🔔 Subscribing to announcements...', { roomNumber, branchId, tenantId });
+        logger.info('🔔 Subscribing to announcements...', { roomNumber, branchId, tenantId }, 'GuestDashboard');
 
         // Load read statuses
         const loadReadStatuses = async () => {
@@ -2110,7 +2124,7 @@ export const GuestDashboard: React.FC = () => {
                 const statuses = await getAnnouncementReadStatus(roomNumber, branchId, tenantId);
                 setAnnouncementReadStatuses(statuses);
             } catch (error) {
-                console.error('Error loading announcement read statuses:', error);
+                logger.error('Error loading announcement read statuses:', error, 'GuestDashboard');
             }
         };
 
@@ -2118,7 +2132,7 @@ export const GuestDashboard: React.FC = () => {
 
         // Subscribe to real-time announcements
         const unsubscribe = subscribeToAnnouncements(branchId, tenantId, async (announcementsList) => {
-            console.log('🔔 Announcements updated:', announcementsList.length, 'announcements');
+            logger.info('🔔 Announcements updated:', announcementsList.length, 'GuestDashboard');
             setAnnouncements(announcementsList);
             
             // Update read statuses and unread count
@@ -2132,7 +2146,7 @@ export const GuestDashboard: React.FC = () => {
 
         // Cleanup on unmount or when session changes
         return () => {
-            console.log('🔌 Unsubscribing from announcements');
+            logger.info('🔌 Unsubscribing from announcements', undefined, 'GuestDashboard');
             unsubscribe();
         };
     }, [session?.branch, session?.hotelId, session?.roomNumber]);
@@ -2161,7 +2175,7 @@ export const GuestDashboard: React.FC = () => {
 
         if (!branchId || !tenantId || !roomNumber) return;
 
-        console.log('🚨 Subscribing to emergency alerts...', { roomNumber, branchId, tenantId });
+        logger.info('🚨 Subscribing to emergency alerts...', { roomNumber, branchId, tenantId }, 'GuestDashboard');
 
         // Load read statuses
         const loadReadStatuses = async () => {
@@ -2169,7 +2183,7 @@ export const GuestDashboard: React.FC = () => {
                 const statuses = await getAlertReadStatus(roomNumber, branchId, tenantId);
                 setAlertReadStatuses(statuses);
             } catch (error) {
-                console.error('Error loading alert read statuses:', error);
+                logger.error('Error loading alert read statuses:', error, 'GuestDashboard');
             }
         };
 
@@ -2177,7 +2191,7 @@ export const GuestDashboard: React.FC = () => {
 
         // Subscribe to real-time emergency alerts
         const unsubscribe = subscribeToEmergencyAlerts(roomNumber, branchId, tenantId, async (alerts) => {
-            console.log('🚨 Emergency alerts updated:', alerts.length, 'alerts');
+            logger.info('🚨 Emergency alerts updated:', alerts.length, 'GuestDashboard');
             
             // Check for new alerts
             const currentAlertIds = alerts.map(a => a.id);
@@ -2222,7 +2236,7 @@ export const GuestDashboard: React.FC = () => {
 
         // Cleanup on unmount or when session changes
         return () => {
-            console.log('🔌 Unsubscribing from emergency alerts');
+            logger.info('🔌 Unsubscribing from emergency alerts', undefined, 'GuestDashboard');
             unsubscribe();
         };
     }, [session?.branch, session?.hotelId, session?.roomNumber, notificationPermission]);
@@ -2237,14 +2251,14 @@ export const GuestDashboard: React.FC = () => {
         const branchId = session.branch;
         const currentRoom = session.roomNumber;
 
-        console.log('🚚 Setting up room transfer listener for room:', currentRoom);
+        logger.info('🚚 Setting up room transfer listener for room:', currentRoom, 'GuestDashboard');
 
         const unsubscribe = subscribeToRoomTransfers(
             tenantId,
             branchId,
             currentRoom,
             (notification) => {
-                console.log('🚚 Room transfer detected:', notification);
+                logger.info('🚚 Room transfer detected:', notification, 'GuestDashboard');
                 
                 // Show the transfer notification
                 setRoomTransferNotification(notification);
@@ -2277,7 +2291,7 @@ export const GuestDashboard: React.FC = () => {
         );
 
         return () => {
-            console.log('🔌 Unsubscribing from room transfer listener');
+            logger.info('🔌 Unsubscribing from room transfer listener', undefined, 'GuestDashboard');
             unsubscribe();
         };
     }, [session?.roomNumber, session?.branch, session?.hotelId]);
@@ -2295,7 +2309,7 @@ export const GuestDashboard: React.FC = () => {
                 { id: 'snack', name: 'سناك', price: 12, icon: '🍫' }
             ]);
         } catch (error) {
-            console.error('Error loading minibar menu:', error);
+            logger.error('Error loading minibar menu:', error, 'GuestDashboard');
         }
     };
 
@@ -2402,7 +2416,7 @@ export const GuestDashboard: React.FC = () => {
                 setShowMinibarModal(false);
             }
         } catch (error) {
-            console.error('Error submitting order:', error);
+            logger.error('Error submitting order:', error, 'GuestDashboard');
         } finally {
             setIsSubmitting(false);
         }
@@ -2483,7 +2497,7 @@ export const GuestDashboard: React.FC = () => {
             await logGuestActivity('extension_request', {});
             alert(t('guest.extensionSentSuccess') || 'تم إرسال طلب التمديد بنجاح! سيتم التواصل معك.');
         } catch (error) {
-            console.error('Extension error:', error);
+            logger.error('Extension error:', error, 'GuestDashboard');
             alert(t('guest.extensionSentError') || 'فشل إرسال الطلب');
         }
     };
@@ -3223,100 +3237,7 @@ export const GuestDashboard: React.FC = () => {
                 </div>
                 </div>
 
-                {/* ============================================
-                    DEVELOPER SIGNATURE - VERIFICATION SCREEN (DYNAMIC)
-                    Matches LoginScreen.tsx footer exactly
-                    ============================================ */}
-                <footer 
-                    className="relative z-10 w-full py-2 mt-4 text-center pointer-events-auto"
-                    dir="ltr"
-                >
-                    <p 
-                        className="text-[8px] sm:text-[9px] tracking-wide transition-all duration-300 flex items-center justify-center gap-1.5 flex-wrap px-4"
-                        style={{ fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif" }}
-                    >
-                        {/* Copyright */}
-                        <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-                            © {new Date().getFullYear()}
-                        </span>
-                        <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                        
-                        {/* Developer Name */}
-                        <span className={`font-semibold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
-                            {(() => {
-                                try { return localStorage.getItem('adora_dev_name') || 'Ayman Abo Warda'; } 
-                                catch { return 'Ayman Abo Warda'; }
-                            })()}
-                        </span>
-                        <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                        
-                        {/* Saudi Phone - with WhatsApp dynamic greeting */}
-                        <a 
-                            href={`https://wa.me/${(() => {
-                                try { return localStorage.getItem('adora_dev_phone_sa') || '966570707121'; } 
-                                catch { return '966570707121'; }
-                            })()}?text=${encodeURIComponent((() => {
-                                const hour = new Date().getHours();
-                                return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
-                            })())}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`hover:underline transition-colors ${
-                                isDark 
-                                    ? 'text-slate-300 hover:text-teal-400' 
-                                    : 'text-slate-600 hover:text-teal-600'
-                            }`}
-                        >
-                            +{(() => {
-                                try { return localStorage.getItem('adora_dev_phone_sa') || '966570707121'; } 
-                                catch { return '966570707121'; }
-                            })()}
-                        </a>
-                        <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                        
-                        {/* Egypt Phone - with WhatsApp dynamic greeting */}
-                        <a 
-                            href={`https://wa.me/${(() => {
-                                try { return localStorage.getItem('adora_dev_phone_eg') || '201500000162'; } 
-                                catch { return '201500000162'; }
-                            })()}?text=${encodeURIComponent((() => {
-                                const hour = new Date().getHours();
-                                return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
-                            })())}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`hover:underline transition-colors ${
-                                isDark 
-                                    ? 'text-slate-300 hover:text-teal-400' 
-                                    : 'text-slate-600 hover:text-teal-600'
-                            }`}
-                        >
-                            +{(() => {
-                                try { return localStorage.getItem('adora_dev_phone_eg') || '201500000162'; } 
-                                catch { return '201500000162'; }
-                            })()}
-                        </a>
-                        <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                        
-                        {/* Developer Email */}
-                        <a 
-                            href={`mailto:${(() => {
-                                try { return localStorage.getItem('adora_dev_email') || '77aayy@gmail.com'; } 
-                                catch { return '77aayy@gmail.com'; }
-                            })()}`}
-                            className={`hover:underline transition-colors ${
-                                isDark 
-                                    ? 'text-slate-300 hover:text-teal-400' 
-                                    : 'text-slate-600 hover:text-teal-600'
-                            }`}
-                        >
-                            {(() => {
-                                try { return localStorage.getItem('adora_dev_email') || '77aayy@gmail.com'; } 
-                                catch { return '77aayy@gmail.com'; }
-                            })()}
-                        </a>
-                    </p>
-                </footer>
+                {/* ✅ التوقيع الموحد من App.tsx (DeveloperFooter) — لا توقيع محلي */}
 
                 {/* ============================================
                     PREMIUM CSS ANIMATIONS FOR GUEST VERIFICATION
@@ -4763,7 +4684,7 @@ export const GuestDashboard: React.FC = () => {
                                             {currentEmergencyAlert.titleAr || currentEmergencyAlert.title}
                                         </h2>
                                         <p className="text-white/60 text-xs">
-                                            {new Date(currentEmergencyAlert.createdAt?.toDate ? currentEmergencyAlert.createdAt.toDate() : currentEmergencyAlert.createdAt).toLocaleString('ar-SA')}
+                                            {formatDateTimeGregorianEn(currentEmergencyAlert.createdAt?.toDate ? currentEmergencyAlert.createdAt.toDate() : currentEmergencyAlert.createdAt)}
                                         </p>
                                     </div>
                                 </div>
@@ -4874,7 +4795,7 @@ export const GuestDashboard: React.FC = () => {
                                             {currentEmergencyAlert.titleAr || currentEmergencyAlert.title}
                                         </h2>
                                         <p className="text-white/60 text-xs">
-                                            {new Date(currentEmergencyAlert.createdAt?.toDate ? currentEmergencyAlert.createdAt.toDate() : currentEmergencyAlert.createdAt).toLocaleString('ar-SA')}
+                                            {formatDateTimeGregorianEn(currentEmergencyAlert.createdAt?.toDate ? currentEmergencyAlert.createdAt.toDate() : currentEmergencyAlert.createdAt)}
                                         </p>
                                     </div>
                                 </div>
@@ -5315,99 +5236,7 @@ export const GuestDashboard: React.FC = () => {
                 />
             )}
 
-            {/* ============================================
-                DEVELOPER FOOTER - Professional Single Line
-                ============================================ */}
-            <footer 
-                className="relative z-10 w-full py-4 mt-auto text-center"
-                dir="ltr"
-            >
-                <p 
-                    className="text-[8px] sm:text-[9px] tracking-wide transition-all duration-300 flex items-center justify-center gap-1.5 flex-wrap px-4"
-                    style={{ fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif" }}
-                >
-                    {/* Copyright */}
-                    <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-                        © {new Date().getFullYear()}
-                    </span>
-                    <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                    
-                    {/* Developer Name */}
-                    <span className={`font-semibold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
-                        {(() => {
-                            try { return localStorage.getItem('adora_dev_name') || 'Ayman Abo Warda'; } 
-                            catch { return 'Ayman Abo Warda'; }
-                        })()}
-                    </span>
-                    <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                    
-                    {/* Saudi Phone */}
-                    <a 
-                        href={`https://wa.me/${(() => {
-                            try { return localStorage.getItem('adora_dev_phone_sa') || '966570707121'; } 
-                            catch { return '966570707121'; }
-                        })()}?text=${encodeURIComponent((() => {
-                            const hour = new Date().getHours();
-                            return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
-                        })())}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`hover:underline transition-colors ${
-                            isDark 
-                                ? 'text-slate-300 hover:text-teal-400' 
-                                : 'text-slate-600 hover:text-teal-600'
-                        }`}
-                    >
-                        +{(() => {
-                            try { return localStorage.getItem('adora_dev_phone_sa') || '966570707121'; } 
-                            catch { return '966570707121'; }
-                        })()}
-                    </a>
-                    <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                    
-                    {/* Egypt Phone */}
-                    <a 
-                        href={`https://wa.me/${(() => {
-                            try { return localStorage.getItem('adora_dev_phone_eg') || '201500000162'; } 
-                            catch { return '201500000162'; }
-                        })()}?text=${encodeURIComponent((() => {
-                            const hour = new Date().getHours();
-                            return hour >= 5 && hour < 12 ? 'صباح الخير، أنا مهتم بمشروعك' : 'مساء الخير، أنا مهتم بمشروعك';
-                        })())}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`hover:underline transition-colors ${
-                            isDark 
-                                ? 'text-slate-300 hover:text-teal-400' 
-                                : 'text-slate-600 hover:text-teal-600'
-                        }`}
-                    >
-                        +{(() => {
-                            try { return localStorage.getItem('adora_dev_phone_eg') || '201500000162'; } 
-                            catch { return '201500000162'; }
-                        })()}
-                    </a>
-                    <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                    
-                    {/* Developer Email */}
-                    <a 
-                        href={`mailto:${(() => {
-                            try { return localStorage.getItem('adora_dev_email') || '77aayy@gmail.com'; } 
-                            catch { return '77aayy@gmail.com'; }
-                        })()}`}
-                        className={`hover:underline transition-colors ${
-                            isDark 
-                                ? 'text-slate-300 hover:text-teal-400' 
-                                : 'text-slate-600 hover:text-teal-600'
-                        }`}
-                    >
-                        {(() => {
-                            try { return localStorage.getItem('adora_dev_email') || '77aayy@gmail.com'; } 
-                            catch { return '77aayy@gmail.com'; }
-                        })()}
-                    </a>
-                </p>
-            </footer>
+            {/* ✅ التوقيع الموحد من App.tsx (DeveloperFooter) — لا توقيع محلي */}
 
             {/* ============================================
                 PREMIUM CSS ANIMATIONS FOR DASHBOARD

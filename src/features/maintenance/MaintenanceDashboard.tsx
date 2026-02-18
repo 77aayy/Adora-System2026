@@ -32,6 +32,7 @@ import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboar
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
 // DeveloperSignature is now in GlobalFooter (App.tsx)
 import VoiceInputButton from '../../components/shared/VoiceInputButton';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // Shared Components
 import { ProcurementCartWizard } from '../../components/shared/ProcurementCartWizard';
@@ -59,6 +60,10 @@ import { SupportTicketModal } from '../../components/shared/SupportTicketModal';
 import { TransferNotificationBadge } from '../../components/guest/TransferNotificationBadge'; // ✅ Room transfer notifications
 import { useBrandName } from '../../hooks/useBrandName';
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline'; // ✅ Commitment Timeline
+// ✅ Universal Action Card (New System)
+import { UniversalActionCard } from '../../components/cards/UniversalActionCard';
+import { shouldUseUniversalCard } from '../../services/featureFlagsService';
+import { moveRequest } from '../../services/stateTransitionService';
 
 // Creative Dashboard Components
 import { TaskProgress } from '../../components/dashboard';
@@ -103,6 +108,23 @@ export const MaintenanceDashboard: React.FC = () => {
     const { t } = useTranslation();
     const { tenantId, setTenant } = useTenant(); // ✅ Use Tenant Context - moved early
     const brandName = useBrandName();
+
+    // ✅ Feature Flag: Check if Universal Card should be used
+    const [useUniversalCard, setUseUniversalCard] = useState(false);
+    
+    useEffect(() => {
+        if (!tenantId) return;
+        
+        shouldUseUniversalCard(tenantId, 'maintenance')
+            .then(enabled => {
+                setUseUniversalCard(enabled);
+                logger.info(`🎯 Universal Action Card ${enabled ? 'ENABLED' : 'DISABLED'} for Maintenance`, undefined, 'MaintenanceDashboard');
+            })
+            .catch(err => {
+                logger.error('Error checking feature flag:', err, 'MaintenanceDashboard');
+                setUseUniversalCard(false); // Safe default
+            });
+    }, [tenantId]);
 
     // State
     const [currentTab, setCurrentTab] = useState<'new' | 'in_progress' | 'completed'>('new'); // ✅ Unified tabs
@@ -360,7 +382,7 @@ export const MaintenanceDashboard: React.FC = () => {
 
         // ✅ FIX: Use tenant-scoped collection (tenants/${tenantId}/requests)
         if (!userTenantId) {
-            console.warn('⚠️ [MaintenanceDashboard] Cannot subscribe to requests: tenantId is missing');
+            logger.warn('⚠️ [MaintenanceDashboard] Cannot subscribe to requests: tenantId is missing', undefined, 'MaintenanceDashboard');
             setNewRequests([]);
             setInProgressRequests([]);
             setCompletedRequests([]);
@@ -446,15 +468,20 @@ export const MaintenanceDashboard: React.FC = () => {
                 return; // Skip - belongs to another department
             }
 
-            if (request.status === 'COMPLETED') {
+            // ✅ Unified: Filter by status and currentDepartment
+            const status = (request as any).status || request.status;
+            const currentDept = (request as any).currentDepartment || request.currentDepartment;
+            
+            if (status === 'COMPLETED') {
+                // ✅ Completed: Show if completed today
                 if (isToday(request.timeline?.completed)) {
                     completed.push(request);
                 }
-            } else if (['CONFIRMED', 'SCHEDULED'].includes(request.status)) {
-                // ✅ New tab: CONFIRMED requests waiting to start
+            } else if (status === 'NEW' || (status === 'CONFIRMED' && currentDept === 'maintenance')) {
+                // ✅ New tab: NEW status OR (CONFIRMED status AND currentDepartment is maintenance)
                 newList.push(request);
-            } else if (['IN_PROGRESS', 'WAITING_PARTS'].includes(request.status)) {
-                // ✅ In Progress tab: Actively being worked on
+            } else if (status === 'IN_PROGRESS' && currentDept === 'maintenance') {
+                // ✅ In Progress tab: IN_PROGRESS status AND currentDepartment is maintenance
                 inProgressList.push(request);
             }
         });
@@ -605,7 +632,10 @@ export const MaintenanceDashboard: React.FC = () => {
                 updateData.beforePhoto = beforePhoto;
             }
 
-            await updateDoc(doc(db, 'requests', currentStartRequest.id), {
+            if (!tenantId) {
+                throw new Error('tenantId is required');
+            }
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, currentStartRequest.id), {
                 ...updateData,
                 'workflow.journey': arrayUnion({
                     department: 'maintenance',
@@ -782,11 +812,14 @@ export const MaintenanceDashboard: React.FC = () => {
                 requiresReinspection: true
             };
 
-            await updateDoc(doc(db, 'requests', currentCompleteRequest.id), updateData);
+            if (!tenantId) {
+                throw new Error('tenantId is required');
+            }
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, currentCompleteRequest.id), updateData);
 
             // ✅ Update linked cleaning request if exists
             if (currentCompleteRequest.linkedCleaningId) {
-                const cleaningRef = doc(db, 'requests', currentCompleteRequest.linkedCleaningId);
+                const cleaningRef = doc(db, `tenants/${tenantId}/requests`, currentCompleteRequest.linkedCleaningId);
                 await updateDoc(cleaningRef, {
                     currentDepartment: 'housekeeping',
                     waitingForMaintenance: false,
@@ -836,7 +869,10 @@ export const MaintenanceDashboard: React.FC = () => {
         }
 
         try {
-            await updateDoc(doc(db, 'requests', request.id), {
+            if (!tenantId) {
+                throw new Error('tenantId is required');
+            }
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, request.id), {
                 status: 'WAITING_PARTS',
                 'timeline.pausedAt': Timestamp.now()
             });
@@ -856,7 +892,10 @@ export const MaintenanceDashboard: React.FC = () => {
         }
 
         try {
-            await updateDoc(doc(db, 'requests', request.id), {
+            if (!tenantId) {
+                throw new Error('tenantId is required');
+            }
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, request.id), {
                 status: 'IN_PROGRESS',
                 'timeline.resumedAt': Timestamp.now() // Could be array for multiple pauses
             });
@@ -880,9 +919,9 @@ export const MaintenanceDashboard: React.FC = () => {
 
         try {
             // ✅ Use branchId from AuthContext (already defined above)
-            if (!branchId) return [];
+            if (!branchId || !tenantId) return [];
             const q = query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${tenantId}/requests`),
                 where('branch', '==', branchId),
                 where('roomNumber', '==', roomNumber),
                 where('serviceType', '==', 'maintenance'),
@@ -974,7 +1013,7 @@ export const MaintenanceDashboard: React.FC = () => {
             r.maintenanceType || t('maintenance.general'),
             r.status,
             r.actualCost || r.estimatedCost || 0,
-            r.createdAt?.toDate?.()?.toLocaleDateString('ar-SA') || ''
+            r.createdAt?.toDate?.() ? formatDateGregorianEn(r.createdAt.toDate()) : ''
         ]);
 
         const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -1310,9 +1349,101 @@ export const MaintenanceDashboard: React.FC = () => {
 
                 {/* Content - ✅ Unified 3 tabs */}
                 <div className="px-4 sm:px-6 max-w-7xl mx-auto space-y-4">
-                    {currentTab === 'new' && filteredNewRequests.map(renderMaintenanceCard)}
-                    {currentTab === 'in_progress' && filteredInProgressRequests.map(renderMaintenanceCard)}
-                    {currentTab === 'completed' && filteredCompletedRequests.map(renderMaintenanceCard)}
+                    {currentTab === 'new' && filteredNewRequests.map(request => {
+                        // ✅ Feature Flag: Use Universal Card if enabled, otherwise use old card
+                        if (useUniversalCard && tenantId && user?.id && user?.name) {
+                            return (
+                                <UniversalActionCard
+                                    key={request.id}
+                                    request={request as any}
+                                    viewMode="maintenance"
+                                    onAction={async (action) => {
+                                        if (action === 'start' && request.status === 'NEW') {
+                                            try {
+                                                await moveRequest(
+                                                    tenantId,
+                                                    request.id,
+                                                    'IN_PROGRESS',
+                                                    'maintenance',
+                                                    user.id,
+                                                    user.name,
+                                                    'بدأ الصيانة'
+                                                );
+                                                showStartModal(request.id);
+                                                success(t('maintenance.workStarted') || 'تم بدء العمل');
+                                            } catch (err: any) {
+                                                error(err.message || t('common.error') || 'حدث خطأ');
+                                            }
+                                        } else if (action === 'complete' && request.status === 'IN_PROGRESS') {
+                                            try {
+                                                await moveRequest(
+                                                    tenantId,
+                                                    request.id,
+                                                    'COMPLETED',
+                                                    'reception', // Return to reception
+                                                    user.id,
+                                                    user.name,
+                                                    'تم الصيانة'
+                                                );
+                                                showCompleteModal(request.id);
+                                                success(t('maintenance.workCompleted') || 'تم إكمال العمل');
+                                            } catch (err: any) {
+                                                error(err.message || t('common.error') || 'حدث خطأ');
+                                            }
+                                        }
+                                    }}
+                                    onView={() => handleCardClick(request.id)}
+                                />
+                            );
+                        }
+                        return renderMaintenanceCard(request);
+                    })}
+                    {currentTab === 'in_progress' && filteredInProgressRequests.map(request => {
+                        if (useUniversalCard && tenantId && user?.id && user?.name) {
+                            return (
+                                <UniversalActionCard
+                                    key={request.id}
+                                    request={request as any}
+                                    viewMode="maintenance"
+                                    onAction={async (action) => {
+                                        if (action === 'complete' && request.status === 'IN_PROGRESS') {
+                                            try {
+                                                await moveRequest(
+                                                    tenantId,
+                                                    request.id,
+                                                    'COMPLETED',
+                                                    'reception',
+                                                    user.id,
+                                                    user.name,
+                                                    'تم الصيانة'
+                                                );
+                                                showCompleteModal(request.id);
+                                                success(t('maintenance.workCompleted') || 'تم إكمال العمل');
+                                            } catch (err: any) {
+                                                error(err.message || t('common.error') || 'حدث خطأ');
+                                            }
+                                        }
+                                    }}
+                                    onView={() => handleCardClick(request.id)}
+                                />
+                            );
+                        }
+                        return renderMaintenanceCard(request);
+                    })}
+                    {currentTab === 'completed' && filteredCompletedRequests.map(request => {
+                        if (useUniversalCard && tenantId && user?.id && user?.name) {
+                            return (
+                                <UniversalActionCard
+                                    key={request.id}
+                                    request={request as any}
+                                    viewMode="maintenance"
+                                    onAction={async () => {}}
+                                    onView={() => handleCardClick(request.id)}
+                                />
+                            );
+                        }
+                        return renderMaintenanceCard(request);
+                    })}
 
                     {currentTab === 'new' && filteredNewRequests.length === 0 && (
                         <div className="text-center py-6 sm:py-8 lg:py-12 adora-text-tertiary text-sm sm:text-base">{t('maintenance.noNewRequests')}</div>
@@ -1748,7 +1879,7 @@ const RequestDetailsModal: React.FC<{
                                 {roomInfo?.floor && (
                                     <p className="text-white/50 text-xs mt-0.5">{t('maintenance.floor')}: {roomInfo.floor}</p>
                                 )}
-                                <p className="text-white/50 text-xs mt-1">{request.createdAt?.toDate?.().toLocaleString('ar-SA')}</p>
+                                <p className="text-white/50 text-xs mt-1">{request.createdAt?.toDate?.() ? formatDateTimeGregorianEn(request.createdAt.toDate(), { showSeconds: false }) : ''}</p>
                             </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">

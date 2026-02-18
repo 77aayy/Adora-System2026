@@ -4,6 +4,7 @@ import { db } from '../../services/firebase';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
+import { logger } from '../../services/loggerService';
 
 interface TeamMember {
     id: string;
@@ -51,7 +52,7 @@ export const HousekeepingTeamManager: React.FC<HousekeepingTeamManagerProps> = (
                 setMembers([]);
             }
         } catch (error) {
-            console.error('Error loading team:', error);
+            logger.error('Error loading team:', error, 'HousekeepingTeamManager');
             showError('حدث خطأ في تحميل الفريق');
         } finally {
             setLoading(false);
@@ -79,7 +80,7 @@ export const HousekeepingTeamManager: React.FC<HousekeepingTeamManagerProps> = (
             success('تمت إضافة العضو بنجاح');
             onUpdate();
         } catch (error) {
-            console.error('Error adding member:', error);
+            logger.error('Error adding member:', error, 'HousekeepingTeamManager');
             showError('فشل إضافة العضو');
         } finally {
             setIsAdding(false);
@@ -99,7 +100,7 @@ export const HousekeepingTeamManager: React.FC<HousekeepingTeamManagerProps> = (
             success('تم حذف العضو');
             onUpdate();
         } catch (error) {
-            console.error('Error removing member:', error);
+            logger.error('Error removing member:', error, 'HousekeepingTeamManager');
             showError('فشل حذف العضو');
         }
     };
@@ -128,7 +129,7 @@ export const HousekeepingTeamManager: React.FC<HousekeepingTeamManagerProps> = (
             success('تم تحديث البيانات');
             onUpdate();
         } catch (error) {
-            console.error('Error updating member:', error);
+            logger.error('Error updating member:', error, 'HousekeepingTeamManager');
             showError('فشل التحديث');
         }
     };

@@ -10,6 +10,8 @@ import {
     query, where, orderBy, limit, onSnapshot,
     serverTimestamp, Timestamp
 } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -76,11 +78,17 @@ export const getSourceLabel = (source: string): string => {
  * Subscribe to maintenance requests
  */
 export const subscribeToMaintenanceRequests = (
+    tenantId: string,
     branchId: string,
     callback: (active: MaintenanceRequest[], completed: MaintenanceRequest[]) => void
 ): (() => void) => {
+    if (!tenantId) {
+        logger.error('subscribeToMaintenanceRequests: tenantId is required', undefined, 'maintenanceAdvancedFeatures');
+        callback([], []);
+        return () => {};
+    }
     const maintenanceQuery = query(
-        collection(db, 'requests'),
+        collection(db, `tenants/${tenantId}/requests`),
         where('branch', '==', branchId),
         where('serviceType', '==', 'maintenance')
     );
@@ -129,15 +137,20 @@ export const subscribeToMaintenanceRequests = (
 
 /**
  * Start maintenance work
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const startMaintenance = async (
+    tenantId: string,
     requestId: string,
     employeeId: string,
     employeeName: string,
     beforePhoto?: string
 ): Promise<boolean> => {
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     try {
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
         await updateDoc(requestRef, {
             status: 'MAINTENANCE_IN_PROGRESS',
             beforePhoto: beforePhoto || null,
@@ -146,15 +159,17 @@ export const startMaintenance = async (
         });
         return true;
     } catch (error) {
-        console.error('Error starting maintenance:', error);
+        logger.error('Error starting maintenance:', error, 'maintenanceAdvancedFeatures');
         return false;
     }
 };
 
 /**
  * Complete maintenance (with optional re-inspection request)
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const completeMaintenance = async (
+    tenantId: string,
     requestId: string,
     employeeId: string,
     employeeName: string,
@@ -181,10 +196,13 @@ export const completeMaintenance = async (
     }
 ): Promise<boolean> => {
     try {
+        if (!tenantId) {
+            throw new Error('tenantId is required');
+        }
         const batch = writeBatch(db);
 
         // 1. Update maintenance request as completed
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
         batch.update(requestRef, {
             status: 'COMPLETED',
             afterPhoto: maintenanceData.afterPhoto,
@@ -196,8 +214,9 @@ export const completeMaintenance = async (
         // 2. Create re-inspection request if needed
         if (maintenanceData.requiresReinspection) {
             // Check for existing inspection request
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
             const existingQuery = query(
-                collection(db, 'requests'),
+                requestsRef,
                 where('branch', '==', branchId),
                 where('roomNumber', '==', maintenanceData.roomNumber),
                 where('serviceType', '==', 'inspection'),
@@ -208,7 +227,7 @@ export const completeMaintenance = async (
 
             if (existingSnapshot.empty) {
                 // Create new inspection request
-                const reinspectionRef = doc(collection(db, 'requests'));
+                const reinspectionRef = doc(requestsRef);
                 batch.set(reinspectionRef, {
                     roomNumber: maintenanceData.roomNumber,
                     branch: branchId,
@@ -235,13 +254,14 @@ export const completeMaintenance = async (
                         completedBy: { id: employeeId, name: employeeName }
                     },
                     previousInspectionReport: maintenanceData.inspectionReport || null,
+                    tenantId: tenantId, // ✅ Add tenantId
                     createdBy: { id: employeeId, name: employeeName },
                     createdAt: serverTimestamp(),
                     timeline: { created: serverTimestamp() }
                 });
             } else {
                 // Update existing inspection request
-                const existingRef = doc(db, 'requests', existingSnapshot.docs[0].id);
+                const existingRef = doc(db, `tenants/${tenantId}/requests`, existingSnapshot.docs[0].id);
                 batch.update(existingRef, {
                     parentRequestId: requestId,
                     maintenanceReport: {
@@ -259,7 +279,7 @@ export const completeMaintenance = async (
         await batch.commit();
         return true;
     } catch (error) {
-        console.error('Error completing maintenance:', error);
+        logger.error('Error completing maintenance:', error, 'maintenanceAdvancedFeatures');
         return false;
     }
 };
@@ -317,13 +337,22 @@ const getDateRange = (
 /**
  * Load maintenance history with filters
  */
+/**
+ * Load maintenance history with filters
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
+ */
 export const loadMaintenanceHistory = async (
+    tenantId: string,
     branchId: string,
     filter: HistoryFilter
 ): Promise<any[]> => {
+    if (!tenantId) {
+        logger.error('loadMaintenanceHistory: tenantId is required', undefined, 'maintenanceAdvancedFeatures');
+        return [];
+    }
     try {
         const requestsQuery = query(
-            collection(db, 'requests'),
+            collection(db, `tenants/${tenantId}/requests`),
             where('branch', '==', branchId),
             where('serviceType', '==', 'maintenance')
         );
@@ -366,7 +395,7 @@ export const loadMaintenanceHistory = async (
 
         return results;
     } catch (error) {
-        console.error('Error loading maintenance history:', error);
+        logger.error('Error loading maintenance history:', error, 'maintenanceAdvancedFeatures');
         return [];
     }
 };
@@ -523,7 +552,7 @@ export const printMaintenanceHistory = (
         <html dir="rtl" lang="ar">
         <head>
             <meta charset="UTF-8">
-            <title>سجل الصيانة - ${new Date().toLocaleDateString('ar-SA')}</title>
+            <title>سجل الصيانة - ${formatDateGregorianEn(new Date())}</title>
             <style>
                 body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 20px; }
                 h1 { text-align: center; margin-bottom: 20px; color: #1a1a2e; }
@@ -541,7 +570,7 @@ export const printMaintenanceHistory = (
         <body>
             <h1>سجل الصيانة</h1>
             <div class="info">
-                <p><strong>التاريخ:</strong> ${new Date().toLocaleDateString('ar-SA')}</p>
+                <p><strong>التاريخ:</strong> ${formatDateGregorianEn(new Date())}</p>
                 <p><strong>الموظف:</strong> ${employeeName || '--'}</p>
                 <p><strong>الفرع:</strong> ${branchName || '--'}</p>
             </div>
@@ -556,13 +585,7 @@ export const printMaintenanceHistory = (
                 </thead>
                 <tbody>
                     ${items.map(item => {
-        const date = item.workDate.toLocaleString('ar-SA', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const date = formatDateTimeGregorianEn(item.workDate, { dateStyle: 'medium', showSeconds: false });
         const type = getMaintenanceTypeName(item.maintenanceType);
         const statusBadge = getStatusBadge(item.status);
 
@@ -578,7 +601,7 @@ export const printMaintenanceHistory = (
                 </tbody>
             </table>
             <div class="footer">
-                تم الطباعة بواسطة نظام أدورا - ${new Date().toLocaleString('ar-SA')}
+                تم الطباعة بواسطة نظام أدورا - ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}
             </div>
         </body>
         </html>

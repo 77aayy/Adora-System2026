@@ -4,7 +4,7 @@
  */
 
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, onSnapshot, orderBy, writeBatch, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, retryFirestoreOperation } from './firebase';
 import { logger } from './loggerService';
 
 // ============================================================
@@ -140,7 +140,7 @@ export const getSubscription = async (tenantId: string): Promise<Subscription | 
             renewalDate: data.renewalDate?.toDate()
         } as Subscription;
     } catch (error) {
-        console.error('Error getting subscription:', error);
+        logger.error('Error getting subscription:', error, 'billingService');
         return null;
     }
 };
@@ -176,7 +176,7 @@ const getNextVoucherNumber = async (): Promise<number> => {
         
         return maxNumber + 1;
     } catch (error) {
-        console.error('Error getting next voucher number:', error);
+        logger.error('Error getting next voucher number:', error, 'billingService');
         // Fallback: count all vouchers
         try {
             const allSnapshot = await getDocs(collection(db, 'receiptVouchers'));
@@ -214,7 +214,7 @@ const getNextInvoiceNumber = async (): Promise<number> => {
         
         return maxNumber + 1;
     } catch (error) {
-        console.error('Error getting next invoice number:', error);
+        logger.error('Error getting next invoice number:', error, 'billingService');
         // Fallback: count all invoices
         try {
             const allSnapshot = await getDocs(collection(db, 'invoices'));
@@ -248,21 +248,25 @@ export const createReceiptVoucher = async (voucher: Omit<ReceiptVoucher, 'id' | 
         
         // ✅ Create corresponding invoice automatically
         try {
+            // ✅ Get the created voucher data from Firestore to ensure we have the correct createdAt (Timestamp)
+            const voucherDoc = await getDoc(voucherRef);
+            const voucherData = voucherDoc.data();
+            
             const createdVoucher: ReceiptVoucher = {
                 id: voucherId,
                 ...voucher,
                 voucherNumber,
-                createdAt: voucher.createdAt || new Date()
+                createdAt: voucherData?.createdAt?.toDate() || new Date()
             };
             await createInvoiceFromReceiptVoucher(createdVoucher);
         } catch (invoiceError) {
-            console.error('Error creating invoice from receipt voucher:', invoiceError);
+            logger.error('Error creating invoice from receipt voucher:', invoiceError, 'billingService');
             // Don't throw - voucher is created, invoice can be created later
         }
         
         return voucherId;
     } catch (error) {
-        console.error('Error creating receipt voucher:', error);
+        logger.error('Error creating receipt voucher:', error, 'billingService');
         throw error;
     }
 };
@@ -273,10 +277,30 @@ export const createReceiptVoucher = async (voucher: Omit<ReceiptVoucher, 'id' | 
  * ✅ FIX: Use fallback to avoid composite index requirement
  */
 export const getAllReceiptVouchers = async (): Promise<ReceiptVoucher[]> => {
-    try {
+    // ✅ Use retry wrapper to handle INTERNAL ASSERTION FAILED errors
+    return await retryFirestoreOperation(async () => {
         if (!db) {
-            console.error('Database not initialized');
+            logger.error('Database not initialized', undefined, 'billingService');
             return [];
+        }
+        
+        // ✅ DEBUG: First, try to get ALL vouchers without any filters to check if collection has data
+        try {
+            const simpleQuery = collection(db, 'receiptVouchers');
+            const simpleSnapshot = await getDocs(simpleQuery);
+            logger.debug(`🔍 [billingService] DEBUG: Total vouchers in collection (no filters): ${simpleSnapshot.docs.length}`, undefined, 'billingService');
+            if (simpleSnapshot.docs.length > 0) {
+                logger.debug(`🔍 [billingService] DEBUG: Sample voucher tenantIds:`, 
+                    simpleSnapshot.docs.slice(0, 5).map(d => ({
+                        id: d.id,
+                        tenantId: d.data().tenantId,
+                        isDeleted: d.data().isDeleted,
+                        voucherNumber: d.data().voucherNumber
+                    }))
+                );
+            }
+        } catch (debugError: any) {
+            logger.warn('⚠️ [billingService] DEBUG: Could not check collection directly:', debugError.message, 'billingService');
         }
         
         // ✅ Try with filter first (requires composite index)
@@ -298,7 +322,7 @@ export const getAllReceiptVouchers = async (): Promise<ReceiptVoucher[]> => {
                     isDeleted: data.isDeleted || false
                 } as ReceiptVoucher;
             });
-            console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (with filter)`);
+            logger.info(`✅ [billingService] Loaded ${results.length} receipt vouchers (with filter)`, undefined, 'billingService');
             return results;
         } catch (indexError: any) {
             // ✅ Handle permission errors in index check
@@ -307,17 +331,15 @@ export const getAllReceiptVouchers = async (): Promise<ReceiptVoucher[]> => {
                                       indexError?.message?.includes('Missing or insufficient');
             
             if (isPermissionError) {
-                console.warn('⚠️ [billingService] Permission denied for receipt vouchers query - trying without filter...', indexError);
+                logger.warn('⚠️ [billingService] Permission denied for receipt vouchers query - trying without filter...', indexError, 'billingService');
             } else {
                 // ✅ Fallback: Load all and filter in code (no index required)
-                console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
+                logger.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message, 'billingService');
             }
             
             try {
-                const q = query(
-                    collection(db, 'receiptVouchers'),
-                    orderBy('createdAt', 'desc')
-                );
+                // ✅ Try without orderBy first (simpler query)
+                const q = query(collection(db, 'receiptVouchers'));
                 const snapshot = await getDocs(q);
                 const results = snapshot.docs
                     .map(doc => {
@@ -331,59 +353,17 @@ export const getAllReceiptVouchers = async (): Promise<ReceiptVoucher[]> => {
                             isDeleted: data.isDeleted || false
                         } as ReceiptVoucher;
                     })
-                    .filter(v => !v.isDeleted); // Filter in code as fallback
-                console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (fallback, filtered)`);
+                    .filter(v => !v.isDeleted) // Filter in code as fallback
+                    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); // Sort in code
+                logger.info(`✅ [billingService] Loaded ${results.length} receipt vouchers (fallback, filtered)`, undefined, 'billingService');
                 return results;
             } catch (fallbackError: any) {
-                console.error('❌ [billingService] Error in fallback query for receipt vouchers:', fallbackError);
+                logger.error('❌ [billingService] Error in fallback query for receipt vouchers:', fallbackError, 'billingService');
+                // ✅ Return empty array instead of throwing - allows UI to still render
                 return [];
             }
         }
-    } catch (error: any) {
-        // ✅ Handle Firestore internal errors gracefully
-        if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
-            console.warn('Firestore internal error in getAllReceiptVouchers (likely cache issue)', error);
-            return [];
-        }
-        
-        // ✅ Handle permission errors gracefully
-        const isPermissionError = error?.code === 'permission-denied' || 
-                                  error?.message?.includes('permission') ||
-                                  error?.message?.includes('Missing or insufficient');
-        
-        if (isPermissionError) {
-            console.warn('⚠️ [billingService] Permission denied for receipt vouchers - trying without filter...', error);
-            // ✅ Try to get all vouchers without filter (owner should have access)
-            try {
-                const q = query(
-                    collection(db, 'receiptVouchers'),
-                    orderBy('createdAt', 'desc')
-                );
-                const snapshot = await getDocs(q);
-                const results = snapshot.docs
-                    .map(doc => {
-                        const data = doc.data();
-                        return {
-                            id: doc.id,
-                            ...data,
-                            voucherNumber: data.voucherNumber || null,
-                            createdAt: data.createdAt?.toDate() || new Date(),
-                            deletedAt: data.deletedAt?.toDate(),
-                            isDeleted: data.isDeleted || false
-                        } as ReceiptVoucher;
-                    })
-                    .filter(v => !v.isDeleted);
-                console.log(`✅ [billingService] Loaded ${results.length} receipt vouchers (permission workaround)`);
-                return results;
-            } catch (fallbackError: any) {
-                console.error('❌ [billingService] Error getting receipt vouchers (fallback failed):', fallbackError);
-                return [];
-            }
-        }
-        
-        console.error('❌ [billingService] Error getting receipt vouchers:', error);
-        return [];
-    }
+    }, 1); // Retry once on internal errors
 };
 
 /**
@@ -406,7 +386,7 @@ export const getReceiptVouchersByTenant = async (tenantId: string): Promise<Rece
             } as ReceiptVoucher;
         });
     } catch (error) {
-        console.error('Error getting receipt vouchers by tenant:', error);
+        logger.error('Error getting receipt vouchers by tenant:', error, 'billingService');
         return [];
     }
 };
@@ -425,7 +405,7 @@ export const updateReceiptVoucherPaymentMethod = async (
             updatedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error updating receipt voucher payment method:', error);
+        logger.error('Error updating receipt voucher payment method:', error, 'billingService');
         throw error;
     }
 };
@@ -445,7 +425,7 @@ export const deleteReceiptVoucher = async (
             deletedBy: deletedBy || null
         });
     } catch (error) {
-        console.error('Error deleting receipt voucher:', error);
+        logger.error('Error deleting receipt voucher:', error, 'billingService');
         throw error;
     }
 };
@@ -502,7 +482,7 @@ export const deleteReceiptVouchers = async (
         
         await batch.commit();
     } catch (error) {
-        console.error('Error deleting receipt vouchers:', error);
+        logger.error('Error deleting receipt vouchers:', error, 'billingService');
         throw error;
     }
 };
@@ -539,7 +519,7 @@ export const upsertSubscription = async (subscription: Omit<Subscription, 'id'>)
             return subRef.id;
         }
     } catch (error) {
-        console.error('Error upserting subscription:', error);
+        logger.error('Error upserting subscription:', error, 'billingService');
         throw error;
     }
 };
@@ -629,7 +609,7 @@ export const createInvoice = async (invoice: Omit<Invoice, 'id' | 'invoiceNumber
         if (error?.message?.includes('ديمو') || error?.message?.includes('الديمو')) {
             throw error;
         }
-        console.error('Error creating invoice:', error);
+        logger.error('Error creating invoice:', error, 'billingService');
         throw error;
     }
 };
@@ -667,6 +647,11 @@ export const createInvoiceFromReceiptVoucher = async (voucher: ReceiptVoucher): 
             });
         }
         
+        // ✅ Convert createdAt to Date if it's a Timestamp
+        const voucherCreatedAt = voucher.createdAt instanceof Date 
+            ? voucher.createdAt 
+            : (voucher.createdAt as any)?.toDate?.() || new Date();
+        
         const invoiceData: Omit<Invoice, 'id' | 'invoiceNumber'> = {
             invoiceNumber,
             receiptVoucherId: voucher.id,
@@ -674,9 +659,9 @@ export const createInvoiceFromReceiptVoucher = async (voucher: ReceiptVoucher): 
             amount: voucher.totalAmount,
             currency: voucher.currency || 'SAR',
             status: 'paid', // ✅ الفاتورة مدفوعة لأن السند تم إنشاؤه
-            issueDate: voucher.createdAt,
-            dueDate: voucher.createdAt,
-            paidDate: voucher.createdAt,
+            issueDate: voucherCreatedAt,
+            dueDate: voucherCreatedAt,
+            paidDate: voucherCreatedAt,
             items: items,
             paymentMethod: voucher.paymentMethod || 'cash',
             managerName: voucher.managerName,
@@ -704,7 +689,7 @@ export const createInvoiceFromReceiptVoucher = async (voucher: ReceiptVoucher): 
         
         return invRef.id;
     } catch (error) {
-        console.error('Error creating invoice from receipt voucher:', error);
+        logger.error('Error creating invoice from receipt voucher:', error, 'billingService');
         throw error;
     }
 };
@@ -734,7 +719,7 @@ export const getInvoices = async (tenantId: string): Promise<Invoice[]> => {
             } as Invoice;
         });
     } catch (error) {
-        console.error('Error getting invoices:', error);
+        logger.error('Error getting invoices:', error, 'billingService');
         return [];
     }
 };
@@ -747,43 +732,40 @@ export const getInvoices = async (tenantId: string): Promise<Invoice[]> => {
 export const getAllInvoices = async (): Promise<Invoice[]> => {
     try {
         if (!db) {
-            console.error('Database not initialized');
+            logger.error('Database not initialized', undefined, 'billingService');
             return [];
         }
         
-        // ✅ Try with filter first (requires composite index)
-        try {
-            const q = query(
-                collection(db, 'invoices'),
-                where('isDeleted', '==', false),
-                orderBy('issueDate', 'desc')
-            );
-            const snapshot = await getDocs(q);
-            const results = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    invoiceNumber: data.invoiceNumber || null,
-                    issueDate: data.issueDate?.toDate() || new Date(),
-                    dueDate: data.dueDate?.toDate() || new Date(),
-                    paidDate: data.paidDate?.toDate(),
-                    deletedAt: data.deletedAt?.toDate(),
-                    isDeleted: data.isDeleted || false
-                } as Invoice;
-            });
-            console.log(`✅ [billingService] Loaded ${results.length} invoices (with filter)`);
-            return results;
-        } catch (indexError: any) {
-            // ✅ Fallback: Load all and filter in code (no index required)
-            console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
-            const q = query(
-                collection(db, 'invoices'),
-                orderBy('issueDate', 'desc')
-            );
-            const snapshot = await getDocs(q);
-            const results = snapshot.docs
-                .map(doc => {
+        // ✅ Use retry wrapper to handle INTERNAL ASSERTION FAILED errors
+        return await retryFirestoreOperation(async () => {
+            // ✅ DEBUG: First, try to get ALL invoices without any filters to check if collection has data
+            try {
+                const simpleQuery = collection(db!, 'invoices');
+                const simpleSnapshot = await getDocs(simpleQuery);
+                logger.debug(`🔍 [billingService] DEBUG: Total invoices in collection (no filters): ${simpleSnapshot.docs.length}`, undefined, 'billingService');
+                if (simpleSnapshot.docs.length > 0) {
+                    logger.debug(`🔍 [billingService] DEBUG: Sample invoice tenantIds:`, 
+                        simpleSnapshot.docs.slice(0, 5).map(d => ({
+                            id: d.id,
+                            tenantId: d.data().tenantId,
+                            isDeleted: d.data().isDeleted,
+                            invoiceNumber: d.data().invoiceNumber
+                        }))
+                    );
+                }
+            } catch (debugError: any) {
+                logger.warn('⚠️ [billingService] DEBUG: Could not check collection directly:', debugError.message, 'billingService');
+            }
+            
+            // ✅ Try with filter first (requires composite index)
+            try {
+                const q = query(
+                    collection(db!, 'invoices'),
+                    where('isDeleted', '==', false),
+                    orderBy('issueDate', 'desc')
+                );
+                const snapshot = await getDocs(q);
+                const results = snapshot.docs.map(doc => {
                     const data = doc.data();
                     return {
                         id: doc.id,
@@ -795,18 +777,58 @@ export const getAllInvoices = async (): Promise<Invoice[]> => {
                         deletedAt: data.deletedAt?.toDate(),
                         isDeleted: data.isDeleted || false
                     } as Invoice;
-                })
-                .filter(inv => !inv.isDeleted); // Filter in code as fallback
-            console.log(`✅ [billingService] Loaded ${results.length} invoices (fallback, filtered)`);
-            return results;
-        }
+                });
+                logger.info(`✅ [billingService] Loaded ${results.length} invoices (with filter)`, undefined, 'billingService');
+                return results;
+            } catch (indexError: any) {
+                // ✅ Handle permission errors
+                const isPermissionError = indexError?.code === 'permission-denied' || 
+                                          indexError?.message?.includes('permission') ||
+                                          indexError?.message?.includes('Missing or insufficient');
+                
+                if (isPermissionError) {
+                    logger.warn('⚠️ [billingService] Permission denied for invoices query - trying without filter...', indexError, 'billingService');
+                } else {
+                    // ✅ Fallback: Load all and filter in code (no index required)
+                    logger.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message, 'billingService');
+                }
+                
+                try {
+                    // ✅ Try without orderBy first (simpler query)
+                    const q = query(collection(db!, 'invoices'));
+                    const snapshot = await getDocs(q);
+                    const results = snapshot.docs
+                        .map(doc => {
+                            const data = doc.data();
+                            return {
+                                id: doc.id,
+                                ...data,
+                                invoiceNumber: data.invoiceNumber || null,
+                                issueDate: data.issueDate?.toDate() || new Date(),
+                                dueDate: data.dueDate?.toDate() || new Date(),
+                                paidDate: data.paidDate?.toDate(),
+                                deletedAt: data.deletedAt?.toDate(),
+                                isDeleted: data.isDeleted || false
+                            } as Invoice;
+                        })
+                        .filter(inv => !inv.isDeleted) // Filter in code as fallback
+                        .sort((a, b) => b.issueDate.getTime() - a.issueDate.getTime()); // Sort in code
+                    logger.info(`✅ [billingService] Loaded ${results.length} invoices (fallback, filtered)`, undefined, 'billingService');
+                    return results;
+                } catch (fallbackError: any) {
+                    logger.error('❌ [billingService] Error in fallback query for invoices:', fallbackError, 'billingService');
+                    // ✅ Return empty array instead of throwing - allows UI to still render
+                    return [];
+                }
+            }
+        }, 1); // Retry once on internal errors
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
         if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-            console.warn('Firestore internal error in getAllInvoices (likely cache issue)', error);
+            logger.warn('Firestore internal error in getAllInvoices (likely cache issue)', error, 'billingService');
             return [];
         }
-        console.error('❌ [billingService] Error getting all invoices:', error);
+        logger.error('❌ [billingService] Error getting all invoices:', error, 'billingService');
         return [];
     }
 };
@@ -826,7 +848,7 @@ export const deleteInvoice = async (
             deletedBy: deletedBy || null
         });
     } catch (error) {
-        console.error('Error deleting invoice:', error);
+        logger.error('Error deleting invoice:', error, 'billingService');
         throw error;
     }
 };
@@ -883,7 +905,7 @@ export const deleteInvoices = async (
         
         await batch.commit();
     } catch (error) {
-        console.error('Error deleting invoices:', error);
+        logger.error('Error deleting invoices:', error, 'billingService');
         throw error;
     }
 };
@@ -912,7 +934,7 @@ export const getNextExpenseVoucherNumber = async (): Promise<number> => {
         const lastVoucher = snapshot.docs[0].data();
         return (lastVoucher.voucherNumber || 0) + 1;
     } catch (error) {
-        console.error('Error getting next expense voucher number:', error);
+        logger.error('Error getting next expense voucher number:', error, 'billingService');
         return 1;
     }
 };
@@ -935,7 +957,7 @@ export const createExpenseVoucher = async (
         
         return voucherRef.id;
     } catch (error) {
-        console.error('Error creating expense voucher:', error);
+        logger.error('Error creating expense voucher:', error, 'billingService');
         throw error;
     }
 };
@@ -948,7 +970,7 @@ export const createExpenseVoucher = async (
 export const getAllExpenseVouchers = async (): Promise<ExpenseVoucher[]> => {
     try {
         if (!db) {
-            console.error('Database not initialized');
+            logger.error('Database not initialized', undefined, 'billingService');
             return [];
         }
         
@@ -971,7 +993,7 @@ export const getAllExpenseVouchers = async (): Promise<ExpenseVoucher[]> => {
                     isDeleted: data.isDeleted || false
                 } as ExpenseVoucher;
             });
-            console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (with filter)`);
+            logger.info(`✅ [billingService] Loaded ${results.length} expense vouchers (with filter)`, undefined, 'billingService');
             return results;
         } catch (indexError: any) {
             // ✅ Handle permission errors in index check
@@ -980,10 +1002,10 @@ export const getAllExpenseVouchers = async (): Promise<ExpenseVoucher[]> => {
                                       indexError?.message?.includes('Missing or insufficient');
             
             if (isPermissionError) {
-                console.warn('⚠️ [billingService] Permission denied for expense vouchers query - trying without filter...', indexError);
+                logger.warn('⚠️ [billingService] Permission denied for expense vouchers query - trying without filter...', indexError, 'billingService');
             } else {
                 // ✅ Fallback: Load all and filter in code (no index required)
-                console.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message);
+                logger.warn('⚠️ [billingService] Composite index not found, using fallback:', indexError.message, 'billingService');
             }
             
             try {
@@ -1005,17 +1027,17 @@ export const getAllExpenseVouchers = async (): Promise<ExpenseVoucher[]> => {
                         } as ExpenseVoucher;
                     })
                     .filter(v => !v.isDeleted); // Filter in code as fallback
-                console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (fallback, filtered)`);
+                logger.info(`✅ [billingService] Loaded ${results.length} expense vouchers (fallback, filtered)`, undefined, 'billingService');
                 return results;
             } catch (fallbackError: any) {
-                console.error('❌ [billingService] Error in fallback query for expense vouchers:', fallbackError);
+                logger.error('❌ [billingService] Error in fallback query for expense vouchers:', fallbackError, 'billingService');
                 return [];
             }
         }
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
         if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
-            console.warn('Firestore internal error in getAllExpenseVouchers (likely cache issue)', error);
+            logger.warn('Firestore internal error in getAllExpenseVouchers (likely cache issue)', error, 'billingService');
             return [];
         }
         
@@ -1025,7 +1047,7 @@ export const getAllExpenseVouchers = async (): Promise<ExpenseVoucher[]> => {
                                   error?.message?.includes('Missing or insufficient');
         
         if (isPermissionError) {
-            console.warn('⚠️ [billingService] Permission denied for expense vouchers - trying without filter...', error);
+            logger.warn('⚠️ [billingService] Permission denied for expense vouchers - trying without filter...', error, 'billingService');
             // ✅ Try to get all vouchers without filter (owner should have access)
             try {
                 const q = query(
@@ -1046,15 +1068,15 @@ export const getAllExpenseVouchers = async (): Promise<ExpenseVoucher[]> => {
                         } as ExpenseVoucher;
                     })
                     .filter(v => !v.isDeleted);
-                console.log(`✅ [billingService] Loaded ${results.length} expense vouchers (permission workaround)`);
+                logger.info(`✅ [billingService] Loaded ${results.length} expense vouchers (permission workaround)`, undefined, 'billingService');
                 return results;
             } catch (fallbackError: any) {
-                console.error('❌ [billingService] Error getting expense vouchers (fallback failed):', fallbackError);
+                logger.error('❌ [billingService] Error getting expense vouchers (fallback failed):', fallbackError, 'billingService');
                 return [];
             }
         }
         
-        console.error('❌ [billingService] Error getting all expense vouchers:', error);
+        logger.error('❌ [billingService] Error getting all expense vouchers:', error, 'billingService');
         return [];
     }
 };
@@ -1074,7 +1096,7 @@ export const deleteExpenseVoucher = async (
             deletedBy: deletedBy || null
         });
     } catch (error) {
-        console.error('Error deleting expense voucher:', error);
+        logger.error('Error deleting expense voucher:', error, 'billingService');
         throw error;
     }
 };
@@ -1098,7 +1120,7 @@ export const deleteExpenseVouchers = async (
         });
         await batch.commit();
     } catch (error) {
-        console.error('Error deleting expense vouchers:', error);
+        logger.error('Error deleting expense vouchers:', error, 'billingService');
         throw error;
     }
 };
@@ -1117,7 +1139,7 @@ export const markInvoiceAsPaid = async (invoiceId: string, paymentMethod: string
             updatedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error marking invoice as paid:', error);
+        logger.error('Error marking invoice as paid:', error, 'billingService');
         throw error;
     }
 };
@@ -1144,7 +1166,7 @@ export const recordPayment = async (payment: Omit<Payment, 'id'>): Promise<strin
 
         return payRef.id;
     } catch (error) {
-        console.error('Error recording payment:', error);
+        logger.error('Error recording payment:', error, 'billingService');
         throw error;
     }
 };
@@ -1169,7 +1191,7 @@ export const getPayments = async (tenantId: string): Promise<Payment[]> => {
             } as Payment;
         });
     } catch (error) {
-        console.error('Error getting payments:', error);
+        logger.error('Error getting payments:', error, 'billingService');
         return [];
     }
 };
@@ -1207,10 +1229,10 @@ export const getExpiringSubscriptions = async (days: number = 7): Promise<Subscr
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
         if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-            console.warn('Firestore internal error in getExpiringSubscriptions (likely cache issue)', error);
+            logger.warn('Firestore internal error in getExpiringSubscriptions (likely cache issue)', error, 'billingService');
             return [];
         }
-        console.error('Error getting expiring subscriptions:', error);
+        logger.error('Error getting expiring subscriptions:', error, 'billingService');
         return [];
     }
 };
@@ -1240,10 +1262,10 @@ export const getOverdueInvoices = async (): Promise<Invoice[]> => {
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
         if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-            console.warn('Firestore internal error in getOverdueInvoices (likely cache issue)', error);
+            logger.warn('Firestore internal error in getOverdueInvoices (likely cache issue)', error, 'billingService');
             return [];
         }
-        console.error('Error getting overdue invoices:', error);
+        logger.error('Error getting overdue invoices:', error, 'billingService');
         return [];
     }
 };
@@ -1342,7 +1364,7 @@ export const getDeletedBillingCount = async (): Promise<number> => {
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
         if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-            console.warn('Firestore internal error in getDeletedBillingCount (likely cache issue)', error);
+            logger.warn('Firestore internal error in getDeletedBillingCount (likely cache issue)', error, 'billingService');
             return 0;
         }
         
@@ -1355,7 +1377,7 @@ export const getDeletedBillingCount = async (): Promise<number> => {
             return 0;
         }
         
-        console.error('Error counting deleted billing documents:', error);
+        logger.error('Error counting deleted billing documents:', error, 'billingService');
         return 0;
     }
 };
@@ -1429,7 +1451,7 @@ export const calculateMonthlyRecurringRevenue = async (forceRefresh: boolean = f
                     return 0;
                 }
                 
-                console.error('Error calculating MRR:', error);
+                logger.error('Error calculating MRR:', error, 'billingService');
                 return 0;
             }
         },
@@ -1480,7 +1502,7 @@ export const calculateTenantRevenue = async (tenantId: string): Promise<number> 
             return 0;
         }
         
-        console.error('Error calculating tenant revenue:', error);
+        logger.error('Error calculating tenant revenue:', error, 'billingService');
         return 0;
     }
 };
@@ -1526,7 +1548,7 @@ export const getAllSubscriptions = async (): Promise<Subscription[]> => {
             return [];
         }
         
-        console.error('Error getting all subscriptions:', error);
+        logger.error('Error getting all subscriptions:', error, 'billingService');
         return [];
     }
 };
@@ -1540,7 +1562,7 @@ export const calculateAnnualRecurringRevenue = async (): Promise<number> => {
         const mrr = await calculateMonthlyRecurringRevenue();
         return mrr * 12;
     } catch (error) {
-        console.error('Error calculating ARR:', error);
+        logger.error('Error calculating ARR:', error, 'billingService');
         return 0;
     }
 };
@@ -1594,7 +1616,7 @@ export const calculateMonthlyRenewalRevenue = async (): Promise<number> => {
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
         if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-            console.warn('Firestore internal error in calculateMonthlyRenewalRevenue (likely cache issue)', error);
+            logger.warn('Firestore internal error in calculateMonthlyRenewalRevenue (likely cache issue)', error, 'billingService');
             return 0;
         }
         
@@ -1607,7 +1629,7 @@ export const calculateMonthlyRenewalRevenue = async (): Promise<number> => {
             return 0;
         }
         
-        console.error('Error calculating monthly renewal revenue:', error);
+        logger.error('Error calculating monthly renewal revenue:', error, 'billingService');
         return 0;
     }
 };
@@ -1662,7 +1684,7 @@ export const getNearestExpiringSubscription = async (): Promise<{
                 }
             }
         } catch (err) {
-            console.warn('Could not fetch branch/tenant name:', err);
+            logger.warn('Could not fetch branch/tenant name:', err, 'billingService');
         }
 
         return {
@@ -1681,7 +1703,7 @@ export const getNearestExpiringSubscription = async (): Promise<{
             return null;
         }
         
-        console.error('Error getting nearest expiring subscription:', error);
+        logger.error('Error getting nearest expiring subscription:', error, 'billingService');
         return null;
     }
 };

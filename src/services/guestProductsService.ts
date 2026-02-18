@@ -6,6 +6,7 @@
 
 import { db } from './firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, onSnapshot, orderBy } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -102,7 +103,7 @@ export const getProductsByType = async (
         const snapshot = await getDocs(q);
         return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Product[];
     } catch (error) {
-        console.error('Failed to get products:', error);
+        logger.error('Failed to get products:', error, 'guestProductsService');
         return [];
     }
 };
@@ -334,7 +335,7 @@ export const placeOrder = async (
 
         return docRef.id;
     } catch (error) {
-        console.error('Failed to place order:', error);
+        logger.error('Failed to place order:', error, 'guestProductsService');
         return null;
     }
 };

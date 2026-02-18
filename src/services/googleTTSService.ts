@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // API configuration
 const TTS_API_URL = 'https://texttospeech.googleapis.com/v1/text:synthesize';
 
@@ -11,7 +13,7 @@ const TTS_API_URL = 'https://texttospeech.googleapis.com/v1/text:synthesize';
 const getApiKey = (): string | null => {
     // Try TTS-specific key first, then fall back to Gemini key
     return (import.meta as any).env.VITE_GOOGLE_TTS_API_KEY ||
-        (import.meta as any).env.VITE_GEMINI_API_KEY ||
+        import.meta.env.VITE_GEMINI_API_KEY ||
         null;
 };
 
@@ -48,12 +50,12 @@ export const synthesizeSpeech = async (text: string, languageCode: string = 'ar-
     const apiKey = getApiKey();
 
     if (!apiKey) {
-        console.warn('🔇 Google TTS API key not configured, falling back to browser TTS');
+        logger.warn('🔇 Google TTS API key not configured, falling back to browser TTS', undefined, 'googleTTSService');
         return null;
     }
 
     try {
-        console.log(`🎙️ Using Google Cloud TTS (${languageCode}) for:`, text.substring(0, 50) + '...');
+        logger.info(`🎙️ Using Google Cloud TTS (${languageCode}) for: ${text.substring(0, 50)}...`, undefined, 'googleTTSService');
 
         // Select voice based on language
         const voiceConfig = VOICE_CONFIGS[languageCode] || VOICE_CONFIGS['default'];
@@ -72,14 +74,14 @@ export const synthesizeSpeech = async (text: string, languageCode: string = 'ar-
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
-            console.error('🔇 Google TTS error:', error);
+            logger.error('🔇 Google TTS error:', error, 'googleTTSService');
             return null;
         }
 
         const data: SynthesizeResponse = await response.json();
 
         if (!data.audioContent) {
-            console.error('🔇 No audio content in response');
+            logger.error('🔇 No audio content in response', undefined, 'googleTTSService');
             return null;
         }
 
@@ -95,11 +97,11 @@ export const synthesizeSpeech = async (text: string, languageCode: string = 'ar-
         const audioBlob = new Blob([uint8Array], { type: 'audio/mp3' });
         const audioUrl = URL.createObjectURL(audioBlob);
 
-        console.log('✅ Google TTS audio ready');
+        logger.info('✅ Google TTS audio ready', undefined, 'googleTTSService');
         return audioUrl;
 
     } catch (error) {
-        console.error('🔇 Google TTS failed:', error);
+        logger.error('🔇 Google TTS failed:', error, 'googleTTSService');
         return null;
     }
 };

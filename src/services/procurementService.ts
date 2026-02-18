@@ -15,6 +15,7 @@ import {
     query,
     where,
     onSnapshot,
+    getDoc,
     getDocs,
     Timestamp,
     orderBy,
@@ -22,7 +23,9 @@ import {
     runTransaction,
     serverTimestamp
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, functions as firebaseFunctions, httpsCallable } from './firebase';
+import { logger } from './loggerService';
+import { approveProcurementPayloadSchema, closeProcurementPayloadSchema } from '../schemas/procurementSchemas';
 
 // ============================================================
 // TYPES
@@ -179,12 +182,12 @@ export const createProcurementRequest = async (
                 ).catch(() => {})
             ]);
         } catch (notifError) {
-            console.warn('Failed to send procurement notification/log (non-critical)', notifError);
+            logger.warn('Failed to send procurement notification/log (non-critical)', notifError, 'procurementService');
         }
 
         return docRef.id;
     } catch (error: any) {
-        console.error('Error creating procurement request:', error);
+        logger.error('Error creating procurement request:', error, 'procurementService');
         throw new Error(`فشل إنشاء طلب الشراء: ${error.message || 'خطأ غير معروف'}`);
     }
 };
@@ -194,9 +197,8 @@ export const createProcurementRequest = async (
 // ============================================================
 
 /**
- * Manager approves a procurement request
- * ✅ SaaS: Uses tenant-scoped collection
- * ✅ Enhanced: Sends notification and logs the action
+ * Manager approves a procurement request (via Cloud Function)
+ * ✅ SaaS: Uses tenant-scoped collection; write performed server-side
  */
 export const approveProcurement = async (
     requestId: string,
@@ -204,49 +206,47 @@ export const approveProcurement = async (
     managerName: string,
     tenantId: string // ✅ SaaS requirement
 ): Promise<void> => {
-    if (!tenantId) throw new Error('tenantId is required for SaaS isolation');
-    
-    // ✅ Use tenant-scoped collection
-    const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
-    
-    // ✅ Verify tenantId matches before approving
-    const requestSnap = await getDoc(requestRef);
-    
-    if (requestSnap.empty) {
-        throw new Error('Request not found or tenant mismatch');
-    }
-    
-    const requestData = requestSnap.docs[0].data();
-    
-    await updateDoc(requestRef, {
-        status: 'APPROVED',
-        approvedAt: Timestamp.now(),
-        approvedBy: { id: managerId, name: managerName }
+    const payload = approveProcurementPayloadSchema.safeParse({
+        requestId,
+        tenantId,
+        managerId,
+        managerName
     });
-    
-    // ✅ Send notification and log
+    if (!payload.success) {
+        const msg = payload.error.issues[0]?.message ?? 'بيانات غير صحيحة';
+        throw new Error(msg);
+    }
+    if (!firebaseFunctions) throw new Error('Firebase Functions not initialized');
+
+    const procurementApproveFn = httpsCallable<
+        { requestId: string; tenantId: string; managerId: string; managerName: string },
+        { success: boolean }
+    >(firebaseFunctions, 'procurementApprove');
+    await procurementApproveFn({ requestId, tenantId, managerId, managerName });
+
+    // ✅ Send notification and log (client-side after success)
     try {
+        const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
+        const requestSnap = await getDoc(requestRef);
+        const requestData = requestSnap.exists() ? requestSnap.data()! : {};
         const { sendProcurementNotification, logProcurementStage } = await import('./procurementNotificationService');
-        
         const context = {
             tenantId,
             branchId: requestData.branch || 'default',
             department: requestData.department,
         };
-        
         const actor = { id: managerId, name: managerName, role: 'manager' };
-        
         await Promise.all([
             sendProcurementNotification('APPROVED', requestId, context, actor, {
-                items: requestData.items?.map((i: any) => ({ name: i.itemName, quantity: i.quantity })),
+                items: requestData.items?.map((i: { itemName?: string; quantity?: number }) => ({ name: i.itemName, quantity: i.quantity })),
             }),
             logProcurementStage('APPROVED', requestId, context, actor, {
                 previousStage: 'PENDING_APPROVAL',
-                items: requestData.items?.map((i: any) => ({ name: i.itemName, requestedQty: i.quantity })),
+                items: requestData.items?.map((i: { itemName?: string; quantity?: number }) => ({ name: i.itemName, requestedQty: i.quantity })),
             }),
         ]);
     } catch (err) {
-        console.error('Error sending procurement notification:', err);
+        logger.error('Error sending procurement notification:', err, 'procurementService');
     }
 };
 
@@ -307,7 +307,7 @@ export const rejectProcurement = async (
             }),
         ]);
     } catch (err) {
-        console.error('Error sending procurement notification:', err);
+        logger.error('Error sending procurement notification:', err, 'procurementService');
     }
 };
 
@@ -364,7 +364,7 @@ export const startPurchasing = async (
                 }),
             ]);
         } catch (err) {
-            console.error('Error sending procurement notification:', err);
+            logger.error('Error sending procurement notification:', err, 'procurementService');
         }
     }
 };
@@ -372,13 +372,19 @@ export const startPurchasing = async (
 /**
  * Rep completes purchase (full or partial)
  * ⭐ Auto-creates new order for remaining items if partial
+ * ✅ FIX: tenantId is now a required parameter for SaaS isolation
  */
 export const completePurchase = async (
     requestId: string,
     items: { itemName: string; purchasedQty: number; unitPrice?: number }[],
     totalCost: number,
+    tenantId: string, // ✅ FIX: Added tenantId as required parameter
     notes?: string
 ): Promise<string | null> => {
+    if (!tenantId) {
+        throw new Error('tenantId is required for SaaS isolation');
+    }
+    
     // ✅ Use tenant-scoped collection
     const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
 
@@ -531,7 +537,7 @@ export const deliverItems = async (
                 }),
             ]);
         } catch (err) {
-            console.error('Error sending procurement notification:', err);
+            logger.error('Error sending procurement notification:', err, 'procurementService');
         }
     }
 };
@@ -647,10 +653,10 @@ export const confirmReceipt = async (
                     { id: employeeId, name: employeeName }
                 );
                 
-                console.log(`✅ Auto-created inventory item: ${it.itemName} under category "${category}"`);
+                logger.info(`✅ Auto-created inventory item: ${it.itemName} under category "${category}"`, undefined, 'procurementService');
             }
         } catch (e) {
-            console.error(`Error updating inventory for ${it.itemName}:`, e);
+            logger.error(`Error updating inventory for ${it.itemName}:`, e, 'procurementService');
         }
     }
 
@@ -727,14 +733,14 @@ export const confirmReceipt = async (
                     notes: 'تم إنشاؤه تلقائياً للكمية المتبقية بعد العجز في الاستلام'
                 });
                 
-                console.log(`✅ ATOMIC: Backorder created with ID: ${backorderId} for remaining ${remainingItems.length} items`);
+                logger.info(`✅ ATOMIC: Backorder created with ID: ${backorderId} for remaining ${remainingItems.length} items`, undefined, 'procurementService');
             }
         });
         
-        console.log(`✅ ATOMIC: Request ${requestId} updated to ${receiptType === 'shortage' ? 'PARTIALLY_DELIVERED' : 'RECEIVED'} successfully`);
+        logger.info(`✅ ATOMIC: Request ${requestId} updated to ${receiptType === 'shortage' ? 'PARTIALLY_DELIVERED' : 'RECEIVED'} successfully`, undefined, 'procurementService');
         
     } catch (error: any) {
-        console.error('❌ ATOMIC TRANSACTION FAILED:', error);
+        logger.error('❌ ATOMIC TRANSACTION FAILED:', error, 'procurementService');
         throw new Error(`فشل تأكيد الاستلام: ${error.message || 'خطأ غير معروف'}`);
     }
     
@@ -763,7 +769,7 @@ export const confirmReceipt = async (
             { notes }
         );
     } catch (err) {
-        console.error('Error creating receipt record:', err);
+        logger.error('Error creating receipt record:', err, 'procurementService');
         // Don't fail the whole operation if notification fails
     }
 
@@ -771,14 +777,18 @@ export const confirmReceipt = async (
 };
 
 /**
- * Close the procurement request
+ * Close the procurement request (via Cloud Function)
+ * ✅ SaaS: tenantId required; write performed server-side
  */
-export const closeProcurement = async (requestId: string): Promise<void> => {
-    // ✅ Use tenant-scoped collection
-    const requestRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
-    await updateDoc(requestRef, {
-        status: 'COMPLETED'
-    });
+export const closeProcurement = async (requestId: string, tenantId: string): Promise<void> => {
+    const payload = closeProcurementPayloadSchema.safeParse({ requestId, tenantId });
+    if (!payload.success) {
+        const msg = payload.error.issues[0]?.message ?? 'بيانات غير صحيحة';
+        throw new Error(msg);
+    }
+    if (!firebaseFunctions) throw new Error('Firebase Functions not initialized');
+    const procurementCloseFn = httpsCallable<{ requestId: string; tenantId: string }, { success: boolean }>(firebaseFunctions, 'procurementClose');
+    await procurementCloseFn({ requestId, tenantId });
 };
 
 // ============================================================
@@ -795,7 +805,7 @@ export const subscribeToPendingApprovals = (
     callback: (requests: ProcurementRequest[]) => void
 ): Unsubscribe => {
     if (!tenantId) {
-        console.error('subscribeToPendingApprovals: tenantId is required');
+        logger.error('subscribeToPendingApprovals: tenantId is required', undefined, 'procurementService');
         callback([]);
         return () => {}; // Return empty unsubscribe function
     }
@@ -834,7 +844,7 @@ export const subscribeToApprovedRequests = (
     callback: (requests: ProcurementRequest[]) => void
 ): Unsubscribe => {
     if (!tenantId) {
-        console.error('subscribeToApprovedRequests: tenantId is required');
+        logger.error('subscribeToApprovedRequests: tenantId is required', undefined, 'procurementService');
         callback([]);
         return () => {}; // Return empty unsubscribe function
     }
@@ -873,7 +883,7 @@ export const subscribeToDepartmentRequests = (
     callback: (requests: ProcurementRequest[]) => void
 ): Unsubscribe => {
     if (!tenantId) {
-        console.error('subscribeToDepartmentRequests: tenantId is required');
+        logger.error('subscribeToDepartmentRequests: tenantId is required', undefined, 'procurementService');
         callback([]);
         return () => {}; // Return empty unsubscribe function
     }
@@ -901,6 +911,47 @@ export const subscribeToDepartmentRequests = (
     });
 };
 
+/**
+ * Subscribe to department's delivered requests (ready for receipt)
+ * ✅ SaaS: tenantId is now mandatory for proper isolation
+ * ✅ FIX: Returns only DELIVERED requests for department receipt confirmation
+ */
+export const subscribeToDeliveredRequests = (
+    tenantId: string, // ✅ SaaS requirement - mandatory
+    branchId: string,
+    department: string,
+    callback: (requests: ProcurementRequest[]) => void
+): Unsubscribe => {
+    if (!tenantId) {
+        logger.error('subscribeToDeliveredRequests: tenantId is required', undefined, 'procurementService');
+        callback([]);
+        return () => {}; // Return empty unsubscribe function
+    }
+    
+    // ✅ FIX: Use tenant-scoped collection
+    const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
+    const q = query(
+        requestsRef,
+        where('branch', '==', branchId),
+        where('department', '==', department),
+        where('status', '==', 'DELIVERED') // ✅ Only show delivered requests (ready for receipt)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+        const requests = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as ProcurementRequest[];
+        // ✅ Client-side sort
+        requests.sort((a, b) => {
+            const tA = a.deliveredAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+            const tB = b.deliveredAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+            return tB - tA;
+        });
+        callback(requests);
+    });
+};
+
 export default {
     approveProcurement,
     rejectProcurement,
@@ -911,5 +962,6 @@ export default {
     closeProcurement,
     subscribeToPendingApprovals,
     subscribeToApprovedRequests,
-    subscribeToDepartmentRequests
+    subscribeToDepartmentRequests,
+    subscribeToDeliveredRequests
 };

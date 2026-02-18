@@ -11,6 +11,7 @@
  */
 
 import { toast } from '../components/common/ToastManager';
+import { logger } from './loggerService';
 
 // ============================================================
 // ARABIC ERROR MESSAGES
@@ -181,7 +182,7 @@ export const showInfoToast = (message: string, duration: number = 3000): void =>
  * Handle Firebase connection errors
  */
 export const handleFirebaseError = (error: any): void => {
-    console.error('Firebase Error:', error);
+    logger.error('Firebase Error:', error, 'errorToastService');
     showErrorToast(error);
 };
 

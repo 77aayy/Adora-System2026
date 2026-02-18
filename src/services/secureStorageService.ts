@@ -7,6 +7,8 @@
  * Adora Hotel Management System V3
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // ENCRYPTION UTILITIES
 // ============================================================
@@ -52,7 +54,7 @@ const xorDecrypt = (encoded: string, key: string): string => {
         }
         return result;
     } catch (e) {
-        console.error('Decryption failed:', e);
+        logger.error('Decryption failed:', e, 'secureStorageService');
         return '';
     }
 };
@@ -104,7 +106,7 @@ const aesEncrypt = async (plaintext: string, password: string): Promise<string> 
         
         return btoa(String.fromCharCode(...combined));
     } catch (e) {
-        console.error('AES encryption failed:', e);
+        logger.error('AES encryption failed:', e, 'secureStorageService');
         // Fallback to XOR
         return xorEncrypt(plaintext, password);
     }
@@ -129,7 +131,7 @@ const aesDecrypt = async (ciphertext: string, password: string): Promise<string>
         
         return new TextDecoder().decode(decrypted);
     } catch (e) {
-        console.error('AES decryption failed:', e);
+        logger.error('AES decryption failed:', e, 'secureStorageService');
         // Try XOR fallback
         return xorDecrypt(ciphertext, password);
     }
@@ -195,7 +197,7 @@ class SecureStorage {
                 return decryptedValue as unknown as T;
             }
         } catch (e) {
-            console.error('Failed to decrypt:', e);
+            logger.error('Failed to decrypt:', e, 'secureStorageService');
             return null;
         }
     }
@@ -254,7 +256,7 @@ export const saveFirebaseConfigSecure = async (config: {
     appId?: string;
 }): Promise<void> => {
     await secureStorage.setItem(FIREBASE_CONFIG_KEY, config, true);
-    console.log('🔐 Firebase config saved securely');
+    logger.info('🔐 Firebase config saved securely', undefined, 'secureStorageService');
 };
 
 /**
@@ -276,7 +278,7 @@ export const getFirebaseConfigSecure = async (): Promise<{
  */
 export const clearFirebaseConfigSecure = (): void => {
     secureStorage.removeItem(FIREBASE_CONFIG_KEY);
-    console.log('🗑️ Firebase config cleared');
+    logger.info('🗑️ Firebase config cleared', undefined, 'secureStorageService');
 };
 
 /**
@@ -296,7 +298,7 @@ export const storeServiceAccountTemporary = async (json: string): Promise<void> 
     // ✅ Auto-clear after 5 minutes for security
     setTimeout(() => {
         secureStorage.removeItem(SERVICE_ACCOUNT_KEY);
-        console.log('🔐 Service Account auto-cleared for security');
+        logger.info('🔐 Service Account auto-cleared for security', undefined, 'secureStorageService');
     }, 5 * 60 * 1000);
 };
 
@@ -312,7 +314,7 @@ export const getServiceAccountTemporary = async (): Promise<string | null> => {
  */
 export const clearServiceAccountImmediate = (): void => {
     secureStorage.removeItem(SERVICE_ACCOUNT_KEY);
-    console.log('🗑️ Service Account cleared immediately');
+    logger.info('🗑️ Service Account cleared immediately', undefined, 'secureStorageService');
 };
 
 /**
@@ -337,7 +339,7 @@ export const autoDestructServiceAccount = (): void => {
         });
     }
     
-    console.log('🔐✅ Service Account AUTO-DESTRUCTED after deployment');
+    logger.info('🔐✅ Service Account AUTO-DESTRUCTED after deployment', undefined, 'secureStorageService');
 };
 
 // ============================================================
@@ -359,9 +361,9 @@ export const migrateToSecureStorage = async (): Promise<void> => {
             
             // Remove old unencrypted config
             localStorage.removeItem(oldKey);
-            console.log('✅ Migrated Firebase config to secure storage');
+            logger.info('✅ Migrated Firebase config to secure storage', undefined, 'secureStorageService');
         } catch (e) {
-            console.error('Migration failed:', e);
+            logger.error('Migration failed:', e, 'secureStorageService');
         }
     }
 };

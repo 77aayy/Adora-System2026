@@ -9,6 +9,8 @@
 
 import { collection, addDoc, Timestamp, query, where, orderBy, limit, getDocs, onSnapshot, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { logger } from '../services/loggerService';
+import { formatDateTimeGregorianEn } from './dateUtils';
 
 // ============================================================
 // TYPES
@@ -136,11 +138,14 @@ export const logAudit = async (
             timestamp: Timestamp.now(),
             userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'server',
         });
-        
-        console.log(`📝 Audit: ${action} on ${targetType}:${targetId} by ${userName}`);
-    } catch (error) {
-        console.error('Audit log failed:', error);
-        // Don't throw - audit failure shouldn't break the app
+    } catch (error: unknown) {
+        // تجاهل "Document already exists" (استدعاء مزدوج من Strict Mode أو إعادة محاولة)
+        const msg = error && typeof (error as { message?: string }).message === 'string' ? (error as { message: string }).message : '';
+        const code = error && typeof (error as { code?: string }).code === 'string' ? (error as { code: string }).code : '';
+        if (code === 'already-exists' || /already exists/i.test(msg)) {
+            return;
+        }
+        // أي خطأ آخر: لا نرمي حتى لا نكسر التطبيق
     }
 };
 
@@ -363,12 +368,12 @@ export const fetchActivityLogs = async (forceRefresh: boolean = false): Promise<
 }> => {
     // Return cached data if valid and not forcing refresh
     if (!forceRefresh && isCacheValid()) {
-        console.log('📦 Activity: Returning cached data (no Firebase read)');
+        logger.debug('Activity: Returning cached data (no Firebase read)', undefined, 'auditService');
         return { logs: cachedLogs, fromCache: true };
     }
     
     try {
-        console.log('🔥 Activity: Fetching from Firebase...');
+        logger.debug('Activity: Fetching from Firebase...', undefined, 'auditService');
         const auditRef = collection(db, AUDIT_COLLECTION);
         const q = query(
             auditRef,
@@ -386,11 +391,17 @@ export const fetchActivityLogs = async (forceRefresh: boolean = false): Promise<
         
         lastFetchTimestamp = new Date();
         
-        console.log(`✅ Activity: Fetched ${cachedLogs.length} logs, cached for 5 minutes`);
+        logger.debug(`Activity: Fetched ${cachedLogs.length} logs, cached for 5 minutes`, undefined, 'auditService');
         
         return { logs: cachedLogs, fromCache: false };
-    } catch (error) {
-        console.error('Activity fetch error:', error);
+    } catch (error: any) {
+        const isChannelError = error?.code === 400 || error?.code === 404 ||
+            error?.message?.includes('400') || error?.message?.includes('404') || error?.message?.includes('Listen/channel');
+        if (isChannelError) {
+            logger.debug('Activity fetch: Listen channel error, using cache', undefined, 'auditService');
+        } else {
+            logger.warn('Activity fetch error:', error?.message || error, 'auditService');
+        }
         return { logs: cachedLogs, fromCache: true };
     }
 };
@@ -410,7 +421,7 @@ export const forceRefreshActivity = async (): Promise<AuditLog[]> => {
 export const clearActivityCache = (): void => {
     cachedLogs = [];
     lastFetchTimestamp = null;
-    console.log('🗑️ Activity cache cleared');
+    logger.debug('Activity cache cleared', undefined, 'auditService');
 };
 
 // ============================================================
@@ -425,7 +436,7 @@ export const startActivityPolling = (
     callback: (logs: AuditLog[]) => void,
     _intervalMs?: number
 ): () => void => {
-    console.log('⚠️ startActivityPolling is deprecated - using on-demand fetch instead');
+    logger.debug('startActivityPolling is deprecated - using on-demand fetch instead', undefined, 'auditService');
     
     // Just do initial fetch, no polling
     fetchActivityLogs().then((result) => {
@@ -638,11 +649,5 @@ export const formatTimeAgo = (date: Date): string => {
     if (diffHour < 24) return `منذ ${diffHour} ساعة`;
     if (diffDay < 7) return `منذ ${diffDay} يوم`;
     
-    return date.toLocaleDateString('ar-SA', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    return formatDateTimeGregorianEn(date, { dateStyle: 'medium', showSeconds: false });
 };

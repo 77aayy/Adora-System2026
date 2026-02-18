@@ -29,6 +29,7 @@ import { useAuth } from '../../context/AuthContext';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { logger } from '../../services/loggerService';
 import { useTranslation } from 'react-i18next';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 import {
     LostFoundItem,
     ItemStatus,
@@ -511,7 +512,7 @@ const ItemDetailsModal: React.FC<ItemDetailsModalProps> = ({ isOpen, onClose, it
     const formatDate = (timestamp: any) => {
         if (!timestamp) return '-';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return date.toLocaleString('ar-SA');
+        return formatDateTimeGregorianEn(date, { showSeconds: false });
     };
 
     return (
@@ -884,7 +885,7 @@ export const LostFoundManagement: React.FC = () => {
                             <StatusBadge status={item.status} />
                             <div className="flex items-center gap-1 text-white/40 text-xs">
                                 <Clock className="w-3 h-3" />
-                                {item.createdAt?.toDate?.().toLocaleDateString('ar-SA') || '-'}
+                                {item.createdAt?.toDate?.() ? formatDateGregorianEn(item.createdAt.toDate()) : '-'}
                             </div>
                         </div>
                     </div>

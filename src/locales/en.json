@@ -147,6 +147,8 @@
         "elapsed": "elapsed",
         "from": "From",
         "to": "To",
+        "highToLow": "High to Low",
+        "lowToHigh": "Low to High",
         "minuteShort": "m",
         "hourShort": "h",
         "dayShort": "d",
@@ -278,6 +280,7 @@
         "enterOwnerCode": "Enter owner code (6 digits)",
         "afterBranchEnterPin": "After entering branch code, press \"Employee Code\" to continue",
         "loginSuccess": "Login successful! ✨",
+        "loggingIn": "Logging in...",
         "wrongCode": "Wrong code",
         "biometricFailed": "Biometric verification failed",
         "forgotCode": "Forgot code?",
@@ -288,6 +291,7 @@
         "goodEvening": "Good evening, I am interested in your project",
         "dayMode": "Day Mode",
         "nightMode": "Night Mode",
+        "language": "Change language",
         "branchNotSpecified": "Not specified",
         "morningMessage": "Start your day with high productivity",
         "afternoonMessage": "Keep achieving success",
@@ -1166,12 +1170,31 @@
         "hiddenPageOwnerOnly": "Hidden page - Owner only",
         "enterPasswordForConfigMode": "Please enter password to access Configuration Mode",
         "enterRequiredPassword": "Enter required password",
-        "typeAdoraToEnter": "Type <span className=\"font-bold text-teal-400\">adora</span> to enter:",
+        "typeAdoraToEnter": "Type <span className=\"font-bold text-teal-400\">ADORA2026</span> to enter:",
         "enterPassword": "Enter password",
+        "scanPasswordTitle": "🔐 Password",
+        "scanPasswordSubtitle": "Enter password to access scan/purge options",
+        "password": "Password",
         "passwordIncorrect": "Password incorrect",
         "cancel": "Cancel",
         "enter": "Enter",
+        "auditChoiceTitle": "Choose action",
+        "auditChoiceSubtitle": "Choose between system scan or full purge",
+        "deepAudit": "🔍 Scan system",
+        "purgeSystem": "☢️ Purge system",
+        "deletedManagersPurgeFailed": "Purge ran but deleted-managers archive was not cleared (permissions). Deploy rules: firebase deploy --only firestore:rules",
         "autoNavigateToBilling": "Auto navigate to billing tab",
+        "brandName": "Brand or Group Name",
+        "totalBranches": "Total Branches",
+        "lastActivity": "Last Activity",
+        "lastRequest": "Last Request",
+        "allBranches": "All Branches",
+        "accountCreationDate": "Account Creation Date",
+        "employeesCount": "Employees Count",
+        "totalRequests": "Total Requests",
+        "topDepartment": "Most Requested Department",
+        "managerLifecycle": "Manager Lifecycle",
+        "quickStatsDescription": "Total branches, users, requests, and rooms",
         "subscriptionReportTitle": "Subscription Report - {{name}}",
         "adoraSubscriptionReport": "🏨 Adora Subscription Report",
         "managerCode": "Manager Code",
@@ -1209,6 +1232,8 @@
         "totalRequests": "Total Requests",
         "totalRooms": "Total Rooms",
         "demoAccounts": "Demo Accounts",
+        "scanOrPurge": "Nuclear Purge & Factory Reset",
+        "fullSystemScanOrPurge": "Nuclear purge and factory reset — keep only owner settings, everything else resets",
         "account": "account",
         "nearestExpiry": "Nearest Expiry",
         "farthestExpiry": "Farthest Expiry",
@@ -1295,6 +1320,7 @@
         "expenseVouchers": "Expense Vouchers",
         "overdue": "Overdue",
         "invoice": "Invoice",
+        "invoices": "Invoices",
         "activeLicense": "Active Subscriber",
         "suspendedLicense": "Temporarily Suspended",
         "expiredLicense": "License Expired",
@@ -1523,6 +1549,110 @@
             "subtitleHighlight1": "your time and effort",
             "subtitleHighlight2": "guest satisfaction",
             "ctaButton": "Request Trial"
+        },
+        "statistics": {
+            "title": "Adora by the Numbers",
+            "subtitle": "Real statistics from hotels using Adora",
+            "timeSaving": {
+                "value": "40%",
+                "label": "Time Saved on Administration"
+            },
+            "guestSatisfaction": {
+                "value": "95%+",
+                "label": "Guest Satisfaction Rate"
+            },
+            "responseTime": {
+                "value": "30 seconds",
+                "label": "Average Response Time"
+            },
+            "efficiency": {
+                "value": "60%",
+                "label": "Increase in Employee Efficiency"
+            },
+            "cloudBased": {
+                "value": "100%",
+                "label": "Cloud-Based - No Installation"
+            }
+        },
+        "whyAdora": {
+            "title": "Why Adora?",
+            "subtitle": "What sets Adora apart from competitors",
+            "local": {
+                "title": "100% Local",
+                "desc": "First SaaS system designed specifically for Saudi hotels"
+            },
+            "noCommissions": {
+                "title": "No Commissions",
+                "desc": "Subscribe and use directly - no hidden fees or commissions"
+            },
+            "support": {
+                "title": "24/7 Support",
+                "desc": "Arabic technical support available around the clock"
+            },
+            "training": {
+                "title": "Free Training",
+                "desc": "Free training for all employees with comprehensive guide"
+            },
+            "automaticOperations": "Automatic Operations",
+            "updates": {
+                "title": "Continuous Updates",
+                "desc": "Continuous updates at no additional cost"
+            },
+            "integration": {
+                "title": "Seamless Integration",
+                "desc": "Integration with existing systems without complications"
+            }
+        },
+        "beforeAfter": {
+            "title": "Before Adora → After Adora",
+            "subtitle": "See the difference yourself",
+            "paperwork": {
+                "before": "Scattered papers + Excel",
+                "after": "Unified digital system"
+            },
+            "feedback": {
+                "before": "Lost guest feedback",
+                "after": "Instant ratings and reports"
+            },
+            "tracking": {
+                "before": "Manual task tracking",
+                "after": "Smart automatic tracking"
+            },
+            "delays": {
+                "before": "Unnoticed delays",
+                "after": "Instant delay alerts"
+            },
+            "reports": {
+                "before": "Monthly manual reports",
+                "after": "Automatic real-time reports"
+            }
+        },
+        "testimonials": {
+            "title": "What They Say About Adora",
+            "subtitle": "Real experiences from hotels using Adora",
+            "testimonial1": {
+                "text": "We saved 20 hours weekly in management after using Adora",
+                "author": "5-Star Hotel",
+                "location": "Riyadh"
+            },
+            "testimonial2": {
+                "text": "Our guest satisfaction rose from 3.5 to 4.8 stars after implementing Adora",
+                "author": "4-Star Hotel",
+                "location": "Jeddah"
+            },
+            "testimonial3": {
+                "text": "We now track everything in real-time - excellent and easy-to-use system",
+                "author": "3-Star Hotel",
+                "location": "Makkah"
+            }
+        },
+        "trustIndicators": {
+            "title": "Trust & Commitment",
+            "subtitle": "We are committed to serving you",
+            "secure": "100% Secure",
+            "local": "100% Local",
+            "support": "24/7 Support",
+            "satisfaction": "Satisfaction Guaranteed"
         },
         "features": {
             "title": "{adora} Features",

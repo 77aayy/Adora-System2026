@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { db } from '../../services/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 
 // ============================================================
 // TYPES
@@ -135,9 +136,9 @@ const StatRow: React.FC<{ label: string; value: number | string; color?: string 
 
 export const DepartmentStatsCards: React.FC = () => {
     const { user } = useAuth();
+    const { tenantId } = useTenant();
     const navigate = useNavigate();
     const branchId = (user as any)?.branch || (user as any)?.branchId || 'default';
-    const tenantId = (user as any)?.tenantId;
 
     const [stats, setStats] = useState<DeptStats>({
         reception: { active: 0, completed: 0, avgTime: 0, delayed: 0, inquiries: 0 },
@@ -153,11 +154,15 @@ export const DepartmentStatsCards: React.FC = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        // ✅ FIX: Use tenant-scoped collection
+        if (!tenantId) {
+            console.error('DepartmentStatsCards: tenantId is required');
+            return;
+        }
         // 1. Requests Listener
         const requestsConstraints: any[] = [where('branch', '==', branchId)];
-        if (tenantId) requestsConstraints.push(where('tenantId', '==', tenantId));
 
-        const unsubRequests = onSnapshot(query(collection(db, 'requests'), ...requestsConstraints), (snapshot) => {
+        const unsubRequests = onSnapshot(query(collection(db, `tenants/${tenantId}/requests`), ...requestsConstraints), (snapshot) => {
             const reqs = snapshot.docs.map(d => ({ ...d.data(), createdAt: d.data().createdAt?.toDate() || new Date() }));
 
             const calcMetrics = (deptReqs: any[]) => {
@@ -221,12 +226,12 @@ export const DepartmentStatsCards: React.FC = () => {
             }));
         });
 
-        // 2. Room Cards Listener (For specific counts)
-        const cardConstraints: any[] = [where('branch', '==', branchId)];
-        if (tenantId) cardConstraints.push(where('tenantId', '==', tenantId));
-
-        const unsubCards = onSnapshot(query(collection(db, 'roomCards'), ...cardConstraints), (snapshot) => {
-            const cards = snapshot.docs.map(d => d.data());
+        // 2. Room Cards Listener (tenant-scoped)
+        const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
+        const unsubCards = onSnapshot(query(roomCardsRef, where('status', '==', 'active')), (snapshot) => {
+            const cards = snapshot.docs
+                .map(d => d.data())
+                .filter((c: any) => c.branch === branchId || c.branchId === branchId);
             const checkIns = cards.filter((c: any) => c.checkInTime?.toDate() >= today).length;
             // Assuming checkOutDate is populated when checkout happens or is planned
             // For now simply counting inactive updated today logic or similar? 
@@ -237,11 +242,9 @@ export const DepartmentStatsCards: React.FC = () => {
             }));
         });
 
-        // 3. Rooms Listener (For HK status)
-        const roomConstraints: any[] = [where('branchId', '==', branchId)];
-        if (tenantId) roomConstraints.push(where('tenantId', '==', tenantId));
-
-        const unsubRooms = onSnapshot(query(collection(db, 'rooms'), ...roomConstraints), (snapshot) => {
+        // 3. Rooms Listener (tenant-scoped)
+        const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+        const unsubRooms = onSnapshot(query(roomsRef, where('branchId', '==', branchId)), (snapshot) => {
             const rooms = snapshot.docs.map(d => d.data());
             setStats(prev => ({
                 ...prev,
@@ -256,7 +259,7 @@ export const DepartmentStatsCards: React.FC = () => {
         });
 
         return () => { unsubRequests(); unsubCards(); unsubRooms(); };
-    }, [branchId]);
+    }, [branchId, tenantId]);
 
     return (
         <div id="department-stats-cards" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">

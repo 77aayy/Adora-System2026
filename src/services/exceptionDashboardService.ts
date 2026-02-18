@@ -13,6 +13,7 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -67,6 +68,7 @@ const DEFAULT_THRESHOLDS: ExceptionThresholds = {
  * Detect DNA Patterns - Recurring issues in same room
  */
 export async function detectDNAPatterns(
+    tenantId: string,
     branchId: string,
     days: number = 30
 ): Promise<ExceptionAlert[]> {
@@ -74,18 +76,16 @@ export async function detectDNAPatterns(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // 🔐 SECURITY: tenantId is required for SaaS isolation
     if (!tenantId) {
-        console.warn('⚠️ [ExceptionDashboard] getExceptionPatterns called without tenantId');
+        logger.warn('⚠️ [ExceptionDashboard] detectDNAPatterns called without tenantId', undefined, 'exceptionDashboardService');
         return [];
     }
 
     try {
-        const requestsRef = collection(db, 'requests');
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
             where('branch', '==', branchId),
-            where('tenantId', '==', tenantId), // 🔐 CRITICAL: Tenant isolation
             where('serviceType', '==', 'maintenance'),
             where('createdAt', '>=', Timestamp.fromDate(startDate))
         );
@@ -129,7 +129,7 @@ export async function detectDNAPatterns(
             }
         });
     } catch (error) {
-        console.error('Error detecting DNA patterns:', error);
+        logger.error('Error detecting DNA patterns:', error, 'exceptionDashboardService');
     }
 
     return alerts;
@@ -139,12 +139,15 @@ export async function detectDNAPatterns(
  * Detect Watchdog Timeouts - Delayed tasks
  */
 export async function detectWatchdogTimeouts(
+    tenantId: string,
     branchId: string
 ): Promise<ExceptionAlert[]> {
     const alerts: ExceptionAlert[] = [];
 
+    if (!tenantId) return [];
+
     try {
-        const requestsRef = collection(db, 'requests');
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
             where('branch', '==', branchId),
@@ -187,7 +190,7 @@ export async function detectWatchdogTimeouts(
             }
         });
     } catch (error) {
-        console.error('Error detecting watchdog timeouts:', error);
+        logger.error('Error detecting watchdog timeouts:', error, 'exceptionDashboardService');
     }
 
     return alerts;
@@ -197,6 +200,7 @@ export async function detectWatchdogTimeouts(
  * Detect Performance Issues - Employees below average
  */
 export async function detectPerformanceIssues(
+    tenantId: string,
     branchId: string,
     days: number = 7
 ): Promise<ExceptionAlert[]> {
@@ -204,8 +208,10 @@ export async function detectPerformanceIssues(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
+    if (!tenantId) return [];
+
     try {
-        const requestsRef = collection(db, 'requests');
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
             where('branch', '==', branchId),
@@ -272,7 +278,7 @@ export async function detectPerformanceIssues(
             }
         });
     } catch (error) {
-        console.error('Error detecting performance issues:', error);
+        logger.error('Error detecting performance issues:', error, 'exceptionDashboardService');
     }
 
     return alerts;
@@ -285,14 +291,15 @@ export async function detectPerformanceIssues(
 /**
  * Get all exceptions for a branch
  */
-export async function getAllExceptions(branchId: string): Promise<{
+export async function getAllExceptions(tenantId: string, branchId: string): Promise<{
     alerts: ExceptionAlert[];
     summary: { high: number; medium: number; low: number; total: number };
 }> {
+    if (!tenantId) return { alerts: [], summary: { high: 0, medium: 0, low: 0, total: 0 } };
     const [dnaAlerts, watchdogAlerts, performanceAlerts] = await Promise.all([
-        detectDNAPatterns(branchId),
-        detectWatchdogTimeouts(branchId),
-        detectPerformanceIssues(branchId),
+        detectDNAPatterns(tenantId, branchId),
+        detectWatchdogTimeouts(tenantId, branchId),
+        detectPerformanceIssues(tenantId, branchId),
     ]);
 
     const alerts = [...dnaAlerts, ...watchdogAlerts, ...performanceAlerts]
@@ -342,29 +349,29 @@ function getExpectedTime(serviceType: string): number {
 
 import { useState, useEffect, useCallback } from 'react';
 
-export function useExceptionDashboard(branchId: string) {
+export function useExceptionDashboard(tenantId: string, branchId: string) {
     const [alerts, setAlerts] = useState<ExceptionAlert[]>([]);
     const [summary, setSummary] = useState({ high: 0, medium: 0, low: 0, total: 0 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const refresh = useCallback(async () => {
-        if (!branchId) return;
+        if (!tenantId || !branchId) return;
 
         setLoading(true);
         setError(null);
 
         try {
-            const result = await getAllExceptions(branchId);
+            const result = await getAllExceptions(tenantId, branchId);
             setAlerts(result.alerts);
             setSummary(result.summary);
         } catch (err) {
             setError('فشل تحميل الاستثناءات');
-            console.error(err);
+            logger.error('Error loading exceptions:', err, 'exceptionDashboardService');
         } finally {
             setLoading(false);
         }
-    }, [branchId]);
+    }, [tenantId, branchId]);
 
     useEffect(() => {
         refresh();

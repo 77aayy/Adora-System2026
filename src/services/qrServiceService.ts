@@ -6,6 +6,7 @@
 
 import { collection, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where, getDocs, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -101,7 +102,7 @@ export const subscribeToQRServices = (
             callback(services);
         },
         (error) => {
-            console.error('Error subscribing to QR services:', error);
+            logger.error('Error subscribing to QR services:', error, 'qrServiceService');
             callback([]);
         }
     );
@@ -135,7 +136,7 @@ export const getQRServices = async (branchId: string, tenantId: string): Promise
 
         return services;
     } catch (error) {
-        console.error('Error getting QR services:', error);
+        logger.error('Error getting QR services:', error, 'qrServiceService');
         return [];
     }
 };
@@ -161,7 +162,7 @@ export const createQRService = async (
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating QR service:', error);
+        logger.error('Error creating QR service:', error, 'qrServiceService');
         throw error;
     }
 };
@@ -183,7 +184,7 @@ export const updateQRService = async (
             updatedBy: { id: userId, name: userName }
         });
     } catch (error) {
-        console.error('Error updating QR service:', error);
+        logger.error('Error updating QR service:', error, 'qrServiceService');
         throw error;
     }
 };
@@ -195,7 +196,7 @@ export const deleteQRService = async (serviceId: string): Promise<void> => {
     try {
         await deleteDoc(doc(db, 'qr_services', serviceId));
     } catch (error) {
-        console.error('Error deleting QR service:', error);
+        logger.error('Error deleting QR service:', error, 'qrServiceService');
         throw error;
     }
 };
@@ -293,12 +294,44 @@ export const createRequestFromQRService = async (
             }
         }
 
+        // ✅ FIX: Use tenant-scoped collection for SaaS isolation
+        if (!tenantId) {
+            throw new Error('tenantId is required for SaaS isolation');
+        }
+        
         const { addDoc } = await import('firebase/firestore');
-        const docRef = await addDoc(collection(db, 'requests'), requestData);
+        const docRef = await addDoc(collection(db, `tenants/${tenantId}/requests`), requestData);
+        
+        // ✅ Initialize Unified State Machine (if feature enabled)
+        // This ensures new requests have all unified state fields (involvedDepartments, isActionRequiredByReception, stateHistory)
+        try {
+            const { isFeatureEnabled } = await import('./featureFlagsService');
+            const useUnifiedStateMachine = await isFeatureEnabled(tenantId, 'useUnifiedStateMachine');
+            
+            if (useUnifiedStateMachine) {
+                const { initializeRequest } = await import('./stateTransitionService');
+                const targetDepartment = (service.targetDepartment || 'reception') as any;
+                
+                await initializeRequest(
+                    tenantId,
+                    docRef.id,
+                    service.requestType || 'other',
+                    'reception' as any,
+                    targetDepartment,
+                    'guest',
+                    guestName,
+                    notes || 'تم إنشاء الطلب من QR'
+                );
+                logger.info('✅ Unified State Machine initialized for new QR request', undefined, 'qrServiceService');
+            }
+        } catch (initError: any) {
+            // Non-critical: Log but don't fail request creation
+            logger.warn('⚠️ Failed to initialize Unified State Machine for QR request (non-critical):', initError.message, 'qrServiceService');
+        }
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating request from QR service:', error);
+        logger.error('Error creating request from QR service:', error, 'qrServiceService');
         throw error;
     }
 };

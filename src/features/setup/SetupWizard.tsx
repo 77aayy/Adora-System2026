@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { collection, addDoc, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { logger } from '../../services/loggerService';
 import { AdoraLoaderInline } from '../../components/common/AdoraLoader';
 
 // ============================================================
@@ -171,7 +172,7 @@ export const SetupWizard: React.FC = () => {
             setSetupComplete(true);
             navigate('/login');
         } catch (error) {
-            console.error('Setup failed:', error);
+            logger.error('Setup failed:', error, 'SetupWizard');
         } finally {
             setIsLoading(false);
         }

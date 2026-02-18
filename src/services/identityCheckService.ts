@@ -99,9 +99,9 @@ export async function confirmGuestIdentity(
 
         await setDoc(verificationRef, { id: verificationRef.id, ...verification });
 
-        // Update the request with identity confirmation
+        // Update the request with identity confirmation (tenant-scoped path)
         if (requestId) {
-            const requestRef = doc(db, 'requests', requestId);
+            const requestRef = doc(db, 'tenants', tenantId, 'requests', requestId);
             await updateDoc(requestRef, {
                 identityConfirmed: true,
                 identityConfirmedBy: confirmedBy,
@@ -137,24 +137,25 @@ async function getGuestPhoneLastFour(
     roomNumber: string
 ): Promise<{ phoneLastFour: string; fullPhone: string; guestName: string } | null> {
     try {
-        // Query room card
-        const roomCardsRef = collection(db, 'roomCards');
+        const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
         const q = query(
             roomCardsRef,
-            where('tenantId', '==', tenantId),
-            where('branch', '==', branchId),
             where('roomNumber', '==', roomNumber),
             where('status', '==', 'active'),
             where('qrActive', '==', true)
         );
-
         const snapshot = await getDocs(q);
-        if (snapshot.empty) {
+        const matchBranch = (d: { data: () => Record<string, unknown> }) => {
+            const data = d.data();
+            return data && (data.branch === branchId || data.branchId === branchId);
+        };
+        const docSnap = snapshot.docs.find(matchBranch);
+        if (!docSnap) {
             logger.warn(`No active room card found for room ${roomNumber}`, null, 'identityCheckService');
             return null;
         }
 
-        const roomCard = snapshot.docs[0].data();
+        const roomCard = docSnap.data();
         const guestPhone = roomCard.guestPhone || '';
         const phoneLastFour = guestPhone.replace(/\D/g, '').slice(-4);
         
@@ -371,21 +372,18 @@ export async function fetchGuestInfoForReception(
     roomNumber: string
 ): Promise<{ guestName: string; guestPhone: string; guestIdentity: string } | null> {
     try {
-        const roomCardsRef = collection(db, 'roomCards');
+        const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
         const q = query(
             roomCardsRef,
-            where('tenantId', '==', tenantId),
-            where('branch', '==', branchId),
             where('roomNumber', '==', roomNumber),
             where('status', '==', 'active')
         );
-
         const snapshot = await getDocs(q);
-        if (snapshot.empty) {
-            return null;
-        }
-
-        const roomCard = snapshot.docs[0].data();
+        const docSnap = snapshot.docs.find(
+            d => (d.data().branch === branchId || d.data().branchId === branchId)
+        );
+        if (!docSnap) return null;
+        const roomCard = docSnap.data();
         return {
             guestName: roomCard.guestName || '',
             guestPhone: roomCard.guestPhone || '',
@@ -414,22 +412,21 @@ export async function setTemporaryGuestData(
     setBy: { id: string; name: string }
 ): Promise<boolean> {
     try {
-        const roomCardsRef = collection(db, 'roomCards');
+        const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
         const q = query(
             roomCardsRef,
-            where('tenantId', '==', tenantId),
-            where('branch', '==', branchId),
             where('roomNumber', '==', roomNumber),
             where('status', '==', 'active')
         );
-
         const snapshot = await getDocs(q);
-        if (snapshot.empty) {
+        const docSnap = snapshot.docs.find(
+            d => (d.data().branch === branchId || d.data().branchId === branchId)
+        );
+        if (!docSnap) {
             logger.warn(`No active room card found for room ${roomNumber}`, null, 'identityCheckService');
             return false;
         }
-
-        const roomCardRef = snapshot.docs[0].ref;
+        const roomCardRef = docSnap.ref;
         await updateDoc(roomCardRef, {
             guestName: tempGuestName,
             guestPhone: tempGuestPhone,

@@ -107,10 +107,11 @@ export const ProcurementCartWizard: React.FC<Props> = ({
         const fetchRecentItems = async () => {
             setLoadingQuickItems(true);
             try {
+                // ✅ FIX: Use tenant-scoped collection
+                const requestsRef = collection(db, `tenants/${tenantId}/procurementRequests`);
                 // Get recent procurement requests for this department
                 const q = query(
-                    collection(db, 'procurementRequests'),
-                    where('tenantId', '==', tenantId),
+                    requestsRef,
                     where('department', '==', department),
                     orderBy('createdAt', 'desc'),
                     fbLimit(50) // Get last 50 orders to analyze
@@ -237,7 +238,9 @@ export const ProcurementCartWizard: React.FC<Props> = ({
             // ✅ If autoApproved (manager request), set status to APPROVED directly
             const orderStatus = autoApproved ? 'APPROVED' : 'PENDING_APPROVAL';
             
-            await addDoc(collection(db, 'procurementRequests'), {
+            // ✅ FIX: Use tenant-scoped collection
+            const requestsRef = collection(db, `tenants/${effectiveTenantId}/procurementRequests`);
+            await addDoc(requestsRef, {
                 items: cart.map(item => ({
                     itemName: item.name,
                     quantity: item.quantity,

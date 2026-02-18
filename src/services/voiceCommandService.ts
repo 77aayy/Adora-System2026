@@ -5,6 +5,8 @@
  * Adora Hotel Management System V3 - SaaS
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -166,7 +168,7 @@ export function isVoiceSupported(): boolean {
  */
 export function initVoiceRecognition(): boolean {
     if (!isVoiceSupported()) {
-        console.warn('Voice recognition not supported');
+        logger.warn('Voice recognition not supported', undefined, 'voiceCommandService');
         return false;
     }
     
@@ -192,7 +194,7 @@ export function initVoiceRecognition(): boolean {
     };
     
     recognition.onerror = (event) => {
-        console.error('Voice recognition error:', event.error);
+        logger.error('Voice recognition error:', event.error, 'voiceCommandService');
         isListening = false;
         
         if (onResultCallback) {

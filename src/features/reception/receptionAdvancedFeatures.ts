@@ -10,6 +10,8 @@ import {
     query, where, orderBy, limit, onSnapshot, arrayUnion,
     serverTimestamp, Timestamp
 } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -56,9 +58,10 @@ interface Employee {
 // ============================================================
 
 /**
- * Check for unread shift notes
+ * Check for unread shift notes (tenant-scoped: same path as shiftNotesService)
  */
 export const checkShiftNotes = async (
+    hotelId: string,
     branchId: string,
     employeeId: string
 ): Promise<number> => {
@@ -67,9 +70,8 @@ export const checkShiftNotes = async (
         today.setHours(0, 0, 0, 0);
 
         const notesQuery = query(
-            collection(db, 'shift_notes'),
-            where('branchId', '==', branchId),
-            where('department', '==', 'reception'),
+            collection(db, `tenants/${hotelId}/branches/${branchId}/shiftNotes`),
+            where('status', '==', 'active'),
             where('createdAt', '>=', Timestamp.fromDate(today))
         );
 
@@ -85,23 +87,23 @@ export const checkShiftNotes = async (
 
         return unreadCount;
     } catch (error) {
-        console.error('Error checking shift notes:', error);
+        logger.error('Error checking shift notes:', error, 'receptionAdvancedFeatures');
         return 0;
     }
 };
 
 /**
- * Load shift notes
+ * Load shift notes (tenant-scoped: same path as shiftNotesService)
  */
 export const loadShiftNotes = async (
+    hotelId: string,
     branchId: string,
     limitCount = 10
 ): Promise<ShiftNote[]> => {
     try {
         const notesQuery = query(
-            collection(db, 'shift_notes'),
-            where('branchId', '==', branchId),
-            where('department', '==', 'reception'),
+            collection(db, `tenants/${hotelId}/branches/${branchId}/shiftNotes`),
+            where('status', '==', 'active'),
             orderBy('createdAt', 'desc'),
             limit(limitCount)
         );
@@ -118,53 +120,56 @@ export const loadShiftNotes = async (
 
         return notes;
     } catch (error) {
-        console.error('Error loading shift notes:', error);
+        logger.error('Error loading shift notes:', error, 'receptionAdvancedFeatures');
         return [];
     }
 };
 
 /**
- * Add new shift note
+ * Add new shift note (tenant-scoped: same path as shiftNotesService)
  */
 export const addShiftNote = async (
+    hotelId: string,
     branchId: string,
     employeeId: string,
     employeeName: string,
     content: string
 ): Promise<string | null> => {
     try {
-        const docRef = await addDoc(collection(db, 'shift_notes'), {
-            branchId,
-            department: 'reception',
+        const docRef = await addDoc(collection(db, `tenants/${hotelId}/branches/${branchId}/shiftNotes`), {
+            roomNumber: '',
             content,
-            createdBy: employeeId,
-            createdByName: employeeName,
+            priority: 'normal',
+            status: 'active',
+            createdBy: { id: employeeId, name: employeeName },
             createdAt: serverTimestamp(),
             readBy: [employeeId]
         });
 
         return docRef.id;
     } catch (error) {
-        console.error('Error adding shift note:', error);
+        logger.error('Error adding shift note:', error, 'receptionAdvancedFeatures');
         return null;
     }
 };
 
 /**
- * Mark shift note as read
+ * Mark shift note as read (tenant-scoped: same path as shiftNotesService)
  */
 export const markShiftNoteAsRead = async (
+    hotelId: string,
+    branchId: string,
     noteId: string,
     employeeId: string
 ): Promise<boolean> => {
     try {
-        const noteRef = doc(db, 'shift_notes', noteId);
+        const noteRef = doc(db, `tenants/${hotelId}/branches/${branchId}/shiftNotes`, noteId);
         await updateDoc(noteRef, {
             readBy: arrayUnion(employeeId)
         });
         return true;
     } catch (error) {
-        console.error('Error marking note as read:', error);
+        logger.error('Error marking note as read:', error, 'receptionAdvancedFeatures');
         return false;
     }
 };
@@ -191,7 +196,7 @@ export const getEmployeePoints = async (
         }
         return 0;
     } catch (error) {
-        console.error('Error getting employee points:', error);
+        logger.error('Error getting employee points:', error, 'receptionAdvancedFeatures');
         return 0;
     }
 };
@@ -225,7 +230,7 @@ export const getPointsHistory = async (
 
         return history;
     } catch (error) {
-        console.error('Error getting points history:', error);
+        logger.error('Error getting points history:', error, 'receptionAdvancedFeatures');
         return [];
     }
 };
@@ -270,7 +275,7 @@ export const addPointsToEmployee = async (
 
         return true;
     } catch (error) {
-        console.error('Error adding points:', error);
+        logger.error('Error adding points:', error, 'receptionAdvancedFeatures');
         return false;
     }
 };
@@ -294,7 +299,7 @@ export const getDepartmentPointsSettings = async (
         }
         return getDefaultPointsSettings(department);
     } catch (error) {
-        console.error('Error getting points settings:', error);
+        logger.error('Error getting points settings:', error, 'receptionAdvancedFeatures');
         return getDefaultPointsSettings(department);
     }
 };
@@ -362,7 +367,7 @@ export const loadReceptionEmployees = async (
 
         return employees;
     } catch (error) {
-        console.error('Error loading reception employees:', error);
+        logger.error('Error loading reception employees:', error, 'receptionAdvancedFeatures');
         return [];
     }
 };
@@ -446,15 +451,21 @@ const isDateInRange = (date: Date, from: Date, to: Date): boolean => {
 
 /**
  * Load history data with filters
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const loadHistoryData = async (
+    tenantId: string,
     branchId: string,
     employeeId: string,
     filter: HistoryFilter
 ): Promise<any[]> => {
+    if (!tenantId) {
+        logger.error('loadHistoryData: tenantId is required', undefined, 'receptionAdvancedFeatures');
+        return [];
+    }
     try {
         const requestsQuery = query(
-            collection(db, 'requests'),
+            collection(db, `tenants/${tenantId}/requests`),
             where('branch', '==', branchId)
         );
 
@@ -505,7 +516,7 @@ export const loadHistoryData = async (
 
         return results;
     } catch (error) {
-        console.error('Error loading history:', error);
+        logger.error('Error loading history:', error, 'receptionAdvancedFeatures');
         return [];
     }
 };
@@ -542,26 +553,27 @@ export const addProcurementToCart = (
         addedAt: new Date()
     };
 
-    // Get existing cart from localStorage
-    const existingCart = JSON.parse(localStorage.getItem('procurement_cart') || '[]');
+    // ✅ Unified key: adora_cart_${department} (reception when adding from reception dashboard)
+    const CART_KEY = 'adora_cart_reception';
+    const existingCart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
     existingCart.push(cartItem);
-    localStorage.setItem('procurement_cart', JSON.stringify(existingCart));
+    localStorage.setItem(CART_KEY, JSON.stringify(existingCart));
 
     return cartItem;
 };
 
 /**
- * Get procurement cart
+ * Get procurement cart (reception source — uses adora_cart_reception)
  */
 export const getProcurementCart = (): any[] => {
-    return JSON.parse(localStorage.getItem('procurement_cart') || '[]');
+    return JSON.parse(localStorage.getItem('adora_cart_reception') || '[]');
 };
 
 /**
- * Clear procurement cart
+ * Clear procurement cart (reception)
  */
 export const clearProcurementCart = (): void => {
-    localStorage.removeItem('procurement_cart');
+    localStorage.removeItem('adora_cart_reception');
 };
 
 /**
@@ -591,7 +603,7 @@ export const submitProcurementOrder = async (
 
         return orderRef.id;
     } catch (error) {
-        console.error('Error submitting procurement order:', error);
+        logger.error('Error submitting procurement order:', error, 'receptionAdvancedFeatures');
         return null;
     }
 };
@@ -636,7 +648,7 @@ export const loadMinibarItems = async (
 
         return items;
     } catch (error) {
-        console.error('Error loading minibar items:', error);
+        logger.error('Error loading minibar items:', error, 'receptionAdvancedFeatures');
         return [];
     }
 };
@@ -838,7 +850,7 @@ export const printHistoryReport = (
         <html dir="rtl" lang="ar">
         <head>
             <meta charset="UTF-8">
-            <title>سجل الاستقبال - ${new Date().toLocaleDateString('ar-SA')}</title>
+            <title>سجل الاستقبال - ${formatDateGregorianEn(new Date())}</title>
             <style>
                 body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 20px; }
                 h1 { text-align: center; margin-bottom: 20px; color: #1a1a2e; }
@@ -854,7 +866,7 @@ export const printHistoryReport = (
         <body>
             <h1>سجل الاستقبال</h1>
             <div class="info">
-                <p><strong>التاريخ:</strong> ${new Date().toLocaleDateString('ar-SA')}</p>
+                <p><strong>التاريخ:</strong> ${formatDateGregorianEn(new Date())}</p>
                 <p><strong>الموظف:</strong> ${employeeName || '--'}</p>
                 <p><strong>الفرع:</strong> ${branchName || '--'}</p>
             </div>
@@ -869,13 +881,7 @@ export const printHistoryReport = (
                 </thead>
                 <tbody>
                     ${items.map(item => {
-        const date = item.requestDate.toLocaleString('ar-SA', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const date = formatDateTimeGregorianEn(item.requestDate, { dateStyle: 'medium', showSeconds: false });
         const status = item.status === 'COMPLETED' ? '✓ مكتمل' :
             item.status === 'CONFIRMED' ? '⏳ مؤكد' : '⏸ قيد الانتظار';
         return `
@@ -890,7 +896,7 @@ export const printHistoryReport = (
                 </tbody>
             </table>
             <div class="footer">
-                تم الطباعة بواسطة نظام أدورا - ${new Date().toLocaleString('ar-SA')}
+                تم الطباعة بواسطة نظام أدورا - ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}
             </div>
         </body>
         </html>

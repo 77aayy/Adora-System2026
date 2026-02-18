@@ -22,6 +22,7 @@ import {
     increment
 } from 'firebase/firestore';
 import { checkDailyAttendance } from './challengeService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -155,7 +156,7 @@ export async function recordDailyActivity(
             };
         }
     } catch (error) {
-        console.error('Error recording daily activity:', error);
+        logger.error('Error recording daily activity:', error, 'dailyActivityService');
         return {
             success: false,
             isFirstActivityToday: false,
@@ -178,7 +179,7 @@ export async function hasActivityToday(
         const activityDoc = await getDoc(activityRef);
         return activityDoc.exists();
     } catch (error) {
-        console.error('Error checking daily activity:', error);
+        logger.error('Error checking daily activity:', error, 'dailyActivityService');
         return false;
     }
 }
@@ -199,7 +200,7 @@ export async function getDailyActivitySummary(
         if (!activityDoc.exists()) return null;
         return activityDoc.data() as DailyActivityRecord;
     } catch (error) {
-        console.error('Error getting daily activity:', error);
+        logger.error('Error getting daily activity:', error, 'dailyActivityService');
         return null;
     }
 }

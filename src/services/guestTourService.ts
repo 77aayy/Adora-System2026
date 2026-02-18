@@ -10,6 +10,8 @@
  * Adora Hotel Management System V3
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // CONSTANTS
 // ============================================================
@@ -69,7 +71,7 @@ const saveTourData = (data: GuestTourData): void => {
         const key = `${TOUR_STORAGE_KEY}_${data.branchId}_${data.roomNumber}`;
         localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-        console.error('Error saving tour data:', error);
+        logger.error('Error saving tour data:', error, 'guestTourService');
     }
 };
 
@@ -151,7 +153,7 @@ export const resetRoomTour = (roomNumber: string, branchId: string): void => {
         const key = `${TOUR_STORAGE_KEY}_${branchId}_${roomNumber}`;
         localStorage.removeItem(key);
     } catch (error) {
-        console.error('Error resetting tour data:', error);
+        logger.error('Error resetting tour data:', error, 'guestTourService');
     }
 };
 
@@ -163,7 +165,7 @@ export const clearAllTourData = (): void => {
         const keys = Object.keys(localStorage).filter(key => key.startsWith(TOUR_STORAGE_KEY));
         keys.forEach(key => localStorage.removeItem(key));
     } catch (error) {
-        console.error('Error clearing tour data:', error);
+        logger.error('Error clearing tour data:', error, 'guestTourService');
     }
 };
 

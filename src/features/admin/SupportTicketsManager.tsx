@@ -15,6 +15,7 @@ import { useUX } from '../../context/UXContext';
 import { useTranslation } from 'react-i18next';
 import { useTenantBranches } from '../../hooks/useTenantData';
 import { SupportTicketModal } from '../../components/shared/SupportTicketModal';
+import { formatDateTimeGregorianEn } from '../../utils/dateUtils';
 import {
     subscribeToAllTickets,
     subscribeToTenantTickets,
@@ -239,11 +240,11 @@ export const SupportTicketsManager: React.FC = () => {
                 {/* Tabs */}
                 <div className="flex gap-2 mb-6 overflow-x-auto">
                     {[
-                        { id: 'pending', label: t('supportTickets.status.pending') || 'في الانتظار', count: tickets.filter(t => t.status === 'pending').length },
-                        { id: 'acknowledged', label: t('supportTickets.status.acknowledged') || 'تم العلم', count: tickets.filter(t => t.status === 'acknowledged').length },
-                        { id: 'in_progress', label: t('supportTickets.status.inProgress') || 'جاري العمل', count: tickets.filter(t => t.status === 'in_progress').length },
-                        { id: 'resolved', label: t('supportTickets.status.resolved') || 'تم الحل', count: tickets.filter(t => t.status === 'resolved').length },
-                        { id: 'closed', label: t('supportTickets.status.closed') || 'مغلق', count: tickets.filter(t => t.status === 'closed').length },
+                        { id: 'pending', label: t('admin.supportTickets.status.pending') || 'في الانتظار', count: tickets.filter(t => t.status === 'pending').length },
+                        { id: 'acknowledged', label: t('admin.supportTickets.status.acknowledged') || 'تم العلم', count: tickets.filter(t => t.status === 'acknowledged').length },
+                        { id: 'in_progress', label: t('admin.supportTickets.status.inProgress') || 'جاري العمل', count: tickets.filter(t => t.status === 'in_progress').length },
+                        { id: 'resolved', label: t('admin.supportTickets.status.resolved') || 'تم الحل', count: tickets.filter(t => t.status === 'resolved').length },
+                        { id: 'closed', label: t('admin.supportTickets.status.closed') || 'مغلق', count: tickets.filter(t => t.status === 'closed').length },
                         { id: 'all', label: t('common.all') || 'الكل', count: tickets.length }
                     ].map(tab => (
                         <button
@@ -298,7 +299,7 @@ export const SupportTicketsManager: React.FC = () => {
                                             {ticket.contactPhone}
                                         </span>
                                         <span>
-                                            {new Date(ticket.createdAt?.toDate ? ticket.createdAt.toDate() : ticket.createdAt).toLocaleString('ar-SA')}
+                                            {formatDateTimeGregorianEn(ticket.createdAt?.toDate ? ticket.createdAt.toDate() : ticket.createdAt, { showSeconds: false })}
                                         </span>
                                     </div>
                                 </div>
@@ -444,7 +445,7 @@ const TicketDetailsModal: React.FC<{
                             <div>
                                 <span className="text-white/60 text-sm">التاريخ:</span>
                                 <p className="text-white font-medium">
-                                    {new Date(ticket.createdAt?.toDate ? ticket.createdAt.toDate() : ticket.createdAt).toLocaleString('ar-SA')}
+                                    {formatDateTimeGregorianEn(ticket.createdAt?.toDate ? ticket.createdAt.toDate() : ticket.createdAt, { showSeconds: false })}
                                 </p>
                             </div>
                         </div>
@@ -473,7 +474,7 @@ const TicketDetailsModal: React.FC<{
                                 <p className="text-white mt-1">{ticket.ownerResponse}</p>
                                 {ticket.ownerResponseAt && (
                                     <p className="text-white/50 text-xs mt-1">
-                                        {new Date(ticket.ownerResponseAt.toDate ? ticket.ownerResponseAt.toDate() : ticket.ownerResponseAt).toLocaleString('ar-SA')}
+                                        {formatDateTimeGregorianEn(ticket.ownerResponseAt.toDate ? ticket.ownerResponseAt.toDate() : ticket.ownerResponseAt, { showSeconds: false })}
                                     </p>
                                 )}
                             </div>
@@ -486,7 +487,7 @@ const TicketDetailsModal: React.FC<{
                                 <p className="text-white mt-1">{ticket.resolutionNote}</p>
                                 {ticket.resolvedAt && (
                                     <p className="text-white/50 text-xs mt-1">
-                                        {new Date(ticket.resolvedAt.toDate ? ticket.resolvedAt.toDate() : ticket.resolvedAt).toLocaleString('ar-SA')}
+                                        {formatDateTimeGregorianEn(ticket.resolvedAt.toDate ? ticket.resolvedAt.toDate() : ticket.resolvedAt, { showSeconds: false })}
                                     </p>
                                 )}
                             </div>

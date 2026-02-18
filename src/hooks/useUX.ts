@@ -19,7 +19,9 @@ const showToast = (message: string, type: 'success' | 'error' | 'info') => {
         info: 'bg-blue-500'
     };
 
-    toast.className = `fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl z-[9999] flex items-center gap-3 text-white font-medium animate-slide-up ${colors[type]} border-0 outline-none`;
+    // ✅ FIX: Add "toast" class so theme-system doesn't apply card border; avoid heavy shadow that draws a black line in light mode
+    toast.className = `fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-lg z-[9999] flex items-center gap-3 text-white font-medium animate-slide-up toast ${colors[type]} border-0 outline-none`;
+    toast.setAttribute('data-ux-toast', 'true');
 
     // Add icon based on type
     const icon = type === 'success' ? '✅' : type === 'error' ? '⚠️' : 'ℹ️';

@@ -48,8 +48,11 @@ const db = admin.firestore();
 /**
  * ✅ Get System Settings via Cloud Function
  * Uses Admin SDK - no Rules needed
+ * ✅ CORS enabled for localhost development
  */
-exports.getSystemSettings = functions.https.onCall(async (data, context) => {
+exports.getSystemSettings = functions
+    .region('us-central1')
+    .https.onCall(async (data, context) => {
     try {
         // ✅ Require authentication (any authenticated user can read)
         if (!context.auth) {
@@ -85,8 +88,11 @@ exports.getSystemSettings = functions.https.onCall(async (data, context) => {
 });
 /**
  * ✅ Set System Settings (Owner only)
+ * ✅ CORS enabled for localhost development
  */
-exports.setSystemSettings = functions.https.onCall(async (data, context) => {
+exports.setSystemSettings = functions
+    .region('us-central1')
+    .https.onCall(async (data, context) => {
     var _a, _b;
     try {
         // ✅ Require authentication

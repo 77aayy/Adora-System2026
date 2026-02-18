@@ -44,6 +44,7 @@ import { PointsConfiguration } from './PointsConfiguration';
 import { useTenant } from '../../context/TenantContext';
 import { useUX } from '../../context/UXContext';
 import { useAuth } from '../../context/AuthContext';
+import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { useTenantBranches, useAllBranchesForOwner } from '../../hooks/useTenantData';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { logger } from '../../services/loggerService';
@@ -73,6 +74,8 @@ import { EmergencyAlertsManager } from './EmergencyAlertsManager';
 import { NotificationSettingsManager } from '../../components/admin/NotificationSettingsManager';
 import { QRRoomManager } from './QRRoomManager';
 import { useTranslation } from 'react-i18next';
+import { getTenantBranding, saveTenantBranding } from '../../services/tenantCustomizationService';
+import { formatDateGregorianEn, formatTimeGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES & PROPS
@@ -406,13 +409,7 @@ const QRCodeGenerator: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pr
                                                         <div>
                                                             <p className="text-xs font-semibold text-slate-800 dark:text-white">غرفة {token.roomNumber}</p>
                                                             <p className="text-xs text-slate-500 dark:text-white/40">
-                                                                {token.createdAt.toLocaleDateString('ar-SA', {
-                                                                    year: 'numeric',
-                                                                    month: 'short',
-                                                                    day: 'numeric',
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                })}
+                                                                {formatDateTimeGregorianEn(token.createdAt, { dateStyle: 'medium', showSeconds: false })}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -2202,7 +2199,7 @@ const CalendarSourcesManager: React.FC = () => {
                     {lastSync && (
                         <div className="text-xs text-slate-500 flex items-center gap-1">
                             <RefreshCw className="w-3 h-3" />
-                            آخر مزامنة: {lastSync.toLocaleDateString('ar-EG')} - {lastSync.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                            آخر مزامنة: {formatDateGregorianEn(lastSync)} - {formatTimeGregorianEn(lastSync, { showSeconds: false })}
                         </div>
                     )}
 
@@ -2488,6 +2485,7 @@ const BranchSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pro
     const { tenantId: contextTenantId } = useTenant();
     const tenantId = propTenantId || contextTenantId;
     const { success, error } = useUX();
+    const { isEnabled: isCalendarSyncEnabled } = useFeatureGate('calendarSync');
     const [formData, setFormData] = useState({ branchName: '', branchCode: '', logoUrl: '' });
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -2670,6 +2668,100 @@ const BranchSettings: React.FC<BranchSettingsProps> = ({ branchId, tenantId: pro
 // ============================================================
 // MAIN PAGE COMPONENT
 // ============================================================
+
+// ============================================================
+// DEPARTMENT TOGGLES (enable/disable departments — tenant branding)
+// Keys match autoTransferService.departmentToFeatureMap
+// ============================================================
+
+const DEPARTMENT_FEATURE_KEYS = ['housekeeping', 'maintenance', 'bellman', 'coffeeshop', 'procurement'] as const;
+const DEPARTMENT_LABELS: Record<string, string> = {
+    housekeeping: 'النظافة',
+    maintenance: 'الصيانة',
+    bellman: 'البيلمان',
+    coffeeshop: 'الكوفي شوب',
+    procurement: 'المشتريات'
+};
+
+const DepartmentTogglesSettings: React.FC = () => {
+    const { tenantId } = useTenant();
+    const { user } = useAuth();
+    const { t } = useTranslation();
+    const [disabled, setDisabled] = useState<Set<string>>(new Set());
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            if (!tenantId) return;
+            setLoading(true);
+            try {
+                const branding = await getTenantBranding(tenantId);
+                if (cancelled) return;
+                const list = branding?.disabledFeatures ?? [];
+                setDisabled(new Set(list));
+            } catch (e) {
+                logger.error('Error loading department toggles', e, 'SettingsManager');
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        };
+        load();
+        return () => { cancelled = true; };
+    }, [tenantId]);
+
+    const handleToggle = async (featureKey: string, enabled: boolean) => {
+        if (!tenantId || !user?.id) return;
+        setSaving(true);
+        try {
+            const next = new Set(disabled);
+            if (enabled) next.delete(featureKey); else next.add(featureKey);
+            setDisabled(next);
+            await saveTenantBranding(
+                tenantId,
+                { disabledFeatures: Array.from(next) },
+                user.id
+            );
+        } catch (e) {
+            logger.error('Error saving department toggles', e, 'SettingsManager');
+            setDisabled(prev => new Set(prev)); // revert
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) return null;
+
+    return (
+        <div className="rounded-2xl rounded-3xl p-6 flex flex-col border border-white/5 relative overflow-hidden group">
+            <div className="flex items-center gap-3 mb-6 relative">
+                <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center border border-teal-500/20">
+                    <Shirt className="w-5 h-5 text-teal-400" />
+                </div>
+                <div>
+                    <h3 className="text-base font-bold text-white tracking-tight">تعطيل / تفعيل الأقسام</h3>
+                    <p className="text-[10px] text-white/40">إظهار أو إخفاء الأقسام من التوجيه التلقائي والواجهة</p>
+                </div>
+            </div>
+            <div className="space-y-3 relative">
+                {DEPARTMENT_FEATURE_KEYS.map(key => {
+                    const isEnabled = !disabled.has(key);
+                    return (
+                        <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                            <span className="text-sm font-medium text-white">{DEPARTMENT_LABELS[key] || key}</span>
+                            <Switch
+                                checked={isEnabled}
+                                onChange={(checked) => handleToggle(key, checked)}
+                                disabled={saving}
+                            />
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 // ============================================================
 // GENERAL ORGANIZATION SETTINGS (NEW)
@@ -3093,27 +3185,30 @@ export const SettingsManager: React.FC = () => {
                         {/* Sidebar: General Settings (4 cols) */}
                         <div className="lg:col-span-4 space-y-6">
                             <GeneralSettings />
+                            <DepartmentTogglesSettings />
                         </div>
 
                         {/* Main Stream: Points & Integrations (8 cols) */}
                         <div className="lg:col-span-8 space-y-6">
 
 
-                            <div className="rounded-2xl transition-colors duration-300-dark rounded-3xl p-8 border border-white/5 relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full -mr-32 -mt-32 group-hover:bg-purple-500/10 transition-colors duration-700" />
+                            {isCalendarSyncEnabled && (
+                                <div className="rounded-2xl transition-colors duration-300-dark rounded-3xl p-8 border border-white/5 relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full -mr-32 -mt-32 group-hover:bg-purple-500/10 transition-colors duration-700" />
 
-                                <div className="flex items-center gap-3 mb-8 px-2 relative">
-                                    <div className="w-12 h-12 rounded-2xl bg-purple-500/20 flex items-center justify-center border border-purple-500/20">
-                                        <Globe className="w-6 h-6 text-purple-400" />
+                                    <div className="flex items-center gap-3 mb-8 px-2 relative">
+                                        <div className="w-12 h-12 rounded-2xl bg-purple-500/20 flex items-center justify-center border border-purple-500/20">
+                                            <Globe className="w-6 h-6 text-purple-400" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-bold text-white">مركز التكاملات الخارجية</h2>
+                                            <p className="text-white/40 text-sm">ربط النظام مع المصادر العالمية للمواسم والمناسبات</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-white">مركز التكاملات الخارجية</h2>
-                                        <p className="text-white/40 text-sm">ربط النظام مع المصادر العالمية للمواسم والمناسبات</p>
-                                    </div>
+
+                                    <CalendarSourcesManager />
                                 </div>
-
-                                <CalendarSourcesManager />
-                            </div>
+                            )}
 
                             {/* 🏆 Points & Rewards Configuration (Integrated) */}
                             <div className="rounded-2xl transition-colors duration-300-dark rounded-3xl p-8 border border-white/5 relative overflow-hidden group">

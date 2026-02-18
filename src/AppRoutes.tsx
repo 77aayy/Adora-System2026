@@ -9,21 +9,13 @@ import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { PageTransition } from './components/common/PageTransition';
 
-// ✅ Adora Custom Loading Spinner for Suspense fallback
-import { AdoraLoader } from './components/common/AdoraLoader';
-
+// ✅ حد أدنى للتحميل عند تغيير المسار عند تغيير المسار - بدون شاشة كاملة (أسرع استجابة)
 const LoadingSpinner = () => (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-        <img
-            src="/adora-logo.png"
-            alt="Adora"
-            className="w-24 h-24 object-contain mb-4 animate-pulse"
-            style={{ filter: 'drop-shadow(0 0 15px rgba(45, 212, 191, 0.4))' }}
-        />
+    <div className="min-h-[40vh] flex items-center justify-center bg-transparent">
         <div className="flex gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '120ms' }} />
+            <div className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '240ms' }} />
         </div>
     </div>
 );
@@ -73,9 +65,21 @@ const ApproveRoomTypes = lazyLoad(() => import(/* webpackChunkName: "onboarding"
 
 // Core
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { GuestPortalGate } from './components/layout/GuestPortalGate';
 import { useAuth } from './context/AuthContext';
 import { getDepartmentPath } from './services/userService';
 import { ReceptionProvider } from './context/ReceptionContext';
+import { isFirebaseConfigured } from './services/firebase';
+
+// ======================================================
+// Firebase Setup Guard — لا نُ mount المعالج إن كان Firebase مُعداً (منع صفحة شبح)
+// ======================================================
+const FirebaseSetupGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    if (isFirebaseConfigured()) {
+        return <Navigate to="/login" replace />;
+    }
+    return <>{children}</>;
+};
 
 // ======================================================
 // Root Redirect (Smart SaaS Redirect)
@@ -112,7 +116,7 @@ export const AppRoutes: React.FC = () => {
                 {/* ================= Public ================= */}
                 <Route path="/login" element={<LoginScreen />} />
                 <Route path="/setup" element={<SetupWizard />} />
-                <Route path="/firebase-setup" element={<FirebaseSetupWizard />} />
+                <Route path="/firebase-setup" element={<FirebaseSetupGuard><FirebaseSetupWizard /></FirebaseSetupGuard>} />
 
                 {/* ================= Onboarding (Locked for Managers) ================= */}
                 <Route
@@ -214,13 +218,15 @@ export const AppRoutes: React.FC = () => {
                 {/* ================= About Us (Public) ================= */}
                 <Route path="/about" element={<AboutUs />} />
 
-                {/* ================= Guest (Public) ================= */}
+                {/* ================= Guest (Public - Gated by qrCodeGuestPortal) ================= */}
                 <Route
                     path="/guest"
                     element={
-                        <GuestLayout>
-                            <GuestDashboard />
-                        </GuestLayout>
+                        <GuestPortalGate>
+                            <GuestLayout>
+                                <GuestDashboard />
+                            </GuestLayout>
+                        </GuestPortalGate>
                     }
                 />
 

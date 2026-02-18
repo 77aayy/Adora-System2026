@@ -43,11 +43,15 @@ import { UnifiedModal, ModalActions } from '../common/UnifiedModal';
 import { toast } from '../common/EnhancedToast';
 import { useUX } from '../../context/UXContext';
 
+/** عرض الشريط الجانبي عند التوسيع وعند الطي — لاستخدامها في هامش المحتوى */
+export const SIDEBAR_WIDTH_EXPANDED_PX = 280;
+export const SIDEBAR_WIDTH_COLLAPSED_PX = 80;
+
 interface AdminSidebarProps {
     isOwner: boolean;
-    onClose?: () => void; // ✅ For mobile closing
-    className?: string;   // ✅ For custom styling
-    onCollapseChange?: (isCollapsed: boolean) => void; // ✅ Callback for collapse state
+    onClose?: () => void;
+    className?: string;
+    onCollapseChange?: (isCollapsed: boolean) => void;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, className = '', onCollapseChange }) => {
@@ -139,7 +143,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
             icon: <Crown className="w-4 h-4" style={{ color: 'var(--theme-accent-yellow)' }} />,
             items: [
                 { to: '/owner-dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: t('admin.overview') || t('admin.mainDashboard') || 'Overview', end: true },
-                { to: '/owner-panel', icon: <ShieldCheck className="w-4 h-4" />, label: t('admin.ownerDashboard') || 'Owner Dashboard' },
                 { to: '/owner-dashboard?tab=tenants', icon: <Users className="w-4 h-4" />, label: t('admin.manageSubscribers') || 'إدارة المشتركين' },
                 { to: '/owner-dashboard?tab=billing', icon: <DollarSign className="w-4 h-4" />, label: t('admin.billing') || 'Billing' },
                 { 
@@ -148,7 +151,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     label: t('admin.subscriptionRequests') || 'طلبات التجربة والاشتراك',
                     badge: pendingSubscriptionRequests > 0 ? pendingSubscriptionRequests : undefined
                 },
-                { to: '/owner-dashboard?tab=demo', icon: <Share2 className="w-4 h-4" />, label: t('admin.demoLinks') || 'Demo Links' },
             ]
         },
         {
@@ -354,23 +356,26 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
     // ✅ Use filteredBranches for active branch (respects access control)
     const activeBranch = filteredBranches.find(b => b.id === branchId) || filteredBranches[0];
 
-    // ✅ ADORA SMART & FLUID SIDEBAR V5.2 - Premium Specifications
+    const transitionEase = 'cubic-bezier(0.4, 0, 0.2, 1)';
+    const transitionDuration = '0.3s';
+
     return (
         <aside 
             className={`flex flex-col min-h-screen relative ${className}`} 
             style={{ 
-                width: isCollapsed ? '80px' : '280px',
+                width: isCollapsed ? SIDEBAR_WIDTH_COLLAPSED_PX : SIDEBAR_WIDTH_EXPANDED_PX,
+                minWidth: isCollapsed ? SIDEBAR_WIDTH_COLLAPSED_PX : SIDEBAR_WIDTH_EXPANDED_PX,
                 minHeight: '100vh',
                 background: 'var(--theme-bg-secondary)',
                 backdropFilter: 'var(--theme-backdrop-filter, blur(20px) saturate(180%))',
                 borderRight: '1px solid var(--theme-border-primary)',
                 boxShadow: 'var(--theme-shadow-card)',
-                padding: isCollapsed ? '15px 8px' : '15px 16px',
+                padding: isCollapsed ? '12px 8px' : '15px 16px',
                 display: 'flex',
                 flexDirection: 'column',
                 zIndex: 100,
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                overflow: 'hidden', // ✅ FIX: Prevent text overflow and line artifacts when collapsed
+                transition: `width ${transitionDuration} ${transitionEase}, min-width ${transitionDuration} ${transitionEase}, padding ${transitionDuration} ${transitionEase}`,
+                overflow: 'hidden',
             }}
         >
             {/* 🎨 Header with Dynamic Logo & Toggle Button - ✅ ADORA SMART SIDEBAR */}
@@ -408,60 +413,54 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                     )}
                 </button>
 
-                {/* ✅ Logo Area - Dynamic based on state */}
-                <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+                {/* ✅ Logo + Title — انتقال سلس (opacity + max-width) */}
+                <div 
+                    className="flex items-center gap-3 overflow-hidden"
+                    style={{ justifyContent: isCollapsed ? 'center' : 'flex-start', transition: `justify-content ${transitionDuration} ${transitionEase}` }}
+                >
                     {activeBranch?.logoUrl ? (
                         <img
                             src={activeBranch.logoUrl}
                             alt="Hotel Logo"
-                            className={`rounded-xl object-cover shadow-lg border transition-all duration-300 flex-shrink-0`}
+                            className="rounded-xl object-cover shadow-lg border flex-shrink-0"
                             style={{ 
-                                width: isCollapsed ? '32px' : '48px',
-                                height: isCollapsed ? '32px' : '48px',
+                                width: isCollapsed ? 32 : 48,
+                                height: isCollapsed ? 32 : 48,
                                 borderColor: '#f1f5f9',
+                                transition: `width ${transitionDuration} ${transitionEase}, height ${transitionDuration} ${transitionEase}`,
                             }}
                         />
                     ) : (
                         <div 
                             className="rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-500/20 flex-shrink-0"
                             style={{
-                                width: isCollapsed ? '32px' : '48px',
-                                height: isCollapsed ? '32px' : '48px',
+                                width: isCollapsed ? 32 : 48,
+                                height: isCollapsed ? 32 : 48,
+                                transition: `width ${transitionDuration} ${transitionEase}, height ${transitionDuration} ${transitionEase}`,
                             }}
                         >
-                            {isCollapsed ? (
-                                <Crown className="w-4 h-4 text-white" />
-                            ) : (
-                                <Crown className="w-6 h-6 text-white" />
-                            )}
+                            <Crown className={`text-white transition-all duration-300 ${isCollapsed ? 'w-4 h-4' : 'w-6 h-6'}`} />
                         </div>
                     )}
-
-                    {/* ✅ Branch Name - Hidden when collapsed */}
-                    {!isCollapsed && (
-                        <div className="min-w-0 flex-1">
-                            <h1 
-                                className="text-base font-bold leading-tight transition-colors duration-300" 
-                                style={{ 
-                                    color: 'var(--theme-text-primary)',
-                                    fontSize: '16px',
-                                    fontFamily: 'Cairo, sans-serif',
-                                    fontWeight: 600,
-                                }}
-                            >
-                                {activeBranch?.name || 'Adora Admin'}
-                            </h1>
-                            <p 
-                                className="text-[9px] font-bold tracking-wider uppercase opacity-80"
-                                style={{
-                                    color: 'var(--theme-primary-600)',
-                                    fontFamily: 'Cairo, sans-serif',
-                                }}
-                            >
-                                {isOwner ? (t('admin.ownerDashboard') || 'لوحة المالك') : (t('admin.managerDashboard') || 'مدير النظام')}
-                            </p>
-                        </div>
-                    )}
+                    <div 
+                        className="min-w-0 flex-1 overflow-hidden"
+                        style={{
+                            opacity: isCollapsed ? 0 : 1,
+                            maxWidth: isCollapsed ? 0 : 240,
+                            transition: `opacity ${transitionDuration} ${transitionEase}, max-width ${transitionDuration} ${transitionEase}`,
+                            pointerEvents: isCollapsed ? 'none' : 'auto',
+                        }}
+                    >
+                        <h1 
+                            className="text-base font-bold leading-tight whitespace-nowrap"
+                            style={{ color: 'var(--theme-text-primary)', fontSize: '16px', fontFamily: 'Cairo, sans-serif', fontWeight: 600 }}
+                        >
+                            {activeBranch?.name || 'Adora Admin'}
+                        </h1>
+                        <p className="text-[9px] font-bold tracking-wider uppercase opacity-80 whitespace-nowrap" style={{ color: 'var(--theme-primary-600)', fontFamily: 'Cairo, sans-serif' }}>
+                            {isOwner ? (t('admin.ownerDashboard') || 'لوحة المالك') : (t('admin.managerDashboard') || 'مدير النظام')}
+                        </p>
+                    </div>
                 </div>
 
                 {/* ✅ Branch Selector - Hidden when collapsed */}
@@ -570,31 +569,40 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                         }
                                     }}
                                 >
-                                    <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0" style={{ overflow: 'hidden' }}>
-                                        <div className={`p-1.5 sm:p-1.5 rounded-lg transition-all duration-300 flex-shrink-0 ${isExpanded ? 'bg-teal-500/20 shadow-sm' : ''}`}
+                                    <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0 overflow-hidden">
+                                        <div className={`p-1.5 rounded-lg flex-shrink-0 transition-all duration-300 ${isExpanded ? 'bg-teal-500/20 shadow-sm' : ''}`}
                                              style={!isExpanded ? { background: 'var(--theme-bg-secondary)' } : {}}>
                                             {section.icon}
                                         </div>
-                                        {/* ✅ FIX: Hide section label when collapsed */}
-                                        {!isCollapsed && (
-                                            <span 
-                                                className="text-[10px] sm:text-xs font-bold uppercase tracking-wider"
-                                                style={{
-                                                    whiteSpace: 'nowrap',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    lineHeight: '1.4',
-                                                    color: 'var(--theme-text-secondary)',
-                                                }}
-                                            >
-                                                {section.label}
-                                            </span>
-                                        )}
+                                        <span 
+                                            className="text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap block overflow-hidden text-ellipsis"
+                                            style={{
+                                                opacity: isCollapsed ? 0 : 1,
+                                                maxWidth: isCollapsed ? 0 : 140,
+                                                lineHeight: '1.4',
+                                                color: 'var(--theme-text-secondary)',
+                                                transition: `opacity ${transitionDuration} ${transitionEase}, max-width ${transitionDuration} ${transitionEase}`,
+                                            }}
+                                        >
+                                            {section.label}
+                                        </span>
                                     </div>
-                                    <ChevronDown
-                                        className={`w-3.5 h-3.5 sm:w-3 sm:h-3 transition-transform duration-300 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
-                                        style={{ color: isExpanded ? 'var(--theme-primary-500)' : 'var(--theme-text-tertiary)' }}
-                                    />
+                                    <span 
+                                        className="flex-shrink-0 overflow-hidden block"
+                                        style={{ 
+                                            maxWidth: isCollapsed ? 0 : 14,
+                                            transition: `max-width ${transitionDuration} ${transitionEase}`,
+                                        }}
+                                    >
+                                        <ChevronDown
+                                            className="transition-transform duration-300"
+                                            style={{ 
+                                                width: 14, height: 14, 
+                                                color: isExpanded ? 'var(--theme-primary-500)' : 'var(--theme-text-tertiary)',
+                                                transform: isExpanded ? 'rotate(180deg)' : 'none',
+                                            }}
+                                        />
+                                    </span>
                                 </button>
 
                                 {isExpanded && (
@@ -634,14 +642,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         height: '40px', // ✅ Strict height
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: isCollapsed ? '0' : '10px', // ✅ FIX: No gap when collapsed
-                                                        padding: isCollapsed ? '0 8px' : '0 12px', // ✅ FIX: Reduced padding when collapsed
-                                                        marginBottom: '2px', // ✅ Minimal margin
-                                                        borderRadius: '8px', // ✅ Strict border radius
-                                                        fontSize: '13.5px', // ✅ Strict font size
-                                                        fontWeight: 500, // ✅ Strict font weight
+                                                        gap: isCollapsed ? 0 : 10,
+                                                        padding: isCollapsed ? '0 8px' : '0 12px',
+                                                        marginBottom: '2px',
+                                                        borderRadius: '8px',
+                                                        fontSize: '13.5px',
+                                                        fontWeight: 500,
                                                         cursor: 'pointer',
-                                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', // ✅ Smooth transition with easing
+                                                        transition: `all 0.25s ${transitionEase}, gap ${transitionDuration} ${transitionEase}, padding ${transitionDuration} ${transitionEase}`,
                                                         transform: 'scale(1)', // ✅ Initial scale
                                                         color: isActive ? 'var(--theme-primary-600)' : 'var(--theme-text-secondary)', // ✅ Active: Primary color | Inactive: Secondary text
                                                         background: isActive ? 'var(--theme-primary-100)' : 'transparent', // ✅ Active: Light primary | Inactive: Transparent
@@ -719,27 +727,19 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                                 : item.icon
                                                             }
                                                         </span>
-                                                        {/* ✅ Label - Hidden when collapsed with proper overflow handling */}
-                                                        {!isCollapsed && (
-                                                            <span 
-                                                                className="flex-1 truncate"
-                                                                style={{
-                                                                    fontFamily: 'Cairo, sans-serif',
-                                                                    fontSize: '14px',
-                                                                    fontWeight: 600,
-                                                                    overflow: 'hidden',
-                                                                    textOverflow: 'ellipsis',
-                                                                    whiteSpace: 'nowrap',
-                                                                    maxWidth: '100%',
-                                                                }}
-                                                            >
-                                                                {item.label}
-                                                            </span>
-                                                        )}
-                                                        {/* ✅ FIX: Ensure label is completely hidden when collapsed */}
-                                                        {isCollapsed && (
-                                                            <span style={{ display: 'none' }}>{item.label}</span>
-                                                        )}
+                                                        <span 
+                                                            className="flex-1 truncate whitespace-nowrap block overflow-hidden text-ellipsis"
+                                                            style={{
+                                                                fontFamily: 'Cairo, sans-serif',
+                                                                fontSize: '14px',
+                                                                fontWeight: 600,
+                                                                opacity: isCollapsed ? 0 : 1,
+                                                                maxWidth: isCollapsed ? 0 : '100%',
+                                                                transition: `opacity ${transitionDuration} ${transitionEase}, max-width ${transitionDuration} ${transitionEase}`,
+                                                            }}
+                                                        >
+                                                            {item.label}
+                                                        </span>
                                                         {/* ✅ Tooltip - Shows when collapsed and hovered */}
                                                         {isCollapsed && hoveredItem === item.to && (
                                                             <div
@@ -784,15 +784,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                         height: '40px', // ✅ Strict height
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: isCollapsed ? '0' : '10px', // ✅ FIX: No gap when collapsed
-                                                        padding: isCollapsed ? '0 8px' : '0 12px', // ✅ FIX: Reduced padding when collapsed
-                                                        marginBottom: '2px', // ✅ Minimal margin
-                                                        borderRadius: '8px', // ✅ Strict border radius
-                                                        overflow: 'hidden', // ✅ FIX: Prevent text overflow artifacts
-                                                        fontSize: '13.5px', // ✅ Strict font size
-                                                        fontWeight: 500, // ✅ Strict font weight
+                                                        gap: isCollapsed ? 0 : 10,
+                                                        padding: isCollapsed ? '0 8px' : '0 12px',
+                                                        marginBottom: '2px',
+                                                        borderRadius: '8px',
+                                                        overflow: 'hidden',
+                                                        fontSize: '13.5px',
+                                                        fontWeight: 500,
                                                         cursor: 'pointer',
-                                                        transition: 'all 0.15s ease-in-out', // ✅ Strict transition
+                                                        transition: `all 0.25s ${transitionEase}, gap ${transitionDuration} ${transitionEase}, padding ${transitionDuration} ${transitionEase}`,
                                                         color: isActive 
                                                             ? 'var(--theme-primary-600)' 
                                                             : 'var(--theme-text-secondary)', // ✅ Active: Primary | Inactive: Secondary text
@@ -852,20 +852,17 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOwner, onClose, cl
                                                                     : item.icon
                                                                 }
                                                             </span>
-                                                            {/* ✅ FIX: Hide label when collapsed */}
-                                                            {!isCollapsed ? (
-                                                                <span 
-                                                                    className="flex-1 text-sm"
-                                                                    style={{
-                                                                        whiteSpace: 'nowrap',
-                                                                        overflow: 'hidden',
-                                                                        textOverflow: 'ellipsis',
-                                                                        lineHeight: '1.4',
-                                                                    }}
-                                                                >
-                                                                    {item.label}
-                                                                </span>
-                                                            ) : null}
+                                                            <span 
+                                                                className="flex-1 text-sm whitespace-nowrap block overflow-hidden text-ellipsis"
+                                                                style={{
+                                                                    lineHeight: '1.4',
+                                                                    opacity: isCollapsed ? 0 : 1,
+                                                                    maxWidth: isCollapsed ? 0 : '100%',
+                                                                    transition: `opacity ${transitionDuration} ${transitionEase}, max-width ${transitionDuration} ${transitionEase}`,
+                                                                }}
+                                                            >
+                                                                {item.label}
+                                                            </span>
                                                             {(item as any).badge && (item as any).badge > 0 && (
                                                                 <span className={`ml-auto px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-xs font-bold flex-shrink-0 ${
                                                                     isActive 

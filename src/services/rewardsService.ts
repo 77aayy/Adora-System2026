@@ -16,6 +16,7 @@ import {
     Timestamp, serverTimestamp, increment
 } from 'firebase/firestore';
 // import { getReasonText, EmployeeContext } from './pointsService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -135,7 +136,7 @@ export const loadRewardSettings = async (
             return data.rewardsSettings || DEFAULT_REWARD_SETTINGS;
         }
     } catch (error) {
-        console.error('Error loading reward settings:', error);
+        logger.error('Error loading reward settings:', error, 'rewardsService');
     }
 
     return DEFAULT_REWARD_SETTINGS;
@@ -258,7 +259,7 @@ export const calculateDailyRewards = async (
 
         return rewarded;
     } catch (error) {
-        console.error('Error calculating daily rewards:', error);
+        logger.error('Error calculating daily rewards:', error, 'rewardsService');
         return [];
     }
 };
@@ -380,7 +381,7 @@ export const calculateWeeklyRewards = async (
 
         return rewarded;
     } catch (error) {
-        console.error('Error calculating weekly rewards:', error);
+        logger.error('Error calculating weekly rewards:', error, 'rewardsService');
         return [];
     }
 };
@@ -502,7 +503,7 @@ export const calculateMonthlyRewards = async (
 
         return rewarded;
     } catch (error) {
-        console.error('Error calculating monthly rewards:', error);
+        logger.error('Error calculating monthly rewards:', error, 'rewardsService');
         return [];
     }
 };

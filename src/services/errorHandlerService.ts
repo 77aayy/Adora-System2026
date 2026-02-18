@@ -6,6 +6,8 @@
 
 import { db } from './firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { logger } from './loggerService';
+import { formatDateTimeGregorianEn } from '../utils/dateUtils';
 
 // ============================================================
 // CONFIGURATION
@@ -163,7 +165,7 @@ export const logErrorToFirestore = async (
             userAgent: navigator.userAgent
         });
     } catch (e) {
-        console.error('Failed to log error to Firestore:', e);
+        logger.error('Failed to log error to Firestore:', e, 'errorHandlerService');
     }
 };
 
@@ -183,7 +185,7 @@ export const getErrorLog = (): ErrorInfo[] => {
  */
 export const generateDiagnosticReport = (): string => {
     const errors = getErrorLog();
-    const timestamp = new Date().toLocaleString('ar-SA');
+    const timestamp = formatDateTimeGregorianEn(new Date(), { showSeconds: true });
     const userAgent = navigator.userAgent;
     const url = window.location.href;
 
@@ -217,10 +219,10 @@ export const copyDiagnosticReport = async (): Promise<boolean> => {
     try {
         const report = generateDiagnosticReport();
         await navigator.clipboard.writeText(report);
-        console.log('📋 تم نسخ تقرير التشخيص إلى الحافظة');
+        logger.info('📋 تم نسخ تقرير التشخيص إلى الحافظة', undefined, 'errorHandlerService');
         return true;
     } catch (err) {
-        console.error('Failed to copy diagnostic report:', err);
+        logger.error('Failed to copy diagnostic report:', err, 'errorHandlerService');
         return false;
     }
 };
@@ -231,7 +233,7 @@ export const copyDiagnosticReport = async (): Promise<boolean> => {
 export const clearErrorLog = (): void => {
     localStorage.removeItem(STORAGE_KEY);
     errorCount = 0;
-    console.log('🧹 تم مسح سجل الأخطاء');
+    logger.info('🧹 تم مسح سجل الأخطاء', undefined, 'errorHandlerService');
 };
 
 // ============================================================
@@ -265,16 +267,35 @@ const handleError = (event: ErrorEvent): void => {
     const isFirestoreInternalError = errorMessage.includes('INTERNAL ASSERTION FAILED') ||
                                      errorMessage.includes('Unexpected state');
     
+    // ✅ CRITICAL FIX: Firestore INTERNAL ASSERTION FAILED requires immediate page reload
+    // Reinitializing Firestore while listeners are active causes cascading errors
+    // Solution: Force page reload immediately (don't attempt recovery)
+    if (isFirestoreInternalError && !isPermissionError) {
+        // Check if we've already attempted reload in this session
+        const reloadKey = 'adora_firestore_reload_attempted';
+        const hasAttemptedReload = sessionStorage.getItem(reloadKey) === 'true';
+        
+        if (!hasAttemptedReload && typeof window !== 'undefined') {
+            sessionStorage.setItem(reloadKey, 'true');
+            logger.error('❌ [Firestore] INTERNAL ASSERTION FAILED detected - forcing page reload for clean recovery...', undefined, 'errorHandlerService');
+            
+            // ✅ CRITICAL: Force immediate reload (no recovery attempt - it causes more errors)
+            setTimeout(() => {
+                window.location.reload();
+            }, 500); // Very short delay to allow error logging
+            return; // Exit early, reload is happening
+        } else if (hasAttemptedReload) {
+            // If reload already attempted, just log and continue (to avoid infinite reload loop)
+            logger.warn('⚠️ Firestore internal error (reload already attempted this session, skipping):', errorMessage, 'errorHandlerService');
+        }
+    }
+    
     // ✅ Only increment error count for real errors
     if (!isQuotaError && !isPermissionError && !isResizeObserverError && !isFirestoreInternalError) {
         errorCount++;
-        console.error('🔴 خطأ غير متوقع:', event.error);
-    } else {
-        if (isFirestoreInternalError) {
-            console.warn('⚠️ Firestore internal error (SDK issue, ignored):', errorMessage);
-        } else {
-            console.warn('⚠️ Non-critical error (ignored):', errorMessage);
-        }
+        logger.error('🔴 خطأ غير متوقع:', event.error, 'errorHandlerService');
+    } else if (!isFirestoreInternalError) {
+        logger.warn('⚠️ Non-critical error (ignored):', errorMessage, 'errorHandlerService');
     }
 
     logError({
@@ -313,16 +334,35 @@ const handleUnhandledRejection = (event: PromiseRejectionEvent): void => {
     const isFirestoreInternalError = errorMessage.includes('INTERNAL ASSERTION FAILED') ||
                                      errorMessage.includes('Unexpected state');
     
+    // ✅ CRITICAL FIX: Firestore INTERNAL ASSERTION FAILED requires immediate page reload
+    // Reinitializing Firestore while listeners are active causes cascading errors
+    // Solution: Force page reload immediately (don't attempt recovery)
+    if (isFirestoreInternalError && !isPermissionError) {
+        // Check if we've already attempted reload in this session
+        const reloadKey = 'adora_firestore_reload_attempted';
+        const hasAttemptedReload = sessionStorage.getItem(reloadKey) === 'true';
+        
+        if (!hasAttemptedReload && typeof window !== 'undefined') {
+            sessionStorage.setItem(reloadKey, 'true');
+            logger.error('❌ [Firestore] INTERNAL ASSERTION FAILED detected (promise rejection) - forcing page reload...', undefined, 'errorHandlerService');
+            
+            // ✅ CRITICAL: Force immediate reload (no recovery attempt - it causes more errors)
+            setTimeout(() => {
+                window.location.reload();
+            }, 500); // Very short delay to allow error logging
+            return; // Exit early, reload is happening
+        } else if (hasAttemptedReload) {
+            // If reload already attempted, just log and continue (to avoid infinite reload loop)
+            logger.warn('⚠️ Firestore internal error (reload already attempted this session, skipping):', errorMessage, 'errorHandlerService');
+        }
+    }
+    
     // ✅ Only increment error count for real errors
     if (!isQuotaError && !isPermissionError && !isFirestoreInternalError) {
         errorCount++;
-        console.error('🔴 Promise غير معالج:', event.reason);
-    } else {
-        if (isFirestoreInternalError) {
-            console.warn('⚠️ Firestore internal error (SDK issue, ignored):', errorMessage);
-        } else {
-            console.warn('⚠️ Firebase error (ignored):', errorMessage);
-        }
+        logger.error('🔴 Promise غير معالج:', event.reason, 'errorHandlerService');
+    } else if (!isFirestoreInternalError) {
+        logger.warn('⚠️ Firebase error (ignored):', errorMessage, 'errorHandlerService');
     }
 
     logError({
@@ -487,7 +527,7 @@ export function safeExecute<T, Args extends any[]>(
         try {
             return await fn(...args);
         } catch (error: any) {
-            console.error('❌ خطأ في التنفيذ:', error);
+            logger.error('❌ خطأ في التنفيذ:', error, 'errorHandlerService');
 
             logError({
                 type: 'safeExecute',
@@ -544,7 +584,6 @@ export const initErrorHandler = (): void => {
     }, ERROR_RESET_INTERVAL);
 
     isInitialized = true;
-    console.log('✅ تم تهيئة نظام معالجة الأخطاء');
 };
 
 /**

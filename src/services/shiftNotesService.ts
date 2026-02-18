@@ -13,6 +13,7 @@ import {
     collection, doc, addDoc, getDocs, updateDoc, deleteDoc,
     query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, writeBatch
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -105,10 +106,10 @@ export const createShiftNote = async (
         };
 
         const docRef = await addDoc(collection(db, getNotesPath(session)), note);
-        console.log('✅ Shift note created:', docRef.id);
+        logger.info('✅ Shift note created:', docRef.id, 'shiftNotesService');
         return docRef.id;
     } catch (error) {
-        console.error('Error creating shift note:', error);
+        logger.error('Error creating shift note:', error, 'shiftNotesService');
         return null;
     }
 };
@@ -139,7 +140,7 @@ export const getActiveNotes = async (session: SessionContext): Promise<ShiftNote
 
         return notes;
     } catch (error) {
-        console.error('Error getting active notes:', error);
+        logger.error('Error getting active notes:', error, 'shiftNotesService');
         return [];
     }
 };
@@ -174,7 +175,7 @@ export const getNotesForRoom = async (
 
         return notes;
     } catch (error) {
-        console.error('Error getting room notes:', error);
+        logger.error('Error getting room notes:', error, 'shiftNotesService');
         return [];
     }
 };
@@ -190,7 +191,7 @@ export const getUnreadNotesCount = async (
         const notes = await getActiveNotes(session);
         return notes.filter(note => !note.readBy?.includes(employeeId)).length;
     } catch (error) {
-        console.error('Error getting unread count:', error);
+        logger.error('Error getting unread count:', error, 'shiftNotesService');
         return 0;
     }
 };
@@ -243,10 +244,10 @@ export const markNoteAsRead = async (
                             points,
                             'تأكيد استلام ملاحظة وردية'
                         );
-                        console.log(`✨ Awarded ${points} points to ${employeeId} for note acknowledgment`);
+                        logger.info(`✨ Awarded ${points} points to ${employeeId} for note acknowledgment`, undefined, 'shiftNotesService');
                     }
                 } catch (pointsError) {
-                    console.error('Error awarding points for note read:', pointsError);
+                    logger.error('Error awarding points for note read:', pointsError, 'shiftNotesService');
                     // Don't fail the read operation just because points failed
                 }
             }
@@ -254,7 +255,7 @@ export const markNoteAsRead = async (
 
         return true;
     } catch (error) {
-        console.error('Error marking note as read:', error);
+        logger.error('Error marking note as read:', error, 'shiftNotesService');
         return false;
     }
 };
@@ -276,10 +277,10 @@ export const archiveNote = async (
             checkoutId: checkoutId || null
         });
 
-        console.log('✅ Note archived:', noteId);
+        logger.info('✅ Note archived:', noteId, 'shiftNotesService');
         return true;
     } catch (error) {
-        console.error('Error archiving note:', error);
+        logger.error('Error archiving note:', error, 'shiftNotesService');
         return false;
     }
 };
@@ -308,10 +309,10 @@ export const archiveRoomNotes = async (
         });
 
         await batch.commit();
-        console.log(`✅ Archived ${notes.length} notes for room ${roomNumber}`);
+        logger.info(`✅ Archived ${notes.length} notes for room ${roomNumber}`, undefined, 'shiftNotesService');
         return notes.length;
     } catch (error) {
-        console.error('Error archiving room notes:', error);
+        logger.error('Error archiving room notes:', error, 'shiftNotesService');
         return 0;
     }
 };
@@ -345,7 +346,7 @@ export const getArchivedNotes = async (
 
         return notes.slice(0, limitCount);
     } catch (error) {
-        console.error('Error getting archived notes:', error);
+        logger.error('Error getting archived notes:', error, 'shiftNotesService');
         return [];
     }
 };
@@ -359,10 +360,10 @@ export const deleteNote = async (
 ): Promise<boolean> => {
     try {
         await deleteDoc(doc(db, getNotesPath(session), noteId));
-        console.log('✅ Note deleted:', noteId);
+        logger.info('✅ Note deleted:', noteId, 'shiftNotesService');
         return true;
     } catch (error) {
-        console.error('Error deleting note:', error);
+        logger.error('Error deleting note:', error, 'shiftNotesService');
         return false;
     }
 };

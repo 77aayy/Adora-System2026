@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -63,7 +65,7 @@ export const initTheme = (): void => {
         startAutoCheck();
     }
 
-    console.log('✅ Theme service initialized');
+    logger.info('✅ Theme service initialized', undefined, 'themeService');
 };
 
 /**

@@ -4,6 +4,9 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+import { formatDateTimeGregorianEn } from '../utils/dateUtils';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -266,7 +269,7 @@ export const printReport = (data: ReportData, options: PrintOptions = {}): void 
         subtitle: `التاريخ: ${data.date}`, // Date acts as main subtitle
         branch: data.branch, // Pass branch to header
         logo: true,
-        footer: `طُبع بواسطة نظام أدورا - ${new Date().toLocaleString('ar-SA')}`,
+        footer: `طُبع بواسطة نظام أدورا - ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}`,
         ...options
     });
 };
@@ -433,7 +436,7 @@ export const printReceipt = (receipt: {
 export const printElement = (elementId: string, options: PrintOptions = {}): void => {
     const element = document.getElementById(elementId);
     if (!element) {
-        console.error(`Element ${elementId} not found`);
+        logger.error(`Element ${elementId} not found`, undefined, 'printService');
         return;
     }
 

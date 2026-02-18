@@ -54,7 +54,7 @@ import {
     Unsubscribe,
     writeBatch
 } from 'firebase/firestore';
-import { db, auth } from './firebase';
+import { db, auth, functions as firebaseFunctions, httpsCallable } from './firebase';
 import {
     Request,
     RequestType,
@@ -70,6 +70,11 @@ import { awardPerformancePoints, awardRatingPoints, awardPoints, awardPointsWith
 import { logger } from './loggerService';
 import { validateTenantAccess, validateTenantId } from './tenantSecurityService';
 import { logAction, LogAction } from './advancedLogService';
+import {
+    confirmCompletionPayloadSchema,
+    completeRequestPayloadSchema,
+    transferRequestPayloadSchema
+} from '../schemas/requestSchemas';
 
 // ============================================================
 // TYPE DEFINITIONS
@@ -118,6 +123,25 @@ export const createRequest = async (
     validateTenantAccess(tenantId);
 
     try {
+        // F2: Idempotency — if key provided, return existing request id when duplicate within last 2 minutes
+        // Note: Firestore may require a composite index on (idempotencyKey, createdAt) for this query
+        if (input.idempotencyKey) {
+            const twoMinutesAgo = Timestamp.fromDate(new Date(Date.now() - 2 * 60 * 1000));
+            const requestsRef = collection(db, 'tenants', tenantId, 'requests');
+            const q = query(
+                requestsRef,
+                where('idempotencyKey', '==', input.idempotencyKey),
+                where('createdAt', '>=', twoMinutesAgo),
+                limit(1)
+            );
+            const existing = await getDocs(q);
+            if (!existing.empty) {
+                const existingId = existing.docs[0].id;
+                logger.info(`F2: Idempotent createRequest — returning existing id ${existingId}`, undefined, 'requestService');
+                return existingId;
+            }
+        }
+
         // 🕰️ Intelligent Target Time Assignment (Procurement)
         let targetCompletionTime = input.targetCompletionTime ? Timestamp.fromDate(input.targetCompletionTime) : undefined;
 
@@ -156,9 +180,9 @@ export const createRequest = async (
             initialDepartment = 'coffee_shop'; // ✅ Coffee shop department
         }
 
-        const requestData: Omit<Request, 'id'> = {
+        const requestData: Omit<Request, 'id'> & { idempotencyKey?: string } = {
             type: input.type,
-            status: RequestStatus.PENDING_RECEPTION,
+            status: RequestStatus.NEW, // ✅ Unified: Always start as NEW
             priority: input.priority || RequestPriority.NORMAL,
             source: input.source || RequestSource.RECEPTION,
 
@@ -167,6 +191,8 @@ export const createRequest = async (
 
             branch,
             tenantId, // ✅ SaaS requirement
+
+            ...(input.idempotencyKey && { idempotencyKey: input.idempotencyKey }),
 
             createdBy: {
                 id: userId,
@@ -200,6 +226,36 @@ export const createRequest = async (
         // ✅ STEP 4: Use tenant-scoped collection (Pattern 1)
         const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const docRef = await addDoc(requestsRef, requestData);
+        
+        // ✅ STEP 4.3: Initialize Unified State Machine (if feature enabled)
+        // This ensures new requests have all unified state fields (involvedDepartments, isActionRequiredByReception, stateHistory)
+        try {
+            const { isFeatureEnabled } = await import('./featureFlagsService');
+            const useUnifiedStateMachine = await isFeatureEnabled(tenantId, 'useUnifiedStateMachine');
+            
+            if (useUnifiedStateMachine) {
+                const { initializeRequest } = await import('./stateTransitionService');
+                const { REQUEST_TYPE_TO_DEPARTMENT, DEPARTMENTS } = await import('./workflowService');
+                
+                // Determine target department from request type
+                const targetDepartment = REQUEST_TYPE_TO_DEPARTMENT[input.type] || DEPARTMENTS.RECEPTION;
+                
+                await initializeRequest(
+                    tenantId,
+                    docRef.id,
+                    input.type,
+                    initialDepartment as any,
+                    targetDepartment,
+                    userId,
+                    userName,
+                    input.notes || 'تم إنشاء الطلب'
+                );
+                logger.info('Unified State Machine initialized for new request', { requestId: docRef.id }, 'requestService');
+            }
+        } catch (initError: any) {
+            // Non-critical: Log but don't fail request creation
+            logger.warn('Failed to initialize Unified State Machine (non-critical)', initError, 'requestService');
+        }
         
         // ✅ STEP 4.5: Check if target department is disabled and transfer immediately
         try {
@@ -486,17 +542,49 @@ export const confirmRequest = async (
         }
         const oldStatus = request.status;
 
-        // ✅ Use tenant-scoped collection
-        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
-        await updateDoc(requestRef, {
-            status: RequestStatus.CONFIRMED,
-            confirmedBy: {
-                id: userId,
-                name: userName
-            },
-            confirmedAt: Timestamp.now(),
-            'timeline.confirmed': Timestamp.now()
-        });
+        // ✅ Use Unified State Machine
+        try {
+            const { moveRequest } = await import('./stateTransitionService');
+            const { REQUEST_TYPE_TO_DEPARTMENT, DEPARTMENTS } = await import('./workflowService');
+            
+            // Determine target department from request type
+            const targetDepartment = REQUEST_TYPE_TO_DEPARTMENT[request.type] || DEPARTMENTS.RECEPTION;
+            
+            // Confirm = Keep status as NEW but ensure it's ready for target department
+            await moveRequest(
+                validatedTenantId,
+                requestId,
+                'NEW',
+                targetDepartment,
+                userId,
+                userName,
+                'تم تأكيد الطلب'
+            );
+            
+            // Update legacy fields for backward compatibility
+            const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+            await updateDoc(requestRef, {
+                confirmedBy: {
+                    id: userId,
+                    name: userName
+                },
+                confirmedAt: Timestamp.now(),
+                'timeline.confirmed': Timestamp.now()
+            });
+        } catch (stateMachineError: any) {
+            // Fallback to legacy update if State Machine fails
+            logger.warn('State Machine failed, using legacy update', stateMachineError, 'requestService');
+            const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+            await updateDoc(requestRef, {
+                status: RequestStatus.NEW,
+                confirmedBy: {
+                    id: userId,
+                    name: userName
+                },
+                confirmedAt: Timestamp.now(),
+                'timeline.confirmed': Timestamp.now()
+            });
+        }
 
         // 📝 Audit Log: Request Confirmed
         try {
@@ -521,9 +609,9 @@ export const confirmRequest = async (
                     roomNumber: request.roomNumber
                 },
                 {
-                    description: `تم تأكيد الطلب من ${oldStatus} إلى ${RequestStatus.CONFIRMED}`,
+                    description: `تم تأكيد الطلب من ${oldStatus} إلى NEW`,
                     previousValue: oldStatus,
-                    newValue: RequestStatus.CONFIRMED,
+                    newValue: RequestStatus.NEW,
                     metadata: { requestType: request.type, requestPriority: request.priority }
                 }
             ).catch(err => logger.warn('Failed to log request confirmation', err, 'requestService'));
@@ -569,18 +657,46 @@ export const startRequest = async (
             throw new Error('Request not found');
         }
         const oldStatus = request.status;
+        const currentDept = request.currentDepartment || 'reception';
 
-        // ✅ Use tenant-scoped collection
-        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
-        await updateDoc(requestRef, {
-            status: RequestStatus.IN_PROGRESS,
-            assignedTo: {
-                id: userId,
-                name: userName
-            },
-            startedAt: Timestamp.now(),
-            'timeline.started': Timestamp.now()
-        });
+        // ✅ Use Unified State Machine
+        try {
+            const { moveRequest } = await import('./stateTransitionService');
+            
+            await moveRequest(
+                validatedTenantId,
+                requestId,
+                'IN_PROGRESS',
+                currentDept as any,
+                userId,
+                userName,
+                'بدأ العمل على الطلب'
+            );
+            
+            // Update legacy fields for backward compatibility
+            const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+            await updateDoc(requestRef, {
+                assignedTo: {
+                    id: userId,
+                    name: userName
+                },
+                startedAt: Timestamp.now(),
+                'timeline.started': Timestamp.now()
+            });
+        } catch (stateMachineError: any) {
+            // Fallback to legacy update if State Machine fails
+            logger.warn('State Machine failed, using legacy update', stateMachineError, 'requestService');
+            const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+            await updateDoc(requestRef, {
+                status: RequestStatus.IN_PROGRESS,
+                assignedTo: {
+                    id: userId,
+                    name: userName
+                },
+                startedAt: Timestamp.now(),
+                'timeline.started': Timestamp.now()
+            });
+        }
 
         // 📝 Audit Log: Request Started
         try {
@@ -605,9 +721,9 @@ export const startRequest = async (
                     roomNumber: request.roomNumber
                 },
                 {
-                    description: `تم بدء العمل على الطلب من ${oldStatus} إلى ${RequestStatus.IN_PROGRESS}`,
+                    description: `تم بدء العمل على الطلب من ${oldStatus} إلى IN_PROGRESS`,
                     previousValue: oldStatus,
-                    newValue: RequestStatus.IN_PROGRESS,
+                    newValue: 'IN_PROGRESS',
                     metadata: { requestType: request.type, assignedTo: userId }
                 }
             ).catch(err => logger.warn('Failed to log request start', err, 'requestService'));
@@ -632,43 +748,58 @@ export const completeRequest = async (
     rating?: number,
     feedback?: string
 ): Promise<void> => {
-    if (!db) {
-        logger.error('Firebase not initialized - cannot complete request', undefined, 'requestService');
-        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    const payload = completeRequestPayloadSchema.safeParse({
+        requestId,
+        tenantId,
+        userId,
+        userName,
+        rating,
+        feedback
+    });
+    if (!payload.success) {
+        const msg = payload.error.issues[0]?.message ?? 'بيانات غير صحيحة';
+        throw new Error(msg);
     }
-
     const validatedTenantId = validateTenantId(tenantId);
     validateTenantAccess(validatedTenantId);
 
+    if (!firebaseFunctions) {
+        logger.error('Firebase Functions not initialized - cannot complete request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const request = await getRequest(requestId, validatedTenantId);
+    if (!request) {
+        throw new Error('Request not found');
+    }
+    const oldStatus = request.status;
+
+    let sentimentResult: { sentiment?: string; [key: string]: unknown } | null = null;
+    if (feedback) {
+        sentimentResult = await analyzeFeedback(feedback);
+    }
+
     try {
-        // ✅ Get request before update (for audit log)
-        const request = await getRequest(requestId, validatedTenantId);
-        if (!request) {
-            throw new Error('Request not found');
-        }
-        const oldStatus = request.status;
-
-        // ✅ Use tenant-scoped collection
-        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
-
-        let sentimentResult = null;
-        if (feedback) {
-            sentimentResult = await analyzeFeedback(feedback);
-        }
-
-        await updateDoc(requestRef, {
-            status: RequestStatus.COMPLETED,
-            completedBy: {
-                id: userId,
-                name: userName
-            },
-            completedAt: Timestamp.now(),
-            'timeline.completed': Timestamp.now(),
-            ...(rating && { rating }),
-            ...(feedback && { feedback }),
-            ...(sentimentResult && { sentimentResult })
+        const requestCompleteFn = httpsCallable<
+            { requestId: string; tenantId: string; userId: string; userName: string; rating?: number; feedback?: string; sentimentResult?: Record<string, unknown> },
+            { success: boolean }
+        >(firebaseFunctions, 'requestComplete');
+        await requestCompleteFn({
+            requestId,
+            tenantId: validatedTenantId,
+            userId,
+            userName,
+            ...(rating !== undefined && { rating }),
+            ...(feedback !== undefined && { feedback }),
+            ...(sentimentResult !== null && { sentimentResult: sentimentResult as Record<string, unknown> })
         });
+    } catch (err: unknown) {
+        const msg = (err as { message?: string })?.message ?? '';
+        logger.error('Error completing request', err, 'requestService');
+        throw new Error(msg || 'فشل إكمال الطلب. يرجى المحاولة مرة أخرى.');
+    }
 
+    try {
         // 📝 Audit Log: Request Completed
         try {
             const storedUser = localStorage.getItem('adora_user');
@@ -696,9 +827,9 @@ export const completeRequest = async (
                     roomNumber: request.roomNumber
                 },
                 {
-                    description: `تم إتمام الطلب من ${oldStatus} إلى ${RequestStatus.COMPLETED}${rating ? ` - تقييم: ${rating}` : ''}`,
+                    description: `تم إتمام الطلب من ${oldStatus} إلى COMPLETED${rating ? ` - تقييم: ${rating}` : ''}`,
                     previousValue: oldStatus,
-                    newValue: RequestStatus.COMPLETED,
+                    newValue: 'COMPLETED',
                     duration: durationSeconds,
                     metadata: { 
                         requestType: request.type, 
@@ -712,8 +843,8 @@ export const completeRequest = async (
             logger.warn('Failed to create audit log for request completion', auditError, 'requestService');
         }
         if (request) {
-            // 📦 INVENTORY DEDUCTION
-            if (request.status === RequestStatus.COMPLETED && request.details?.items) {
+            // 📦 INVENTORY DEDUCTION (request completed via CF above)
+            if (request.details?.items) {
                 const isConsumable = [
                     RequestType.MINIBAR,
                     RequestType.COFFEE,
@@ -891,63 +1022,66 @@ export const transferRequestToDepartment = async (
     status?: RequestStatus,
     notes?: string
 ): Promise<void> => {
-    if (!db) {
-        logger.error('Firebase not initialized - cannot transfer request', undefined, 'requestService');
-        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    const payload = transferRequestPayloadSchema.safeParse({
+        requestId,
+        tenantId,
+        targetDepartment: toDepartment,
+        userId,
+        userName,
+        fromDepartment,
+        status: status != null ? String(status) : undefined,
+        notes
+    });
+    if (!payload.success) {
+        const msg = payload.error.issues[0]?.message ?? 'بيانات غير صحيحة';
+        throw new Error(msg);
     }
-
     const validatedTenantId = validateTenantId(tenantId);
     validateTenantAccess(validatedTenantId);
 
+    if (!firebaseFunctions) {
+        logger.error('Firebase Functions not initialized - cannot transfer request', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
+    const request = await getRequest(requestId, validatedTenantId);
+    if (!request) {
+        throw new Error('Request not found');
+    }
+    const oldDepartment = request.currentDepartment || fromDepartment;
+    const oldStatus = request.status;
+
     try {
-        // ✅ Use tenant-scoped collection
-        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
-        const request = await getRequest(requestId, validatedTenantId);
-        
-        if (!request) {
-            throw new Error('Request not found');
-        }
-
-        const now = Timestamp.now();
-        const history = request.departmentHistory || [];
-        
-        if (history.length > 0) {
-            const lastEntry = history[history.length - 1];
-            if (lastEntry.department === fromDepartment && !lastEntry.exitedAt) {
-                lastEntry.exitedAt = now;
-                lastEntry.nextDepartment = toDepartment;
-                if (notes) {
-                    lastEntry.notes = notes;
-                }
-            }
-        }
-
-        history.push({
-            department: toDepartment,
-            status: status || RequestStatus.CONFIRMED,
-            enteredAt: now,
-            handledBy: {
-                id: userId,
-                name: userName
+        const requestTransferFn = httpsCallable<
+            {
+                requestId: string;
+                tenantId: string;
+                targetDepartment: string;
+                userId: string;
+                userName: string;
+                fromDepartment?: string;
+                status?: string;
+                notes?: string;
             },
-            notes: notes
+            { success: boolean }
+        >(firebaseFunctions, 'requestTransferToDepartment');
+        await requestTransferFn({
+            requestId,
+            tenantId: validatedTenantId,
+            targetDepartment: toDepartment,
+            userId,
+            userName,
+            fromDepartment,
+            status: status != null ? String(status) : undefined,
+            notes
         });
+    } catch (err: unknown) {
+        const msg = (err as { message?: string })?.message ?? '';
+        logger.error('Error transferring request', err, 'requestService');
+        throw new Error(msg || 'فشل نقل الطلب. يرجى المحاولة مرة أخرى.');
+    }
 
-        const oldDepartment = request.currentDepartment || fromDepartment;
-        const oldStatus = request.status;
-
-        await updateDoc(requestRef, {
-            currentDepartment: toDepartment,
-            status: status || RequestStatus.CONFIRMED,
-            deliveredAt: now,
-            departmentHistory: history,
-            modifiedAt: now,
-            modifiedBy: {
-                id: userId,
-                name: userName
-            }
-        });
-
+    try {
         // 📝 Audit Log: Request Transferred
         try {
             const storedUser = localStorage.getItem('adora_user');
@@ -997,50 +1131,41 @@ export const confirmCompletion = async (
     userName: string,
     department: string
 ): Promise<void> => {
-    if (!db) {
-        logger.error('Firebase not initialized - cannot confirm completion', undefined, 'requestService');
-        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    const payload = confirmCompletionPayloadSchema.safeParse({
+        requestId,
+        tenantId,
+        userId,
+        userName,
+        department
+    });
+    if (!payload.success) {
+        const msg = payload.error.issues[0]?.message ?? 'بيانات غير صحيحة';
+        throw new Error(msg);
     }
-
     const validatedTenantId = validateTenantId(tenantId);
     validateTenantAccess(validatedTenantId);
 
+    if (!firebaseFunctions) {
+        logger.error('Firebase Functions not initialized - cannot confirm completion', undefined, 'requestService');
+        throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
+    }
+
     try {
-        // ✅ Use tenant-scoped collection
-        const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
-        const request = await getRequest(requestId, validatedTenantId);
-        
-        if (!request) {
-            throw new Error('Request not found');
-        }
-
-        const now = Timestamp.now();
-        const history = request.departmentHistory || [];
-        
-        if (history.length > 0) {
-            const lastEntry = history[history.length - 1];
-            if (lastEntry.department === department) {
-                lastEntry.exitedAt = now;
-                lastEntry.status = RequestStatus.COMPLETED;
-            }
-        }
-
-        await updateDoc(requestRef, {
-            status: RequestStatus.COMPLETED,
-            completedAt: now,
-            'timeline.completed': now,
-            departmentHistory: history,
-            currentDepartment: undefined,
-            modifiedAt: now,
-            modifiedBy: {
-                id: userId,
-                name: userName,
-                department: department
-            }
+        const requestConfirmCompletionFn = httpsCallable<
+            { requestId: string; tenantId: string; userId: string; userName: string; department: string },
+            { success: boolean }
+        >(firebaseFunctions, 'requestConfirmCompletion');
+        await requestConfirmCompletionFn({
+            requestId,
+            tenantId: validatedTenantId,
+            userId,
+            userName,
+            department
         });
-    } catch (error) {
+    } catch (error: unknown) {
+        const msg = (error as { message?: string })?.message ?? '';
         logger.error('Error confirming completion', error, 'requestService');
-        throw new Error('فشل تأكيد الإكمال. يرجى المحاولة مرة أخرى.');
+        throw new Error(msg || 'فشل تأكيد الإكمال. يرجى المحاولة مرة أخرى.');
     }
 };
 
@@ -1311,16 +1436,24 @@ export const subscribeToRequest = (
 // BATCH OPERATIONS
 // ============================================================
 
+/** F6: Result of bulk confirm/complete */
+export interface BulkResult {
+    successCount: number;
+    failedCount: number;
+    failedIds?: string[];
+}
+
 /**
  * Bulk confirm requests
  * 🔐 SECURITY: Validates tenant access
+ * F6: Returns successCount and failedCount (and failedIds on partial failure)
  */
 export const bulkConfirmRequests = async (
     requestIds: string[],
     tenantId: string,
     userId: string,
     userName: string
-): Promise<void> => {
+): Promise<BulkResult> => {
     if (!db) {
         logger.error('Firebase not initialized - cannot bulk confirm requests', undefined, 'requestService');
         throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
@@ -1329,39 +1462,75 @@ export const bulkConfirmRequests = async (
     const validatedTenantId = validateTenantId(tenantId);
     validateTenantAccess(validatedTenantId);
 
+    let successCount = 0;
+    const failedIds: string[] = [];
+
     try {
         const batch = writeBatch(db);
+        let hasLegacyUpdates = false;
 
-        requestIds.forEach(requestId => {
-            // ✅ Use tenant-scoped collection
-            const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
-            batch.update(requestRef, {
-                status: RequestStatus.CONFIRMED,
-                confirmedBy: {
-                    id: userId,
-                    name: userName
-                },
-                confirmedAt: Timestamp.now()
-            });
-        });
+        for (const requestId of requestIds) {
+            try {
+                const { moveRequest } = await import('./stateTransitionService');
+                const request = await getRequest(requestId, validatedTenantId);
+                if (request) {
+                    const { REQUEST_TYPE_TO_DEPARTMENT, DEPARTMENTS } = await import('./workflowService');
+                    const targetDepartment = REQUEST_TYPE_TO_DEPARTMENT[request.type] || DEPARTMENTS.RECEPTION;
+                    await moveRequest(
+                        validatedTenantId,
+                        requestId,
+                        'NEW',
+                        targetDepartment,
+                        userId,
+                        userName,
+                        'تم التأكيد الجماعي'
+                    );
+                    const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+                    await updateDoc(requestRef, {
+                        confirmedBy: { id: userId, name: userName },
+                        confirmedAt: Timestamp.now()
+                    });
+                    successCount++;
+                } else {
+                    failedIds.push(requestId);
+                }
+            } catch (err: any) {
+                logger.warn(`Failed to confirm request ${requestId} using State Machine, using legacy update`, err, 'requestService');
+                const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+                batch.update(requestRef, {
+                    status: RequestStatus.NEW,
+                    confirmedBy: { id: userId, name: userName },
+                    confirmedAt: Timestamp.now()
+                });
+                hasLegacyUpdates = true;
+                successCount++;
+            }
+        }
 
-        await batch.commit();
+        if (hasLegacyUpdates) await batch.commit();
+        return { successCount, failedCount: failedIds.length, ...(failedIds.length ? { failedIds } : {}) };
     } catch (error) {
         logger.error('Error bulk confirming requests', error, 'requestService');
-        throw new Error('فشل تأكيد الطلبات. يرجى المحاولة مرة أخرى.');
+        const failedCount = requestIds.length - successCount;
+        throw new Error(
+            failedCount > 0
+                ? `فشل تأكيد ${failedCount} من ${requestIds.length}. تم تأكيد ${successCount}.`
+                : 'فشل تأكيد الطلبات. يرجى المحاولة مرة أخرى.'
+        );
     }
 };
 
 /**
  * Bulk complete requests
  * 🔐 SECURITY: Validates tenant access
+ * F6: Returns successCount and failedCount (and failedIds on partial failure)
  */
 export const bulkCompleteRequests = async (
     requestIds: string[],
     tenantId: string,
     userId: string,
     userName: string
-): Promise<void> => {
+): Promise<BulkResult> => {
     if (!db) {
         logger.error('Firebase not initialized - cannot bulk complete requests', undefined, 'requestService');
         throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
@@ -1370,26 +1539,63 @@ export const bulkCompleteRequests = async (
     const validatedTenantId = validateTenantId(tenantId);
     validateTenantAccess(validatedTenantId);
 
+    let successCount = 0;
+    const failedIds: string[] = [];
+
     try {
         const batch = writeBatch(db);
+        let hasLegacyUpdates = false;
 
-        requestIds.forEach(requestId => {
-            // ✅ Use tenant-scoped collection
-            const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
-            batch.update(requestRef, {
-                status: RequestStatus.COMPLETED,
-                completedBy: {
-                    id: userId,
-                    name: userName
-                },
-                completedAt: Timestamp.now()
-            });
-        });
+        for (const requestId of requestIds) {
+            try {
+                const { moveRequest } = await import('./stateTransitionService');
+                const { DEPARTMENTS } = await import('./workflowService');
+                await moveRequest(
+                    validatedTenantId,
+                    requestId,
+                    'COMPLETED',
+                    DEPARTMENTS.RECEPTION,
+                    userId,
+                    userName,
+                    'تم الإكمال الجماعي'
+                );
+                const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+                await updateDoc(requestRef, {
+                    completedBy: { id: userId, name: userName },
+                    completedAt: Timestamp.now()
+                });
+                successCount++;
+            } catch (err: any) {
+                logger.warn(`Failed to complete request ${requestId} using State Machine`, err, 'requestService');
+                const requestRef = doc(db, `tenants/${validatedTenantId}/requests`, requestId);
+                const snap = await getDoc(requestRef);
+                const currentStatus = snap.exists() ? (snap.data().status || '').toString().toUpperCase() : '';
+                const allowedForCompletion = ['IN_PROGRESS', 'CONFIRMED', 'IN PROGRESS'];
+                if (allowedForCompletion.includes(currentStatus)) {
+                    batch.update(requestRef, {
+                        status: RequestStatus.COMPLETED,
+                        currentDepartment: 'reception',
+                        isActionRequiredByReception: true,
+                        completedBy: { id: userId, name: userName },
+                        completedAt: Timestamp.now()
+                    });
+                    hasLegacyUpdates = true;
+                    successCount++;
+                } else {
+                    failedIds.push(requestId);
+                }
+            }
+        }
 
-        await batch.commit();
-    } catch (error) {
+        if (hasLegacyUpdates) await batch.commit();
+        return { successCount, failedCount: failedIds.length, ...(failedIds.length ? { failedIds } : {}) };
+    } catch (error: any) {
         logger.error('Error bulk completing requests', error, 'requestService');
-        throw new Error('فشل إكمال الطلبات. يرجى المحاولة مرة أخرى.');
+        const failedCount = requestIds.length - successCount;
+        const msg = failedCount > 0
+            ? `فشل إكمال ${failedCount} من ${requestIds.length}. تم إكمال ${successCount}. يرجى التحقق من القائمة وإعادة المحاولة للباقي.`
+            : 'فشل إكمال الطلبات. يرجى المحاولة مرة أخرى.';
+        throw new Error(msg);
     }
 };
 
@@ -1432,13 +1638,34 @@ export const getRequestStats = async (
         const snapshot = await getDocs(q);
         const requests = snapshot.docs.map(doc => doc.data() as Request);
 
+        // ✅ Unified: Use new status system
         return {
             total: requests.length,
-            pending: requests.filter(r => r.status === RequestStatus.PENDING_RECEPTION).length,
-            confirmed: requests.filter(r => r.status === RequestStatus.CONFIRMED).length,
-            inProgress: requests.filter(r => r.status === RequestStatus.IN_PROGRESS).length,
-            completed: requests.filter(r => r.status === RequestStatus.COMPLETED).length,
-            cancelled: requests.filter(r => r.status === RequestStatus.CANCELLED).length,
+            new: requests.filter(r => {
+                const status = (r as any).status || r.status;
+                return status === 'NEW' || status === 'PENDING_RECEPTION' || status === 'PENDING';
+            }).length,
+            inProgress: requests.filter(r => {
+                const status = (r as any).status || r.status;
+                return status === 'IN_PROGRESS' || status === 'CONFIRMED';
+            }).length,
+            completed: requests.filter(r => {
+                const status = (r as any).status || r.status;
+                return status === 'COMPLETED';
+            }).length,
+            // Legacy compatibility
+            pending: requests.filter(r => {
+                const status = (r as any).status || r.status;
+                return status === 'NEW' || status === 'PENDING_RECEPTION' || status === 'PENDING';
+            }).length,
+            confirmed: requests.filter(r => {
+                const status = (r as any).status || r.status;
+                return status === 'NEW' || status === 'CONFIRMED';
+            }).length,
+            cancelled: requests.filter(r => {
+                const status = (r as any).status || r.status;
+                return status === 'CANCELLED' || (r as any).isCancelled;
+            }).length,
 
             byType: {
                 cleaning: requests.filter(r => r.type === RequestType.CLEANING).length,

@@ -42,7 +42,7 @@ export const LicenseNotificationScheduler: React.FC = () => {
 
             try {
                 isRunningRef.current = true;
-                logger.info('Checking license expiry for all managers...', undefined, 'LicenseNotificationScheduler');
+                logger.debug('Checking license expiry for all managers...', undefined, 'LicenseNotificationScheduler');
 
                 const notifications = await checkAllManagersLicenseExpiry();
 

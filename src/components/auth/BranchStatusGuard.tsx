@@ -11,6 +11,7 @@ import { useTenant } from '../../context/TenantContext';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Lock, AlertTriangle } from 'lucide-react';
+import { logger } from '../../services/loggerService';
 
 // ✅ SAFE STRING EXTRACTION - Outside component to avoid re-creation
 function safeExtractString(value: unknown): string | null {
@@ -92,7 +93,7 @@ export const BranchStatusGuard: React.FC<{ children: React.ReactNode }> = ({ chi
             try {
                 unsubscribeRef.current();
             } catch (e) {
-                console.error('Error unsubscribing:', e);
+                logger.error('Error unsubscribing:', e, 'BranchStatusGuard');
             }
             unsubscribeRef.current = null;
         }
@@ -121,7 +122,7 @@ export const BranchStatusGuard: React.FC<{ children: React.ReactNode }> = ({ chi
         try {
             // ✅ Ensure both are strings before calling doc()
             if (typeof tenantIdStr !== 'string' || typeof branchIdStr !== 'string') {
-                console.warn('Invalid tenantId or branchId types');
+                logger.warn('Invalid tenantId or branchId types', undefined, 'BranchStatusGuard');
                 setIsSuspended(false);
                 setLoading(false);
                 return;
@@ -129,7 +130,7 @@ export const BranchStatusGuard: React.FC<{ children: React.ReactNode }> = ({ chi
             
             // ✅ Ensure db is not null
             if (!db) {
-                console.warn('Firebase db is not initialized');
+                logger.warn('Firebase db is not initialized', undefined, 'BranchStatusGuard');
                 setIsSuspended(false);
                 setLoading(false);
                 return;
@@ -149,7 +150,7 @@ export const BranchStatusGuard: React.FC<{ children: React.ReactNode }> = ({ chi
                     setLoading(false);
                 },
                 (error) => {
-                    console.error('BranchStatusGuard error:', error);
+                    logger.error('BranchStatusGuard error:', error, 'BranchStatusGuard');
                     setIsSuspended(false);
                     setLoading(false);
                 }
@@ -162,13 +163,13 @@ export const BranchStatusGuard: React.FC<{ children: React.ReactNode }> = ({ chi
                     try {
                         unsubscribeRef.current();
                     } catch (e) {
-                        console.error('Error in cleanup:', e);
+                        logger.error('Error in cleanup:', e, 'BranchStatusGuard');
                     }
                     unsubscribeRef.current = null;
                 }
             };
         } catch (error) {
-            console.error('BranchStatusGuard setup error:', error);
+            logger.error('BranchStatusGuard setup error:', error, 'BranchStatusGuard');
             setIsSuspended(false);
             setLoading(false);
             return undefined;

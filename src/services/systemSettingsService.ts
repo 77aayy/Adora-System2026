@@ -5,7 +5,8 @@
  */
 
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, getSafeFirestore } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -104,7 +105,6 @@ export interface SystemSettings {
         billing?: boolean;       // الفواتير (in sidebar)
         settings?: boolean;      // الإعدادات (in sidebar)
         broadcasts?: boolean;    // الرسائل (in sidebar)
-        demo?: boolean;          // روابط الديمو (not in sidebar - keep visible)
         'core-config'?: boolean; // التأسيس (in sidebar)
     };
     
@@ -262,47 +262,99 @@ const _fetchSystemSettings = async (): Promise<SystemSettings> => {
     const localSettings = localData ? JSON.parse(localData) : null;
     
     // ✅ NEW: Try Cloud Function first (bypasses client Rules)
-    try {
-        const { functions, httpsCallable } = await import('./firebase');
-        if (functions) {
-            const getSettingsFunction = httpsCallable(functions, 'getSystemSettings');
-            const result = await getSettingsFunction({});
-            const response = result.data as any;
+    // ✅ FIX: Skip Cloud Function if CORS error detected (use Firestore directly)
+    const corsFailed = typeof window !== 'undefined' && sessionStorage.getItem('adora_cloud_functions_cors_failed') === 'true';
+    if (!corsFailed) {
+        try {
+            const { functions, httpsCallable } = await import('./firebase');
+            if (functions) {
+                const getSettingsFunction = httpsCallable(functions, 'getSystemSettings');
+                // ✅ Add timeout to prevent hanging on CORS errors
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Function call timeout (likely CORS)')), 5000)
+                );
+                const result = await Promise.race([
+                    getSettingsFunction({}),
+                    timeoutPromise
+                ]) as any;
+                const response = result.data as any;
 
-            if (response.success && response.settings) {
-                const firebaseSettings = {
-                    ...DEFAULT_SETTINGS,
-                    ...response.settings,
-                    updates: response.settings.updates?.map((u: any) => ({
-                        ...u,
-                        releaseDate: u.releaseDate?.toDate ? new Date(u.releaseDate.toDate()) : new Date()
-                    })) || [],
-                    broadcastMessages: response.settings.broadcastMessages?.map((m: any) => ({
-                        ...m,
-                        startDate: m.startDate?.toDate ? new Date(m.startDate.toDate()) : new Date(),
-                        endDate: m.endDate?.toDate ? new Date(m.endDate.toDate()) : new Date()
-                    })) || []
-                } as SystemSettings;
-                
-                // ✅ Sync Firebase data to localStorage for offline access
-                if (typeof window !== 'undefined' && window.localStorage) {
-                    localStorage.setItem(localKey, JSON.stringify(firebaseSettings));
+                if (response.success && response.settings) {
+                    const firebaseSettings = {
+                        ...DEFAULT_SETTINGS,
+                        ...response.settings,
+                        updates: response.settings.updates?.map((u: any) => ({
+                            ...u,
+                            releaseDate: u.releaseDate?.toDate ? new Date(u.releaseDate.toDate()) : new Date()
+                        })) || [],
+                        broadcastMessages: response.settings.broadcastMessages?.map((m: any) => ({
+                            ...m,
+                            startDate: m.startDate?.toDate ? new Date(m.startDate.toDate()) : new Date(),
+                            endDate: m.endDate?.toDate ? new Date(m.endDate.toDate()) : new Date()
+                        })) || []
+                    } as SystemSettings;
+                    
+                    // ✅ Sync Firebase data to localStorage for offline access
+                    if (typeof window !== 'undefined' && window.localStorage) {
+                        localStorage.setItem(localKey, JSON.stringify(firebaseSettings));
+                    }
+                    return firebaseSettings;
                 }
-                return firebaseSettings;
             }
+        } catch (functionError: any) {
+            // ✅ FIX: Detect CORS errors and skip Cloud Function permanently for this session
+            const isCORSError = functionError?.message?.includes('CORS') || 
+                               functionError?.code === 'functions/internal' ||
+                               functionError?.message?.includes('blocked by CORS');
+            if (isCORSError) {
+                logger.warn('⚠️ [systemSettingsService] CORS error detected, skipping Cloud Function for this session', undefined, 'systemSettingsService');
+                // Mark CORS as failed in sessionStorage to skip future attempts
+                if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('adora_cloud_functions_cors_failed', 'true');
+                }
+            } else {
+                logger.warn('Cloud Function getSystemSettings failed, using fallback:', functionError.message, 'systemSettingsService');
+            }
+            // Fall through to Firestore fallback
         }
-    } catch (functionError: any) {
-        console.warn('Cloud Function getSystemSettings failed, using fallback:', functionError.message);
-        // Fall through to Firestore fallback
     }
     
     // ✅ Fallback: Direct Firestore read (if Functions not available)
     try {
-        if (!db) {
-            console.debug('Firebase not initialized, returning local/default settings');
+        // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+        const safeDb = await getSafeFirestore();
+        if (!safeDb) {
+            logger.debug('Firebase not initialized, returning local/default settings', undefined, 'systemSettingsService');
             return localSettings ? { ...DEFAULT_SETTINGS, ...localSettings } : DEFAULT_SETTINGS;
         }
-        const docRef = doc(db, SYSTEM_SETTINGS_PATH);
+        
+        // ✅ CRITICAL: Verify auth state before making Firestore request
+        const { auth } = await import('./firebase');
+        if (!auth?.currentUser) {
+            return localSettings ? { ...DEFAULT_SETTINGS, ...localSettings } : DEFAULT_SETTINGS;
+        }
+        
+        // Use cached token to avoid burning Auth quota (getIdToken(true) causes quota-exceeded on Spark)
+        try {
+            await auth.currentUser.getIdToken(false);
+        } catch (tokenError: any) {
+            if (tokenError?.code === 'auth/quota-exceeded') {
+                logger.warn('⚠️ [systemSettingsService] Auth quota exceeded, using cached settings', undefined, 'systemSettingsService');
+            } else {
+                logger.error('❌ [systemSettingsService] Token failed:', tokenError?.message, 'systemSettingsService');
+            }
+            return localSettings ? { ...DEFAULT_SETTINGS, ...localSettings } : DEFAULT_SETTINGS;
+        }
+        
+        const docRef = doc(safeDb, SYSTEM_SETTINGS_PATH);
+        
+        // ✅ CRITICAL: Log auth state before Firestore request
+        logger.debug('🔍 [systemSettingsService] Before Firestore read:', {
+            uid: auth.currentUser?.uid,
+            isAnonymous: auth.currentUser?.isAnonymous,
+            hasToken: !!auth.currentUser
+        });
+        
         const snap = await getDoc(docRef);
         
         if (snap.exists()) {
@@ -330,22 +382,27 @@ const _fetchSystemSettings = async (): Promise<SystemSettings> => {
         
         // If no settings exist in Firebase, try to create from localStorage
         if (localSettings) {
-            console.log('📦 No Firebase settings, using localStorage');
+            logger.info('📦 No Firebase settings, using localStorage', undefined, 'systemSettingsService');
             return { ...DEFAULT_SETTINGS, ...localSettings };
         }
         
         // If no settings exist anywhere, return defaults (don't create via client)
         return DEFAULT_SETTINGS;
     } catch (error: any) {
-        // ✅ Handle Firestore internal errors gracefully
-        if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-            console.warn('Firestore internal error in _fetchSystemSettings (likely cache issue)', error);
+        const isChannelError = error?.code === 400 || error?.code === 404 ||
+            error?.message?.includes('400') || error?.message?.includes('Listen/channel') || error?.message?.includes('Write/channel');
+        if (isChannelError) {
+            logger.debug('System settings: Listen/Write channel error, using local/default', undefined, 'systemSettingsService');
+        } else if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
+            logger.warn('Firestore internal error in _fetchSystemSettings (likely cache issue)', error, 'systemSettingsService');
         } else {
-            console.error('Error getting system settings:', error);
+            if (!error?.message?.includes('permission')) {
+                logger.error('Error getting system settings:', error, 'systemSettingsService');
+            }
         }
         // ✅ FIX: Return localStorage settings on Firebase error (not defaults!)
         if (localSettings) {
-            console.log('📦 Firebase error, using localStorage backup (price=' + localSettings.defaultSubscriptionPrice + ')');
+            logger.info('📦 Firebase error, using localStorage backup (price=' + localSettings.defaultSubscriptionPrice + ')', undefined, 'systemSettingsService');
             return { ...DEFAULT_SETTINGS, ...localSettings };
         }
         return DEFAULT_SETTINGS;
@@ -397,16 +454,18 @@ export const updateSystemSettings = async (
         
         // 🔍 DEBUG: Log what we're saving
         if (merged) {
-            console.log('💾 updateSystemSettings: price=' + (sanitizedUpdates as any).defaultSubscriptionPrice + 
+            logger.info('💾 updateSystemSettings: price=' + (sanitizedUpdates as any).defaultSubscriptionPrice + 
                        ', merged_price=' + merged.defaultSubscriptionPrice);
         }
         
-        if (!db) {
-            console.warn('Firebase not initialized, settings saved to localStorage only');
+        // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+        const safeDb = await getSafeFirestore();
+        if (!safeDb) {
+            logger.warn('Firebase not initialized, settings saved to localStorage only', undefined, 'systemSettingsService');
             return; // ✅ Don't throw - localStorage backup worked
         }
         
-        const docRef = doc(db, SYSTEM_SETTINGS_PATH);
+        const docRef = doc(safeDb, SYSTEM_SETTINGS_PATH);
         
         // ✅ CRITICAL: Get current document first to merge properly
         const currentDoc = await getDoc(docRef);
@@ -443,11 +502,11 @@ export const updateSystemSettings = async (
             localStorage.setItem(localKey, JSON.stringify(updatedLocal));
         }
         
-        console.log('✅ Settings saved to Firebase successfully', { developerBranding: mergedUpdates.developerBranding });
+        logger.info('✅ Settings saved to Firebase successfully', { developerBranding: mergedUpdates.developerBranding }, 'systemSettingsService');
     } catch (error) {
-        console.error('Error updating system settings in Firebase:', error);
+        logger.error('Error updating system settings in Firebase:', error, 'systemSettingsService');
         // ✅ Don't throw - localStorage backup already saved
-        console.info('Settings saved to localStorage as fallback');
+        logger.info('Settings saved to localStorage as fallback', undefined, 'systemSettingsService');
     }
 };
 
@@ -456,13 +515,18 @@ export const updateSystemSettings = async (
  */
 export const setSystemSettings = async (settings: SystemSettings): Promise<void> => {
     try {
-        const docRef = doc(db, SYSTEM_SETTINGS_PATH);
+        // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+        const safeDb = await getSafeFirestore();
+        if (!safeDb) {
+            throw new Error('Firestore not ready. Please wait and try again.');
+        }
+        const docRef = doc(safeDb, SYSTEM_SETTINGS_PATH);
         await setDoc(docRef, {
             ...settings,
             updatedAt: serverTimestamp()
         });
     } catch (error) {
-        console.error('Error setting system settings:', error);
+        logger.error('Error setting system settings:', error, 'systemSettingsService');
         throw error;
     }
 };
@@ -488,7 +552,7 @@ export const toggleFeature = async (
         const { invalidateCache } = await import('../utils/requestCache');
         invalidateCache('settings:system');
     } catch (err) {
-        console.warn('Could not invalidate cache:', err);
+        logger.warn('Could not invalidate cache:', err, 'systemSettingsService');
     }
 };
 
@@ -562,7 +626,7 @@ export const isFeatureEnabled = async (
     
     // ✅ FIX: Validate feature key exists in settings
     if (!settings.features || typeof settings.features[featureKey] !== 'boolean') {
-        console.warn(`⚠️ Feature key "${featureKey}" not found in settings, defaulting to false`);
+        logger.warn(`⚠️ Feature key "${featureKey}" not found in settings, defaulting to false`, undefined, 'systemSettingsService');
         return false;
     }
     

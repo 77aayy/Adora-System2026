@@ -23,6 +23,7 @@ import { useUX } from '../../context/UXContext';
 import { useTranslation } from 'react-i18next';
 import { PageTransition } from '../../components/common/PageTransition';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // HELPER: Safe Date Conversion (handles Firestore Timestamps)
@@ -113,7 +114,7 @@ export const SuperAdminMasterAccess: React.FC = () => {
                                 const empSnap = await getDocs(empQuery);
                                 employeeCount = empSnap.size;
                             } catch (err) {
-                                console.warn('Error counting branches/employees:', err);
+                                logger.warn('Error counting branches/employees:', err, 'SuperAdminMasterAccess');
                             }
                         }
 
@@ -134,7 +135,7 @@ export const SuperAdminMasterAccess: React.FC = () => {
 
                 setTenants(tenantsData);
             } catch (err) {
-                console.error('Error loading tenants:', err);
+                logger.error('Error loading tenants:', err, 'SuperAdminMasterAccess');
                 error('فشل في تحميل بيانات المستأجرين');
             } finally {
                 setLoading(false);
@@ -193,7 +194,7 @@ export const SuperAdminMasterAccess: React.FC = () => {
             setSelectedTenant({ ...selectedTenant, managerCode: newPin });
 
         } catch (err) {
-            console.error('Error resetting password:', err);
+            logger.error('Error resetting password:', err, 'SuperAdminMasterAccess');
             error('فشل في إعادة تعيين كلمة المرور');
         } finally {
             setResetting(false);

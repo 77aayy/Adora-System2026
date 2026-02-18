@@ -132,11 +132,11 @@
   --theme-gradient-card: none;
   
   /* ─────────────────────────────────────────────────────────
-     SCROLLBAR
+     SCROLLBAR (واضح على الخلفيات الفاتحة)
      ───────────────────────────────────────────────────────── */
-  --theme-scrollbar-bg: #f1f5f9;
-  --theme-scrollbar-thumb: #cbd5e1;
-  --theme-scrollbar-thumb-hover: #94a3b8;
+  --theme-scrollbar-bg: #e2e8f0;
+  --theme-scrollbar-thumb: #0d9488;
+  --theme-scrollbar-thumb-hover: #14b8a6;
   
   /* ─────────────────────────────────────────────────────────
      INPUT STYLES
@@ -260,11 +260,11 @@
   --theme-gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
   
   /* ─────────────────────────────────────────────────────────
-     SCROLLBAR
+     SCROLLBAR (واضح على الخلفيات الداكنة)
      ───────────────────────────────────────────────────────── */
-  --theme-scrollbar-bg: #1e293b;
-  --theme-scrollbar-thumb: #475569;
-  --theme-scrollbar-thumb-hover: #64748b;
+  --theme-scrollbar-bg: #0f172a;
+  --theme-scrollbar-thumb: #14b8a6;
+  --theme-scrollbar-thumb-hover: #2dd4bf;
   
   /* ─────────────────────────────────────────────────────────
      INPUT STYLES
@@ -1328,34 +1328,37 @@ html.light .to-slate-900 {
    ============================================================ */
 
 /* Force visible borders on ALL cards in light mode */
-/* ✅ EXCLUDE: Toast notifications - they should not have borders */
-html[data-theme="light"] [class*="rounded-xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
-html[data-theme="light"] [class*="rounded-2xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
-html[data-theme="light"] [class*="rounded-3xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
-html.light [class*="rounded-xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
-html.light [class*="rounded-2xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]),
-html.light [class*="rounded-3xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]) {
+/* ✅ EXCLUDE: Toast notifications and useUX toasts - they should not have borders */
+html[data-theme="light"] [class*="rounded-xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]):not([data-ux-toast]),
+html[data-theme="light"] [class*="rounded-2xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]):not([data-ux-toast]),
+html[data-theme="light"] [class*="rounded-3xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]):not([data-ux-toast]),
+html.light [class*="rounded-xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]):not([data-ux-toast]),
+html.light [class*="rounded-2xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]):not([data-ux-toast]),
+html.light [class*="rounded-3xl"]:not(.toast):not([class*="toast"]):not([id*="toast"]):not([data-ux-toast]) {
   border-color: #cbd5e1 !important;
 }
 
 /* Ensure all card-like elements have visible shadows */
-/* ✅ EXCLUDE: Toast notifications - they should not have borders */
-html[data-theme="light"] .bg-white:not(.toast):not([class*="toast"]):not([id*="toast"]),
-html.light .bg-white:not(.toast):not([class*="toast"]):not([id*="toast"]) {
+/* ✅ EXCLUDE: Toast notifications and useUX toasts - they should not have card borders */
+html[data-theme="light"] .bg-white:not(.toast):not([class*="toast"]):not([id*="toast"]):not([data-ux-toast]),
+html.light .bg-white:not(.toast):not([class*="toast"]):not([id*="toast"]):not([data-ux-toast]) {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05) !important;
   border: 1px solid #e2e8f0 !important;
 }
 
-/* ✅ FIX: Toast notifications should never have borders in light mode */
+/* ✅ FIX: Toast notifications should never have borders in light mode; no dark shadow edge (black line) */
 html[data-theme="light"] .toast,
 html[data-theme="light"] [class*="toast"],
 html[data-theme="light"] [id*="toast"],
+html[data-theme="light"] [data-ux-toast],
 html.light .toast,
 html.light [class*="toast"],
-html.light [id*="toast"] {
+html.light [id*="toast"],
+html.light [data-ux-toast] {
   border: none !important;
+  border-width: 0 !important;
   outline: none !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
 }
 
 /* Navigation bar high contrast */

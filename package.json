@@ -16,7 +16,8 @@
         "test": "vitest",
         "test:run": "vitest run",
         "test:coverage": "vitest run --coverage",
-        "deploy-fb": "npm run build && firebase deploy --only hosting"
+        "deploy-fb": "npm run build && firebase deploy --only hosting",
+        "translation-audit": "node scripts/translation-audit.mjs"
     },
     "dependencies": {
         "@google/generative-ai": "^0.24.1",

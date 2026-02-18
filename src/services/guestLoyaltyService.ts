@@ -28,6 +28,7 @@ import {
     orderBy,
     limit
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -258,7 +259,7 @@ export async function rateGuest(
                 : '⚠️ تم تسجيل الملاحظة'
         };
     } catch (error) {
-        console.error('Error rating guest:', error);
+        logger.error('Error rating guest:', error, 'guestLoyaltyService');
         return {
             success: false,
             message: '❌ فشل تسجيل التقييم'

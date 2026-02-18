@@ -9,7 +9,7 @@
  * Adora Hotel Management System V3
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Database, Key, Globe, FolderOpen, FileJson,
     CheckCircle2, XCircle, Loader2, Shield, ExternalLink,
@@ -111,6 +111,17 @@ export const TenantFirebaseConfig: React.FC<TenantFirebaseConfigProps> = ({
     const [connectionMessage, setConnectionMessage] = useState('');
     const [isExpanded, setIsExpanded] = useState(false);
     const [serviceAccountValid, setServiceAccountValid] = useState<boolean | null>(null);
+    const [pasteTextareaValue, setPasteTextareaValue] = useState(''); // ✅ State للـ textarea
+    const extractTimeoutRef = useRef<NodeJS.Timeout | null>(null); // ✅ Ref لتخزين timeout
+
+    // ✅ Cleanup timeout عند unmount
+    useEffect(() => {
+        return () => {
+            if (extractTimeoutRef.current) {
+                clearTimeout(extractTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // Auto-fill auth domain and storage bucket when project ID changes
     useEffect(() => {
@@ -363,56 +374,60 @@ export const TenantFirebaseConfig: React.FC<TenantFirebaseConfigProps> = ({
                             placeholder={'الصق هنا كود firebaseConfig الكامل من Firebase Console...\n\nمثال:\nconst firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "...",\n  projectId: "...",\n  ...\n};'}
                             className="w-full p-3 rounded-xl bg-black/30 border border-amber-500/30 text-white placeholder-white/30 text-xs font-mono resize-none h-24 focus:outline-none focus:border-amber-400"
                             dir="ltr"
-                            onPaste={(e) => {
-                                e.preventDefault();
-                                const text = e.clipboardData.getData('text');
+                            value={pasteTextareaValue}
+                            onChange={(e) => {
+                                const text = e.target.value;
+                                // ✅ السماح بالكتابة العادية
+                                setPasteTextareaValue(text);
                                 
-                                // استخراج القيم من النص
-                                const apiKeyMatch = text.match(/apiKey:\s*["']([^"']+)["']/);
-                                const authDomainMatch = text.match(/authDomain:\s*["']([^"']+)["']/);
-                                const projectIdMatch = text.match(/projectId:\s*["']([^"']+)["']/);
-                                const storageBucketMatch = text.match(/storageBucket:\s*["']([^"']+)["']/);
-                                const messagingSenderIdMatch = text.match(/messagingSenderId:\s*["']([^"']+)["']/);
-                                const appIdMatch = text.match(/appId:\s*["']([^"']+)["']/);
-                                
-                                // التحقق من وجود قيم
-                                if (apiKeyMatch || projectIdMatch) {
-                                    const newConfig: ExtendedFirebaseConfig = {
-                                        ...config,
-                                        apiKey: apiKeyMatch?.[1] || config.apiKey,
-                                        authDomain: authDomainMatch?.[1] || config.authDomain,
-                                        projectId: projectIdMatch?.[1] || config.projectId,
-                                        storageBucket: storageBucketMatch?.[1] || config.storageBucket,
-                                        messagingSenderId: messagingSenderIdMatch?.[1] || config.messagingSenderId,
-                                        appId: appIdMatch?.[1] || config.appId,
-                                    };
-                                    
-                                    // Auto-fill auth domain and storage if not present
-                                    if (!newConfig.authDomain && newConfig.projectId) {
-                                        newConfig.authDomain = `${newConfig.projectId}.firebaseapp.com`;
-                                    }
-                                    if (!newConfig.storageBucket && newConfig.projectId) {
-                                        newConfig.storageBucket = `${newConfig.projectId}.appspot.com`;
-                                    }
-                                    
-                                    onChange(newConfig);
-                                    setConnectionStatus('idle');
-                                    setConnectionMessage('');
-                                    
-                                    // عرض رسالة نجاح
-                                    const extractedCount = [apiKeyMatch, projectIdMatch, appIdMatch, authDomainMatch, storageBucketMatch, messagingSenderIdMatch].filter(Boolean).length;
-                                    (e.target as HTMLTextAreaElement).value = `✅ تم استخراج ${extractedCount} حقول بنجاح!\n\nProject: ${newConfig.projectId || 'N/A'}`;
-                                    
-                                    // مسح الـ textarea بعد ثانيتين
-                                    setTimeout(() => {
-                                        (e.target as HTMLTextAreaElement).value = '';
-                                    }, 2000);
-                                } else {
-                                    (e.target as HTMLTextAreaElement).value = '❌ لم يتم العثور على بيانات Firebase صالحة في النص المُلصق';
-                                    setTimeout(() => {
-                                        (e.target as HTMLTextAreaElement).value = '';
-                                    }, 2000);
+                                // ✅ إلغاء أي timeout سابق
+                                if (extractTimeoutRef.current) {
+                                    clearTimeout(extractTimeoutRef.current);
                                 }
+                                
+                                // ✅ استخراج القيم من النص بعد توقف المستخدم عن الكتابة (debounce)
+                                extractTimeoutRef.current = setTimeout(() => {
+                                    const apiKeyMatch = text.match(/apiKey:\s*["']([^"']+)["']/);
+                                    const authDomainMatch = text.match(/authDomain:\s*["']([^"']+)["']/);
+                                    const projectIdMatch = text.match(/projectId:\s*["']([^"']+)["']/);
+                                    const storageBucketMatch = text.match(/storageBucket:\s*["']([^"']+)["']/);
+                                    const messagingSenderIdMatch = text.match(/messagingSenderId:\s*["']([^"']+)["']/);
+                                    const appIdMatch = text.match(/appId:\s*["']([^"']+)["']/);
+                                    
+                                    // التحقق من وجود قيم Firebase صالحة
+                                    if (apiKeyMatch || projectIdMatch) {
+                                        const newConfig: ExtendedFirebaseConfig = {
+                                            ...config,
+                                            apiKey: apiKeyMatch?.[1] || config.apiKey,
+                                            authDomain: authDomainMatch?.[1] || config.authDomain,
+                                            projectId: projectIdMatch?.[1] || config.projectId,
+                                            storageBucket: storageBucketMatch?.[1] || config.storageBucket,
+                                            messagingSenderId: messagingSenderIdMatch?.[1] || config.messagingSenderId,
+                                            appId: appIdMatch?.[1] || config.appId,
+                                        };
+                                        
+                                        // Auto-fill auth domain and storage if not present
+                                        if (!newConfig.authDomain && newConfig.projectId) {
+                                            newConfig.authDomain = `${newConfig.projectId}.firebaseapp.com`;
+                                        }
+                                        if (!newConfig.storageBucket && newConfig.projectId) {
+                                            newConfig.storageBucket = `${newConfig.projectId}.appspot.com`;
+                                        }
+                                        
+                                        onChange(newConfig);
+                                        setConnectionStatus('idle');
+                                        setConnectionMessage('');
+                                        
+                                        // عرض رسالة نجاح
+                                        const extractedCount = [apiKeyMatch, projectIdMatch, appIdMatch, authDomainMatch, storageBucketMatch, messagingSenderIdMatch].filter(Boolean).length;
+                                        setPasteTextareaValue(`✅ تم استخراج ${extractedCount} حقول بنجاح!\n\nProject: ${newConfig.projectId || 'N/A'}`);
+                                        
+                                        // مسح الـ textarea بعد ثانيتين
+                                        setTimeout(() => {
+                                            setPasteTextareaValue('');
+                                        }, 2000);
+                                    }
+                                }, 300); // ✅ انتظار 300ms بعد توقف المستخدم عن الكتابة
                             }}
                         />
                         <p className="text-[10px] text-amber-400/70 mt-2 flex items-center gap-1">

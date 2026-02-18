@@ -57,10 +57,9 @@ export async function predictBusyHours(
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        const requestsRef = collection(db, 'requests');
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
-            where('tenantId', '==', tenantId),
             where('branch', '==', branchId),
             where('department', '==', department),
             where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo))
@@ -268,14 +267,12 @@ export async function predictMaintenanceIssues(
     const predictions: PredictionResult[] = [];
     
     try {
-        // Get maintenance history
-        const maintenanceRef = collection(db, 'requests');
+        const maintenanceRef = collection(db, `tenants/${tenantId}/requests`);
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 90);
-        
+
         const q = query(
             maintenanceRef,
-            where('tenantId', '==', tenantId),
             where('branch', '==', branchId),
             where('department', '==', 'maintenance'),
             where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo))

@@ -18,6 +18,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { logger } from '../../services/loggerService';
+import { formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -146,11 +147,6 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if true;
       allow write: if request.auth != null;
-    }
-    
-    // 📱 Demo links
-    match /demoLinks/{linkId} {
-      allow read, write: if request.auth != null;
     }
     
     // 📜 License notifications
@@ -629,7 +625,7 @@ export const CoreConfigTemplate: React.FC<CoreConfigTemplateProps> = ({ onSave }
             {/* Last Updated Info */}
             {config.updatedAt && (
                 <div className="text-center text-xs text-slate-500 dark:text-white/40">
-                    آخر تحديث: {config.updatedAt?.toDate?.()?.toLocaleString('ar-SA') || 'غير معروف'}
+                    آخر تحديث: {config.updatedAt ? formatDateTimeGregorianEn(config.updatedAt, { showSeconds: true }) : 'غير معروف'}
                     {config.updatedBy && ` بواسطة ${config.updatedBy}`}
                 </div>
             )}

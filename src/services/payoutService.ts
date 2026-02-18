@@ -9,6 +9,7 @@ import {
     collection, doc, runTransaction, serverTimestamp, query, where, orderBy, getDocs
 } from 'firebase/firestore';
 import { PayoutRequest } from '../types';
+import { logger } from './loggerService';
 
 /**
  * Request a payout (Redeem Points)
@@ -78,7 +79,7 @@ export async function requestPayout(
 
         return result;
     } catch (error: any) {
-        console.error('Payout Request Failed:', error);
+        logger.error('Payout Request Failed:', error, 'payoutService');
         return { success: false, error: error.message };
     }
 }
@@ -96,7 +97,7 @@ export async function getEmployeePayoutHistory(tenantId: string, userId: string)
         const snap = await getDocs(q);
         return snap.docs.map(doc => doc.data() as PayoutRequest);
     } catch (error) {
-        console.error('Error getting payout history:', error);
+        logger.error('Error getting payout history:', error, 'payoutService');
         return [];
     }
 }
@@ -114,7 +115,7 @@ export async function getPendingPayouts(tenantId: string): Promise<PayoutRequest
         const snap = await getDocs(q);
         return snap.docs.map(doc => doc.data() as PayoutRequest);
     } catch (error) {
-        console.error('Error getting pending payouts:', error);
+        logger.error('Error getting pending payouts:', error, 'payoutService');
         return [];
     }
 }

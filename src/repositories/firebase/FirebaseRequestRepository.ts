@@ -223,18 +223,20 @@ export class FirebaseRequestRepository implements IRequestRepository {
 
     async bulkConfirmRequests(
         requestIds: string[],
+        tenantId: string,
         userId: string,
         userName: string
-    ): Promise<void> {
-        return firebaseBulkConfirmRequests(requestIds, userId, userName);
+    ): Promise<{ successCount: number; failedCount: number; failedIds?: string[] }> {
+        return firebaseBulkConfirmRequests(requestIds, tenantId, userId, userName);
     }
 
     async bulkCompleteRequests(
         requestIds: string[],
+        tenantId: string,
         userId: string,
         userName: string
-    ): Promise<void> {
-        return firebaseBulkCompleteRequests(requestIds, userId, userName);
+    ): Promise<{ successCount: number; failedCount: number; failedIds?: string[] }> {
+        return firebaseBulkCompleteRequests(requestIds, tenantId, userId, userName);
     }
 
     async cancelAllActiveRequestsByBranch(

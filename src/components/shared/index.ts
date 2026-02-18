@@ -23,8 +23,7 @@ export { ProcurementLogViewer } from './ProcurementLogViewer';
 // Points Progress
 export { DepartmentPointsProgress, PointsProgressCard } from './DepartmentPointsProgress';
 
-// Developer Signature
-export { DeveloperSignature } from './DeveloperSignature';
+// ✅ التوقيع الموحد في App.tsx (DeveloperFooter) — لا مكوّن منفصل
 
 // Department Navigation
 export { DepartmentTabs, useAllowedDepartments } from './DepartmentTabs';

@@ -16,6 +16,7 @@ import {
     Timestamp, serverTimestamp, writeBatch, onSnapshot, Unsubscribe
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -81,13 +82,12 @@ export const transferGuestToRoom = async (
     const affectedRequestIds: string[] = [];
 
     try {
-        // 1. Find and update the active room card
-        const roomCardsRef = collection(db, 'roomCards');
+        // 1. Find and update the active room card (tenant-scoped)
+        const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
         const roomCardQuery = query(
             roomCardsRef,
             where('roomNumber', '==', fromRoom),
-            where('status', '==', 'active'),
-            where('tenantId', '==', tenantId)
+            where('status', '==', 'active')
         );
         const roomCardSnapshot = await getDocs(roomCardQuery);
 
@@ -99,7 +99,7 @@ export const transferGuestToRoom = async (
         const roomCardData = roomCardDoc.data();
 
         // Update room card with new room number
-        batch.update(doc(db, 'roomCards', roomCardDoc.id), {
+        batch.update(doc(db, `tenants/${tenantId}/roomCards`, roomCardDoc.id), {
             roomNumber: toRoom,
             previousRoom: fromRoom,
             transferredAt: serverTimestamp(),
@@ -107,19 +107,18 @@ export const transferGuestToRoom = async (
             transferReason: reason || 'تغيير الغرفة'
         });
 
-        // 2. Find and update all active requests for this room
-        const requestsRef = collection(db, 'requests');
+        // 2. Find and update all active requests for this room (tenant-scoped)
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const activeRequestsQuery = query(
             requestsRef,
             where('roomNumber', '==', fromRoom),
-            where('tenantId', '==', tenantId),
             where('status', 'in', ['pending', 'in_progress', 'PENDING_RECEPTION', 'confirmed'])
         );
         const requestsSnapshot = await getDocs(activeRequestsQuery);
 
         requestsSnapshot.docs.forEach(requestDoc => {
             affectedRequestIds.push(requestDoc.id);
-            batch.update(doc(db, 'requests', requestDoc.id), {
+            batch.update(doc(db, `tenants/${tenantId}/requests`, requestDoc.id), {
                 roomNumber: toRoom,
                 previousRoom: fromRoom,
                 transferredAt: serverTimestamp(),
@@ -143,9 +142,9 @@ export const transferGuestToRoom = async (
             status: 'completed'
         };
 
-        const transferRef = await addDoc(collection(db, 'roomTransfers'), transferRecord);
+        const transferRef = await addDoc(collection(db, `tenants/${tenantId}/roomTransfers`), transferRecord);
 
-        // 4. Create notifications for all departments
+        // 4. Create notifications for all departments (tenant-scoped)
         const departments = ['reception', 'housekeeping', 'maintenance', 'coffee_shop', 'bellman'];
         
         for (const department of departments) {
@@ -162,11 +161,11 @@ export const transferGuestToRoom = async (
                 createdAt: serverTimestamp()
             };
             
-            await addDoc(collection(db, 'departmentNotifications'), notification);
+            await addDoc(collection(db, `tenants/${tenantId}/departmentNotifications`), notification);
         }
 
-        // 5. Create guest-facing notification (for real-time sync)
-        await addDoc(collection(db, 'guestNotifications'), {
+        // 5. Create guest-facing notification (for real-time sync, tenant-scoped)
+        await addDoc(collection(db, `tenants/${tenantId}/guestNotifications`), {
             tenantId,
             branchId,
             roomNumber: toRoom, // New room
@@ -180,7 +179,7 @@ export const transferGuestToRoom = async (
         // Commit batch updates
         await batch.commit();
 
-        console.log(`✅ Room transfer completed: ${fromRoom} → ${toRoom} (${affectedRequestIds.length} requests updated)`);
+        logger.info(`✅ Room transfer completed: ${fromRoom} → ${toRoom} (${affectedRequestIds.length} requests updated)`, undefined, 'roomTransferService');
 
         return { 
             success: true, 
@@ -188,7 +187,7 @@ export const transferGuestToRoom = async (
         };
 
     } catch (error: any) {
-        console.error('Error transferring room:', error);
+        logger.error('Error transferring room:', error, 'roomTransferService');
         return { 
             success: false, 
             error: error.message || 'حدث خطأ أثناء نقل الغرفة' 
@@ -211,8 +210,7 @@ export const subscribeToRoomTransfers = (
     onTransfer: (notification: { newRoom: string; message: string }) => void
 ): Unsubscribe => {
     const q = query(
-        collection(db, 'guestNotifications'),
-        where('tenantId', '==', tenantId),
+        collection(db, `tenants/${tenantId}/guestNotifications`),
         where('branchId', '==', branchId),
         where('previousRoom', '==', currentRoom),
         where('type', '==', 'room_transfer'),
@@ -229,7 +227,7 @@ export const subscribeToRoomTransfers = (
                 });
 
                 // Mark as read
-                updateDoc(doc(db, 'guestNotifications', change.doc.id), { read: true });
+                updateDoc(doc(db, `tenants/${tenantId}/guestNotifications`, change.doc.id), { read: true });
             }
         });
     });
@@ -245,8 +243,7 @@ export const subscribeToDepartmentTransferNotifications = (
     callback: (notifications: TransferNotification[]) => void
 ): Unsubscribe => {
     const q = query(
-        collection(db, 'departmentNotifications'),
-        where('tenantId', '==', tenantId),
+        collection(db, `tenants/${tenantId}/departmentNotifications`),
         where('branchId', '==', branchId),
         where('department', '==', department),
         where('type', '==', 'room_transfer'),
@@ -263,10 +260,10 @@ export const subscribeToDepartmentTransferNotifications = (
 };
 
 /**
- * Mark transfer notification as read
+ * Mark transfer notification as read (tenant-scoped)
  */
-export const markTransferNotificationAsRead = async (notificationId: string): Promise<void> => {
-    await updateDoc(doc(db, 'departmentNotifications', notificationId), { read: true });
+export const markTransferNotificationAsRead = async (tenantId: string, notificationId: string): Promise<void> => {
+    await updateDoc(doc(db, `tenants/${tenantId}/departmentNotifications`, notificationId), { read: true });
 };
 
 // ============================================================
@@ -281,8 +278,7 @@ export const getRoomTransferHistory = async (
     roomNumber: string
 ): Promise<RoomTransfer[]> => {
     const q = query(
-        collection(db, 'roomTransfers'),
-        where('tenantId', '==', tenantId),
+        collection(db, `tenants/${tenantId}/roomTransfers`),
         where('fromRoom', '==', roomNumber)
     );
 
@@ -301,14 +297,10 @@ export const getAllTransfers = async (
     branchId?: string,
     limit: number = 50
 ): Promise<RoomTransfer[]> => {
-    let q = query(
-        collection(db, 'roomTransfers'),
-        where('tenantId', '==', tenantId)
-    );
-
-    if (branchId) {
-        q = query(q, where('branchId', '==', branchId));
-    }
+    const baseRef = collection(db, `tenants/${tenantId}/roomTransfers`);
+    let q = branchId
+        ? query(baseRef, where('branchId', '==', branchId))
+        : query(baseRef);
 
     const snapshot = await getDocs(q);
     return snapshot.docs

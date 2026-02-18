@@ -23,7 +23,8 @@ import {
     saveAndNotifyReport,
     markReportAsViewed
 } from '../../services/dataHealthReportService';
-import { formatHijriDate } from '../../utils/printUtils';
+import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn, formatTimeGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -112,23 +113,23 @@ const MetricCard: React.FC<{
         : (trend === 'up' ? 'text-red-400' : 'text-gray-400');
 
     return (
-        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+        <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+            <div className={`w-8 h-8 rounded-md flex items-center justify-center [&>svg]:w-4 [&>svg]:h-4 ${
                 status === 'critical' ? 'bg-red-500/20' :
                 status === 'warning' ? 'bg-orange-500/20' : 'bg-teal-500/20'
             }`}>
                 {icon}
             </div>
-            <div className="flex-1">
-                <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>{label}</p>
+            <div className="flex-1 min-w-0">
+                <p className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>{label}</p>
                 <div className="flex items-baseline gap-1">
-                    <span className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>{value}</span>
-                    <span className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>{unit}</span>
+                    <span className="text-base font-bold" style={{ color: 'var(--theme-text-primary)' }}>{value}</span>
+                    <span className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>{unit}</span>
                 </div>
             </div>
             {trendPercent !== undefined && trendPercent > 0 && (
-                <div className={`flex items-center gap-1 text-xs ${trendColor}`}>
-                    <TrendIcon className="w-3 h-3" />
+                <div className={`flex items-center gap-0.5 text-[10px] ${trendColor}`}>
+                    <TrendIcon className="w-2.5 h-2.5" />
                     <span>{trendPercent}%</span>
                 </div>
             )}
@@ -165,7 +166,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                 : tenantId;
             
             if (!effectiveTenantId) {
-                console.warn('⚠️ No tenantId available for health report');
+                logger.warn('⚠️ No tenantId available for health report', undefined, 'DataHealthReportCard');
                 setLoading(false);
                 return;
             }
@@ -181,7 +182,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                     }
                 } else {
                     // ✅ TEMP: Create mock report for testing the modal
-                    console.log('⚠️ No reports found - creating mock report for testing');
+                    logger.debug('No reports found - creating mock report for testing', undefined, 'DataHealthReportCard');
                     const mockReport: DataHealthReport = {
                         id: 'mock-report-test',
                         tenantId: effectiveTenantId,
@@ -216,7 +217,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                     setReport(mockReport);
                 }
             } catch (err: any) {
-                console.error('Error loading health report:', err);
+                logger.error('Error loading health report:', err, 'DataHealthReportCard');
                 // ✅ Handle permission errors specifically
                 const isPermissionError = err?.code === 'permission-denied' || 
                                           err?.message?.includes('permission') ||
@@ -224,7 +225,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                 
                 if (isPermissionError && user?.role === 'owner') {
                     // ✅ Owner should have access - this is unexpected
-                    console.warn('⚠️ Owner permission denied for health reports - this should not happen');
+                    logger.warn('⚠️ Owner permission denied for health reports - this should not happen', undefined, 'DataHealthReportCard');
                     error('خطأ في الصلاحيات: المالك يجب أن يكون لديه صلاحيات الوصول. يرجى التحقق من Firestore Rules.');
                 } else if (err?.message?.includes('not initialized')) {
                     error(t('healthReport.firebaseNotConnected') || 'Firebase غير متصل');
@@ -262,12 +263,12 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
             success(t('healthReport.reportGenerated') || 'تم إنشاء التقرير بنجاح');
             haptic('success');
         } catch (err: any) {
-            console.error('❌ Error generating report:', err);
-            console.error('Error details:', {
+            logger.error('❌ Error generating report:', err, 'DataHealthReportCard');
+            logger.error('Error details:', {
                 message: err?.message,
                 code: err?.code,
                 stack: err?.stack
-            });
+            }, 'DataHealthReportCard');
             
             // ✅ Show user-friendly error message
             if (err?.message?.includes('not initialized')) {
@@ -279,7 +280,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
             } else {
                 const errorMsg = err?.message || 'خطأ غير معروف';
                 error(`${t('healthReport.generateFailed')}: ${errorMsg.substring(0, 100)}`);
-                console.error('Full error:', err);
+                logger.error('Full error:', err, 'DataHealthReportCard');
             }
             haptic('error');
         } finally {
@@ -287,29 +288,18 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
         }
     };
 
-    const formatDate = (date: Date) => {
-        // ✅ Format: Day Name, Day/Month/Year (Gregorian) - Full Hijri
-        const dayName = date.toLocaleDateString('ar-SA', { weekday: 'long' });
-        const day = date.getDate();
-        const month = date.toLocaleDateString('ar-SA', { month: 'long' });
-        const year = date.getFullYear();
-        
-        const gregorianDate = `${dayName} ${day} ${month} ${year}`;
-        const hijriDate = formatHijriDate(date);
-        
-        return `${gregorianDate} (ميلادي) | ${hijriDate} (هجري)`;
-    };
+    const formatDate = (date: Date) => formatDateGregorianEn(date, 'full');
 
     if (loading) {
         return (
-            <div className="solid-modal rounded-2xl p-6" style={{ background: 'var(--theme-bg-secondary)' }}>
-                <div className="animate-pulse space-y-4">
-                    <div className="h-6 bg-white/10 rounded w-1/3" />
-                    <div className="flex gap-4">
-                        <div className="w-20 h-20 bg-white/10 rounded-full" />
-                        <div className="flex-1 space-y-2">
-                            <div className="h-4 bg-white/10 rounded w-2/3" />
-                            <div className="h-4 bg-white/10 rounded w-1/2" />
+            <div className="solid-modal rounded-xl p-3" style={{ background: 'var(--theme-bg-secondary)' }}>
+                <div className="animate-pulse space-y-2">
+                    <div className="h-4 bg-white/10 rounded w-1/3" />
+                    <div className="flex gap-2">
+                        <div className="w-12 h-12 bg-white/10 rounded-full" />
+                        <div className="flex-1 space-y-1">
+                            <div className="h-3 bg-white/10 rounded w-2/3" />
+                            <div className="h-3 bg-white/10 rounded w-1/2" />
                         </div>
                     </div>
                 </div>
@@ -318,25 +308,25 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
     }
 
     return (
-        <div className="solid-modal rounded-2xl overflow-hidden" style={{ background: 'var(--theme-bg-secondary)' }}>
+        <div className="solid-modal rounded-xl overflow-hidden" style={{ background: 'var(--theme-bg-secondary)' }}>
             {/* Header */}
             <div
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
                 onClick={() => setExpanded(!expanded)}
                 style={{ borderBottom: expanded ? '1px solid var(--theme-border-primary)' : 'none' }}
             >
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-teal-500/20 flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-teal-400" />
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                        <Activity className="w-4 h-4 text-teal-400" />
                     </div>
                     <div>
-                        <h3 className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                        <h3 className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                             🏥 تقرير صحة البيانات
                         </h3>
-                        <p className="text-xs leading-relaxed" style={{ color: 'var(--theme-text-tertiary)' }}>
+                        <p className="text-[10px] leading-snug" style={{ color: 'var(--theme-text-tertiary)' }}>
                             {report ? (
                                 <>
-                                    <span className="block mb-1">
+                                    <span className="block">
                                         <span className="font-medium">من:</span> {formatDate(report.reportPeriod.start)}
                                     </span>
                                     <span className="block">
@@ -350,11 +340,11 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     {report && (
                         <HealthScoreRing score={report.overallHealth} size="sm" />
                     )}
-                    <ChevronRight className={`w-5 h-5 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                    <ChevronRight className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
                         style={{ color: 'var(--theme-text-tertiary)' }}
                     />
                 </div>
@@ -362,17 +352,17 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
 
             {/* Expanded Content */}
             {expanded && (
-                <div className="p-4 space-y-4">
+                <div className="p-3 space-y-3">
                     {report ? (
                         <>
                             {/* Main Score */}
-                            <div className="flex items-center justify-center gap-6 py-4">
-                                <HealthScoreRing score={report.overallHealth} size="lg" />
+                            <div className="flex items-center justify-center gap-4 py-2">
+                                <HealthScoreRing score={report.overallHealth} size="md" />
                                 <div>
-                                    <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
                                         الحالة العامة للنظام
                                     </p>
-                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                    <p className="text-base font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.overallHealth >= 80 ? '✅ ممتاز' :
                                          report.overallHealth >= 60 ? '👍 جيد' :
                                          report.overallHealth >= 40 ? '⚠️ يحتاج تحسين' : '🚨 حرج'}
@@ -381,28 +371,28 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                             </div>
 
                             {/* Summary Stats */}
-                            <div className="grid grid-cols-4 gap-3">
-                                <div className="text-center p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                            <div className="grid grid-cols-4 gap-2">
+                                <div className="text-center p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.totalIssues}
                                     </p>
-                                    <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي الحالات</p>
+                                    <p className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي الحالات</p>
                                 </div>
-                                <div className="text-center p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-2xl font-bold text-green-400">{report.resolvedIssues}</p>
-                                    <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>تم حلها</p>
+                                <div className="text-center p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-lg font-bold text-green-400">{report.resolvedIssues}</p>
+                                    <p className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>تم حلها</p>
                                 </div>
-                                <div className="text-center p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className={`text-2xl font-bold ${report.criticalIssues > 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                                <div className="text-center p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className={`text-lg font-bold ${report.criticalIssues > 0 ? 'text-red-400' : 'text-gray-400'}`}>
                                         {report.criticalIssues}
                                     </p>
-                                    <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>حرجة</p>
+                                    <p className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>حرجة</p>
                                 </div>
-                                <div className="text-center p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className={`text-2xl font-bold ${report.errorAnalysis?.totalErrors > 0 ? 'text-orange-400' : 'text-gray-400'}`}>
+                                <div className="text-center p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className={`text-lg font-bold ${report.errorAnalysis?.totalErrors > 0 ? 'text-orange-400' : 'text-gray-400'}`}>
                                         {report.errorAnalysis?.totalErrors || 0}
                                     </p>
-                                    <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>أخطاء</p>
+                                    <p className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>أخطاء</p>
                                 </div>
                             </div>
 
@@ -443,7 +433,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                                         <AlertTriangle className="w-4 h-4" />
                                         تحليل الأخطاء
                                     </p>
-                                    <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                         <div className="grid grid-cols-2 gap-2 mb-3">
                                             <div>
                                                 <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي الأخطاء</p>
@@ -479,7 +469,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                                         <BarChart3 className="w-4 h-4" />
                                         تحليل الأداء
                                     </p>
-                                    <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                         <div className="grid grid-cols-2 gap-2">
                                             <div>
                                                 <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>متوسط وقت الاستجابة</p>
@@ -517,7 +507,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                                         <History className="w-4 h-4" />
                                         خط زمني للأحداث ({report.activityTimeline.length})
                                     </p>
-                                    <div className="p-3 rounded-xl max-h-48 overflow-y-auto" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <div className="p-2 rounded-lg max-h-40 overflow-y-auto" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                         {report.activityTimeline.slice(0, 10).map((event, idx) => (
                                             <div key={idx} className="flex items-start gap-2 mb-2 text-xs">
                                                 <div className={`w-2 h-2 rounded-full mt-1 ${
@@ -528,12 +518,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                                                 <div className="flex-1">
                                                     <p style={{ color: 'var(--theme-text-secondary)' }}>{event.event}</p>
                                                     <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
-                                                        {new Date(event.timestamp).toLocaleString('ar-SA', { 
-                                                            day: 'numeric', 
-                                                            month: 'short', 
-                                                            hour: '2-digit', 
-                                                            minute: '2-digit' 
-                                                        })}
+                                                        {formatDateTimeGregorianEn(new Date(event.timestamp), { dateStyle: 'medium', showSeconds: false })}
                                                     </p>
                                                 </div>
                                             </div>
@@ -556,7 +541,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                                     {report.recommendations.map((rec, idx) => (
                                         <div
                                             key={idx}
-                                            className="flex items-start gap-2 p-3 rounded-xl"
+                                            className="flex items-start gap-2 p-2 rounded-lg"
                                             style={{ background: 'var(--theme-bg-tertiary)' }}
                                         >
                                             <CheckCircle2 className="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" />
@@ -572,7 +557,7 @@ export const DataHealthReportCard: React.FC<DataHealthReportCardProps> = ({
                             <button
                                 ref={buttonRef}
                                 onClick={() => {
-                                    console.log('🔍 [DataHealthReportCard] Opening full report modal...', { report: report?.id, showFullReport });
+                                    logger.info('🔍 [DataHealthReportCard] Opening full report modal...', { report: report?.id, showFullReport }, 'DataHealthReportCard');
                                     setShowFullReport(true);
                                 }}
                                 className="w-full py-3 rounded-xl bg-teal-500/10 text-teal-400 font-medium hover:bg-teal-500/20 transition-colors flex items-center justify-center gap-2"
@@ -663,11 +648,11 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
     // ✅ DEBUG: Log when modal is rendered
     React.useEffect(() => {
-        console.log('🎯 [FullReportModal] Modal rendered/updated', { 
+        logger.info('🎯 [FullReportModal] Modal rendered/updated', { 
             reportId: report?.id, 
             position, 
             anchorRef: anchorRef?.current ? 'exists' : 'null' 
-        });
+        }, 'DataHealthReportCard');
     }, [report, position, anchorRef]);
 
     // ✅ FIX: Calculate position relative to button - ALWAYS show near button
@@ -908,7 +893,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
             success('تم نسخ التقرير الكامل إلى الحافظة');
             setTimeout(() => setCopied(false), 2000);
         }).catch((err) => {
-            console.error('Failed to copy to clipboard:', err);
+            logger.error('Failed to copy to clipboard:', err, 'DataHealthReportCard');
             error(t('healthReport.copyFailed'));
         });
     };
@@ -976,7 +961,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
             exportToExcel(exportData, `health-report-${startDate.toISOString().split('T')[0]}.xlsx`);
             success(t('healthReport.exportSuccess'));
         } catch (err: any) {
-            console.error('Excel export failed:', err);
+            logger.error('Excel export failed:', err, 'DataHealthReportCard');
             error('فشل تصدير Excel: ' + (err?.message || 'خطأ غير معروف'));
         }
     };
@@ -1008,61 +993,26 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
             return 'تاريخ غير صحيح';
         }
         
-        // ✅ Format: Day Name, Day/Month/Year (Gregorian) - Full Hijri
-        const dayName = dateObj.toLocaleDateString('ar-SA', { weekday: 'long' });
-        const day = dateObj.getDate();
-        const month = dateObj.toLocaleDateString('ar-SA', { month: 'long' });
-        const year = dateObj.getFullYear();
-        
-        const gregorianDate = `${dayName} ${day} ${month} ${year}`;
-        
-        const hijriDate = formatHijriDate(dateObj);
-        
-        return `${gregorianDate} (ميلادي) | ${hijriDate} (هجري)`;
+        return formatDateGregorianEn(dateObj, 'full');
     };
     
     const formatDateTime = (date: Date | any) => {
-        // ✅ Safe date conversion: Handle Firestore Timestamp, Date, or string
         let dateObj: Date;
-        
         if (date instanceof Date) {
             dateObj = date;
         } else if (date?.toDate && typeof date.toDate === 'function') {
-            // Firestore Timestamp
             dateObj = date.toDate();
         } else if (date?.seconds) {
-            // Firestore Timestamp (seconds property)
             dateObj = new Date(date.seconds * 1000);
         } else if (typeof date === 'string') {
             dateObj = new Date(date);
         } else if (typeof date === 'number') {
             dateObj = new Date(date);
         } else {
-            // Fallback: return error message instead of crashing
             return 'تاريخ غير صحيح';
         }
-        
-        // Validate date
-        if (isNaN(dateObj.getTime())) {
-            return 'تاريخ غير صحيح';
-        }
-        
-        // ✅ Format with time: Day Name, Day/Month/Year HH:MM (Gregorian) - Full Hijri
-        const dayName = dateObj.toLocaleDateString('ar-SA', { weekday: 'long' });
-        const day = dateObj.getDate();
-        const month = dateObj.toLocaleDateString('ar-SA', { month: 'long' });
-        const year = dateObj.getFullYear();
-        
-        const time = dateObj.toLocaleTimeString('ar-SA', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        
-        const gregorianDate = `${dayName} ${day} ${month} ${year} الساعة ${time}`;
-        
-        const hijriDate = formatHijriDate(dateObj);
-        
-        return `${gregorianDate} (ميلادي) | ${hijriDate} (هجري)`;
+        if (isNaN(dateObj.getTime())) return 'تاريخ غير صحيح';
+        return formatDateTimeGregorianEn(dateObj, { dateStyle: 'long', showSeconds: false });
     };
 
     // ✅ MOBILE-FIRST: Detect mobile screen
@@ -1205,35 +1155,35 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                 </div>
 
                 {/* Content - Mobile Responsive */}
-                <div className={`${isMobile ? 'p-3 sm:p-4' : 'p-6'} overflow-y-auto`} style={{ 
+                <div className={`${isMobile ? 'p-2 sm:p-3' : 'p-4'} overflow-y-auto`} style={{ 
                     maxHeight: isMobile ? 'calc(100vh - 200px)' : 'calc(100vh - 300px)',
                     height: isMobile ? 'calc(100vh - 200px)' : 'auto',
                     WebkitOverflowScrolling: 'touch' // ✅ FIX: Smooth scrolling on mobile
                 }}>
                     {activeTab === 'errors' && (
-                        <div className="space-y-3 sm:space-y-4">
-                            <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-4'} gap-2 sm:gap-4`}>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي الأخطاء</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                        <div className="space-y-2 sm:space-y-3">
+                            <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي الأخطاء</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.errorAnalysis.totalErrors}
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>غير محلولة</p>
-                                    <p className={`text-2xl font-bold ${report.errorAnalysis.unresolvedErrors > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>غير محلولة</p>
+                                    <p className={`text-lg font-bold ${report.errorAnalysis.unresolvedErrors > 0 ? 'text-red-400' : 'text-green-400'}`}>
                                         {report.errorAnalysis.unresolvedErrors}
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>أنواع الأخطاء</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>أنواع الأخطاء</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {Object.keys(report.errorAnalysis.errorsByType).length}
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>الخدمات المتأثرة</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>الخدمات المتأثرة</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {Object.keys(report.errorAnalysis.errorsByService).length}
                                     </p>
                                 </div>
@@ -1241,17 +1191,17 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                             {/* Errors by Type */}
                             <div>
-                                <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                     الأخطاء حسب النوع
                                 </h3>
-                                <div className="space-y-2">
+                                <div className="space-y-1">
                                     {Object.entries(report.errorAnalysis.errorsByType)
                                         .sort(([, a], [, b]) => b - a)
                                         .map(([type, count]) => (
-                                            <div key={type} className="flex items-center justify-between p-3 rounded-xl"
+                                            <div key={type} className="flex items-center justify-between p-2 rounded-lg"
                                                 style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                                <code className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{type}</code>
-                                                <span className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>{count}</span>
+                                                <code className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>{type}</code>
+                                                <span className="font-bold text-sm" style={{ color: 'var(--theme-text-primary)' }}>{count}</span>
                                             </div>
                                         ))}
                                 </div>
@@ -1259,17 +1209,17 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                             {/* Errors by Service */}
                             <div>
-                                <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                     الأخطاء حسب الخدمة
                                 </h3>
-                                <div className="space-y-2">
+                                <div className="space-y-1">
                                     {Object.entries(report.errorAnalysis.errorsByService)
                                         .sort(([, a], [, b]) => b - a)
                                         .map(([service, count]) => (
-                                            <div key={service} className="flex items-center justify-between p-3 rounded-xl"
+                                            <div key={service} className="flex items-center justify-between p-2 rounded-lg"
                                                 style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                                <code className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{service}</code>
-                                                <span className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>{count}</span>
+                                                <code className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>{service}</code>
+                                                <span className="font-bold text-sm" style={{ color: 'var(--theme-text-primary)' }}>{count}</span>
                                             </div>
                                         ))}
                                 </div>
@@ -1277,32 +1227,32 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                             {/* Top Errors */}
                             <div>
-                                <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                     أكثر الأخطاء تكراراً
                                 </h3>
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     {report.errorAnalysis.topErrors.map((error, idx) => (
-                                        <div key={idx} className="p-4 rounded-xl border"
+                                        <div key={idx} className="p-2 rounded-lg border"
                                             style={{ 
                                                 background: 'var(--theme-bg-tertiary)',
                                                 borderColor: 'var(--theme-border-primary)'
                                             }}>
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div className="flex-1">
-                                                    <p className="text-sm font-medium mb-1" style={{ color: 'var(--theme-text-primary)' }}>
+                                            <div className="flex items-start justify-between mb-1">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--theme-text-primary)' }}>
                                                         {error.message}
                                                     </p>
-                                                    <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                                    <p className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>
                                                         آخر حدوث: {formatDateTime(error.lastOccurrence)} | التكرار: {error.count}x
                                                     </p>
                                                 </div>
                                             </div>
                                             {error.stackTrace && (
-                                                <details className="mt-2">
-                                                    <summary className="text-xs cursor-pointer" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                                <details className="mt-1">
+                                                    <summary className="text-[10px] cursor-pointer" style={{ color: 'var(--theme-text-tertiary)' }}>
                                                         Stack Trace
                                                     </summary>
-                                                    <pre className="mt-2 p-3 rounded text-xs overflow-x-auto"
+                                                    <pre className="mt-1 p-2 rounded text-[10px] overflow-x-auto"
                                                         style={{ 
                                                             background: 'var(--theme-bg-primary)',
                                                             color: 'var(--theme-text-secondary)'
@@ -1319,23 +1269,23 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                     )}
 
                     {activeTab === 'performance' && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>متوسط وقت الاستجابة</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>متوسط وقت الاستجابة</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.performanceAnalysis.averageResponseTime}s
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>استعلامات بطيئة</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>استعلامات بطيئة</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.performanceAnalysis.slowQueries}
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>مكالمات API</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>مكالمات API</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.performanceAnalysis.apiCallsCount}
                                     </p>
                                 </div>
@@ -1343,17 +1293,17 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                             {report.performanceAnalysis.slowestEndpoints.length > 0 && (
                                 <div>
-                                    <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                    <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                         أبطأ Endpoints
                                     </h3>
-                                    <div className="space-y-2">
+                                    <div className="space-y-1">
                                         {report.performanceAnalysis.slowestEndpoints.map((endpoint, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 rounded-xl"
+                                            <div key={idx} className="flex items-center justify-between p-2 rounded-lg"
                                                 style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                                <code className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+                                                <code className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
                                                     {endpoint.endpoint}
                                                 </code>
-                                                <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-2">
                                                     <span className="text-sm" style={{ color: 'var(--theme-text-tertiary)' }}>
                                                         {endpoint.count}x
                                                     </span>
@@ -1370,33 +1320,33 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                     )}
 
                     {activeTab === 'console' && (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {report.consoleErrors ? (
                                 <>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                        <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                            <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي الأخطاء</p>
-                                            <p className="text-2xl font-bold text-red-400">{report.consoleErrors?.total || 0}</p>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                            <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي الأخطاء</p>
+                                            <p className="text-lg font-bold text-red-400">{report.consoleErrors?.total || 0}</p>
                                         </div>
-                                        <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                            <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>Errors</p>
-                                            <p className="text-2xl font-bold text-red-400">{report.consoleErrors?.errorsByLevel?.error || 0}</p>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                            <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>Errors</p>
+                                            <p className="text-lg font-bold text-red-400">{report.consoleErrors?.errorsByLevel?.error || 0}</p>
                                         </div>
-                                        <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                            <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>Warnings</p>
-                                            <p className="text-2xl font-bold text-yellow-400">{report.consoleErrors?.errorsByLevel?.warn || 0}</p>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                            <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>Warnings</p>
+                                            <p className="text-lg font-bold text-yellow-400">{report.consoleErrors?.errorsByLevel?.warn || 0}</p>
                                         </div>
-                                        <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                            <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>Info</p>
-                                            <p className="text-2xl font-bold text-blue-400">{report.consoleErrors?.errorsByLevel?.info || 0}</p>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                            <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>Info</p>
+                                            <p className="text-lg font-bold text-blue-400">{report.consoleErrors?.errorsByLevel?.info || 0}</p>
                                         </div>
                                     </div>
 
                                     {/* Full Console Output */}
                                     {report.consoleErrors?.fullConsoleOutput && (
                                         <div>
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h3 className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h3 className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                                     📋 نسخة كاملة من أخطاء الكونسول
                                                 </h3>
                                                 <button
@@ -1404,18 +1354,18 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                                                         navigator.clipboard.writeText(report.consoleErrors?.fullConsoleOutput || '');
                                                         success('تم نسخ أخطاء الكونسول إلى الحافظة');
                                                     }}
-                                                    className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-                                                    style={{ 
+                                                    className="px-2 py-1 rounded-lg text-xs font-medium transition-colors"
+                                                    style={{
                                                         background: 'var(--theme-bg-tertiary)',
                                                         color: 'var(--theme-text-primary)'
                                                     }}
                                                 >
-                                                    <Copy className="w-4 h-4 inline mr-1" />
+                                                    <Copy className="w-3 h-3 inline mr-1" />
                                                     نسخ الكل
                                                 </button>
                                             </div>
-                                            <pre 
-                                                className="p-4 rounded-xl overflow-auto text-xs font-mono max-h-[600px]"
+                                            <pre
+                                                className="p-2 rounded-lg overflow-auto text-[10px] font-mono max-h-[400px]"
                                                 style={{ 
                                                     background: 'var(--theme-bg-tertiary)',
                                                     color: 'var(--theme-text-secondary)',
@@ -1430,14 +1380,14 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                                     {/* Individual Errors List */}
                                     {report.consoleErrors?.errors && report.consoleErrors.errors.length > 0 && (
                                         <div>
-                                            <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                            <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                                 قائمة الأخطاء التفصيلية ({report.consoleErrors.errors.length})
                                             </h3>
-                                            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                                            <div className="space-y-1 max-h-[320px] overflow-y-auto">
                                                 {report.consoleErrors.errors.map((err, idx) => (
-                                                    <div 
-                                                        key={idx} 
-                                                        className="p-3 rounded-xl border-l-4"
+                                                    <div
+                                                        key={idx}
+                                                        className="p-2 rounded-lg border-l-4"
                                                         style={{ 
                                                             background: 'var(--theme-bg-tertiary)',
                                                             borderLeftColor: err.level === 'error' ? '#EF4444' : 
@@ -1495,24 +1445,24 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                     )}
 
                     {activeTab === 'timeline' && (
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                             {report.activityTimeline.map((event, idx) => (
-                                <div key={idx} className="flex items-start gap-3 p-3 rounded-xl"
+                                <div key={idx} className="flex items-start gap-2 p-2 rounded-lg"
                                     style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                                    <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
                                         event.type === 'error' ? 'bg-red-400' :
                                         event.type === 'warning' ? 'bg-yellow-400' :
                                         event.type === 'info' ? 'bg-blue-400' : 'bg-green-400'
                                     }`} />
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium mb-1" style={{ color: 'var(--theme-text-primary)' }}>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--theme-text-primary)' }}>
                                             {event.event}
                                         </p>
-                                        <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                        <p className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>
                                             {formatDateTime(event.timestamp)}
                                         </p>
                                         {event.details && (
-                                            <p className="text-xs mt-1" style={{ color: 'var(--theme-text-secondary)' }}>
+                                            <p className="text-[10px] mt-0.5" style={{ color: 'var(--theme-text-secondary)' }}>
                                                 {event.details}
                                             </p>
                                         )}
@@ -1523,57 +1473,57 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                     )}
 
                     {activeTab === 'system' && (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {/* System Info */}
                             {report.systemInfo && (
                                 <div>
-                                    <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                    <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                         🌐 معلومات البيئة
                                     </h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>المتصفح</p>
                                             <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                 {report.systemInfo.browser} {report.systemInfo.browserVersion}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>نظام التشغيل</p>
                                             <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                 {report.systemInfo.os}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>حجم الشاشة</p>
                                             <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                 {report.systemInfo.screenSize}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>حجم النافذة</p>
                                             <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                 {report.systemInfo.viewportSize}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>اللغة</p>
                                             <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                 {report.systemInfo.language}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>المنطقة الزمنية</p>
                                             <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                 {report.systemInfo.timezone}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>الاتصال بالإنترنت</p>
                                             <p className={`text-sm font-medium ${report.systemInfo.online ? 'text-green-400' : 'text-red-400'}`}>
                                                 {report.systemInfo.online ? '✅ متصل' : '❌ غير متصل'}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>PWA مثبت</p>
                                             <p className={`text-sm font-medium ${report.systemInfo.pwaInstalled ? 'text-green-400' : 'text-gray-400'}`}>
                                                 {report.systemInfo.pwaInstalled ? '✅ نعم' : '❌ لا'}
@@ -1583,24 +1533,24 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                                     
                                     {/* Memory Info */}
                                     {report.systemInfo.memoryInfo && (
-                                        <div className="mt-4">
-                                            <h4 className="text-base font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
+                                        <div className="mt-3">
+                                            <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--theme-text-primary)' }}>
                                                 💾 معلومات الذاكرة
                                             </h4>
-                                            <div className="grid grid-cols-3 gap-3">
-                                                <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                                     <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>المستخدم</p>
                                                     <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                         {(report.systemInfo.memoryInfo.usedJSHeapSize! / 1024 / 1024).toFixed(2)} MB
                                                     </p>
                                                 </div>
-                                                <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                                     <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>الإجمالي</p>
                                                     <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                         {(report.systemInfo.memoryInfo.totalJSHeapSize! / 1024 / 1024).toFixed(2)} MB
                                                     </p>
                                                 </div>
-                                                <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                                     <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>الحد الأقصى</p>
                                                     <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                         {(report.systemInfo.memoryInfo.jsHeapSizeLimit! / 1024 / 1024).toFixed(2)} MB
@@ -1612,30 +1562,30 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                                     
                                     {/* Connection Info */}
                                     {report.systemInfo.connectionInfo && (
-                                        <div className="mt-4">
-                                            <h4 className="text-base font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
+                                        <div className="mt-3">
+                                            <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--theme-text-primary)' }}>
                                                 📡 معلومات الاتصال
                                             </h4>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                                     <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>نوع الاتصال</p>
                                                     <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                         {report.systemInfo.connectionInfo.effectiveType || 'Unknown'}
                                                     </p>
                                                 </div>
-                                                <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                                     <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>السرعة (Mbps)</p>
                                                     <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                         {report.systemInfo.connectionInfo.downlink || 'Unknown'}
                                                     </p>
                                                 </div>
-                                                <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                                     <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>RTT (ms)</p>
                                                     <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                         {report.systemInfo.connectionInfo.rtt || 'Unknown'}
                                                     </p>
                                                 </div>
-                                                <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                                     <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>توفير البيانات</p>
                                                     <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                         {report.systemInfo.connectionInfo.saveData ? '✅ مفعل' : '❌ معطل'}
@@ -1650,29 +1600,29 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                             {/* Firebase Status */}
                             {report.firebaseStatus && (
                                 <div>
-                                    <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                    <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                         🔥 حالة Firebase
                                     </h3>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>الاتصال</p>
                                             <p className={`text-sm font-medium ${report.firebaseStatus.connected ? 'text-green-400' : 'text-red-400'}`}>
                                                 {report.firebaseStatus.connected ? '✅ متصل' : '❌ غير متصل'}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>أخطاء القراءة</p>
                                             <p className="text-sm font-medium text-red-400">
                                                 {report.firebaseStatus.readErrors}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>أخطاء الكتابة</p>
                                             <p className="text-sm font-medium text-red-400">
                                                 {report.firebaseStatus.writeErrors}
                                             </p>
                                         </div>
-                                        <div className="p-3 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                        <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
                                             <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>تحذيرات Index</p>
                                             <p className={`text-sm font-medium ${report.firebaseStatus.indexWarnings > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
                                                 {report.firebaseStatus.indexWarnings}
@@ -1683,14 +1633,14 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
                                     {/* Missing Indexes List */}
                                     {report.firebaseStatus.missingIndexes && report.firebaseStatus.missingIndexes.length > 0 && (
                                         <div>
-                                            <h4 className="text-base font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
+                                            <h4 className="text-sm font-bold mb-1" style={{ color: 'var(--theme-text-primary)' }}>
                                                 ⚠️ Indexes المفقودة ({report.firebaseStatus.missingIndexes.length})
                                             </h4>
-                                            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                                            <div className="space-y-1 max-h-[240px] overflow-y-auto">
                                                 {report.firebaseStatus.missingIndexes.map((idx, idxIndex) => (
                                                     <div 
                                                         key={idxIndex}
-                                                        className="p-3 rounded-xl border-l-4"
+                                                        className="p-2 rounded-lg border-l-4"
                                                         style={{ 
                                                             background: 'var(--theme-bg-tertiary)',
                                                             borderLeftColor: '#F59E0B'
@@ -1724,7 +1674,7 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                     {activeTab === 'raw' && (
                         <div>
-                            <pre className="p-4 rounded-xl overflow-x-auto text-xs"
+                            <pre className="p-2 rounded-lg overflow-x-auto text-[10px]"
                                 style={{ 
                                     background: 'var(--theme-bg-primary)',
                                     color: 'var(--theme-text-secondary)'
@@ -1736,21 +1686,21 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                     {/* User Activity Tab */}
                     {activeTab === 'userActivity' && report.userActivity && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي المستخدمين</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي المستخدمين</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.userActivity.totalUsers}
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>المستخدمين النشطين</p>
-                                    <p className="text-2xl font-bold text-teal-400">{report.userActivity.activeUsers}</p>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>المستخدمين النشطين</p>
+                                    <p className="text-lg font-bold text-teal-400">{report.userActivity.activeUsers}</p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>متوسط الطلبات/مستخدم</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>متوسط الطلبات/مستخدم</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.userActivity.requestsPerUser}
                                     </p>
                                 </div>
@@ -1758,22 +1708,22 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                             {report.userActivity.mostActiveUsers.length > 0 && (
                                 <div>
-                                    <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                    <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                         أكثر المستخدمين نشاطاً
                                     </h3>
-                                    <div className="space-y-2">
+                                    <div className="space-y-1">
                                         {report.userActivity.mostActiveUsers.map((user, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 rounded-xl"
+                                            <div key={idx} className="flex items-center justify-between p-2 rounded-lg"
                                                 style={{ background: 'var(--theme-bg-tertiary)' }}>
                                                 <div>
-                                                    <p className="text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
+                                                    <p className="text-xs font-medium" style={{ color: 'var(--theme-text-primary)' }}>
                                                         {user.userName}
                                                     </p>
-                                                    <p className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                                    <p className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>
                                                         {user.userId}
                                                     </p>
                                                 </div>
-                                                <span className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                                <span className="font-bold text-sm" style={{ color: 'var(--theme-text-primary)' }}>
                                                     {user.requestCount} طلب
                                                 </span>
                                             </div>
@@ -1786,23 +1736,23 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                     {/* Request Statistics Tab */}
                     {activeTab === 'requestStats' && report.requestStatistics && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي الطلبات</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي الطلبات</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.requestStatistics.totalRequests}
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>متوسط وقت الإتمام</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>متوسط وقت الإتمام</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.requestStatistics.averageCompletionTime} دقيقة
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>أسرع طلب</p>
-                                    <p className="text-2xl font-bold text-green-400">
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>أسرع طلب</p>
+                                    <p className="text-lg font-bold text-green-400">
                                         {report.requestStatistics.fastestRequest} دقيقة
                                     </p>
                                 </div>
@@ -1810,17 +1760,17 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                             {Object.keys(report.requestStatistics.requestsByType).length > 0 && (
                                 <div>
-                                    <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                    <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                         الطلبات حسب النوع
                                     </h3>
-                                    <div className="space-y-2">
+                                    <div className="space-y-1">
                                         {Object.entries(report.requestStatistics.requestsByType)
                                             .sort(([, a], [, b]) => b - a)
                                             .map(([type, count]) => (
-                                                <div key={type} className="flex items-center justify-between p-3 rounded-xl"
+                                                <div key={type} className="flex items-center justify-between p-2 rounded-lg"
                                                     style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                                    <span className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{type}</span>
-                                                    <span className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>{count}</span>
+                                                    <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>{type}</span>
+                                                    <span className="font-bold text-sm" style={{ color: 'var(--theme-text-primary)' }}>{count}</span>
                                                 </div>
                                             ))}
                                     </div>
@@ -1829,17 +1779,17 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                             {report.requestStatistics.peakHours.length > 0 && (
                                 <div>
-                                    <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                    <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                         ساعات الذروة
                                     </h3>
-                                    <div className="space-y-2">
+                                    <div className="space-y-1">
                                         {report.requestStatistics.peakHours.map((peak, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 rounded-xl"
+                                            <div key={idx} className="flex items-center justify-between p-2 rounded-lg"
                                                 style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                                <span className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+                                                <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
                                                     {peak.hour}:00
                                                 </span>
-                                                <span className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                                <span className="font-bold text-sm" style={{ color: 'var(--theme-text-primary)' }}>
                                                     {peak.count} طلب
                                                 </span>
                                             </div>
@@ -1852,23 +1802,23 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                     {/* Database Statistics Tab */}
                     {activeTab === 'database' && report.databaseStatistics && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي المستندات</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>إجمالي المستندات</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.databaseStatistics.totalDocuments.toLocaleString()}
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>التخزين المقدر</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>التخزين المقدر</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.systemResources.estimatedStorage} MB
                                     </p>
                                 </div>
-                                <div className="p-4 rounded-xl" style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                    <p className="text-xs mb-1" style={{ color: 'var(--theme-text-tertiary)' }}>القراءات المقدرة</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                <div className="p-2 rounded-lg" style={{ background: 'var(--theme-bg-tertiary)' }}>
+                                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--theme-text-tertiary)' }}>القراءات المقدرة</p>
+                                    <p className="text-lg font-bold" style={{ color: 'var(--theme-text-primary)' }}>
                                         {report.systemResources.estimatedReads.toLocaleString()}
                                     </p>
                                 </div>
@@ -1876,21 +1826,21 @@ const FullReportModal: React.FC<FullReportModalProps> = ({ report, onClose, anch
 
                             {Object.keys(report.databaseStatistics.collections).length > 0 && (
                                 <div>
-                                    <h3 className="text-lg font-bold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                                    <h3 className="text-sm font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
                                         Collections
                                     </h3>
-                                    <div className="space-y-2">
+                                    <div className="space-y-1">
                                         {Object.entries(report.databaseStatistics.collections)
                                             .sort(([, a], [, b]) => b.count - a.count)
                                             .map(([name, data]) => (
-                                                <div key={name} className="flex items-center justify-between p-3 rounded-xl"
+                                                <div key={name} className="flex items-center justify-between p-2 rounded-lg"
                                                     style={{ background: 'var(--theme-bg-tertiary)' }}>
-                                                    <code className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{name}</code>
-                                                    <div className="flex items-center gap-4">
-                                                        <span className="text-sm" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                                    <code className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>{name}</code>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
                                                             {data.growth > 0 ? `+${data.growth}%` : data.growth < 0 ? `${data.growth}%` : '0%'}
                                                         </span>
-                                                        <span className="font-bold" style={{ color: 'var(--theme-text-primary)' }}>
+                                                        <span className="font-bold text-sm" style={{ color: 'var(--theme-text-primary)' }}>
                                                             {data.count.toLocaleString()}
                                                         </span>
                                                     </div>

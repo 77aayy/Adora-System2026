@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { RequestStatus } from '../types/request';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -84,8 +85,10 @@ export const REQUEST_TYPE_TO_DEPARTMENT: Record<string, DepartmentId> = {
 /**
  * إرسال كرت من قسم لآخر
  * Send card from origin to target department
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export async function sendToTargetDepartment(
+    tenantId: string,
     requestId: string,
     originDept: DepartmentId,
     targetDept: DepartmentId,
@@ -94,8 +97,11 @@ export async function sendToTargetDepartment(
     notes?: string
 ): Promise<void> {
     if (!db) throw new Error('Database not initialized');
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     
-    const requestRef = doc(db, 'requests', requestId);
+    const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
     const now = Timestamp.now();
     
     // Get current request data
@@ -133,14 +139,19 @@ export async function sendToTargetDepartment(
         'deliveredAt': now
     });
     
-    console.log(`✅ Card ${requestId} sent from ${originDept} to ${targetDept}`);
+    logger.info(`✅ Card ${requestId} sent from ${originDept} to ${targetDept}`, undefined, 'workflowService');
 }
 
 /**
  * بدء العمل على الكرت (من القسم المستلم)
  * Start working on card (by target department)
  */
+/**
+ * Start work on request
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
+ */
 export async function startWork(
+    tenantId: string,
     requestId: string,
     department: DepartmentId,
     userId: string,
@@ -148,8 +159,11 @@ export async function startWork(
     notes?: string
 ): Promise<void> {
     if (!db) throw new Error('Database not initialized');
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     
-    const requestRef = doc(db, 'requests', requestId);
+    const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
     const now = Timestamp.now();
     
     // Verify this department is the current holder
@@ -190,14 +204,19 @@ export async function startWork(
         'assignedTo': { id: userId, name: userName, department }
     });
     
-    console.log(`✅ Work started on card ${requestId} by ${department}`);
+    logger.info(`✅ Work started on card ${requestId} by ${department}`, undefined, 'workflowService');
 }
 
 /**
  * إكمال العمل وإرجاع الكرت للراسل
  * Complete work and return card to origin
  */
+/**
+ * Complete work and return card to origin
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
+ */
 export async function completeAndReturn(
+    tenantId: string,
     requestId: string,
     department: DepartmentId,
     userId: string,
@@ -206,8 +225,11 @@ export async function completeAndReturn(
     additionalData?: Record<string, any>
 ): Promise<void> {
     if (!db) throw new Error('Database not initialized');
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     
-    const requestRef = doc(db, 'requests', requestId);
+    const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
     const now = Timestamp.now();
     
     // Verify this department is the current holder
@@ -261,7 +283,7 @@ export async function completeAndReturn(
         ...additionalData
     });
     
-    console.log(`✅ Card ${requestId} completed by ${department} and returned to ${originDept}`);
+    logger.info(`✅ Card ${requestId} completed by ${department} and returned to ${originDept}`, undefined, 'workflowService');
 }
 
 // ============================================================
@@ -279,17 +301,21 @@ export function subscribeToWorkflowCards(
     callback: (cards: { new: any[], inProgress: any[], completed: any[] }) => void
 ): () => void {
     if (!db) {
-        console.error('Database not initialized');
+        logger.error('Database not initialized', undefined, 'workflowService');
         callback({ new: [], inProgress: [], completed: [] });
         return () => {};
     }
     
-    const requestsRef = collection(db, 'requests');
+    // ✅ FIX: Use tenant-scoped collection
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
+    const requestsRef = collection(db, `tenants/${tenantId}/requests`);
     
+    // ✅ FIX: No need for tenantId where clause - already tenant-scoped
     // Query for cards where this department is involved
     const q = query(
         requestsRef,
-        where('tenantId', '==', tenantId),
         where('branch', '==', branchId),
         orderBy('createdAt', 'desc')
     );
@@ -345,7 +371,7 @@ export function subscribeToWorkflowCards(
         
         callback(result);
     }, (error) => {
-        console.error('Workflow subscription error:', error);
+        logger.error('Workflow subscription error:', error, 'workflowService');
         callback({ new: [], inProgress: [], completed: [] });
     });
 }
@@ -440,10 +466,17 @@ function mapLegacyStatus(status: string): WorkflowStatus {
 // MIGRATION: Update existing requests with workflow fields
 // ============================================================
 
-export async function migrateRequestToWorkflow(requestId: string): Promise<void> {
+/**
+ * Migrate request to workflow format
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
+ */
+export async function migrateRequestToWorkflow(tenantId: string, requestId: string): Promise<void> {
     if (!db) return;
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     
-    const requestRef = doc(db, 'requests', requestId);
+    const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
     const requestSnap = await getDoc(requestRef);
     
     if (!requestSnap.exists()) return;
@@ -469,7 +502,7 @@ export async function migrateRequestToWorkflow(requestId: string): Promise<void>
     };
     
     await updateDoc(requestRef, { workflow });
-    console.log(`✅ Migrated request ${requestId} to workflow format`);
+    logger.info(`✅ Migrated request ${requestId} to workflow format`, undefined, 'workflowService');
 }
 
 export default {

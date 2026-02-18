@@ -143,7 +143,7 @@ export const getAPIKeys = async (tenantId: string): Promise<APIKey[]> => {
             } as APIKey;
         });
     } catch (error) {
-        console.error('Error getting API keys:', error);
+        logger.error('Error getting API keys:', error, 'apiManagementService');
         return [];
     }
 };
@@ -159,7 +159,7 @@ export const revokeAPIKey = async (keyId: string): Promise<void> => {
             updatedAt: serverTimestamp()
         });
     } catch (error) {
-        console.error('Error revoking API key:', error);
+        logger.error('Error revoking API key:', error, 'apiManagementService');
         throw error;
     }
 };
@@ -236,7 +236,7 @@ export const checkRateLimit = async (
             limit
         };
     } catch (error) {
-        console.error('Error checking rate limit:', error);
+        logger.error('Error checking rate limit:', error, 'apiManagementService');
         // Fail open - allow request
         return { allowed: true, remaining: 999, resetAt: new Date(), limit: 1000 };
     }
@@ -259,7 +259,7 @@ export const recordAPIUsage = async (usage: Omit<APIUsage, 'timestamp'>): Promis
             lastUsed: serverTimestamp()
         });
     } catch (error) {
-        console.error('Error recording API usage:', error);
+        logger.error('Error recording API usage:', error, 'apiManagementService');
         // Don't throw - usage tracking is not critical
     }
 };
@@ -297,7 +297,7 @@ export const getAPIUsageStats = async (
             } as APIUsage;
         });
     } catch (error) {
-        console.error('Error getting API usage stats:', error);
+        logger.error('Error getting API usage stats:', error, 'apiManagementService');
         return [];
     }
 };

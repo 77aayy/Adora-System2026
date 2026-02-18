@@ -259,6 +259,16 @@
                     "order": "ASCENDING"
                 }
             ]
+        },
+        {
+            "collectionGroup": "trial_requests_deleted",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "deletedAt",
+                    "order": "DESCENDING"
+                }
+            ]
         }
     ],
     "fieldOverrides": []

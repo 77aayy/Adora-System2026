@@ -254,7 +254,7 @@ export const useProcurementCart = () => {
                     requestData.timeline.approved = Timestamp.now();
                 }
 
-                return addDoc(collection(db, 'requests'), requestData);
+                return addDoc(collection(db, `tenants/${tenantId}/requests`), requestData);
             });
 
             await Promise.all(promises);

@@ -184,30 +184,7 @@ export const StatCard: React.FC<StatCardProps> = ({
 
     return (
         <div 
-            className="group relative overflow-hidden transition-all duration-300 ease-out flex items-center justify-between"
-            style={{
-                background: 'var(--theme-bg-secondary)', // ✅ Theme-aware background
-                border: '1px solid var(--theme-border-primary)', // ✅ Theme-aware border
-                borderRadius: 'clamp(8px, 1.5vw, 12px)', // ✅ Smaller border radius - more compact
-                padding: 'clamp(10px, 1.5vw, 14px) clamp(12px, 1.5vw, 16px)', // ✅ Compact padding - reduced from previous
-                minHeight: 'auto', // ✅ Auto height - no fixed min-height
-                height: 'auto', // ✅ Auto height for flexibility
-                // ✅ Subtle Shadow - Theme-aware
-                boxShadow: 'var(--theme-shadow-sm)',
-                gap: 'clamp(8px, 1.5vw, 10px)', // ✅ Compact gap between elements
-            } as React.CSSProperties}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--theme-border-focus)'; // ✅ Theme-aware focus color
-                e.currentTarget.style.transform = 'translateY(-2px)'; // ✅ Subtle hover lift - reduced from -4px
-                // ✅ Subtle shadow on hover - Theme-aware
-                e.currentTarget.style.boxShadow = 'var(--theme-shadow-md)';
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--theme-border-primary)';
-                e.currentTarget.style.transform = 'translateY(0)';
-                // ✅ Restore subtle shadow - Theme-aware
-                e.currentTarget.style.boxShadow = 'var(--theme-shadow-sm)';
-            }}
+            className="stat-card-unified group relative overflow-hidden min-w-0"
         >
             {/* Content Section - Left (RTL) */}
             <div className="flex flex-col gap-0.5 sm:gap-1 flex-1 min-w-0">

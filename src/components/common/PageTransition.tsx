@@ -15,18 +15,29 @@ export const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
     const location = useLocation();
     const [isEntering, setIsEntering] = useState(true);
 
+    // ✅ صفحات الشاشة الكاملة (دخول، ضيف، معالج Firebase، إعداد): بدون أنيميشن + خلفية صلبة حتى لا تظهر "صفحة شبح" (مثل معالج إعداد Firebase) خلف صفحة الدخول
+    const isFullScreenRoute = location.pathname === '/login' || location.pathname.startsWith('/guest') || location.pathname === '/firebase-setup' || location.pathname === '/setup';
+
     useEffect(() => {
-        // Reset animation on route change
+        if (isFullScreenRoute) return;
         setIsEntering(false);
-        const timer = setTimeout(() => {
-            setIsEntering(true);
-        }, 10);
-
-        // Scroll to top on route change
+        const timer = setTimeout(() => setIsEntering(true), 10);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-
         return () => clearTimeout(timer);
-    }, [location.pathname]);
+    }, [location.pathname, isFullScreenRoute]);
+
+    // صفحات الشاشة الكاملة: طبقة معزولة ومن فوق أي محتوى سابق (لا صفحة شبح خلفها)
+    if (isFullScreenRoute) {
+        return (
+            <div
+                key={location.pathname}
+                className="min-h-screen w-full opacity-100 bg-slate-950 relative z-[100] isolate"
+                style={{ contain: 'layout paint' }}
+            >
+                {children}
+            </div>
+        );
+    }
 
     return (
         <div

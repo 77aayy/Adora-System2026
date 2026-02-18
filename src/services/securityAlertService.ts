@@ -19,6 +19,7 @@ import {
     updateDoc,
     doc
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -137,7 +138,7 @@ export const sendSecurityAlert = async (
     customMessage?: string
 ): Promise<string | null> => {
     if (!db) {
-        console.error('Firebase not initialized');
+        logger.error('Firebase not initialized', undefined, 'securityAlertService');
         return null;
     }
 
@@ -163,14 +164,14 @@ export const sendSecurityAlert = async (
             timestamp: Timestamp.fromDate(alert.timestamp)
         });
 
-        console.log(`🚨 Security Alert Sent: ${type} for tenant ${tenantId}`);
+        logger.info(`🚨 Security Alert Sent: ${type} for tenant ${tenantId}`, undefined, 'securityAlertService');
         
         // Also trigger browser notification if supported
         triggerBrowserNotification(template.title, alert.message, template.severity);
         
         return docRef.id;
     } catch (error) {
-        console.error('Error sending security alert:', error);
+        logger.error('Error sending security alert:', error, 'securityAlertService');
         return null;
     }
 };
@@ -263,7 +264,7 @@ export const subscribeToSecurityAlerts = (
     } = {}
 ): (() => void) => {
     if (!db) {
-        console.error('Firebase not initialized');
+        logger.error('Firebase not initialized', undefined, 'securityAlertService');
         return () => {};
     }
 
@@ -300,7 +301,7 @@ export const subscribeToSecurityAlerts = (
 
         onAlert(alerts);
     }, (error) => {
-        console.error('Error subscribing to security alerts:', error);
+        logger.error('Error subscribing to security alerts:', error, 'securityAlertService');
     });
 
     return unsubscribe;
@@ -331,7 +332,7 @@ export const markAlertAsRead = async (
         });
         return true;
     } catch (error) {
-        console.error('Error marking alert as read:', error);
+        logger.error('Error marking alert as read:', error, 'securityAlertService');
         return false;
     }
 };
@@ -368,7 +369,7 @@ export const getUnreadAlertCount = async (
 
         return snapshot.size;
     } catch (error) {
-        console.error('Error getting unread alert count:', error);
+        logger.error('Error getting unread alert count:', error, 'securityAlertService');
         return 0;
     }
 };

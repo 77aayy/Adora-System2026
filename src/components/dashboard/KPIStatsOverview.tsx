@@ -15,6 +15,7 @@ import {
 import { db } from '../../services/firebase';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { StatCard } from '../common/StatCard';
 
 // ============================================================
@@ -54,8 +55,8 @@ const getIconColorVariant = (color: string): 'teal' | 'blue' | 'green' | 'orange
 
 export const KPIStatsOverview: React.FC = () => {
     const { user } = useAuth();
+    const { tenantId } = useTenant();
     const branchId = (user as any)?.branch || (user as any)?.branchId || 'default';
-    const tenantId = (user as any)?.tenantId;
     const [loading, setLoading] = useState(true);
 
     // Stats
@@ -86,14 +87,18 @@ export const KPIStatsOverview: React.FC = () => {
             const weekAgo = new Date();
             weekAgo.setDate(weekAgo.getDate() - 7);
 
+            // ✅ FIX: Use tenant-scoped collection
+            if (!tenantId) {
+                console.error('KPIStatsOverview: tenantId is required');
+                return;
+            }
             const constraints: any[] = [where('branch', '==', branchId)];
-            if (tenantId) constraints.push(where('tenantId', '==', tenantId));
 
             constraints.push(orderBy('createdAt', 'desc'));
             constraints.push(limit(500));
 
             const q = query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${tenantId}/requests`),
                 ...constraints
             );
 

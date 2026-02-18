@@ -6,6 +6,7 @@
 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -80,7 +81,7 @@ export async function validateEmployee(
       }
     };
   } catch (error) {
-    console.error('Employee validation error:', error);
+    logger.error('Employee validation error:', error, 'employeeValidationService');
     return {
       valid: false,
       error: 'فشل التحقق من بيانات الموظف'

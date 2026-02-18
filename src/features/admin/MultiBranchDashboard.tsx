@@ -71,10 +71,10 @@ export const MultiBranchDashboard: React.FC = () => {
                         const usersCount = await getCountFromServer(usersQuery);
                         totalUsers += usersCount.data().count;
 
+                        // ✅ FIX: Use tenant-scoped collection
                         // Count requests for this tenant (from all branches)
                         const requestsQuery = query(
-                            collection(db, 'requests'),
-                            where('tenantId', '==', tenantId)
+                            collection(db, `tenants/${tenantId}/requests`)
                         );
                         const requestsCount = await getCountFromServer(requestsQuery);
                         totalRequests += requestsCount.data().count;
@@ -150,10 +150,14 @@ export const MultiBranchDashboard: React.FC = () => {
             const usersCount = await getCountFromServer(usersQuery);
             totalUsers = usersCount.data().count;
 
+            // ✅ FIX: Use tenant-scoped collection
             // Count requests for this tenant
+            if (!user.tenantId) {
+                logger.error('MultiBranchDashboard: tenantId is required', undefined, 'MultiBranchDashboard');
+                return;
+            }
             const requestsQuery = query(
-                collection(db, 'requests'),
-                where('tenantId', '==', user.tenantId)
+                collection(db, `tenants/${user.tenantId}/requests`)
             );
             const requestsCount = await getCountFromServer(requestsQuery);
             totalRequests = requestsCount.data().count;

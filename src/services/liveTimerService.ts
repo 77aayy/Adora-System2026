@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -45,7 +47,6 @@ export function startLiveTimers(config: Partial<TimerConfig> = {}): void {
     // Start interval
     timerInterval = setInterval(updateAllTimers, currentConfig.updateIntervalMs);
 
-    console.log('⏱️ Live timers started');
 }
 
 /**

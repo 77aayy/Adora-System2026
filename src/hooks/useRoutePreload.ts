@@ -26,6 +26,17 @@ const routeImports: Record<string, () => Promise<any>> = {
     '/guest': () => import('../features/guest/GuestDashboard'),
 };
 
+/** Preload chunk for a path immediately (no debounce). Call as soon as user is known to speed up first navigation. */
+const preloadedPaths = new Set<string>();
+export function preloadRouteByPath(path: string): void {
+    if (!path || preloadedPaths.has(path)) return;
+    const importFn = Object.entries(routeImports).find(([route]) => path.startsWith(route))?.[1];
+    if (importFn) {
+        preloadedPaths.add(path);
+        preloadComponent(importFn);
+    }
+}
+
 // ============================================================
 // PRELOAD HOOK
 // ============================================================
@@ -57,15 +68,20 @@ export function useRoutePreload(): UseRoutePreloadReturn {
         }
 
         timeoutRef.current[path] = setTimeout(() => {
-            // Find matching import
+            if (preloadedPaths.has(path)) {
+                preloadedRef.current.add(path);
+                delete timeoutRef.current[path];
+                return;
+            }
             const importFn = Object.entries(routeImports).find(([route]) => 
                 path.startsWith(route)
             )?.[1];
 
             if (importFn) {
                 preloadComponent(importFn);
+                preloadedPaths.add(path);
                 preloadedRef.current.add(path);
-                console.log(`⚡ Preloaded: ${path}`);
+                if (import.meta.env.DEV) console.log(`⚡ Preloaded: ${path}`);
             }
 
             delete timeoutRef.current[path];
@@ -94,13 +110,18 @@ const adjacentRoutes: Record<string, string[]> = {
     '/owner-dashboard': ['/admin'],
 };
 
+/** Paths we've already scheduled adjacent preload for (avoid duplicate runs/logs). */
+const adjacentPreloadedForPath = new Set<string>();
+
 /**
  * Preload adjacent routes when a route loads
- * Call this after main component mounts
+ * Call this after main component mounts. Runs at most once per path.
  */
 export function preloadAdjacentRoutes(currentPath: string): void {
     const adjacent = adjacentRoutes[currentPath];
     if (!adjacent) return;
+    if (adjacentPreloadedForPath.has(currentPath)) return;
+    adjacentPreloadedForPath.add(currentPath);
 
     // Preload after a delay to not block main content
     setTimeout(() => {
@@ -110,7 +131,9 @@ export function preloadAdjacentRoutes(currentPath: string): void {
         
         if (imports.length > 0) {
             preloadComponents(imports);
-            console.log(`⚡ Preloaded adjacent routes for ${currentPath}`);
+            if (import.meta.env.DEV) {
+                console.log(`⚡ Preloaded adjacent routes for ${currentPath}`);
+            }
         }
     }, 2000); // Wait 2 seconds after main content loads
 }
@@ -139,11 +162,12 @@ export async function prefetchRouteData(path: string, config: PrefetchConfig): P
                 `requests_${branchId}_active`,
                 async () => {
                     const { collection, query, where, orderBy, limit, getDocs } = await import('firebase/firestore');
-                    const { db } = await import('../services/firebase');
+                    const { getSafeFirestore } = await import('../services/firebase');
+                    const db = await getSafeFirestore();
                     if (!db) return [];
                     
                     const q = query(
-                        collection(db, `tenants/${tenantId}/branches/${branchId}/requests`),
+                        collection(db, 'tenants', tenantId, 'branches', branchId, 'requests'),
                         where('status', 'in', ['PENDING', 'CONFIRMED', 'IN_PROGRESS']),
                         orderBy('createdAt', 'desc'),
                         limit(50)
@@ -161,11 +185,12 @@ export async function prefetchRouteData(path: string, config: PrefetchConfig): P
                 `rooms_${branchId}_status`,
                 async () => {
                     const { collection, getDocs } = await import('firebase/firestore');
-                    const { db } = await import('../services/firebase');
+                    const { getSafeFirestore } = await import('../services/firebase');
+                    const db = await getSafeFirestore();
                     if (!db) return [];
                     
                     const snap = await getDocs(
-                        collection(db, `tenants/${tenantId}/branches/${branchId}/rooms`)
+                        collection(db, 'tenants', tenantId, 'branches', branchId, 'rooms')
                     );
                     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 },

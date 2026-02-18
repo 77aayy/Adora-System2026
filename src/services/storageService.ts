@@ -10,6 +10,7 @@
  */
 
 import { uploadToImgBB, uploadFileToImgBB, compressImage, fileToBase64 } from './imageUploadService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -74,7 +75,7 @@ export const uploadFile = async (
             };
         }
     } catch (error: any) {
-        console.error('Upload error:', error);
+        logger.error('Upload error:', error, 'storageService');
         return {
             success: false,
             error: error.message,
@@ -140,7 +141,7 @@ export const uploadInspectionPhoto = async (
             };
         }
     } catch (error: any) {
-        console.error('Inspection upload error:', error);
+        logger.error('Inspection upload error:', error, 'storageService');
         return {
             success: false,
             error: error.message,

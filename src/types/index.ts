@@ -33,18 +33,14 @@ import {
 // OLD TYPE DEFINITIONS (for backward compatibility)
 // ============================================================
 
+/**
+ * ✅ Unified Request Status - 3 States Only (Legacy compatibility)
+ * Re-exported from types/request.ts for backward compatibility
+ */
 export enum RequestStatus {
-    PENDING_RECEPTION = 'PENDING_RECEPTION',
-    CONFIRMED = 'CONFIRMED',
+    NEW = 'NEW',
     IN_PROGRESS = 'IN_PROGRESS',
-    COMPLETED = 'COMPLETED',
-    MAINTENANCE_PENDING = 'MAINTENANCE_PENDING',
-    PENDING_HOUSEKEEPING = 'PENDING_HOUSEKEEPING',
-    PENDING_MAINTENANCE = 'PENDING_MAINTENANCE',
-    CANCELLED = 'CANCELLED',
-    WAITING_PARTS = 'WAITING_PARTS',
-    SCHEDULED = 'SCHEDULED', // ✅ Consistency with Enums
-    NEEDS_INSPECTION = 'NEEDS_INSPECTION'
+    COMPLETED = 'COMPLETED'
 }
 
 export interface RequestTimeline {

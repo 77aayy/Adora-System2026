@@ -11,6 +11,8 @@
  * - Button loading states
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -125,7 +127,7 @@ const createBeep = (
                 oscillator.stop(startTime + duration);
             });
         } catch (e) {
-            console.log('Audio not supported');
+            logger.info('Audio not supported', undefined, 'uxEffectsService');
         }
     };
 };
@@ -160,7 +162,7 @@ const createUrgentSound = (): (() => void) => {
                 oscillator.stop(audioContext.currentTime + delay + 0.1);
             });
         } catch (e) {
-            console.log('Audio not supported');
+            logger.info('Audio not supported', undefined, 'uxEffectsService');
         }
     };
 };
@@ -444,7 +446,7 @@ export const initUXEffects = (): void => {
     loadTheme();
     applyTheme(currentTheme);
     injectAnimationStyles();
-    console.log('✅ UX Effects initialized');
+    logger.info('✅ UX Effects initialized', undefined, 'uxEffectsService');
 };
 
 // ============================================================

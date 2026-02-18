@@ -5,6 +5,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { logger } from '../loggerService';
 
 // ============================================================
 // 🔄 CONSTANTS & FALLBACK MODELS (Must be defined first)
@@ -27,9 +28,9 @@ let isDiscovering = false;
 
 const getGenAI = (): GoogleGenerativeAI => {
     if (!genAIInstance) {
-        const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
         if (!apiKey) {
-            console.error('⚠️ Gemini API Key missing!');
+            logger.error('⚠️ Gemini API Key missing!', undefined, 'geminiService');
             throw new Error('Gemini API Key is missing');
         }
         genAIInstance = new GoogleGenerativeAI(apiKey);
@@ -39,7 +40,7 @@ const getGenAI = (): GoogleGenerativeAI => {
 
 const discoverModels = async (): Promise<string[]> => {
     try {
-        const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
         if (!apiKey) return FALLBACK_MODELS;
 
         // Check cache first
@@ -63,7 +64,7 @@ const discoverModels = async (): Promise<string[]> => {
         localStorage.setItem(CACHE_KEY, JSON.stringify({ models: sortedModels, timestamp: Date.now() }));
         return sortedModels;
     } catch (e) {
-        console.warn('Discovery failed', e);
+        logger.warn('Discovery failed', e, 'geminiService');
         return FALLBACK_MODELS;
     }
 };
@@ -83,14 +84,14 @@ const generateWithFallback = async (prompt: string): Promise<string> => {
 
     for (const modelName of PRIORITY_MODELS) {
         try {
-            console.log(`🔄 Attempting Model: ${modelName}`);
+            logger.info(`🔄 Attempting Model: ${modelName}`, undefined, 'geminiService');
             const model = ai.getGenerativeModel({ model: modelName });
             const result = await model.generateContent(prompt);
             const response = await result.response;
             const text = response.text();
             if (text) return text;
         } catch (error: any) {
-            console.warn(`⚠️ Error on ${modelName}:`, error.message);
+            logger.warn(`⚠️ Error on ${modelName}: ${error.message}`, error, 'geminiService');
             lastError = error;
         }
     }
@@ -185,7 +186,7 @@ export const processAICommand = async (
         return JSON.parse(jsonStr) as AICommandResponse;
 
     } catch (error) {
-        console.error('AI Process Error:', error);
+        logger.error('AI Process Error:', error, 'geminiService');
         return {
             action: 'error',
             params: {},
@@ -213,7 +214,7 @@ export const streamGenerateContent = async (
 
     for (const modelName of PRIORITY_MODELS) {
         try {
-            console.log(`🌊 Streaming with Model: ${modelName}`);
+            logger.info(`🌊 Streaming with Model: ${modelName}`, undefined, 'geminiService');
             const model = ai.getGenerativeModel({ model: modelName });
             const result = await model.generateContentStream(prompt);
 
@@ -231,7 +232,7 @@ export const streamGenerateContent = async (
                 return;
             }
         } catch (error: any) {
-            console.warn(`⚠️ Streaming error on ${modelName}:`, error.message);
+            logger.warn(`⚠️ Streaming error on ${modelName}: ${error.message}`, error, 'geminiService');
             lastError = error;
         }
     }

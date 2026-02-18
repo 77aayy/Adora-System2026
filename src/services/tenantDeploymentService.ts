@@ -10,6 +10,8 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getApp } from 'firebase/app';
 import { autoDestructServiceAccount } from './secureStorageService';
+import { logger } from './loggerService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -71,12 +73,12 @@ export async function deployTenantFirebase(
         // ✅ AUTO-DESTRUCT: Clear Service Account immediately after successful deployment
         if (result.data.success) {
             autoDestructServiceAccount();
-            console.log('🔐✅ Service Account auto-destructed after successful deployment');
+            logger.info('🔐✅ Service Account auto-destructed after successful deployment', undefined, 'tenantDeploymentService');
         }
         
         return result.data;
     } catch (error: any) {
-        console.error('❌ deployTenantFirebase error:', error);
+        logger.error('❌ deployTenantFirebase error:', error, 'tenantDeploymentService');
         
         // Handle Firebase Functions errors
         if (error.code === 'functions/unauthenticated') {
@@ -127,7 +129,7 @@ export async function testTenantConnectionSecure(
         
         return result.data;
     } catch (error: any) {
-        console.error('❌ testTenantConnection error:', error);
+        logger.error('❌ testTenantConnection error:', error, 'tenantDeploymentService');
         
         return {
             success: false,
@@ -161,7 +163,7 @@ export async function getCoreConfigTemplates(): Promise<{
         
         return null;
     } catch (error) {
-        console.error('❌ getCoreConfigTemplates error:', error);
+        logger.error('❌ getCoreConfigTemplates error:', error, 'tenantDeploymentService');
         return null;
     }
 }
@@ -178,7 +180,7 @@ export async function fullTenantDeployment(
     serviceAccountJson: string
 ): Promise<DeployResult> {
     // Step 1: Test connection first
-    console.log('🔄 Step 1: Testing connection...');
+    logger.info('🔄 Step 1: Testing connection...', undefined, 'tenantDeploymentService');
     const testResult = await testTenantConnectionSecure(serviceAccountJson);
     
     if (!testResult.success) {
@@ -188,14 +190,14 @@ export async function fullTenantDeployment(
         };
     }
     
-    console.log('✅ Connection test passed');
+    logger.info('✅ Connection test passed', undefined, 'tenantDeploymentService');
     
     // Step 2: Get Core Config Templates
-    console.log('🔄 Step 2: Getting core config templates...');
+    logger.info('🔄 Step 2: Getting core config templates...', undefined, 'tenantDeploymentService');
     const templates = await getCoreConfigTemplates();
     
     // Step 3: Deploy
-    console.log('🔄 Step 3: Deploying...');
+    logger.info('🔄 Step 3: Deploying...', undefined, 'tenantDeploymentService');
     const deployResult = await deployTenantFirebase(
         tenantId,
         serviceAccountJson,

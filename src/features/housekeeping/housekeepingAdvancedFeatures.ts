@@ -10,6 +10,8 @@ import {
     query, where, orderBy, limit, onSnapshot,
     serverTimestamp, Timestamp
 } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -139,7 +141,7 @@ export const loadMinibarItems = async (
 
         return items;
     } catch (error) {
-        console.error('Error loading minibar items:', error);
+        logger.error('Error loading minibar items:', error, 'housekeepingAdvancedFeatures');
         return defaultMinibarItems;
     }
 };
@@ -157,13 +159,20 @@ export const getDefaultMinibarItems = (): MinibarItem[] => {
 
 /**
  * Subscribe to cleaning requests
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const subscribeToCleaningRequests = (
+    tenantId: string,
     branchId: string,
     callback: (active: CleaningRequest[], completed: CleaningRequest[]) => void
 ): (() => void) => {
+    if (!tenantId) {
+        logger.error('subscribeToCleaningRequests: tenantId is required', undefined, 'housekeepingAdvancedFeatures');
+        callback([], []);
+        return () => {};
+    }
     const cleaningQuery = query(
-        collection(db, 'requests'),
+        collection(db, `tenants/${tenantId}/requests`),
         where('branch', '==', branchId),
         where('serviceType', '==', 'cleaning')
     );
@@ -206,8 +215,10 @@ export const subscribeToCleaningRequests = (
 
 /**
  * Start cleaning
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const startCleaning = async (
+    tenantId: string,
     requestId: string,
     employeeId: string,
     employeeName: string,
@@ -215,8 +226,11 @@ export const startCleaning = async (
     guestStatus: 'in' | 'out',
     roomAssignments: Record<string, { id: string; name: string }> = {}
 ): Promise<boolean> => {
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     try {
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
         await updateDoc(requestRef, {
             status: 'IN_PROGRESS',
             cleaningType,
@@ -227,15 +241,17 @@ export const startCleaning = async (
         });
         return true;
     } catch (error) {
-        console.error('Error starting cleaning:', error);
+        logger.error('Error starting cleaning:', error, 'housekeepingAdvancedFeatures');
         return false;
     }
 };
 
 /**
  * Complete cleaning (with optional maintenance request)
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const completeCleaning = async (
+    tenantId: string,
     requestId: string,
     employeeId: string,
     employeeName: string,
@@ -251,11 +267,14 @@ export const completeCleaning = async (
         roomCardId?: string;
     }
 ): Promise<boolean> => {
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     try {
         const batch = writeBatch(db);
 
         // Update cleaning request
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
         batch.update(requestRef, {
             status: 'COMPLETED',
             notes: cleaningData.notes || null,
@@ -267,7 +286,8 @@ export const completeCleaning = async (
         // Create maintenance request if needed
         if (cleaningData.hasMaintenance) {
             const isCheckoutCleaning = cleaningData.cleaningType === 'checkout';
-            const maintRef = doc(collection(db, 'requests'));
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+            const maintRef = doc(requestsRef);
             batch.set(maintRef, {
                 roomNumber: cleaningData.roomNumber,
                 branch: branchId,
@@ -280,6 +300,7 @@ export const completeCleaning = async (
                 requiresReinspection: isCheckoutCleaning,
                 parentRequestId: requestId,
                 roomCardId: cleaningData.roomCardId || null,
+                tenantId: tenantId, // ✅ Add tenantId
                 createdBy: { id: employeeId, name: employeeName },
                 createdAt: serverTimestamp(),
                 timeline: { created: serverTimestamp() }
@@ -289,7 +310,7 @@ export const completeCleaning = async (
         await batch.commit();
         return true;
     } catch (error) {
-        console.error('Error completing cleaning:', error);
+        logger.error('Error completing cleaning:', error, 'housekeepingAdvancedFeatures');
         return false;
     }
 };
@@ -300,13 +321,20 @@ export const completeCleaning = async (
 
 /**
  * Subscribe to inspection requests
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const subscribeToInspectionRequests = (
+    tenantId: string,
     branchId: string,
     callback: (requests: InspectionRequest[]) => void
 ): (() => void) => {
+    if (!tenantId) {
+        logger.error('subscribeToInspectionRequests: tenantId is required', undefined, 'housekeepingAdvancedFeatures');
+        callback([]);
+        return () => {};
+    }
     const inspectionQuery = query(
-        collection(db, 'requests'),
+        collection(db, `tenants/${tenantId}/requests`),
         where('branch', '==', branchId),
         where('serviceType', '==', 'inspection')
     );
@@ -335,19 +363,24 @@ export const subscribeToInspectionRequests = (
 
 /**
  * Submit inspection report
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const submitInspection = async (
+    tenantId: string,
     requestId: string,
     employeeId: string,
     employeeName: string,
     report: InspectionReport,
     roomCardId?: string
 ): Promise<boolean> => {
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     try {
         const batch = writeBatch(db);
 
         // Update inspection request - goes back to reception for review
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
         batch.update(requestRef, {
             status: 'PENDING_RECEPTION',
             inspectionReport: report,
@@ -367,7 +400,7 @@ export const submitInspection = async (
         await batch.commit();
         return true;
     } catch (error) {
-        console.error('Error submitting inspection:', error);
+        logger.error('Error submitting inspection:', error, 'housekeepingAdvancedFeatures');
         return false;
     }
 };
@@ -403,7 +436,7 @@ export const loadHousekeepingEmployees = async (
 
         return employees;
     } catch (error) {
-        console.error('Error loading housekeeping employees:', error);
+        logger.error('Error loading housekeeping employees:', error, 'housekeepingAdvancedFeatures');
         return [];
     }
 };
@@ -507,15 +540,21 @@ const getDateRange = (
 
 /**
  * Load cleaning history with filters
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const loadCleaningHistory = async (
+    tenantId: string,
     branchId: string,
     employeeId: string,
     filter: HistoryFilter
 ): Promise<any[]> => {
+    if (!tenantId) {
+        logger.error('loadCleaningHistory: tenantId is required', undefined, 'housekeepingAdvancedFeatures');
+        return [];
+    }
     try {
         const requestsQuery = query(
-            collection(db, 'requests'),
+            collection(db, `tenants/${tenantId}/requests`),
             where('branch', '==', branchId),
             where('serviceType', '==', 'cleaning'),
             where('status', '==', 'COMPLETED'),
@@ -559,7 +598,7 @@ export const loadCleaningHistory = async (
 
         return results;
     } catch (error) {
-        console.error('Error loading cleaning history:', error);
+        logger.error('Error loading cleaning history:', error, 'housekeepingAdvancedFeatures');
         return [];
     }
 };
@@ -739,7 +778,7 @@ export const printCleaningHistory = (
         <html dir="rtl" lang="ar">
         <head>
             <meta charset="UTF-8">
-            <title>سجل التنظيف - ${new Date().toLocaleDateString('ar-SA')}</title>
+            <title>سجل التنظيف - ${formatDateGregorianEn(new Date())}</title>
             <style>
                 body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 20px; }
                 h1 { text-align: center; margin-bottom: 20px; color: #1a1a2e; }
@@ -756,7 +795,7 @@ export const printCleaningHistory = (
         <body>
             <h1>سجل التنظيف</h1>
             <div class="info">
-                <p><strong>التاريخ:</strong> ${new Date().toLocaleDateString('ar-SA')}</p>
+                <p><strong>التاريخ:</strong> ${formatDateGregorianEn(new Date())}</p>
                 <p><strong>الموظف:</strong> ${employeeName || '--'}</p>
                 <p><strong>الفرع:</strong> ${branchName || '--'}</p>
             </div>
@@ -771,13 +810,7 @@ export const printCleaningHistory = (
                 </thead>
                 <tbody>
                     ${items.map(item => {
-        const date = item.completedDate.toLocaleString('ar-SA', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const date = formatDateTimeGregorianEn(item.completedDate, { dateStyle: 'medium', showSeconds: false });
         const type = item.cleaningType === 'checkout' ? 'مغادرة' : 'ساكن';
         const typeClass = item.cleaningType === 'checkout' ? 'checkout' : 'occupied';
 
@@ -801,7 +834,7 @@ export const printCleaningHistory = (
                 </tbody>
             </table>
             <div class="footer">
-                تم الطباعة بواسطة نظام أدورا - ${new Date().toLocaleString('ar-SA')}
+                تم الطباعة بواسطة نظام أدورا - ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}
             </div>
         </body>
         </html>

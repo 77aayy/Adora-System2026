@@ -4,13 +4,15 @@
  * Mobile-First Design with Beautiful Animations
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
   Building2, Fingerprint, User, Crown, Shield, 
-  CheckCircle, AlertCircle, Eye, EyeOff, Sun, Moon, Sunrise, Sunset
+  CheckCircle, AlertCircle, Eye, EyeOff, Sun, Moon, Sunrise, Sunset, Globe
 } from 'lucide-react';
+import { changeLanguage, updateDirection } from '../../i18n';
+import { LANGUAGES } from '../../constants/languages';
 import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../hooks/useUX';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,6 +30,7 @@ import {
   triggerHaptic,
   keypadAnimationStyles 
 } from '../../components/ui/KeypadComponents';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // DYNAMIC GREETING BASED ON TIME OF DAY (i18n-aware)
@@ -114,12 +117,14 @@ const UserTypeTab: React.FC<{
 const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { login, loginWithBiometric, isAuthenticated, isLoading: authLoading, user: authUser } = useAuth();
   const { showInfo } = useUX();
   const { theme, toggleTheme, isDark } = useTheme();
 
   // State
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
   const [userType, setUserType] = useState<'owner' | 'manager' | 'employee'>('employee');
   const [branchCode, setBranchCode] = useState('');
   const [pin, setPin] = useState('');
@@ -132,8 +137,19 @@ const LoginScreen: React.FC = () => {
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [lastLoggedInUser, setLastLoggedInUser] = useState<{ userId: string; tenantId: string } | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  // Close language menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) setLangMenuOpen(false);
+    };
+    if (langMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [langMenuOpen]);
   
-  // ✅ FIX: State for developer settings (auto-updates from owner dashboard)
+  // ✅ مصدر واحد للتوقيع: يحدّث فوراً من نافذة إعدادات المالك
   const [devConfig, setDevConfig] = useState(() => {
     try {
       return {
@@ -141,6 +157,7 @@ const LoginScreen: React.FC = () => {
         phoneSA: localStorage.getItem('adora_dev_phone_sa') || '966570707121',
         phoneEG: localStorage.getItem('adora_dev_phone_eg') || '201500000162',
         email: localStorage.getItem('adora_dev_email') || '77aayy@gmail.com',
+        signature: localStorage.getItem('adora_dev_signature') || 'Crafted by Ayman Abo Warda',
       };
     } catch {
       return {
@@ -148,6 +165,7 @@ const LoginScreen: React.FC = () => {
         phoneSA: '966570707121',
         phoneEG: '201500000162',
         email: '77aayy@gmail.com',
+        signature: 'Crafted by Ayman Abo Warda',
       };
     }
   });
@@ -165,12 +183,9 @@ const LoginScreen: React.FC = () => {
             phoneSA: branding.devPhoneSA || devConfig.phoneSA,
             phoneEG: branding.devPhoneEG || devConfig.phoneEG,
             email: branding.devEmail || devConfig.email,
+            signature: branding.devSignature || devConfig.signature,
           };
-          
-          // Update state
           setDevConfig(newConfig);
-          
-          // Sync to localStorage for backward compatibility
           if (branding.devName) localStorage.setItem('adora_dev_name', branding.devName);
           if (branding.devPhoneSA) localStorage.setItem('adora_dev_phone_sa', branding.devPhoneSA);
           if (branding.devPhoneEG) localStorage.setItem('adora_dev_phone_eg', branding.devPhoneEG);
@@ -178,18 +193,24 @@ const LoginScreen: React.FC = () => {
           if (branding.devSignature) localStorage.setItem('adora_dev_signature', branding.devSignature);
         }
       } catch (err) {
-        console.warn('Failed to load developer settings from Firebase, using localStorage:', err);
+        logger.warn('Failed to load developer settings from Firebase, using localStorage:', err, 'LoginScreen');
       }
     };
     
     loadDeveloperSettings();
   }, []);
   
-  // ✅ FIX: Listen for settings updates from owner dashboard
+  // ✅ تحديث فوري للتوقيع عند الحفظ من لوحة المالك
   useEffect(() => {
     const handleSettingsUpdate = (event: CustomEvent) => {
-      const newConfig = event.detail;
-      // Update state
+      const d = event.detail || {};
+      const newConfig = {
+        devName: d.devName ?? devConfig.devName,
+        phoneSA: d.phoneSA ?? devConfig.phoneSA,
+        phoneEG: d.phoneEG ?? devConfig.phoneEG,
+        email: d.email ?? devConfig.email,
+        signature: d.signature ?? devConfig.signature,
+      };
       setDevConfig(newConfig);
       // Also update localStorage to ensure persistence
       if (newConfig.devName) localStorage.setItem('adora_dev_name', newConfig.devName);
@@ -210,35 +231,14 @@ const LoginScreen: React.FC = () => {
   const greeting = useMemo(() => getDynamicGreeting(t), [t]);
   const GreetingIcon = greeting.icon;
 
-  // ✅ Animation on mount - Delay to wait for splash/initial loader to disappear
-  const [showLogin, setShowLogin] = useState(false);
-  
+  // ✅ عرض صفحة الدخول فوراً (تم إلغاء شاشة اللوجو)
   useEffect(() => {
-    // ✅ Wait for splash screen and initial loader to disappear before showing login
-    const checkAndShow = () => {
-      const initialLoader = document.getElementById('initial-loader');
-      const isLoaderHidden = !initialLoader || initialLoader.style.display === 'none' || initialLoader.style.opacity === '0';
-      
-      // Check if splash is shown (via localStorage)
-      const hasShownSplash = localStorage.getItem('adora_splash_shown');
-      
-      // Wait 800ms after initial loader disappears (or 3000ms if splash is showing)
-      // 3000ms = 2500ms splash duration + 300ms fade + 200ms delay for smooth transition
-      const delay = hasShownSplash ? 800 : 3000;
-      
-      setTimeout(() => {
-        setShowLogin(true);
-        setTimeout(() => setMounted(true), 150);
-      }, delay);
-    };
-    
-    checkAndShow();
+    setMounted(true);
   }, []);
 
   // 🔐 Check if Firebase is configured - redirect to setup if not
   useEffect(() => {
     if (!isFirebaseConfigured()) {
-      console.log('🔧 Firebase not configured - redirecting to setup...');
       navigate('/firebase-setup', { replace: true });
     }
   }, [navigate]);
@@ -418,7 +418,7 @@ const LoginScreen: React.FC = () => {
 
     try {
       const effectiveBranch = userType === 'employee' ? branchCode : '';
-      const result = await login(pin, effectiveBranch);
+      const result = await login(pin.trim(), effectiveBranch);
 
       triggerHaptic('success');
       setSuccess(t('auth.loginSuccess') || 'تم تسجيل الدخول بنجاح! ✨');
@@ -488,40 +488,97 @@ const LoginScreen: React.FC = () => {
 
   return (
     <div 
-      className={`fixed inset-0 ${isDark ? 'bg-slate-950' : 'bg-teal-50'}`}
-      style={{ transition: 'background-color 1.5s ease-in-out' }}
+      className={`fixed inset-0 overflow-y-auto overflow-x-hidden ${isDark ? 'bg-slate-950' : 'bg-teal-50'}`}
+      style={{ transition: 'background-color 0.5s ease-in-out', WebkitOverflowScrolling: 'touch' }}
     >
-      {/* 🌓 Theme Toggle - Minimal Professional */}
-      <button
-        onClick={() => {
-          toggleTheme();
-          triggerHaptic('medium');
-        }}
-        className={`
-          fixed top-4 right-4 z-[9999]
-          w-10 h-10 rounded-full
-          flex items-center justify-center
-          transition-all duration-500 transform hover:scale-105 active:scale-95
-          ${isDark 
-            ? 'bg-slate-800/80 text-amber-300 border border-slate-600/50' 
-            : 'bg-white/80 text-slate-600 border border-slate-200/50'
-          }
-          backdrop-blur-sm shadow-sm
-        `}
-        aria-label={isDark ? t('auth.dayMode') : t('auth.nightMode')}
+      {/* 🎛️ ترويسة: لغة + وضع (ثابتة لا تتأثر بتبديل RTL/LTR) */}
+      <div
+        ref={headerRef}
+        dir="ltr"
+        className="fixed top-4 right-4 z-[9999] flex items-center gap-2"
+        style={{ left: 'auto' }}
       >
-        {isDark ? (
-          <Sun className="w-5 h-5" />
-        ) : (
-          <Moon className="w-5 h-5" />
-        )}
-      </button>
+        {/* زر تغيير اللغة */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setLangMenuOpen((o) => !o);
+              triggerHaptic('light');
+            }}
+            className={`
+              w-10 h-10 rounded-xl flex items-center justify-center
+              transition-all duration-500 ease-in-out hover:scale-105 active:scale-95
+              ${isDark
+                ? 'bg-slate-800/80 text-teal-300 border border-slate-600/50 hover:bg-slate-700/80'
+                : 'bg-white/80 text-slate-600 border border-slate-200/50 hover:bg-white'
+              }
+              backdrop-blur-sm shadow-sm
+            `}
+            aria-label={t('auth.language') || 'تغيير اللغة'}
+            aria-expanded={langMenuOpen}
+          >
+            <Globe className="w-5 h-5" />
+          </button>
+          {langMenuOpen && (
+            <div
+              className={`
+                absolute top-full mt-2 right-0 min-w-[140px] rounded-xl overflow-hidden shadow-xl
+                backdrop-blur-xl border
+                ${isDark ? 'bg-slate-800/95 border-slate-600/50' : 'bg-white/95 border-slate-200/50'}
+              `}
+              style={{ left: 'auto' }}
+            >
+              {LANGUAGES.map((lang) => {
+                const active = (i18n.language || '').startsWith(lang.code);
+                return (
+                  <button
+                    key={lang.code}
+                    onClick={async () => {
+                      await changeLanguage(lang.code);
+                      updateDirection(lang.code);
+                      setLangMenuOpen(false);
+                      triggerHaptic('medium');
+                    }}
+                    className={`
+                      w-full flex items-center gap-2 px-3 py-2.5 text-sm text-start transition-colors
+                      ${active
+                        ? isDark ? 'bg-teal-500/20 text-teal-300' : 'bg-teal-500/15 text-teal-700'
+                        : isDark ? 'text-slate-200 hover:bg-slate-700/80' : 'text-slate-700 hover:bg-slate-100'
+                      }
+                    `}
+                  >
+                    <span>{lang.nativeName}</span>
+                    {active && <CheckCircle className="w-4 h-4 shrink-0 text-primary-500" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {/* زر الوضع الداكن/الفاتح */}
+        <button
+          onClick={() => {
+            toggleTheme();
+            triggerHaptic('medium');
+          }}
+          className={`
+            w-10 h-10 rounded-xl flex items-center justify-center
+            transition-all duration-500 ease-in-out hover:scale-105 active:scale-95
+            ${isDark
+              ? 'bg-slate-800/80 text-amber-300 border border-slate-600/50 hover:bg-slate-700/80'
+              : 'bg-white/80 text-slate-600 border border-slate-200/50 hover:bg-white'
+            }
+            backdrop-blur-sm shadow-sm
+          `}
+          aria-label={isDark ? t('auth.dayMode') : t('auth.nightMode')}
+        >
+          {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
+      </div>
 
       <div 
-        className="min-h-screen flex flex-col items-center justify-between p-4 py-6 relative overflow-hidden transition-all duration-[1500ms] ease-in-out"
-        style={{ 
-          minHeight: '100dvh'
-        }}
+        className="min-h-screen flex flex-col items-center justify-between p-4 py-6 relative transition-all duration-[1500ms] ease-in-out"
+        style={{ minHeight: '100dvh' }}
       >
         {/* 🌅 Premium Animated Background - Theme-aware with Sunset Effect */}
         <div className={`absolute inset-0 premium-bg transition-all duration-[1500ms] ease-in-out ${isDark ? 'opacity-0' : 'opacity-100'}`}>
@@ -706,10 +763,10 @@ const LoginScreen: React.FC = () => {
               </div>
             </div>
             
-            {/* Main Logo */}
+            {/* Main Logo - from DynamicBrandingSection (localStorage) */}
             <div className="relative z-10">
               <img
-                src="/adora-logo.png"
+                src={localStorage.getItem('adora_platform_logo') ?? '/adora-logo.png'}
                 alt={t('auth.welcomeMessage')}
                 className="logo-float logo-crisp"
                 style={{ 
@@ -788,16 +845,16 @@ const LoginScreen: React.FC = () => {
             />
           </div>
 
-          {/* Messages */}
+          {/* Messages - عائمة حتى لا تدفع لوحة الأرقام للأسفل */}
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="fixed left-1/2 -translate-x-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[200] px-4 py-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300 shadow-lg max-w-[calc(100vw-2rem)]">
               <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
               <p className="text-red-600 text-sm">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="mb-4 p-3 rounded-xl bg-green-50 border border-green-200 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="fixed left-1/2 -translate-x-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[200] px-4 py-3 rounded-xl bg-green-50 border border-green-200 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300 shadow-lg max-w-[calc(100vw-2rem)]">
               <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
               <p className="text-green-600 text-sm">{success}</p>
             </div>
@@ -930,18 +987,24 @@ const LoginScreen: React.FC = () => {
               disabled={isLoading}
               isDark={isDark}
             />
-            {/* Login/Biometric button - Same size as other buttons with prominent glow */}
+            {/* Login/Biometric button - Same size as other buttons with prominent glow; animation when logging in */}
             <button
               onClick={biometricSupported ? handleBiometricLogin : handleLogin}
               disabled={isLoading}
-              className={`h-14 sm:h-16 rounded-xl flex items-center justify-center
+              className={`h-14 sm:h-16 rounded-xl flex items-center justify-center gap-2 min-w-[5rem]
                          bg-gradient-to-br from-teal-500 to-teal-600 text-white
                          shadow-[0_0_20px_rgba(20,184,166,0.5),0_4px_12px_rgba(20,184,166,0.3)]
                          hover:shadow-[0_0_30px_rgba(20,184,166,0.6),0_6px_16px_rgba(20,184,166,0.4)]
-                         active:scale-95 transition-all disabled:opacity-50`}
+                         active:scale-95 transition-all disabled:opacity-50
+                         ${isLoading ? 'login-btn-loading cursor-wait' : ''}`}
             >
               {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <>
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white/30 border-t-white rounded-full animate-spin flex-shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium animate-pulse">
+                    {t('auth.loggingIn')}
+                  </span>
+                </>
               ) : (
                 <Fingerprint className="w-5 h-5 sm:w-6 sm:h-6" />
               )}
@@ -989,81 +1052,24 @@ const LoginScreen: React.FC = () => {
             }}
           />
         )}
-        
-        {/* Developer Signature - Professional Single Line - Below content */}
-        <footer 
-          className="w-full py-2 mt-4 text-center pointer-events-auto relative z-20"
-          dir="ltr"
-        >
-          <p 
-            className="text-[8px] sm:text-[9px] tracking-wide transition-all duration-300 flex items-center justify-center gap-1.5 flex-wrap"
-            style={{ fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif" }}
-          >
-          {/* Copyright */}
-          <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-            © {new Date().getFullYear()}
-          </span>
-          <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-          
-                {/* Developer Name */}
-                <span className={`font-semibold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
-                  {devConfig.devName}
-                </span>
-                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                
-                {/* Saudi Phone */}
-                <a 
-                  href={`https://wa.me/${devConfig.phoneSA}?text=${encodeURIComponent((() => {
-                    const hour = new Date().getHours();
-                    return hour >= 5 && hour < 12 ? (t('auth.goodMorning') || 'صباح الخير، أنا مهتم بمشروعك') : (t('auth.goodEvening') || 'مساء الخير، أنا مهتم بمشروعك');
-                  })())}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`hover:underline transition-colors ${
-                    isDark 
-                      ? 'text-slate-300 hover:text-teal-400' 
-                      : 'text-slate-600 hover:text-teal-600'
-                  }`}
-                >
-                  +{devConfig.phoneSA}
-                </a>
-                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                
-                {/* Egypt Phone */}
-                <a 
-                  href={`https://wa.me/${devConfig.phoneEG}?text=${encodeURIComponent((() => {
-                    const hour = new Date().getHours();
-                    return hour >= 5 && hour < 12 ? (t('auth.goodMorning') || 'صباح الخير، أنا مهتم بمشروعك') : (t('auth.goodEvening') || 'مساء الخير، أنا مهتم بمشروعك');
-                  })())}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`hover:underline transition-colors ${
-                    isDark 
-                      ? 'text-slate-300 hover:text-teal-400' 
-                      : 'text-slate-600 hover:text-teal-600'
-                  }`}
-                >
-                  +{devConfig.phoneEG}
-                </a>
-                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                
-                {/* Developer Email */}
-                <a 
-                  href={`mailto:${devConfig.email}`}
-                  className={`hover:underline transition-colors ${
-                    isDark 
-                      ? 'text-slate-300 hover:text-teal-400' 
-                      : 'text-slate-600 hover:text-teal-600'
-                  }`}
-                >
-                  {devConfig.email}
-                </a>
-          </p>
-        </footer>
+        {/* ✅ التوقيع الموحد من App.tsx (DeveloperFooter) — لا توقيع محلي هنا */}
       </div>
 
       {/* Global Animations & Premium Background Styles */}
       <style>{`
+        /* Login button: pulse glow while logging in */
+        .login-btn-loading {
+          animation: loginBtnPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes loginBtnPulse {
+          0%, 100% {
+            box-shadow: 0 0 20px rgba(20,184,166,0.5), 0 4px 12px rgba(20,184,166,0.3);
+          }
+          50% {
+            box-shadow: 0 0 28px rgba(20,184,166,0.7), 0 6px 16px rgba(20,184,166,0.5);
+          }
+        }
+
         @keyframes popIn {
           0% { transform: scale(0.5); opacity: 0; }
           60% { transform: scale(1.1); }

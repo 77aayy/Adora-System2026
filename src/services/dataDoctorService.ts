@@ -11,7 +11,8 @@
  * Adora Hotel Management System V3
  */
 
-import { db, isFirebaseConfigured } from './firebase';
+import { db, isFirebaseConfigured, getSafeFirestore } from './firebase';
+import type { Firestore } from 'firebase/firestore';
 import {
     collection,
     query,
@@ -33,6 +34,7 @@ import {
     seedTenantDatabase, 
     SeedingResult 
 } from './tenantSeedingService';
+import { logger } from './loggerService';
 
 // ============================================================
 // CONFIGURATION
@@ -83,13 +85,15 @@ export interface WeeklyReportData {
  * Diagnose and heal Room data
  * Target: Missing tenantId, inconsistent status
  */
-export const diagnoseRooms = async (tenantId: string, branchId: string): Promise<number> => {
+export const diagnoseRooms = async (tenantId: string, branchId: string, dbInstance?: Firestore | null): Promise<number> => {
     if (!tenantId || !branchId) return 0;
+    const firestore = dbInstance ?? db;
+    if (!firestore) return 0;
 
-    console.log(`🏥 [Data Doctor] Scanning rooms for branch: ${branchId}...`);
+    logger.info(`🏥 [Data Doctor] Scanning rooms for branch: ${branchId}...`, undefined, 'dataDoctorService');
     let healedCount = 0;
 
-    const roomsRef = collection(db, 'rooms');
+    const roomsRef = collection(firestore, 'tenants', tenantId, 'rooms');
     const q = query(roomsRef, where('branchId', '==', branchId));
     const snapshot = await getDocs(q);
 
@@ -100,7 +104,7 @@ export const diagnoseRooms = async (tenantId: string, branchId: string): Promise
         // 1. Repair missing tenantId (SaaS Protection)
         if (!data.tenantId) {
             updates.tenantId = tenantId;
-            console.warn(`🚀 [Data Doctor] Healing tenantId for room ${data.number}`);
+            logger.warn(`🚀 [Data Doctor] Healing tenantId for room ${data.number}`, undefined, 'dataDoctorService');
         }
 
         // 2. Repair missing floor (Visual Protection)
@@ -108,7 +112,7 @@ export const diagnoseRooms = async (tenantId: string, branchId: string): Promise
             const roomNum = parseInt(data.number);
             if (!isNaN(roomNum)) {
                 updates.floor = Math.floor(roomNum / 100);
-                console.warn(`🚀 [Data Doctor] Healing floor for room ${data.number}`);
+                logger.warn(`🚀 [Data Doctor] Healing floor for room ${data.number}`, undefined, 'dataDoctorService');
             }
         }
 
@@ -125,7 +129,7 @@ export const diagnoseRooms = async (tenantId: string, branchId: string): Promise
             description: `قام الطبيب التقني بتحديث بيانات المستأجر والتوزيع المكاني للغرف المفقودة.`,
             severity: 'low',
             resolved: true
-        }, tenantId, branchId);
+        }, tenantId, branchId, firestore);
     }
 
     return healedCount;
@@ -135,14 +139,16 @@ export const diagnoseRooms = async (tenantId: string, branchId: string): Promise
  * Audit Cleaning Quality (Ghost Cleaning Detection)
  * Detects rooms cleaned too fast
  */
-export const auditCleaningQuality = async (tenantId: string, branchId: string): Promise<void> => {
+export const auditCleaningQuality = async (tenantId: string, branchId: string, dbInstance?: Firestore | null): Promise<void> => {
+    const firestore = dbInstance ?? db;
+    if (!firestore) return;
     // This would typically involve checking 'requests' or 'cleaning_logs'
     // For now, we simulate by checking recent room status changes if tracked
-    // Implementation: Query requests of type 'room_service' where status is 'completed' 
+    // Implementation: Query requests of type 'room_service' where status is 'completed'
     // and compare createdAt vs completedAt
 
     // ✅ FIX: Use tenant-scoped collection path
-    const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+    const requestsRef = collection(firestore, 'tenants', tenantId, 'requests');
     const q = query(
         requestsRef,
         where('branch', '==', branchId),
@@ -172,7 +178,7 @@ export const auditCleaningQuality = async (tenantId: string, branchId: string): 
                 severity: 'medium',
                 resolved: false,
                 metadata: { requestId: req.id, roomNumber: data.roomNumber }
-            }, tenantId, branchId);
+            }, tenantId, branchId, firestore);
         }
     }
 };
@@ -180,16 +186,18 @@ export const auditCleaningQuality = async (tenantId: string, branchId: string): 
 /**
  * Log Data Doctor Actions
  */
-const logAction = async (log: Partial<AuditLog>, tenantId: string, branchId: string) => {
+const logAction = async (log: Partial<AuditLog>, tenantId: string, branchId: string, dbInstance?: Firestore | null) => {
+    const firestore = dbInstance ?? db;
+    if (!firestore) return;
     try {
-        await addDoc(collection(db, AUDIT_LOG_COLLECTION), {
+        await addDoc(collection(firestore, AUDIT_LOG_COLLECTION), {
             ...log,
             tenantId,
             branchId,
             timestamp: serverTimestamp()
         });
     } catch (err) {
-        console.error('Data Doctor failed to log:', err);
+        logger.error('Data Doctor failed to log:', err, 'dataDoctorService');
     }
 };
 
@@ -200,11 +208,15 @@ export const runDataDoctor = async (tenantId: string, branchId: string) => {
     if (!tenantId || !branchId) return;
 
     try {
-        const healed = await diagnoseRooms(tenantId, branchId);
-        await auditCleaningQuality(tenantId, branchId);
+        const safeDb = await getSafeFirestore();
+        if (!safeDb) {
+            return { success: true, healedRooms: 0 };
+        }
+        const healed = await diagnoseRooms(tenantId, branchId, safeDb);
+        await auditCleaningQuality(tenantId, branchId, safeDb);
         return { success: true, healedRooms: healed };
     } catch (err) {
-        console.error('Data Doctor Crash:', err);
+        logger.error('Data Doctor Crash:', err, 'dataDoctorService');
         return { success: false, error: err };
     }
 };
@@ -239,10 +251,18 @@ export const performHealthCheck = async (): Promise<{
     seeded: boolean;
     seedingResult?: SeedingResult;
 }> => {
-    if (!isFirebaseConfigured() || !db) {
+    if (!isFirebaseConfigured()) {
         return {
             healthy: false,
             missingCollections: ['ALL - Firebase not configured'],
+            seeded: false
+        };
+    }
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
+        return {
+            healthy: false,
+            missingCollections: ['Firestore not ready'],
             seeded: false
         };
     }
@@ -250,7 +270,6 @@ export const performHealthCheck = async (): Promise<{
     // ✅ SaaS: Get tenantId for data isolation
     const tenantId = getTenantId();
     if (!tenantId) {
-        console.warn('⚠️ [Data Doctor] No tenantId found - skipping health check');
         return {
             healthy: false,
             missingCollections: ['tenantId required'],
@@ -259,13 +278,13 @@ export const performHealthCheck = async (): Promise<{
     }
 
     try {
-        console.log(`🏥 [Data Doctor] Performing database health check for tenant: ${tenantId}...`);
+        logger.debug(`🏥 [Data Doctor] Performing database health check for tenant: ${tenantId}...`, undefined, 'dataDoctorService');
 
         // Check for missing collections
         const missing = await checkMissingCollections(tenantId);
 
         if (missing.length === 0) {
-            console.log('✅ [Data Doctor] Database is healthy!');
+            logger.debug('✅ [Data Doctor] Database is healthy!', undefined, 'dataDoctorService');
             return {
                 healthy: true,
                 missingCollections: [],
@@ -273,26 +292,64 @@ export const performHealthCheck = async (): Promise<{
             };
         }
 
-        console.log(`⚠️ [Data Doctor] Found ${missing.length} missing collections:`, missing);
+        logger.debug(`⚠️ [Data Doctor] Found ${missing.length} missing collections:`, missing, 'dataDoctorService');
 
-        // Auto-seed missing collections
-        console.log('🌱 [Data Doctor] Auto-seeding missing collections...');
+        // ✅ FIX: Only seed if user is owner (to avoid permission-denied errors)
+        // Check user role from localStorage
+        let isOwner = false;
+        try {
+            const userData = localStorage.getItem('adora_user');
+            if (userData) {
+                const user = JSON.parse(userData);
+                isOwner = user?.role === 'owner';
+            }
+        } catch (e) {
+            // If can't parse user, assume not owner
+        }
+
+        if (!isOwner && tenantId === 'system-owner') {
+            // ✅ For system-owner, only seed if user is actually owner
+            logger.warn('⚠️ [Data Doctor] Skipping seeding for system-owner (user is not owner)', undefined, 'dataDoctorService');
+            return {
+                healthy: false,
+                missingCollections: missing,
+                seeded: false
+            };
+        }
+
+        // ✅ Only owner may run client-side seeding (Firestore rules allow tenant write only for owner or bound user;
+        // on app load userBinding may not be ready yet for managers, so skip to avoid "Missing or insufficient permissions")
+        if (!isOwner) {
+            logger.debug('⚠️ [Data Doctor] Skipping auto-seed (non-owner); tenant data is seeded by Cloud Function or onboarding.', undefined, 'dataDoctorService');
+            return {
+                healthy: false,
+                missingCollections: missing,
+                seeded: false
+            };
+        }
+
+        // Auto-seed missing collections (owner only)
+        logger.debug('🌱 [Data Doctor] Auto-seeding missing collections...', undefined, 'dataDoctorService');
         const seedingResult = await seedTenantDatabase(tenantId, { includeDemoRoom: true });
 
-        // Log the action
-        try {
-            await addDoc(collection(db, AUDIT_LOG_COLLECTION), {
-                type: 'system',
-                message: 'تم تأسيس قاعدة البيانات تلقائياً',
-                description: `قام النظام بإنشاء ${seedingResult.collectionsCreated.length} جداول أساسية: ${seedingResult.collectionsCreated.join(', ')}`,
-                severity: 'low',
-                resolved: true,
-                timestamp: serverTimestamp(),
-                metadata: { seeding: seedingResult }
-            });
-        } catch (logErr) {
-            console.warn('Failed to log seeding action:', logErr);
-        }
+        // Log the action (fire-and-forget: don't block on Write channel 404/400)
+        addDoc(collection(safeDb, AUDIT_LOG_COLLECTION), {
+            type: 'system',
+            message: 'تم تأسيس قاعدة البيانات تلقائياً',
+            description: `قام النظام بإنشاء ${seedingResult.collectionsCreated.length} جداول أساسية: ${seedingResult.collectionsCreated.join(', ')}`,
+            severity: 'low',
+            resolved: true,
+            timestamp: serverTimestamp(),
+            metadata: { seeding: seedingResult }
+        }).catch((logErr: any) => {
+            const isChannelError = logErr?.code === 400 || logErr?.code === 404 ||
+                logErr?.message?.includes('400') || logErr?.message?.includes('404') || logErr?.message?.includes('Write/channel');
+            if (isChannelError) {
+                logger.debug('Seeding audit log skipped (Write channel error)', undefined, 'dataDoctorService');
+            } else {
+                logger.warn('Failed to log seeding action:', logErr, 'dataDoctorService');
+            }
+        });
 
         return {
             healthy: seedingResult.success,
@@ -302,7 +359,7 @@ export const performHealthCheck = async (): Promise<{
         };
 
     } catch (error) {
-        console.error('❌ [Data Doctor] Health check failed:', error);
+        logger.error('❌ [Data Doctor] Health check failed:', error, 'dataDoctorService');
         return {
             healthy: false,
             missingCollections: ['Error checking'],
@@ -322,7 +379,8 @@ export const generateWeeklyReport = async (
     tenantId: string,
     branchId?: string
 ): Promise<WeeklyReportData | null> => {
-    if (!db) return null;
+    const firestore = await getSafeFirestore();
+    if (!firestore) return null;
 
     try {
         const now = new Date();
@@ -331,7 +389,7 @@ export const generateWeeklyReport = async (
         weekStart.setHours(0, 0, 0, 0);
 
         // Get logs from the past week
-        const logsRef = collection(db, AUDIT_LOG_COLLECTION);
+        const logsRef = collection(firestore, AUDIT_LOG_COLLECTION);
         let q = query(
             logsRef,
             where('tenantId', '==', tenantId),
@@ -381,7 +439,7 @@ export const generateWeeklyReport = async (
         let avgMaintenanceTimePrevWeek = 0;
         
         try {
-            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+            const requestsRef = collection(firestore, 'tenants', tenantId, 'requests');
             
             // ✅ Calculate current week average
             const maintenanceQuery = query(
@@ -446,7 +504,7 @@ export const generateWeeklyReport = async (
                 );
             }
         } catch (err) {
-            console.warn('Could not calculate maintenance time:', err);
+            logger.warn('Could not calculate maintenance time:', err, 'dataDoctorService');
         }
 
         // ✅ FIX: Calculate trend from previous week (percentage change)
@@ -473,7 +531,7 @@ export const generateWeeklyReport = async (
         };
 
     } catch (error) {
-        console.error('Failed to generate weekly report:', error);
+        logger.error('Failed to generate weekly report:', error, 'dataDoctorService');
         return null;
     }
 };
@@ -496,7 +554,8 @@ export const getDatabaseHealthReport = async (
         recommendations: []
     };
 
-    if (!db) {
+    const firestore = await getSafeFirestore();
+    if (!firestore) {
         report.overallHealth = 'critical';
         report.recommendations.push('Firebase غير متصل');
         return report;
@@ -515,7 +574,7 @@ export const getDatabaseHealthReport = async (
         }
 
         // Get recent logs
-        const logsRef = collection(db, AUDIT_LOG_COLLECTION);
+        const logsRef = collection(firestore, AUDIT_LOG_COLLECTION);
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -562,7 +621,7 @@ export const getDatabaseHealthReport = async (
         return report;
 
     } catch (error) {
-        console.error('Health report generation failed:', error);
+        logger.error('Health report generation failed:', error, 'dataDoctorService');
         report.overallHealth = 'critical';
         report.recommendations.push('فشل في قراءة سجلات النظام');
         return report;
@@ -576,10 +635,11 @@ export const saveWeeklyReportNotification = async (
     tenantId: string,
     report: WeeklyReportData
 ): Promise<boolean> => {
-    if (!db) return false;
+    const firestore = await getSafeFirestore();
+    if (!firestore) return false;
 
     try {
-        await addDoc(collection(db, 'notifications'), {
+        await addDoc(collection(firestore, 'notifications'), {
             tenantId,
             type: 'weekly_health_report',
             title: '📊 تقرير صحة البيانات الأسبوعي',
@@ -596,7 +656,7 @@ export const saveWeeklyReportNotification = async (
 
         return true;
     } catch (error) {
-        console.error('Failed to save weekly report notification:', error);
+        logger.error('Failed to save weekly report notification:', error, 'dataDoctorService');
         return false;
     }
 };

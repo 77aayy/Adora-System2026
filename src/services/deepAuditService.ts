@@ -320,6 +320,43 @@ const auditFirestore = async (): Promise<DeepAuditReport['firestore']> => {
             report.errors.push('Auth not initialized - cannot identify Master Owner');
         }
 
+        // Clear deleted_managers archive so "فحص شامل" removes old traces (آثار قديمة)
+        try {
+            const deletedRef = collection(db, 'deleted_managers');
+            const deletedSnap = await getDocs(deletedRef);
+            if (deletedSnap.size > 0) {
+                const batch = writeBatch(db);
+                for (const d of deletedSnap.docs) {
+                    batch.delete(d.ref);
+                }
+                await batch.commit();
+                report.documentsDeleted += deletedSnap.size;
+                logger.info(`Cleared deleted_managers: ${deletedSnap.size} documents`);
+            }
+        } catch (e: any) {
+            report.errors.push(`deleted_managers purge: ${e.message}`);
+        }
+
+        // Clear billing (سندات، فواتير) so إحصائيات ترجع 0
+        const billingCollections = ['receiptVouchers', 'invoices', 'expenseVouchers', 'subscriptions', 'payments', 'deleted_billing_records'];
+        for (const colName of billingCollections) {
+            try {
+                const ref = collection(db, colName);
+                const snap = await getDocs(ref);
+                if (snap.size > 0) {
+                    const batch = writeBatch(db);
+                    for (const d of snap.docs) {
+                        batch.delete(d.ref);
+                    }
+                    await batch.commit();
+                    report.documentsDeleted += snap.size;
+                    logger.info(`Cleared ${colName}: ${snap.size} documents`);
+                }
+            } catch (e: any) {
+                report.errors.push(`${colName} purge: ${e.message}`);
+            }
+        }
+
         logger.info('✅ Root collections preserved (systemConfigs, globalCodes only)');
 
         // Hard-delete all orphaned documents found
@@ -361,8 +398,9 @@ const auditFirestore = async (): Promise<DeepAuditReport['firestore']> => {
 };
 
 /**
- * ☢️ NUCLEAR MODE: Complete Firestore purge (like purgeAllSystemData)
- * Deletes ALL data except Owner and systemConfigs
+ * ☢️ NUCLEAR MODE: المشروع يرجع كأول يوم برمجة — إعدادات المالك فقط، باقي كل شيء أبيض
+ * PRESERVE: users/{ownerId}, globalCodes/765255, userBindings/{ownerId}, superAdmins/{ownerId}, systemConfigs (لا نمسحها)
+ * DELETE: كل شيء آخر (tenants, billing, managers, logs, ...)
  */
 const auditFirestoreNuclear = async (ownerId: string): Promise<DeepAuditReport['firestore']> => {
     const report: DeepAuditReport['firestore'] = {
@@ -487,24 +525,44 @@ const auditFirestoreNuclear = async (ownerId: string): Promise<DeepAuditReport['
             logger.error("Tenants/Sub purge error:", e);
         }
 
-        // --- PHASE 3: Archives & Records ---
+        // --- PHASE 3: Archives & Records (كل مجموعة على حدة حتى لا يخفى فشل deleted_managers) ---
         logger.info('Phase 3: Clearing Archives & History...');
-        try {
-            const archives = ['deleted_managers', 'audit_logs', 'scheduled_tasks', 'points_history', 'attendance'];
-            for (const colName of archives) {
-                const snap = await getDocs(collection(db, colName));
-                for (const d of snap.docs) {
-                    await deleteDoc(d.ref);
-                    totalDeleted++;
+        const archives = ['deleted_managers', 'audit_logs', 'scheduled_tasks', 'points_history', 'attendance'];
+        for (const colName of archives) {
+            try {
+                const ref = collection(db, colName);
+                const snap = await getDocs(ref);
+                if (snap.size === 0) {
+                    if (colName === 'deleted_managers') logger.info('deleted_managers already empty');
+                    continue;
                 }
-                logger.info(`Cleared ${colName}`);
+                const batch = writeBatch(db);
+                let batchCount = 0;
+                for (const d of snap.docs) {
+                    batch.delete(d.ref);
+                    batchCount++;
+                    totalDeleted++;
+                    if (batchCount >= 500) {
+                        await batch.commit();
+                        batchCount = 0;
+                    }
+                }
+                if (batchCount > 0) await batch.commit();
+                logger.info(`Cleared ${colName}: ${snap.size} docs`);
+            } catch (e: any) {
+                const msg = e?.message || String(e);
+                const permissionDenied = e?.code === 'permission-denied' || /permission|insufficient/i.test(msg);
+                if (colName === 'deleted_managers' && permissionDenied) {
+                    report.errors.push('deleted_managers: صلاحيات الحذف مرفوضة. انشر القواعد: firebase deploy --only firestore:rules');
+                    logger.error('deleted_managers purge failed (permission). Deploy firestore rules.', e);
+                } else {
+                    report.errors.push(`Archive purge ${colName}: ${msg}`);
+                    logger.error(`Archive purge error ${colName}:`, e);
+                }
             }
-        } catch (e: any) {
-            report.errors.push(`Archive purge error: ${e.message}`);
-            logger.error("Archive purge error:", e);
         }
 
-        // --- PHASE 4: Global Business Data ---
+        // --- PHASE 4: Global Business Data (لا نمسح systemConfigs = إعدادات المالك) ---
         logger.info('Phase 4: Resetting Global Business State...');
         const functionalCollections = [
             // Business Operations
@@ -514,14 +572,17 @@ const auditFirestoreNuclear = async (ownerId: string): Promise<DeepAuditReport['
             'workOrders', 'conciergeRequests', 'reservations', 'lostAndFound',
             'complaints', 'cleaningSchedule', 'roomAssignments', 'luggage',
             'amenityRestock', 'transportation', 'guest_activity',
-            // ✅ BILLING & FINANCIAL: Delete ALL invoice/voucher variations
+            // ✅ BILLING & FINANCIAL: مسح كل السندات والفواتير والإحصائيات → 0
             'invoices', 'receipt_vouchers', 'expense_vouchers', 
-            'receiptVouchers', 'expenseVouchers', // ✅ Alternative naming
+            'receiptVouchers', 'expenseVouchers',
             'payments', 'subscriptions', 'billing_history', 'financial_transactions',
+            'deleted_billing_records', // أرشيف المحذوفات الفواتير/السندات
+            // Trial/Subscription requests (من About Us) وأرشيف المحذوفات — مسح كامل = صفر آثار
+            'trial_requests', 'trial_requests_deleted',
             // Support & Communication
             'support_tickets', 'notification_queue', 'fcm_tokens',
             // Demo & Test Data
-            'demoLinks', 'licenseNotifications', 'backups',
+            'licenseNotifications', 'backups',
             // System Collections
             'logs', 'secureAccessTokens', 'userBindings', 'managers', 'superAdmins',
             // Additional Collections
@@ -536,28 +597,33 @@ const auditFirestoreNuclear = async (ownerId: string): Promise<DeepAuditReport['
                 const snap = await getDocs(collection(db, colName));
                 const batch = writeBatch(db);
                 let batchCount = 0;
-                
+                // ✅ إبقاء سجل المالك فقط في userBindings و superAdmins (لو بدونهم isOwner() يقع)
+                const preserveOwnerDoc = (docId: string) =>
+                    (colName === 'userBindings' || colName === 'superAdmins') && docId === ownerId;
+
                 for (const d of snap.docs) {
+                    if (preserveOwnerDoc(d.id)) {
+                        logger.info(`🛡️ Preserved ${colName}/${d.id} (owner)`);
+                        continue;
+                    }
                     batch.delete(d.ref);
                     batchCount++;
                     totalDeleted++;
-                    
-                    // Firestore batch limit is 500
+
                     if (batchCount >= 500) {
                         await batch.commit();
                         batchCount = 0;
                     }
                 }
-                
+
                 if (batchCount > 0) {
                     await batch.commit();
                 }
-                
+
                 if (snap.size > 0) {
                     logger.info(`✅ Purged ${colName}: ${snap.size} documents`);
                 }
             } catch (e: any) {
-                // ✅ Don't fail on missing collections - just log
                 if (e.code !== 'not-found' && e.message?.includes('not found') === false) {
                     report.errors.push(`Could not purge ${colName}: ${e.message}`);
                     logger.warn(`Could not purge ${colName}:`, e);

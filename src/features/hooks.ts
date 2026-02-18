@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useTenant } from '../context/TenantContext';
 
 // Import features
 import ReceptionFeatures from './reception/receptionAdvancedFeatures';
@@ -60,14 +61,16 @@ export const useSession = () => {
 // ============================================================
 
 export const useHousekeepingRequests = (branchId: string) => {
+    const { tenantId } = useTenant();
     const [cleaning, setCleaning] = useState<any[]>([]);
     const [completed, setCompleted] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!branchId) return;
+        if (!branchId || !tenantId) return;
 
         const unsubscribe = HousekeepingFeatures.subscribeToCleaningRequests(
+            tenantId,
             branchId,
             (cleaningReqs: any[], completedReqs: any[]) => {
                 setCleaning(cleaningReqs);
@@ -77,7 +80,7 @@ export const useHousekeepingRequests = (branchId: string) => {
         );
 
         return () => unsubscribe();
-    }, [branchId]);
+    }, [branchId, tenantId]);
 
     return { cleaning, completed, loading };
 };
@@ -106,13 +109,15 @@ export const useMinibarItems = (hotelId: string, branchId: string) => {
 // ============================================================
 
 export const useRoomCards = (branchId: string) => {
+    const { tenantId } = useTenant();
     const [cards, setCards] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!branchId) return;
+        if (!branchId || !tenantId) return;
 
         const unsubscribe = BellmanFeatures.subscribeToRoomCards(
+            tenantId,
             branchId,
             (roomCards: any[]) => {
                 setCards(roomCards);
@@ -121,19 +126,21 @@ export const useRoomCards = (branchId: string) => {
         );
 
         return () => unsubscribe();
-    }, [branchId]);
+    }, [branchId, tenantId]);
 
     return { cards, loading };
 };
 
 export const useBellmanRequests = (branchId: string) => {
+    const { tenantId } = useTenant();
     const [requests, setRequests] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!branchId) return;
+        if (!branchId || !tenantId) return;
 
         const unsubscribe = BellmanFeatures.subscribeToBellmanRequests(
+            tenantId,
             branchId,
             (bellmanReqs: any[]) => {
                 setRequests(bellmanReqs);
@@ -142,7 +149,7 @@ export const useBellmanRequests = (branchId: string) => {
         );
 
         return () => unsubscribe();
-    }, [branchId]);
+    }, [branchId, tenantId]);
 
     return { requests, loading };
 };
@@ -174,14 +181,16 @@ export const useEmployees = (hotelId: string, branchId: string) => {
 };
 
 export const useDashboardStats = (branchId: string) => {
+    const { tenantId } = useTenant();
     const [requests, setRequests] = useState<any[]>([]);
     const [stats, setStats] = useState({ newCount: 0, progressCount: 0, completedCount: 0, delayedCount: 0 });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!branchId) return;
+        if (!branchId || !tenantId) return;
 
         const unsubscribe = DashboardFeatures.subscribeToTodayRequests(
+            tenantId,
             branchId,
             (reqs: any[]) => {
                 setRequests(reqs);
@@ -191,7 +200,7 @@ export const useDashboardStats = (branchId: string) => {
         );
 
         return () => unsubscribe();
-    }, [branchId]);
+    }, [branchId, tenantId]);
 
     return { requests, stats, loading };
 };
@@ -212,14 +221,16 @@ export const useLeaderboard = (employees: any[], maxItems: number = 10) => {
 // ============================================================
 
 export const useMaintenanceRequests = (branchId: string) => {
+    const { tenantId } = useTenant();
     const [active, setActive] = useState<any[]>([]);
     const [completed, setCompleted] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!branchId) return;
+        if (!branchId || !tenantId) return;
 
         const unsubscribe = MaintenanceFeatures.subscribeToMaintenanceRequests(
+            tenantId,
             branchId,
             (activeReqs: any[], completedReqs: any[]) => {
                 setActive(activeReqs);
@@ -229,7 +240,7 @@ export const useMaintenanceRequests = (branchId: string) => {
         );
 
         return () => unsubscribe();
-    }, [branchId]);
+    }, [branchId, tenantId]);
 
     return { active, completed, loading };
 };
@@ -239,15 +250,17 @@ export const useMaintenanceRequests = (branchId: string) => {
 // ============================================================
 
 export const useProcurementRequests = (branchId: string) => {
+    const { tenantId } = useTenant();
     const [pending, setPending] = useState<any[]>([]);
     const [purchased, setPurchased] = useState<any[]>([]);
     const [completed, setCompleted] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!branchId) return;
+        if (!branchId || !tenantId) return;
 
         const unsubscribe = ProcurementFeatures.subscribeToProcurementRequests(
+            tenantId,
             branchId,
             (pendingReqs: any[], purchasedReqs: any[], completedReqs: any[]) => {
                 setPending(pendingReqs);
@@ -258,7 +271,7 @@ export const useProcurementRequests = (branchId: string) => {
         );
 
         return () => unsubscribe();
-    }, [branchId]);
+    }, [branchId, tenantId]);
 
     return { pending, purchased, completed, loading };
 };
@@ -301,14 +314,15 @@ export const useGuestSession = (room: string, branch: string) => {
     return { session, isValid };
 };
 
-export const useActiveRequests = (room: string, branch: string) => {
+export const useActiveRequests = (room: string, branch: string, tenantId?: string) => {
     const [requests, setRequests] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!room || !branch) return;
+        if (!room || !branch || !tenantId) return;
 
         const unsubscribe = GuestFeatures.subscribeToActiveRequests(
+            tenantId,
             room,
             branch,
             (reqs: any[]) => {
@@ -318,7 +332,7 @@ export const useActiveRequests = (room: string, branch: string) => {
         );
 
         return () => unsubscribe();
-    }, [room, branch]);
+    }, [room, branch, tenantId]);
 
     return { requests, loading };
 };

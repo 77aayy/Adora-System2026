@@ -15,6 +15,7 @@ import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
 import { useAllBranchesForOwner } from '../../hooks/useTenantData'; // ✅ SaaS Integration
 import { StatCard } from '../../components/common/StatCard'; // ✅ Use project StatCard
 import { useUX } from '../../context/UXContext';
+import { logger } from '../../services/loggerService';
 
 export const AnalyticsDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -36,7 +37,7 @@ export const AnalyticsDashboard: React.FC = () => {
             const data = await getSystemAnalytics();
             setAnalytics(data);
         } catch (error) {
-            console.error('Error loading analytics:', error);
+            logger.error('Error loading analytics:', error, 'AnalyticsDashboard');
         } finally {
             setLoading(false);
         }
@@ -138,7 +139,7 @@ export const AnalyticsDashboard: React.FC = () => {
                                     exportToPDF(analytics, 'analytics-report.pdf');
                                     success('تم تصدير التقرير PDF بنجاح');
                                 } catch (err) {
-                                    console.error('PDF export failed:', err);
+                                    logger.error('PDF export failed:', err, 'AnalyticsDashboard');
                                     error('فشل تصدير PDF');
                                 }
                             },
@@ -153,7 +154,7 @@ export const AnalyticsDashboard: React.FC = () => {
                                     exportToExcel(analytics, 'analytics-report.xlsx');
                                     success('تم تصدير التقرير Excel بنجاح');
                                 } catch (err) {
-                                    console.error('Excel export failed:', err);
+                                    logger.error('Excel export failed:', err, 'AnalyticsDashboard');
                                     error('فشل تصدير Excel');
                                 }
                             },

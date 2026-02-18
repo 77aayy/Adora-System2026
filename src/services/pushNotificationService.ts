@@ -8,6 +8,7 @@ import { getMessaging, getToken, onMessage, MessagePayload } from 'firebase/mess
 import { doc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { getVapidKey } from './systemConfigsService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -60,13 +61,13 @@ export const initPushNotifications = async (): Promise<boolean> => {
     try {
         // Check if notifications are supported
         if (!('Notification' in window)) {
-            console.warn('Push notifications not supported');
+            logger.warn('Push notifications not supported', undefined, 'pushNotificationService');
             return false;
         }
 
         // Check permission
         if (Notification.permission === 'denied') {
-            console.warn('Push notifications denied by user');
+            logger.warn('Push notifications denied by user', undefined, 'pushNotificationService');
             return false;
         }
 
@@ -84,7 +85,7 @@ export const initPushNotifications = async (): Promise<boolean> => {
         // Get VAPID key dynamically
         const vapidKey = await loadVapidKey();
         if (!vapidKey) {
-            console.warn('No VAPID key configured - push notifications disabled');
+            logger.warn('No VAPID key configured - push notifications disabled', undefined, 'pushNotificationService');
             return false;
         }
 
@@ -92,13 +93,13 @@ export const initPushNotifications = async (): Promise<boolean> => {
         currentToken = await getToken(messaging, { vapidKey });
 
         if (currentToken) {
-            console.log('✅ Push notifications initialized');
+            logger.info('✅ Push notifications initialized', undefined, 'pushNotificationService');
             return true;
         }
 
         return false;
     } catch (error) {
-        console.error('Failed to initialize push notifications:', error);
+        logger.error('Failed to initialize push notifications:', error, 'pushNotificationService');
         return false;
     }
 };
@@ -147,7 +148,7 @@ export const setMessageHandler = (callback: (payload: MessagePayload) => void): 
 
     if (messaging) {
         onMessage(messaging, (payload) => {
-            console.log('📩 Message received:', payload);
+            logger.info('📩 Message received:', payload, 'pushNotificationService');
 
             // Show browser notification if app is in foreground
             if (payload.notification) {
@@ -297,7 +298,7 @@ export const sendPushNotification = async (
 ): Promise<void> => {
     try {
         if (!db) {
-            console.warn('Firebase not initialized, cannot send push notification');
+            logger.warn('Firebase not initialized, cannot send push notification', undefined, 'pushNotificationService');
             return;
         }
 
@@ -317,7 +318,7 @@ export const sendPushNotification = async (
         // Also show local notification immediately (for same-device notifications)
         showLocalNotification(data);
     } catch (error) {
-        console.error('Error sending push notification:', error);
+        logger.error('Error sending push notification:', error, 'pushNotificationService');
         // Fallback: show local notification even if Firestore fails
         showLocalNotification(data);
     }

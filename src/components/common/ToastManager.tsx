@@ -133,20 +133,20 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
         info: <Info className="w-5 h-5 text-blue-400" />,
     };
 
-    // ✅ FIXED: Dark mode compatible backgrounds (solid, not glass) - No border
+    // ✅ FIXED: Light/Dark mode compatible backgrounds
     const bgMap = {
-        success: 'bg-slate-800',
-        error: 'bg-slate-800',
-        warning: 'bg-slate-800',
-        info: 'bg-slate-800',
+        success: 'bg-white dark:bg-slate-800',
+        error: 'bg-white dark:bg-slate-800',
+        warning: 'bg-white dark:bg-slate-800',
+        info: 'bg-white dark:bg-slate-800',
     };
 
-    // ✅ Text colors that work in dark mode
+    // ✅ Text colors that work in both light and dark mode
     const textColorMap = {
-        success: 'text-green-400',
-        error: 'text-red-400',
-        warning: 'text-yellow-400',
-        info: 'text-blue-400',
+        success: 'text-green-600 dark:text-green-400',
+        error: 'text-red-600 dark:text-red-400',
+        warning: 'text-yellow-600 dark:text-yellow-400',
+        info: 'text-blue-600 dark:text-blue-400',
     };
 
     const handleDismiss = () => {
@@ -158,17 +158,17 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
         <div
             className={`
                 pointer-events-auto
-                flex items-center gap-3 p-4 rounded-2xl shadow-2xl toast
+                flex items-center gap-3 p-4 rounded-2xl toast
                 ${bgMap[toast.type]}
                 transition-all duration-300
                 ${isExiting ? 'opacity-0 translate-x-full scale-95' : 'opacity-100 translate-x-0 scale-100'}
                 animate-slide-in-right
                 max-w-sm sm:max-w-md
+                shadow-lg dark:shadow-2xl
+                border border-slate-200 dark:border-slate-700/50
             `}
             style={{ 
-                border: 'none', 
-                outline: 'none',
-                background: 'var(--theme-bg-secondary, rgba(30, 41, 59, 0.95))'
+                outline: 'none'
             }}
             role="alert"
             aria-live="polite"
@@ -177,7 +177,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
             <p className={`flex-1 text-sm leading-relaxed ${textColorMap[toast.type]} font-medium`}>{toast.message}</p>
             <button
                 onClick={handleDismiss}
-                className="w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                className="w-6 h-6 rounded-full flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
                 aria-label="إغلاق"
             >
                 <X className="w-4 h-4" />

@@ -190,11 +190,15 @@ export const subscribeToOrders = (
     status?: string,
     callback?: (orders: CoffeeShopOrder[]) => void
 ): Unsubscribe => {
-    // Query the requests collection for coffee-related requests
+    // ✅ FIX: Use tenant-scoped collection for SaaS isolation
+    if (!tenantId) {
+        throw new Error('tenantId is required for SaaS isolation');
+    }
+    
+    // Query the tenant-scoped requests collection for coffee-related requests
     const q = query(
-        collection(db, 'requests'),
+        collection(db, `tenants/${tenantId}/requests`),
         where('branch', '==', branchId),
-        where('tenantId', '==', tenantId),
         orderBy('createdAt', 'desc')
     );
 
@@ -312,14 +316,19 @@ export const confirmOrder = async (
 
 /**
  * Complete order (from coffee shop)
- * ✅ Now updates requests collection directly
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
+ * ⚠️ NOTE: This service is deprecated - use coffeeShopFlowService.completeDelivery instead
  */
 export const completeOrder = async (
+    tenantId: string,
     orderId: string,
     userId: string,
     userName: string
 ): Promise<void> => {
-    const requestRef = doc(db, 'requests', orderId);
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
+    const requestRef = doc(db, `tenants/${tenantId}/requests`, orderId);
     await updateDoc(requestRef, {
         status: 'COMPLETED',
         currentDepartment: 'reception', // Return to reception for notification
@@ -331,21 +340,26 @@ export const completeOrder = async (
 
 /**
  * Update order status
- * ✅ Now updates requests collection directly
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
+ * ⚠️ NOTE: This service is deprecated - use coffeeShopFlowService instead
  */
 export const updateOrderStatus = async (
+    tenantId: string,
     orderId: string,
     status: CoffeeShopOrder['status'],
     userId?: string,
     userName?: string
 ): Promise<void> => {
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     // Map coffee status to request status
     const requestStatus = status === 'preparing' ? 'IN_PROGRESS' :
                          status === 'ready' ? 'WAITING_INSPECTION' :
                          status === 'delivered' ? 'COMPLETED' :
                          status === 'cancelled' ? 'CANCELLED' : 'CONFIRMED';
     
-    const requestRef = doc(db, 'requests', orderId);
+    const requestRef = doc(db, `tenants/${tenantId}/requests`, orderId);
     const updateData: any = {
         status: requestStatus,
         updatedAt: serverTimestamp()

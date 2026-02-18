@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { formatDateTimeGregorianEn } from './dateUtils';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -437,7 +439,7 @@ export const exportReportAsCSV = (
         index + 1,
         getServiceTypeLabelAr(item.type),
         item.roomNumber || '--',
-        item.date.toLocaleString('ar-SA'),
+        formatDateTimeGregorianEn(item.date, { showSeconds: false }),
         getStatusLabelAr(item.status),
     ]);
 

@@ -5,6 +5,7 @@
 
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // 1. DAILY SUMMARY GENERATION
@@ -22,14 +23,14 @@ export interface DailySummary {
     checkOuts: number;
 }
 
-export const generateDailySummary = async (branch: string, date: Date): Promise<DailySummary> => {
+export const generateDailySummary = async (tenantId: string, branch: string, date: Date): Promise<DailySummary> => {
     try {
         const startOfDay = new Date(date); startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(date); endOfDay.setHours(23, 59, 59, 999);
 
         const snapshot = await getDocs(
             query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${tenantId}/requests`),
                 where('branch', '==', branch),
                 where('createdAt', '>=', Timestamp.fromDate(startOfDay)),
                 where('createdAt', '<=', Timestamp.fromDate(endOfDay))
@@ -65,7 +66,7 @@ export const generateDailySummary = async (branch: string, date: Date): Promise<
             checkOuts: 0
         };
     } catch (error) {
-        console.error('Daily summary error:', error);
+        logger.error('Daily summary error:', error, 'receptionReportsService');
         return { date: '', totalRequests: 0, completedRequests: 0, pendingRequests: 0, avgResponseTime: 0, byDepartment: {}, byStatus: {}, checkIns: 0, checkOuts: 0 };
     }
 };
@@ -84,11 +85,11 @@ export interface ShiftHandoverReport {
     issuesFlagged: number;
 }
 
-export const generateShiftHandover = async (branch: string, employeeId: string, shiftStart: Date, shiftEnd: Date): Promise<ShiftHandoverReport> => {
+export const generateShiftHandover = async (tenantId: string, branch: string, employeeId: string, shiftStart: Date, shiftEnd: Date): Promise<ShiftHandoverReport> => {
     try {
         const snapshot = await getDocs(
             query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${tenantId}/requests`),
                 where('branch', '==', branch),
                 where('confirmedBy.id', '==', employeeId),
                 where('timeline.confirmed', '>=', Timestamp.fromDate(shiftStart)),
@@ -109,7 +110,7 @@ export const generateShiftHandover = async (branch: string, employeeId: string, 
             issuesFlagged: issues
         };
     } catch (error) {
-        console.error('Shift handover error:', error);
+        logger.error('Shift handover error:', error, 'receptionReportsService');
         return { shiftStart, shiftEnd, employeeName: '', requestsHandled: 0, pendingItems: [], notes: [], issuesFlagged: 0 };
     }
 };
@@ -127,11 +128,11 @@ export interface PerformanceMetrics {
     points: number;
 }
 
-export const getPerformanceMetrics = async (branch: string, employeeId: string, startDate: Date, endDate: Date): Promise<PerformanceMetrics> => {
+export const getPerformanceMetrics = async (tenantId: string, branch: string, employeeId: string, startDate: Date, endDate: Date): Promise<PerformanceMetrics> => {
     try {
         const snapshot = await getDocs(
             query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${tenantId}/requests`),
                 where('branch', '==', branch),
                 where('completedBy.id', '==', employeeId),
                 where('timeline.completed', '>=', Timestamp.fromDate(startDate)),
@@ -164,11 +165,11 @@ export const getPerformanceMetrics = async (branch: string, employeeId: string, 
 // 4. OCCUPANCY ANALYTICS
 // ============================================================
 
-export const getOccupancyAnalytics = async (branch: string, startDate: Date, endDate: Date): Promise<{ daily: Record<string, number>; average: number }> => {
+export const getOccupancyAnalytics = async (tenantId: string, branch: string, startDate: Date, endDate: Date): Promise<{ daily: Record<string, number>; average: number }> => {
     try {
         const snapshot = await getDocs(
             query(
-                collection(db, 'roomCards'),
+                collection(db, `tenants/${tenantId}/roomCards`),
                 where('branch', '==', branch),
                 where('checkinAt', '>=', Timestamp.fromDate(startDate)),
                 where('checkinAt', '<=', Timestamp.fromDate(endDate))
@@ -194,7 +195,7 @@ export const getOccupancyAnalytics = async (branch: string, startDate: Date, end
 // 5. REVENUE PER ROOM TRACKING
 // ============================================================
 
-export const getRevenuePerRoom = async (branch: string): Promise<Record<string, number>> => {
+export const getRevenuePerRoom = async (_tenantId: string, branch: string): Promise<Record<string, number>> => {
     // Placeholder - would integrate with billing system
     return {};
 };
@@ -210,11 +211,11 @@ export interface ServiceQualityMetrics {
     repeatRequestsCount: number;
 }
 
-export const getServiceQualityMetrics = async (branch: string, startDate: Date, endDate: Date): Promise<ServiceQualityMetrics> => {
+export const getServiceQualityMetrics = async (tenantId: string, branch: string, startDate: Date, endDate: Date): Promise<ServiceQualityMetrics> => {
     try {
         const snapshot = await getDocs(
             query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${tenantId}/requests`),
                 where('branch', '==', branch),
                 where('createdAt', '>=', Timestamp.fromDate(startDate)),
                 where('createdAt', '<=', Timestamp.fromDate(endDate))
@@ -246,11 +247,11 @@ export const getServiceQualityMetrics = async (branch: string, startDate: Date, 
 // 7. RESPONSE TIME ANALYTICS
 // ============================================================
 
-export const getResponseTimeAnalytics = async (branch: string, startDate: Date, endDate: Date): Promise<{ byDepartment: Record<string, number>; byHour: Record<number, number> }> => {
+export const getResponseTimeAnalytics = async (tenantId: string, branch: string, startDate: Date, endDate: Date): Promise<{ byDepartment: Record<string, number>; byHour: Record<number, number> }> => {
     try {
         const snapshot = await getDocs(
             query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${tenantId}/requests`),
                 where('branch', '==', branch),
                 where('status', '==', 'COMPLETED'),
                 where('createdAt', '>=', Timestamp.fromDate(startDate)),
@@ -302,11 +303,11 @@ export interface DepartmentEfficiency {
     employeeCount: number;
 }
 
-export const getDepartmentEfficiency = async (branch: string, startDate: Date, endDate: Date): Promise<DepartmentEfficiency[]> => {
+export const getDepartmentEfficiency = async (tenantId: string, branch: string, startDate: Date, endDate: Date): Promise<DepartmentEfficiency[]> => {
     try {
         const snapshot = await getDocs(
             query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${tenantId}/requests`),
                 where('branch', '==', branch),
                 where('createdAt', '>=', Timestamp.fromDate(startDate)),
                 where('createdAt', '<=', Timestamp.fromDate(endDate))

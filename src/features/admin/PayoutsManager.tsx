@@ -16,6 +16,7 @@ import { getPendingPayouts, approvePayout, rejectPayout } from '../../services/p
 import { PayoutRequest } from '../../types';
 import * as XLSX from 'xlsx';
 import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 export const PayoutsManager: React.FC = () => {
     const { user } = useAuth();
@@ -91,7 +92,7 @@ export const PayoutsManager: React.FC = () => {
             'عدد النقاط': r.pointsAmount,
             'القيمة المالية (SAR)': r.monetaryValue,
             'سعر الصرف': r.exchangeRate,
-            'تاريخ الطلب': r.createdAt ? new Date((r.createdAt as any).toDate?.() || r.createdAt).toLocaleString('ar-SA') : ''
+            'تاريخ الطلب': r.createdAt ? formatDateTimeGregorianEn((r.createdAt as any).toDate?.() || r.createdAt, { showSeconds: false }) : ''
         }));
 
         const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -247,7 +248,7 @@ export const PayoutsManager: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-white/40 font-bold tabular-nums">
-                                            {req.createdAt ? new Date((req.createdAt as any).toDate?.() || req.createdAt).toLocaleDateString('ar-SA') : '-'}
+                                            {req.createdAt ? formatDateGregorianEn((req.createdAt as any).toDate?.() || req.createdAt) : '-'}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-end gap-2">

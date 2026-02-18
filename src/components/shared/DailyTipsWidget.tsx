@@ -9,6 +9,7 @@ import { Lightbulb, RefreshCw, TrendingUp, Clock, Star } from 'lucide-react';
 import { useDailyTips } from '../../services/dailyTipsService';
 import { AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { db } from '../../services/firebase';
 import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
 
@@ -164,8 +165,8 @@ export const DailyTipsWidget: React.FC<DailyTipsWidgetProps> = ({
     const [avgRating, setAvgRating] = useState(0);
     const [loading, setLoading] = useState(true);
     
+    const { tenantId } = useTenant();
     const branchId = (user as any)?.branch || (user as any)?.branchId || 'default';
-    const tenantId = (user as any)?.tenantId;
 
     // ✅ Load real stats from Firebase
     useEffect(() => {
@@ -175,12 +176,16 @@ export const DailyTipsWidget: React.FC<DailyTipsWidgetProps> = ({
                 today.setHours(0, 0, 0, 0);
                 const todayTimestamp = Timestamp.fromDate(today);
 
+                // ✅ FIX: Use tenant-scoped collection
+                if (!tenantId) {
+                    console.error('DailyTipsWidget: tenantId is required');
+                    return;
+                }
                 const constraints: any[] = [where('branch', '==', branchId)];
-                if (tenantId) constraints.push(where('tenantId', '==', tenantId));
                 constraints.push(orderBy('createdAt', 'desc'));
                 constraints.push(limit(200));
 
-                const q = query(collection(db, 'requests'), ...constraints);
+                const q = query(collection(db, `tenants/${tenantId}/requests`), ...constraints);
                 const snapshot = await getDocs(q);
 
                 let todayCount = 0;

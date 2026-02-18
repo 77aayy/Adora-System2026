@@ -5,7 +5,7 @@
  */
 
 import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, limit, startAfter, getDoc, doc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, getSafeFirestore } from './firebase';
 import { logger } from './loggerService';
 
 // ============================================================
@@ -182,8 +182,15 @@ export const getSystemAnalytics = async (forceRefresh: boolean = false): Promise
 // Internal function to fetch analytics
 const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
     try {
+        // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+        const safeDb = await getSafeFirestore();
+        if (!safeDb) {
+            logger.error('❌ [_fetchSystemAnalytics] Firestore not ready!', undefined, 'analyticsService');
+            throw new Error('Firestore not ready');
+        }
+        
         // Get all tenants in single query
-        const tenantsSnapshot = await getDocs(collection(db, 'tenants'));
+        const tenantsSnapshot = await getDocs(collection(safeDb, 'tenants'));
         const tenants = tenantsSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
@@ -263,7 +270,7 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
             // Try to get error logs from Firestore first
             try {
                 const errorLogsQuery = query(
-                    collection(db, 'errorLogs'),
+                    collection(safeDb, 'errorLogs'),
                     where('timestamp', '>=', Timestamp.fromDate(last24Hours)),
                     orderBy('timestamp', 'desc')
                 );
@@ -333,7 +340,7 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         
         try {
             // Get total rooms across all tenants (override cached)
-            const roomsSnapshot = await getCountFromServer(query(collection(db, 'rooms')));
+            const roomsSnapshot = await getCountFromServer(query(collection(safeDb, 'rooms')));
             totalRooms = roomsSnapshot.data().count;
         } catch (err) {
             logger.debug('Error counting total rooms, using cached value', err, 'analyticsService');
@@ -343,14 +350,14 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
             // 🔐 SECURITY: System-wide analytics (owner only) - no tenantId filter needed
             // This is intentional for owner dashboard to see all tenants' data
             // Get total requests (all-time) - override cached
-            const requestsSnapshot = await getCountFromServer(query(collection(db, 'requests')));
+            const requestsSnapshot = await getCountFromServer(query(collection(safeDb, 'requests')));
             totalRequests = requestsSnapshot.data().count;
             
             // Get today's requests
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
             const todayRequestsSnapshot = await getCountFromServer(
-                query(collection(db, 'requests'), where('createdAt', '>=', Timestamp.fromDate(todayStart)))
+                query(collection(safeDb, 'requests'), where('createdAt', '>=', Timestamp.fromDate(todayStart)))
             );
             totalRequestsToday = todayRequestsSnapshot.data().count;
             
@@ -359,7 +366,7 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
             monthStart.setDate(1);
             monthStart.setHours(0, 0, 0, 0);
             const monthRequestsSnapshot = await getCountFromServer(
-                query(collection(db, 'requests'), where('createdAt', '>=', Timestamp.fromDate(monthStart)))
+                query(collection(safeDb, 'requests'), where('createdAt', '>=', Timestamp.fromDate(monthStart)))
             );
             totalRequestsThisMonth = monthRequestsSnapshot.data().count;
         } catch (err: any) {
@@ -430,19 +437,39 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
         };
     } catch (error: any) {
         // ✅ Graceful handling: Permission denied is expected for non-owners
-        const isPermissionError = error?.code === 'permission-denied' || 
+        const isPermissionError = error?.code === 'permission-denied' ||
                                   error?.message?.includes('permission') ||
                                   error?.message?.includes('Missing or insufficient');
-        
-        if (isPermissionError) {
-            // Return empty/default analytics instead of throwing
-            logger.warn('Permission denied for system analytics (expected for non-owners)', undefined, 'analyticsService');
-            return {
+
+        // ✅ Listen/channel 400: avoid throwing so UI does not break
+        const isChannelError = error?.code === 400 || error?.code === 404 ||
+                              error?.message?.includes('400') || error?.message?.includes('Listen/channel');
+
+        if (isPermissionError || isChannelError) {
+            if (isChannelError) {
+                logger.debug('System analytics: Listen channel 400, using empty analytics', undefined, 'analyticsService');
+            } else {
+                logger.warn('Permission denied for system analytics (expected for non-owners)', undefined, 'analyticsService');
+            }
+            const empty: SystemAnalytics = {
                 totalTenants: 0,
                 activeTenants: 0,
+                suspendedTenants: 0,
+                expiredTenants: 0,
+                planDistribution: { basic: 0, pro: 0, enterprise: 0 },
+                totalUsers: 0,
+                totalBranches: 0,
+                totalRooms: 0,
                 totalRequests: 0,
-                totalRevenue: 0,
+                totalRequestsToday: 0,
+                totalRequestsThisMonth: 0,
+                monthlyRecurringRevenue: 0,
+                annualRecurringRevenue: 0,
+                averageRevenuePerTenant: 0,
+                activeSessionsToday: 0,
+                peakConcurrentUsers: 0,
                 averageRequestsPerTenant: 0,
+                featureAdoption: {},
                 averageResponseTime: 0,
                 errorRate: 0,
                 uptime: 100,
@@ -450,8 +477,9 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
                 churnRate: 0,
                 retentionRate: 100
             };
+            return empty;
         }
-        
+
         logger.error('Error getting system analytics', error, 'analyticsService');
         throw error;
     }
@@ -463,39 +491,168 @@ const _fetchSystemAnalytics = async (): Promise<SystemAnalytics> => {
  * ⚡ PERFORMANCE: 30-second memory cache with request deduplication
  */
 export const getTenantAnalytics = async (forceRefresh: boolean = false): Promise<TenantAnalytics[]> => {
+    logger.info('🚀 [getTenantAnalytics] Called with forceRefresh:', forceRefresh, 'analyticsService');
     const { cachedFetch } = await import('../utils/requestCache');
     
-    return cachedFetch<TenantAnalytics[]>(
-        'analytics:tenants',
-        async () => {
-            return _fetchTenantAnalytics();
-        },
-        { ttl: 30 * 1000, forceRefresh }
-    );
+    try {
+        const result = await cachedFetch<TenantAnalytics[]>(
+            'analytics:tenants',
+            async () => {
+                logger.debug('📥 [getTenantAnalytics] Cache miss - calling _fetchTenantAnalytics...', undefined, 'analyticsService');
+                const data = await _fetchTenantAnalytics();
+                logger.info('✅ [getTenantAnalytics] _fetchTenantAnalytics returned:', data.length, 'analyticsService');
+                return data;
+            },
+            { ttl: 30 * 1000, forceRefresh }
+        );
+        logger.info('✅ [getTenantAnalytics] Final result:', result.length, 'analyticsService');
+        return result;
+    } catch (error: any) {
+        logger.error('❌ [getTenantAnalytics] Error:', error, 'analyticsService');
+        return [];
+    }
 };
 
 // Internal function to fetch tenant analytics
 const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
+    logger.info('🚀 [_fetchTenantAnalytics] Starting...', undefined, 'analyticsService');
     try {
+        // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+        const safeDb = await getSafeFirestore();
+        if (!safeDb) {
+            logger.error('❌ [_fetchTenantAnalytics] Firestore not ready!', undefined, 'analyticsService');
+            return [];
+        }
+        
         // ✅ SaaS OPTIMIZATION: Only 2 Firebase queries instead of 2N
-        const tenantsSnapshot = await getDocs(collection(db, 'tenants'));
-        const tenants = tenantsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as Array<{ id: string; info?: any; [key: string]: any }>;
+        logger.debug('📥 [_fetchTenantAnalytics] Fetching tenants from Firestore...', undefined, 'analyticsService');
+        let tenants: Array<{ id: string; info?: any; [key: string]: any }> = [];
+        try {
+            const tenantsSnapshot = await getDocs(collection(safeDb, 'tenants'));
+            logger.info('✅ [_fetchTenantAnalytics] Got', tenantsSnapshot.docs.length, 'tenant documents', 'analyticsService');
+            tenants = tenantsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Array<{ id: string; info?: any; [key: string]: any }>;
+        } catch (fetchError: any) {
+            const isPermissionDenied = fetchError?.code === 'permission-denied' || fetchError?.message?.includes('insufficient permissions');
+            if (isPermissionDenied) {
+                logger.warn('⚠️ [_fetchTenantAnalytics] Tenant list not allowed - using fallback: managers → tenant data', undefined, 'analyticsService');
+            } else {
+                logger.error('❌ [_fetchTenantAnalytics] Error fetching tenants:', fetchError, 'analyticsService');
+            }
+            // ✅ FIX: If permission-denied, try fallback: get managers and build tenant data from them
+            if (isPermissionDenied) {
+                try {
+                    const { getAllManagers } = await import('./ownerService');
+                    const managers = await getAllManagers() as Array<any>;
+                    logger.info('✅ [_fetchTenantAnalytics] Fallback: Got', managers.length, 'managers', 'analyticsService');
+                    // Build tenant-like objects from managers
+                    tenants = managers
+                        .filter(m => m.tenantId && !m.isDeleted && !m.deletedAt)
+                        .map(m => ({
+                            id: m.tenantId,
+                            info: {
+                                name: m.hotelName || m.name,
+                                status: m.status || 'active',
+                                plan: m.plan || 'basic',
+                                licenseExpiry: m.licenseExpiry,
+                                createdAt: m.createdAt,
+                                maxBranches: m.maxBranches || 1,
+                                cachedStats: m.cachedStats || {}
+                            }
+                        }));
+                    logger.info('✅ [_fetchTenantAnalytics] Fallback: Built', tenants.length, 'tenant objects from managers', 'analyticsService');
+                } catch (fallbackError: any) {
+                    logger.error('❌ [_fetchTenantAnalytics] Fallback also failed:', fallbackError, 'analyticsService');
+                    throw fetchError; // Re-throw original error
+                }
+            } else {
+                throw fetchError; // Re-throw non-permission errors
+            }
+        }
         
         // ✅ Get all managers to map codes and cached stats (also cached!)
         const { getAllManagers } = await import('./ownerService');
         const managers = await getAllManagers() as Array<any>; // ✅ Cast to any to allow dynamic properties
         
+        // ✅ DEBUG: Log all managers for troubleshooting
+        logger.debug('🔍 [getTenantAnalytics] Total managers found:', managers.length, 'analyticsService');
+        logger.debug('🔍 [getTenantAnalytics] Managers:', managers.map(m => ({
+            id: m.id,
+            name: m.name,
+            code: m.code,
+            tenantId: m.tenantId,
+            isDemo: m.isDemo,
+            isTest: m.isTest,
+            isDeleted: m.isDeleted
+        })));
+        logger.debug('🔍 [getTenantAnalytics] Total tenant documents:', tenants.length, 'analyticsService');
+        
         // ✅ SANDBOX INTEGRITY: Filter out demo tenants from analytics
+        // ✅ FIX: Only filter if isDemo is explicitly true (not undefined/null)
+        // This ensures old managers (without isDemo flag) are NOT filtered out
         const realTenants = tenants.filter(t => {
             const manager = managers.find(m => m.tenantId === t.id);
-            return !isDemoTenant(t, manager);
+            // ✅ CRITICAL: Only filter if explicitly marked as demo
+            // Old managers without isDemo flag should NOT be filtered
+            const isDemo = isDemoTenant(t, manager);
+            if (isDemo) {
+                logger.debug('🚫 [getTenantAnalytics] Filtered demo tenant:', t.id, {
+                    tenantIsDemo: t?.info?.isDemo,
+                    managerIsDemo: manager?.isDemo
+                });
+            }
+            return !isDemo;
         });
+        logger.debug('🔍 [getTenantAnalytics] Real tenants (after demo filter):', realTenants.length, 'analyticsService');
+        
+        // ✅ FIX: Include ALL managers (even without tenant documents or incorrectly filtered)
+        // This ensures old managers with receipts/invoices are visible
+        const tenantIds = new Set(realTenants.map(t => t.id));
+        const allTenantIds = new Set(tenants.map(t => t.id));
+        const orphanedManagers = managers.filter(m => {
+            if (!m.tenantId) {
+                logger.debug('🚫 [getTenantAnalytics] Skipping manager (no tenantId):', { id: m.id, name: m.name }, 'analyticsService');
+                return false; // Skip managers without tenantId
+            }
+            if (m.isDeleted || m.deletedAt) {
+                logger.debug('🚫 [getTenantAnalytics] Skipping deleted manager:', { id: m.id, name: m.name }, 'analyticsService');
+                return false; // Skip deleted
+            }
+            if (m.isTest === true) {
+                logger.debug('🚫 [getTenantAnalytics] Skipping test manager:', { id: m.id, name: m.name }, 'analyticsService');
+                return false; // Skip test managers
+            }
+            // ✅ CRITICAL: Include manager if:
+            // 1. No tenant document exists (orphaned)
+            // 2. Tenant document exists but was filtered (incorrectly marked as demo)
+            if (tenantIds.has(m.tenantId)) {
+                // Already in realTenants - skip
+                return false;
+            }
+            // ✅ Include if tenant document was filtered incorrectly
+            if (allTenantIds.has(m.tenantId)) {
+                const tenant = tenants.find(t => t.id === m.tenantId);
+                if (tenant) {
+                    // Check if it was filtered because of isDemo
+                    const wasFilteredAsDemo = isDemoTenant(tenant, m);
+                    // ✅ If manager is NOT demo, include it even if tenant was filtered
+                    if (wasFilteredAsDemo && m.isDemo !== true) {
+                        logger.info('✅ [getTenantAnalytics] Including incorrectly filtered manager:', { id: m.id, name: m.name }, 'analyticsService');
+                        return true; // Include - was incorrectly filtered
+                    }
+                }
+            }
+            // ✅ Include orphaned managers (no tenant document)
+            logger.info('✅ [getTenantAnalytics] Including orphaned manager:', { id: m.id, name: m.name, tenantId: m.tenantId }, 'analyticsService');
+            return true;
+        });
+        logger.debug('🔍 [getTenantAnalytics] Orphaned managers found:', orphanedManagers.length, 'analyticsService');
         
         const analytics: TenantAnalytics[] = [];
         
+        // ✅ Process tenants with documents
         for (const tenant of realTenants) {
             const tenantId = tenant.id;
             const info = tenant.info || {};
@@ -508,29 +665,90 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
             // These stats are updated when data changes, not on every read
             const cachedStats = manager?.cachedStats || info?.cachedStats || {};
             
-            // ✅ Calculate totalEmployees: Use cached stats if available, otherwise calculate from database
+            // ✅ Calculate totalEmployees: Use cached stats if available, otherwise count from DB
             let totalEmployees = cachedStats.totalUsers || cachedStats.totalEmployees || 0;
             if (totalEmployees === 0) {
-                // ✅ If no cached stats, calculate from database (only if needed)
                 try {
                     const usersQuery = query(
-                        collection(db, 'users'),
-                        where('tenantId', '==', tenantId),
-                        where('role', '!=', 'manager') // Exclude manager from employee count
+                        collection(safeDb, 'users'),
+                        where('tenantId', '==', tenantId)
                     );
                     const usersSnapshot = await getDocs(usersQuery);
                     totalEmployees = usersSnapshot.docs.filter(doc => {
                         const data = doc.data();
                         return data.role !== 'manager' && data.status !== 'deleted';
                     }).length;
-                } catch (err) {
-                    console.warn('Error calculating totalEmployees for tenant:', tenantId, err);
-                    totalEmployees = 0; // Default to 0 if calculation fails
+                } catch (err: any) {
+                    const msg = err?.message ?? '';
+                    const isIndexError = msg.includes('requires an index') || msg.includes('create it here');
+                    if (isIndexError) {
+                        logger.debug('totalEmployees: index not created for users query, using 0', { tenantId }, 'analyticsService');
+                    } else {
+                        logger.warn('Error calculating totalEmployees for tenant:', { tenantId, error: err }, 'analyticsService');
+                    }
+                    totalEmployees = 0;
                 }
             }
             
             // ✅ Calculate totalBranches: Use cached stats or branchCodes length
             const totalBranches = cachedStats.totalBranches || manager?.branchCodes?.length || info?.branchCodes?.length || manager?.maxBranches || 1;
+            
+            // ✅ REAL DATA: Calculate totalRooms from actual rooms collection
+            let totalRooms = cachedStats.totalRooms || 0;
+            if (totalRooms === 0) {
+                try {
+                    const roomsQuery = query(
+                        collection(safeDb, `tenants/${tenantId}/rooms`)
+                    );
+                    const roomsSnapshot = await getDocs(roomsQuery);
+                    totalRooms = roomsSnapshot.docs.filter(doc => {
+                        const data = doc.data();
+                        return data.status !== 'deleted' && data.status !== 'unavailable';
+                    }).length;
+                } catch (err) {
+                    logger.warn('Error calculating totalRooms for tenant:', { tenantId, error: err }, 'analyticsService');
+                    totalRooms = 0;
+                }
+            }
+            
+            // ✅ REAL DATA: Calculate totalRequests from actual requests collection AND get real lastActivity
+            let totalRequests = cachedStats.totalRequests || 0;
+            let realLastActivity: Date | null = null;
+            
+            // ✅ Always try to get real last activity from most recent request
+            try {
+                const requestsQuery = query(
+                    collection(safeDb, `tenants/${tenantId}/requests`),
+                    orderBy('createdAt', 'desc'),
+                    limit(1)
+                );
+                const requestsSnapshot = await getDocs(requestsQuery);
+                if (!requestsSnapshot.empty) {
+                    const latestRequest = requestsSnapshot.docs[0].data();
+                    if (latestRequest.createdAt) {
+                        realLastActivity = latestRequest.createdAt.toDate ? latestRequest.createdAt.toDate() : new Date(latestRequest.createdAt);
+                    }
+                }
+                
+                // ✅ Count all requests if cached is 0 or we need to verify
+                if (totalRequests === 0) {
+                    const allRequestsQuery = query(
+                        collection(safeDb, `tenants/${tenantId}/requests`)
+                    );
+                    const allRequestsSnapshot = await getDocs(allRequestsQuery);
+                    totalRequests = allRequestsSnapshot.docs.filter(doc => {
+                        const data = doc.data();
+                        return !data.isCancelled && data.status !== 'cancelled';
+                    }).length;
+                }
+            } catch (err) {
+                logger.warn('Error calculating totalRequests/lastActivity for tenant:', { tenantId, error: err }, 'analyticsService');
+                // Keep cached values if query fails
+                totalRequests = cachedStats.totalRequests || 0;
+            }
+            
+            // ✅ REAL DATA: Use real last activity from requests, fallback to cachedStats, then createdAt
+            const lastActivity = realLastActivity || toSafeDate(cachedStats.lastActivity) || toSafeDate(info.createdAt);
             
             // Calculate license expiry
             const licenseExpiry = toSafeDate(info.licenseExpiry, new Date(0));
@@ -544,14 +762,14 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
                 managerName: info.ownerName || info.owner || manager?.name || undefined,
                 managerCode, // ✅ Add manager code
                 branchCodes: info.branchCodes || manager?.branchCodes || [], // ✅ Add branch codes
-                plan: info.plan || 'basic',
+                plan: (info.plan === 'pro' ? 'basic' : info.plan) || 'basic',
                 status: info.status || 'active',
                 totalEmployees,
                 totalBranches,
-                totalRooms: cachedStats.totalRooms || 0,
-                totalRequests: cachedStats.totalRequests || 0,
+                totalRooms,
+                totalRequests,
                 totalRequestsToday: cachedStats.totalRequestsToday || 0,
-                lastActivity: toSafeDate(cachedStats.lastActivity),
+                lastActivity,
                 activeEmployees: cachedStats.activeEmployees || 0,
                 activeSessions: cachedStats.activeSessions || 0,
                 featuresUsed: cachedStats.featuresUsed || {},
@@ -564,11 +782,53 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
             } as TenantAnalytics & { branchCodes?: string[] });
         }
         
+        // ✅ Add orphaned managers (managers without tenant documents)
+        for (const manager of orphanedManagers) {
+            const tenantId = manager.tenantId;
+            const createdAt = manager.createdAt?.toDate?.() || manager.createdAt || new Date();
+            const licenseExpiry = manager.licenseExpiry?.toDate?.() || manager.licenseExpiry || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+            const daysUntilExpiry = Math.ceil((licenseExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            
+            analytics.push({
+                tenantId: tenantId || manager.id,
+                tenantName: manager.hotelName || manager.name || 'غير محدد',
+                managerName: manager.name,
+                managerCode: manager.code,
+                plan: ((manager.plan === 'pro' ? 'basic' : manager.plan) || 'basic') as 'basic' | 'enterprise',
+                status: (manager.status || 'active') as 'active' | 'suspended' | 'expired',
+                totalEmployees: manager.cachedStats?.totalUsers || 0,
+                totalBranches: manager.maxBranches || 1,
+                totalRooms: manager.cachedStats?.totalRooms || 0,
+                totalRequests: manager.cachedStats?.totalRequests || 0,
+                totalRequestsToday: 0,
+                lastActivity: createdAt,
+                activeEmployees: 0,
+                activeSessions: 0,
+                featuresUsed: {},
+                subscriptionStartDate: createdAt,
+                licenseExpiryDate: licenseExpiry,
+                daysUntilExpiry,
+                paymentStatus: (manager.paymentStatus || 'pending') as 'paid' | 'pending' | 'overdue',
+                employeesGrowth: 0,
+                requestsGrowth: 0,
+                isOrphaned: true // ✅ Mark as orphaned for UI handling
+            } as TenantAnalytics & { isOrphaned?: boolean });
+        }
+        
+        logger.debug('🔍 [getTenantAnalytics] Final analytics count:', analytics.length, 'analyticsService');
+        logger.debug('🔍 [getTenantAnalytics] Analytics:', analytics.map(a => ({
+            tenantId: a.tenantId,
+            tenantName: a.tenantName,
+            managerName: a.managerName,
+            managerCode: a.managerCode,
+            isOrphaned: (a as any).isOrphaned
+        })));
+        
         return analytics;
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
         if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-            console.warn('Firestore internal error in _fetchTenantAnalytics (likely cache issue)', error);
+            logger.warn('Firestore internal error in _fetchTenantAnalytics (likely cache issue)', error, 'analyticsService');
             return [];
         }
         
@@ -579,10 +839,11 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
         
         if (isPermissionError) {
             // Return empty array instead of throwing - prevents UI breakage
+            logger.warn('⚠️ [_fetchTenantAnalytics] Permission denied - returning empty array. This may be expected for non-owner users, but if you are owner, check Firestore rules.', undefined, 'analyticsService');
             return [];
         }
         
-        console.error('Error getting tenant analytics:', error);
+        logger.error('Error getting tenant analytics:', error, 'analyticsService');
         throw error;
     }
 };
@@ -592,10 +853,16 @@ const _fetchTenantAnalytics = async (): Promise<TenantAnalytics[]> => {
  * ✅ OPTIMIZED: Uses cached stats instead of live queries
  */
 export const getTenantAnalyticsById = async (tenantId: string): Promise<TenantAnalytics | null> => {
+    // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
+        logger.error('❌ [getTenantAnalyticsById] Firestore not ready!', undefined, 'analyticsService');
+        return null;
+    }
     try {
         // Get tenant info
         const tenantDoc = await getDocs(query(
-            collection(db, 'tenants'),
+            collection(safeDb, 'tenants'),
             where('__name__', '==', tenantId)
         ));
         
@@ -627,7 +894,7 @@ export const getTenantAnalyticsById = async (tenantId: string): Promise<TenantAn
             totalRooms: cachedStats.totalRooms || 0,
             totalRequests: cachedStats.totalRequests || 0,
             totalRequestsToday: cachedStats.totalRequestsToday || 0,
-            lastActivity: toSafeDate(cachedStats.lastActivity),
+            lastActivity: toSafeDate(cachedStats.lastActivity) || toSafeDate(info.createdAt),
             activeEmployees: cachedStats.activeEmployees || 0,
             activeSessions: cachedStats.activeSessions || 0,
             featuresUsed: cachedStats.featuresUsed || {},
@@ -639,7 +906,7 @@ export const getTenantAnalyticsById = async (tenantId: string): Promise<TenantAn
             requestsGrowth: cachedStats.requestsGrowth || 0
         };
     } catch (error) {
-        console.error('Error getting tenant analytics:', error);
+        logger.error('Error getting tenant analytics:', error, 'analyticsService');
         throw error;
     }
 };
@@ -659,7 +926,9 @@ export const getUsageReport = async (
     featuresUsed: string[];
 }>> => {
     try {
-        if (!db) {
+        // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+        const safeDb = await getSafeFirestore();
+        if (!safeDb) {
             logger.error('Firebase not initialized - cannot get usage report', undefined, 'analyticsService');
             return [];
         }
@@ -669,17 +938,17 @@ export const getUsageReport = async (
 
         let requestsQuery;
         if (tenantId) {
-            // ✅ Tenant-specific usage report
+            // ✅ Tenant-scoped: data under tenants/{tenantId}/requests
+            const requestsRef = collection(safeDb, `tenants/${tenantId}/requests`);
             requestsQuery = query(
-                collection(db, 'requests'),
-                where('tenantId', '==', tenantId),
+                requestsRef,
                 where('createdAt', '>=', startTimestamp),
                 where('createdAt', '<=', endTimestamp)
             );
         } else {
-            // ✅ System-wide usage report (Owner only)
+            // ✅ System-wide (Owner only): root requests deprecated when data is tenant-scoped; may return 0
             requestsQuery = query(
-                collection(db, 'requests'),
+                collection(safeDb, 'requests'),
                 where('createdAt', '>=', startTimestamp),
                 where('createdAt', '<=', endTimestamp)
             );

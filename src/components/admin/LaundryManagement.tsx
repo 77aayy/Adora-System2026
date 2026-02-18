@@ -30,6 +30,7 @@ import {
     generateCSVReport
 } from '../../services/laundryInventoryService';
 import { useSmartAgent } from '../../hooks/useSmartAgent';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -133,7 +134,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             setShowSettleModal(false);
             setSettleItem(null);
         } catch (err) {
-            console.error(err);
+            logger.error('Error settling item:', err, 'LaundryManagement');
             error(t('laundry.settleFailed'));
         }
         setSaving(false);
@@ -146,7 +147,9 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
         setLoading(true);
 
         // Initialize items if needed
-        initializeLaundryItems(tenantId, branchId, user?.id || '', user?.name || '').catch(console.error);
+        initializeLaundryItems(tenantId, branchId, user?.id || '', user?.name || '').catch((err) => {
+            logger.error('Error initializing laundry items:', err, 'LaundryManagement');
+        });
 
         // Subscribe to items
         const unsubItems = subscribeToLaundryItems(tenantId, branchId, (data) => {
@@ -179,7 +182,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             const report = await getMonthlyAccountingReport(tenantId, branchId, reportYear, reportMonth);
             setAccountingReport(report);
         } catch (err) {
-            console.error('Error loading report:', err);
+            logger.error('Error loading report:', err, 'LaundryManagement');
         }
         setLoading(false);
     };
@@ -212,7 +215,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             haptic('success');
             success(t('laundry.addSuccess'));
         } catch (err) {
-            console.error('Error adding item:', err);
+            logger.error('Error adding item:', err, 'LaundryManagement');
             error(t('laundry.addError'));
         }
         setSaving(false);
@@ -231,7 +234,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             success(t('laundry.updateSuccess'));
             setEditingItem(null);
         } catch (err) {
-            console.error('Error updating item:', err);
+            logger.error('Error updating item:', err, 'LaundryManagement');
             error(t('laundry.updateError'));
         }
         setSaving(false);
@@ -249,7 +252,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             haptic('success');
             success(showInCards ? t('laundry.toggleShowSuccess') : t('laundry.toggleHideSuccess'));
         } catch (err) {
-            console.error('Error toggling card visibility:', err);
+            logger.error('Error toggling card visibility:', err, 'LaundryManagement');
             error(t('laundry.toggleError'));
         }
         setSaving(false);
@@ -265,7 +268,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             haptic('medium');
             success(t('laundry.deleteSuccess'));
         } catch (err) {
-            console.error('Error deleting item:', err);
+            logger.error('Error deleting item:', err, 'LaundryManagement');
             error(t('laundry.deleteError'));
         }
     };
@@ -279,7 +282,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
             haptic('success');
             success(t('laundry.saveSettingsSuccess'));
         } catch (err) {
-            console.error('Error saving settings:', err);
+            logger.error('Error saving settings:', err, 'LaundryManagement');
             error(t('laundry.saveSettingsError'));
         }
         setSaving(false);
@@ -383,7 +386,7 @@ export const LaundryManagement: React.FC<LaundryManagementProps> = ({
                 error(t('laundry.reportLossSuccess', { quantity: qty, itemName: item.name })); // Red toast for loss
             }
         } catch (err) {
-            console.error('Voice Action Error:', err);
+            logger.error('Voice Action Error:', err, 'LaundryManagement');
             error(t('laundry.voiceActionError'));
         }
     };

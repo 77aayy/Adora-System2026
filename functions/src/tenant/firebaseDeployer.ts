@@ -111,13 +111,27 @@ export const deployTenantFirebase = functions
             );
         }
         
-        // ✅ Security: Verify caller is owner/super-admin
+        // ✅ Security: Verify caller is owner/super-admin (same as createManager / setSystemSettings)
         const callerUid = context.auth.uid;
         const mainDb = admin.firestore();
-        const userDoc = await mainDb.collection('users').doc(callerUid).get();
-        const userData = userDoc.data();
-        
-        if (!userData || (userData.role !== 'owner' && userData.role !== 'super-admin')) {
+        let isOwner = false;
+
+        const userBindingsDoc = await mainDb.collection('userBindings').doc(callerUid).get();
+        if (userBindingsDoc.exists) {
+            const bindingData = userBindingsDoc.data()!;
+            isOwner = bindingData.role === 'owner' || bindingData.role === 'super-admin';
+        }
+        if (!isOwner) {
+            try {
+                const userRecord = await admin.auth().getUser(callerUid);
+                isOwner = userRecord.customClaims?.role === 'owner' ||
+                    userRecord.customClaims?.role === 'super-admin' ||
+                    userRecord.customClaims?.super_admin === true;
+            } catch (_) {
+                // ignore
+            }
+        }
+        if (!isOwner) {
             throw new functions.https.HttpsError(
                 'permission-denied',
                 'ليس لديك صلاحية لتنفيذ هذه العملية'
@@ -483,14 +497,38 @@ export const testTenantConnection = functions
         memory: '128MB',
     })
     .https.onCall(async (data: { serviceAccountJson: string }, context): Promise<{ success: boolean; message: string; projectId?: string }> => {
-        // ✅ Security: Verify caller is authenticated
         if (!context.auth) {
             throw new functions.https.HttpsError(
                 'unauthenticated',
                 'يجب تسجيل الدخول لتنفيذ هذه العملية'
             );
         }
-        
+
+        // ✅ Same owner check as deployTenantFirebase (userBindings + custom claims)
+        const mainDb = admin.firestore();
+        let isOwner = false;
+        const userBindingsDoc = await mainDb.collection('userBindings').doc(context.auth.uid).get();
+        if (userBindingsDoc.exists) {
+            const bindingData = userBindingsDoc.data()!;
+            isOwner = bindingData.role === 'owner' || bindingData.role === 'super-admin';
+        }
+        if (!isOwner) {
+            try {
+                const userRecord = await admin.auth().getUser(context.auth.uid);
+                isOwner = userRecord.customClaims?.role === 'owner' ||
+                    userRecord.customClaims?.role === 'super-admin' ||
+                    userRecord.customClaims?.super_admin === true;
+            } catch (_) {
+                // ignore
+            }
+        }
+        if (!isOwner) {
+            throw new functions.https.HttpsError(
+                'permission-denied',
+                'ليس لديك صلاحية لتنفيذ هذه العملية'
+            );
+        }
+
         const { serviceAccountJson } = data;
         
         if (!serviceAccountJson) {

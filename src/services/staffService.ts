@@ -153,7 +153,7 @@ export const getStaff = async (
 
     // 🛡️ ADORA PROTECTION: Block query without TenantId
     if (!tenantId || tenantId.trim() === '') {
-        console.warn('⚠️ ADORA: Attempted to get staff without TenantId. Blocked.');
+        logger.warn('⚠️ ADORA: Attempted to get staff without TenantId. Blocked.', undefined, 'staffService');
         logger.error('TenantId is required for getStaff', undefined, 'staffService');
         return [];
     }
@@ -217,7 +217,7 @@ export const getStaffByRole = async (
 
     // 🛡️ ADORA PROTECTION: Block query without TenantId
     if (!tenantId || tenantId.trim() === '') {
-        console.warn('⚠️ ADORA: Attempted to get staff by role without TenantId. Blocked.');
+        logger.warn('⚠️ ADORA: Attempted to get staff by role without TenantId. Blocked.', undefined, 'staffService');
         return [];
     }
 
@@ -238,8 +238,7 @@ export const getStaffByRole = async (
         const snapshot = await getDocs(q);
         return snapshot.docs.map(mapDocToStaff);
     } catch (error) {
-        console.error('Error getting staff by role:', error);
-        logger.error('Error in getStaffByRole', error, 'staffService');
+        logger.error('Error getting staff by role:', error, 'staffService');
         return [];
     }
 };
@@ -279,7 +278,7 @@ export const subscribeToStaff = (
 ): Unsubscribe => {
     // 🛡️ ADORA PROTECTION: Block subscription without TenantId
     if (!tenantId || tenantId.trim() === '') {
-        console.warn('⚠️ ADORA: Attempted to subscribe to staff without TenantId. Blocked.');
+        logger.warn('⚠️ ADORA: Attempted to subscribe to staff without TenantId. Blocked.', undefined, 'staffService');
         logger.error('TenantId is required for subscribeToStaff', undefined, 'staffService');
         callback([]);
         return () => { }; // Return empty unsubscribe function
@@ -310,18 +309,15 @@ export const subscribeToStaff = (
                 const staff = snapshot.docs.map(mapDocToStaff);
                 callback(staff);
             } catch (error) {
-                console.error('Error processing staff snapshot:', error);
-                logger.error('Error in subscribeToStaff callback', error, 'staffService');
+                logger.error('Error processing staff snapshot:', error, 'staffService');
                 callback([]);
             }
         }, (error) => {
-            console.error('Error subscribing to staff:', error);
-            logger.error('Error subscribing to staff', error, 'staffService');
+            logger.error('Error subscribing to staff:', error, 'staffService');
             callback([]);
         });
     } catch (error) {
-        console.error('Error in subscribeToStaff:', error);
-        logger.error('Error in subscribeToStaff', error, 'staffService');
+        logger.error('Error in subscribeToStaff:', error, 'staffService');
         callback([]);
         return () => { };
     }
@@ -512,8 +508,7 @@ export const assignRequest = async (
             throw error; // Re-throw with custom Arabic message
         }
         
-        console.error('Error assigning request:', error);
-        logger.error('Error in assignRequest', error, 'staffService');
+        logger.error('Error assigning request:', error, 'staffService');
         throw new Error('فشل تعيين المهمة. يرجى المحاولة مرة أخرى.');
     }
 };
@@ -555,7 +550,7 @@ export const getStaffWorkload = async (
 
     // 🛡️ ADORA PROTECTION: Block query without TenantId
     if (!tenantId || tenantId.trim() === '') {
-        console.warn('⚠️ ADORA: Attempted to get staff workload without TenantId. Blocked.');
+        logger.warn('⚠️ ADORA: Attempted to get staff workload without TenantId. Blocked.', undefined, 'staffService');
         return 0;
     }
 
@@ -675,8 +670,7 @@ export const getStaffWorkloadMetrics = async (
             performanceScore
         };
     } catch (error) {
-        console.error('Error getting staff workload metrics:', error);
-        logger.error('Error in getStaffWorkloadMetrics', error, 'staffService');
+        logger.error('Error getting staff workload metrics:', error, 'staffService');
         return {
             staffId,
             staffName: '',

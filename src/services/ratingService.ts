@@ -2,10 +2,14 @@
  * Dynamic Rating System Service
  * Allows managers to customize rating forms and trigger rating invitations
  * Adora Hotel Management System V2
+ *
+ * SaaS/tenant: Uses root collections rating_templates, rating_invitations, rating_responses.
+ * For multi-tenant isolation, consider tenant-scoped paths and passing tenantId.
  */
 
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -118,7 +122,7 @@ export const getRatingTemplates = async (branchId: string, tenantId: string): Pr
 
         return templates.sort((a, b) => (a.order || 0) - (b.order || 0));
     } catch (error) {
-        console.error('Error getting rating templates:', error);
+        logger.error('Error getting rating templates:', error, 'ratingService');
         return [];
     }
 };
@@ -151,7 +155,7 @@ export const subscribeToRatingTemplates = (
             callback(templates.sort((a, b) => (a.order || 0) - (b.order || 0)));
         },
         (error) => {
-            console.error('Error subscribing to rating templates:', error);
+            logger.error('Error subscribing to rating templates:', error, 'ratingService');
             callback([]);
         }
     );
@@ -178,7 +182,7 @@ export const createRatingTemplate = async (
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating rating template:', error);
+        logger.error('Error creating rating template:', error, 'ratingService');
         throw error;
     }
 };
@@ -200,7 +204,7 @@ export const updateRatingTemplate = async (
             updatedBy: { id: userId, name: userName }
         });
     } catch (error) {
-        console.error('Error updating rating template:', error);
+        logger.error('Error updating rating template:', error, 'ratingService');
         throw error;
     }
 };
@@ -212,7 +216,7 @@ export const deleteRatingTemplate = async (templateId: string): Promise<void> =>
     try {
         await deleteDoc(doc(db, 'rating_templates', templateId));
     } catch (error) {
-        console.error('Error deleting rating template:', error);
+        logger.error('Error deleting rating template:', error, 'ratingService');
         throw error;
     }
 };
@@ -242,7 +246,7 @@ export const createRatingInvitation = async (
                 t.triggerEvent === triggerEvent && t.isActive
             );
             if (!matchingTemplate) {
-                console.log('No active rating template found for event:', triggerEvent);
+                logger.info('No active rating template found for event:', triggerEvent, 'ratingService');
                 return null; // No template configured
             }
             activeTemplateId = matchingTemplate.id;
@@ -258,7 +262,7 @@ export const createRatingInvitation = async (
         );
         const existingSnapshot = await getDocs(existingQuery);
         if (!existingSnapshot.empty) {
-            console.log('Rating invitation already exists for room:', roomNumber);
+            logger.info('Rating invitation already exists for room:', roomNumber, 'ratingService');
             return existingSnapshot.docs[0].id;
         }
 
@@ -279,7 +283,7 @@ export const createRatingInvitation = async (
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating rating invitation:', error);
+        logger.error('Error creating rating invitation:', error, 'ratingService');
         return null;
     }
 };
@@ -315,7 +319,7 @@ export const subscribeToRatingInvitations = (
                             data.template = { id: templateDoc.id, ...templateDoc.data() } as RatingTemplate;
                         }
                     } catch (error) {
-                        console.error('Error loading template:', error);
+                        logger.error('Error loading template:', error, 'ratingService');
                     }
                 }
                 invitations.push({
@@ -326,7 +330,7 @@ export const subscribeToRatingInvitations = (
             callback(invitations);
         },
         (error) => {
-            console.error('Error subscribing to rating invitations:', error);
+            logger.error('Error subscribing to rating invitations:', error, 'ratingService');
             callback([]);
         }
     );
@@ -342,7 +346,7 @@ export const markInvitationAsShown = async (invitationId: string): Promise<void>
             shownAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error marking invitation as shown:', error);
+        logger.error('Error marking invitation as shown:', error, 'ratingService');
     }
 };
 
@@ -388,7 +392,7 @@ export const submitRatingResponse = async (
 
         return responseRef.id;
     } catch (error) {
-        console.error('Error submitting rating response:', error);
+        logger.error('Error submitting rating response:', error, 'ratingService');
         throw error;
     }
 };
@@ -402,7 +406,7 @@ export const dismissRatingInvitation = async (invitationId: string): Promise<voi
             status: 'dismissed'
         });
     } catch (error) {
-        console.error('Error dismissing invitation:', error);
+        logger.error('Error dismissing invitation:', error, 'ratingService');
     }
 };
 

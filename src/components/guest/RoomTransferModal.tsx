@@ -83,10 +83,9 @@ export const RoomTransferModal: React.FC<RoomTransferModalProps> = ({
             setLoading(true);
             try {
                 // Get rooms that are available (not occupied)
-                const roomsRef = collection(db, 'rooms');
+                const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
                 const q = query(
                     roomsRef,
-                    where('tenantId', '==', tenantId),
                     where('branchId', '==', branchId),
                     where('status', 'in', ['available', 'ready', 'clean'])
                 );
@@ -117,12 +116,13 @@ export const RoomTransferModal: React.FC<RoomTransferModalProps> = ({
         if (!isOpen) return;
 
         const fetchAffectedRequests = async () => {
+            if (!tenantId) return;
             try {
-                const requestsRef = collection(db, 'requests');
+                // ✅ FIX: Use tenant-scoped collection
+                const requestsRef = collection(db, `tenants/${tenantId}/requests`);
                 const q = query(
                     requestsRef,
                     where('roomNumber', '==', currentRoom),
-                    where('tenantId', '==', tenantId),
                     where('status', 'in', ['pending', 'in_progress', 'PENDING_RECEPTION', 'confirmed'])
                 );
 

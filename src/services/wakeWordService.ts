@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // 🎯 Flexible Wake Word Patterns (Arabic + English)
 const WAKE_WORDS = [
     'أدورا',      // Adora (Arabic)
@@ -69,13 +71,13 @@ export const isWakeWordSupported = (): boolean => {
  */
 export const startWakeWordListening = (options: WakeWordServiceOptions): boolean => {
     if (!isWakeWordSupported()) {
-        console.warn('🎤 Wake word not supported in this browser');
+        logger.warn('🎤 Wake word not supported in this browser', undefined, 'wakeWordService');
         options.onError?.('Wake word not supported');
         return false;
     }
 
     if (isListening) {
-        console.log('🎤 Wake word already listening');
+        logger.info('🎤 Wake word already listening', undefined, 'wakeWordService');
         return true;
     }
 
@@ -89,7 +91,7 @@ export const startWakeWordListening = (options: WakeWordServiceOptions): boolean
     recognition.maxAlternatives = 3; // Get multiple interpretations
 
     recognition.onstart = () => {
-        console.log('👂 Wake word listening started...');
+        logger.info('👂 Wake word listening started...', undefined, 'wakeWordService');
         isListening = true;
     };
 
@@ -101,10 +103,10 @@ export const startWakeWordListening = (options: WakeWordServiceOptions): boolean
             // Check main result and alternatives
             for (let j = 0; j < result.length; j++) {
                 const transcript = result[j].transcript;
-                console.log(`🎤 Heard: "${transcript}" (confidence: ${result[j].confidence?.toFixed(2)})`);
+                logger.info(`🎤 Heard: "${transcript}" (confidence: ${result[j].confidence?.toFixed(2)})`, undefined, 'wakeWordService');
 
                 if (containsWakeWord(transcript)) {
-                    console.log('✨ WAKE WORD DETECTED!');
+                    logger.info('✨ WAKE WORD DETECTED!', undefined, 'wakeWordService');
 
                     // Extract any command after wake word
                     const followUpCommand = extractCommandAfterWakeWord(transcript);
@@ -121,11 +123,11 @@ export const startWakeWordListening = (options: WakeWordServiceOptions): boolean
     };
 
     recognition.onerror = (event: any) => {
-        console.warn('👂 Wake word error:', event.error);
+        logger.warn('👂 Wake word error:', event.error, 'wakeWordService');
 
         // 🛑 FATAL ERRORS: Stop the loop immediately
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            console.error('🚫 Microphone access denied. Stopping wake word detection.');
+            logger.error('🚫 Microphone access denied. Stopping wake word detection.', undefined, 'wakeWordService');
             stopWakeWordListening(); // Kill the service completely
             options.onError?.(event.error);
             return;
@@ -135,14 +137,14 @@ export const startWakeWordListening = (options: WakeWordServiceOptions): boolean
             // Normal, just restart
             scheduleRestart(options);
         } else {
-            console.warn('⚠️ Non-fatal wake word error:', event.error);
+            logger.warn('⚠️ Non-fatal wake word error:', event.error, 'wakeWordService');
             scheduleRestart(options, 2000); // Back off to 2 seconds for unknown errors
             options.onError?.(event.error);
         }
     };
 
     recognition.onend = () => {
-        console.log('🎤 Wake word recognition ended');
+        logger.info('🎤 Wake word recognition ended', undefined, 'wakeWordService');
         isListening = false;
 
         // 🔄 AUTO-RESTART: Only if not explicitly killed
@@ -155,7 +157,7 @@ export const startWakeWordListening = (options: WakeWordServiceOptions): boolean
         recognition.start();
         return true;
     } catch (error) {
-        console.error('🎤 Failed to start wake word:', error);
+        logger.error('🎤 Failed to start wake word:', error, 'wakeWordService');
         return false;
     }
 };
@@ -177,7 +179,7 @@ const scheduleRestart = (options: WakeWordServiceOptions, delay: number = 100) =
             try {
                 recognition.start();
             } catch (e) {
-                console.warn('🎤 Restart failed, will try again in 5s');
+                logger.warn('🎤 Restart failed, will try again in 5s', undefined, 'wakeWordService');
                 scheduleRestart(options, 5000); // Exponential-ish backoff
             }
         }
@@ -192,7 +194,7 @@ export const pauseWakeWordListening = () => {
         try {
             recognition.stop();
             isListening = false;
-            console.log('🎤 Wake word paused');
+            logger.info('🎤 Wake word paused', undefined, 'wakeWordService');
         } catch (e) {
             // Already stopped
         }
@@ -232,7 +234,7 @@ export const stopWakeWordListening = () => {
     }
 
     isListening = false;
-    console.log('🎤 Wake word stopped');
+    logger.info('🎤 Wake word stopped', undefined, 'wakeWordService');
 };
 
 /**

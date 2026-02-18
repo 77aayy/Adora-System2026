@@ -12,6 +12,7 @@
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { initializeApp, getApp, deleteApp } from 'firebase/app';
 import { getImgbbApiKey } from './systemConfigsService';
+import { logger } from './loggerService';
 
 // ============================================================
 // CONFIGURATION
@@ -165,13 +166,13 @@ export const compressImage = async (
             const compressedSize = getBase64SizeKB(compressedData);
             const formatLabel = outputFormat === 'image/webp' ? 'WebP' : 'JPEG';
             
-            console.log(`📷 Compressed [${formatLabel}]: ${originalSize}KB → ${compressedSize.toFixed(1)}KB (${Math.round((1 - compressedSize / originalSize) * 100)}% saved) @ Q${Math.round(currentQuality * 100)}`);
+            logger.info(`📷 Compressed [${formatLabel}]: ${originalSize}KB → ${compressedSize.toFixed(1)}KB (${Math.round((1 - compressedSize / originalSize) * 100)}% saved) @ Q${Math.round(currentQuality * 100)}`, undefined, 'imageUploadService');
 
             resolve(compressedData);
         };
 
         img.onerror = () => {
-            console.warn('⚠️ Image compression failed, using original');
+            logger.warn('⚠️ Image compression failed, using original', undefined, 'imageUploadService');
             resolve(base64Data);
         };
         img.src = base64Data;
@@ -428,11 +429,11 @@ export const uploadToFirebaseStorage = async (
             }, tenantAppName);
             
             storage = getStorage(tenantApp);
-            console.log(`📦 Uploading to tenant storage: ${tenantConfig.storageBucket}`);
+            logger.info(`📦 Uploading to tenant storage: ${tenantConfig.storageBucket}`, undefined, 'imageUploadService');
         } else {
             // Use main app's storage
             storage = getStorage(getApp());
-            console.log('📦 Uploading to main storage');
+            logger.info('📦 Uploading to main storage', undefined, 'imageUploadService');
         }
 
         // Convert base64 to Blob
@@ -475,7 +476,7 @@ export const uploadToFirebaseStorage = async (
             try {
                 await deleteApp(tenantApp);
             } catch (e) {
-                console.warn('Could not cleanup tenant app:', e);
+                logger.warn('Could not cleanup tenant app:', e, 'imageUploadService');
             }
         }
 
@@ -485,7 +486,7 @@ export const uploadToFirebaseStorage = async (
             message: 'تم رفع الصورة بنجاح!'
         });
 
-        console.log(`✅ Image uploaded: ${Math.round(blob.size / 1024)}KB → ${finalPath}`);
+        logger.info(`✅ Image uploaded: ${Math.round(blob.size / 1024)}KB → ${finalPath}`, undefined, 'imageUploadService');
 
         return {
             success: true,
@@ -494,7 +495,7 @@ export const uploadToFirebaseStorage = async (
         };
 
     } catch (error: any) {
-        console.error('❌ Firebase Storage upload error:', error);
+        logger.error('❌ Firebase Storage upload error:', error, 'imageUploadService');
         
         onProgress?.({
             stage: 'error',
@@ -609,7 +610,7 @@ export const capturePhoto = async (
 
         return canvas.toDataURL('image/jpeg', 0.8);
     } catch (error) {
-        console.error('Camera capture error:', error);
+        logger.error('Camera capture error:', error, 'imageUploadService');
         return null;
     }
 };

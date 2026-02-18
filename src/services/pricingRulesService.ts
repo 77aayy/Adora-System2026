@@ -18,6 +18,7 @@ import {
     onSnapshot
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -63,7 +64,7 @@ export const getEffectiveBasePrice = async (
     ));
 
     if (!typeDoc.exists()) {
-        console.warn("Room Type not found, returning fallback 0");
+        logger.warn("Room Type not found, returning fallback 0", undefined, 'pricingRulesService');
         return { price: 0, source: 'BASE' };
     }
 

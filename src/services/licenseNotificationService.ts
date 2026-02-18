@@ -194,7 +194,7 @@ export async function getLastNotification(
                                   error?.message?.includes('Missing or insufficient');
         
         if (isPermissionError) {
-            logger.warn('Permission denied for license notifications (expected for non-owners)', undefined, 'licenseNotificationService');
+            logger.debug('Permission denied for license notifications (expected for non-owners)', undefined, 'licenseNotificationService');
         } else {
             logger.error('Failed to get last notification', error, 'licenseNotificationService');
         }
@@ -214,7 +214,7 @@ export async function checkAllManagersLicenseExpiry(): Promise<LicenseNotificati
 
     // Guard: Skip if Firebase not initialized
     if (!db) {
-        logger.info('[LicenseNotificationScheduler] Skipped - Firebase not initialized', null, 'licenseNotificationService');
+        logger.debug('[LicenseNotificationScheduler] Skipped - Firebase not initialized', null, 'licenseNotificationService');
         return [];
     }
 

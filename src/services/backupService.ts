@@ -2,6 +2,9 @@
  * Backup Service
  * Automatic backup system for tenants
  * Adora Hotel Management System V3
+ *
+ * SaaS/tenant: Backups are tenant-scoped (TenantBackup.tenantId). Paths used for backup
+ * data should align with tenant-scoped collections when migrating to full SaaS isolation.
  */
 
 import { collection, query, where, getDocs, Timestamp, addDoc, getDoc, doc } from 'firebase/firestore';
@@ -138,18 +141,14 @@ export async function createTenantBackup(
             logger.warn('Failed to backup users', error, 'backupService');
         }
 
-        // 5. Rooms (if rooms collection exists)
+        // 5. Rooms — tenant-scoped path
         try {
-            const roomsSnapshot = await getDocs(
-                query(
-                    collection(db, 'rooms'),
-                    where('tenantId', '==', tenantId)
-                )
-            );
+            const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+            const roomsSnapshot = await getDocs(roomsRef);
             if (!roomsSnapshot.empty) {
-                backupData.rooms = roomsSnapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
+                backupData.rooms = roomsSnapshot.docs.map((d) => ({
+                    id: d.id,
+                    ...d.data(),
                 }));
             }
         } catch (error) {
@@ -225,7 +224,7 @@ export async function createTenantBackup(
                                       error?.message?.includes('Missing or insufficient');
             
             if (isPermissionError) {
-                logger.warn('Permission denied for creating backup (expected for non-owners)', undefined, 'backupService');
+                logger.debug('Permission denied for creating backup (expected for non-owners)', undefined, 'backupService');
                 // Don't throw for permission errors - just return a failure indicator
                 if (backupId) {
                     try {
@@ -297,7 +296,7 @@ export async function getTenantBackups(tenantId: string): Promise<TenantBackup[]
                                       error?.message?.includes('Missing or insufficient');
             
             if (isPermissionError) {
-                logger.warn('Permission denied for tenant backups (expected for non-owners)', undefined, 'backupService');
+                logger.debug('Permission denied for tenant backups (expected for non-owners)', undefined, 'backupService');
             } else {
                 logger.error('Failed to get tenant backups', error, 'backupService');
             }
@@ -356,7 +355,7 @@ export async function createDailyBackupsForAllTenants(): Promise<{ success: numb
 
     // Guard: Skip if Firebase not initialized
     if (!db) {
-        logger.info('[BackupScheduler] Skipped - Firebase not initialized', null, 'backupService');
+        logger.debug('[BackupScheduler] Skipped - Firebase not initialized', null, 'backupService');
         return { success: 0, failed: 0 };
     }
 
@@ -384,7 +383,7 @@ export async function createDailyBackupsForAllTenants(): Promise<{ success: numb
         });
 
         // Log how many tenants found
-        logger.info(`[BackupScheduler] Found ${activeTenants.length} active tenants for backup`, null, 'backupService');
+        logger.debug(`[BackupScheduler] Found ${activeTenants.length} active tenants for backup`, null, 'backupService');
 
         for (const tenantDoc of activeTenants) {
             const tenantId = tenantDoc.id;
@@ -405,9 +404,9 @@ export async function createDailyBackupsForAllTenants(): Promise<{ success: numb
                 if (!todayBackup) {
                     await createTenantBackup(tenantId, 'daily');
                     success++;
-                    logger.info(`[BackupScheduler] Created backup for tenant ${tenantId}`, null, 'backupService');
+                    logger.debug(`[BackupScheduler] Created backup for tenant ${tenantId}`, null, 'backupService');
                 } else {
-                    logger.info(`[BackupScheduler] Skipped tenant ${tenantId} - backup already exists today`, null, 'backupService');
+                    logger.debug(`[BackupScheduler] Skipped tenant ${tenantId} - backup already exists today`, null, 'backupService');
                 }
             } catch (error: any) {
                 // ✅ Handle Firestore internal errors gracefully
@@ -428,7 +427,7 @@ export async function createDailyBackupsForAllTenants(): Promise<{ success: numb
         }
     }
 
-    logger.info(`[BackupScheduler] Completed: ${success} succeeded, ${failed} failed`, null, 'backupService');
+    logger.debug(`[BackupScheduler] Completed: ${success} succeeded, ${failed} failed`, null, 'backupService');
     return { success, failed };
 }
 

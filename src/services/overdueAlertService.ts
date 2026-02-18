@@ -11,8 +11,9 @@ import {
     onSnapshot,
     Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { getSafeFirestore } from './firebase';
 import { playSound, hapticFeedback } from './soundService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -71,20 +72,25 @@ export function startOverdueMonitoring(
 
     // 🔐 SECURITY: Check tenantId before proceeding
     if (!tenantId || !branchId) {
-        console.warn('⚠️ [OverdueAlert] startOverdueMonitoring called without tenantId or branchId');
+        logger.warn('⚠️ [OverdueAlert] startOverdueMonitoring called without tenantId or branchId', undefined, 'overdueAlertService');
         return;
     }
 
-    // Listen to pending requests
-    const requestsRef = collection(db, 'requests');
-    const q = query(
-        requestsRef,
-        where('branch', '==', branchId),
-        where('tenantId', '==', tenantId), // 🔐 CRITICAL: Tenant isolation
-        where('status', 'in', ['PENDING', 'CONFIRMED', 'IN_PROGRESS'])
-    );
+    // ✅ FIX: Use tenant-scoped collection for SaaS isolation
+    if (!tenantId) {
+        throw new Error('tenantId is required for SaaS isolation');
+    }
 
-    unsubscribe = onSnapshot(q, (snapshot) => {
+    getSafeFirestore().then((safeDb) => {
+        if (!safeDb) return;
+        const requestsRef = collection(safeDb, 'tenants', tenantId, 'requests');
+        const q = query(
+            requestsRef,
+            where('branch', '==', branchId),
+            where('status', 'in', ['PENDING', 'CONFIRMED', 'IN_PROGRESS'])
+        );
+
+        unsubscribe = onSnapshot(q, (snapshot) => {
         pendingRequests = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
@@ -95,10 +101,11 @@ export function startOverdueMonitoring(
         checkOverdueRequests();
     });
 
-    // Start periodic checks
-    checkInterval = setInterval(checkOverdueRequests, currentConfig.checkIntervalMs);
+        // Start periodic checks
+        checkInterval = setInterval(checkOverdueRequests, currentConfig.checkIntervalMs);
 
-    console.log('⏰ Overdue monitoring started');
+        logger.info('⏰ Overdue monitoring started', undefined, 'overdueAlertService');
+    });
 }
 
 /**

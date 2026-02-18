@@ -4,6 +4,8 @@
  * Supports: Fingerprint, Face ID, Windows Hello, etc.
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -188,7 +190,7 @@ export const registerBiometric = async (
             counter: attemptNumber,
         };
     } catch (error: any) {
-        console.error('Biometric registration error:', error);
+        logger.error('Biometric registration error:', error, 'biometricService');
         throw new Error(error.message || 'فشل تسجيل البصمة. يرجى المحاولة مرة أخرى.');
     }
 };
@@ -248,7 +250,7 @@ export const authenticateWithBiometric = async (
 
         return true;
     } catch (error: any) {
-        console.error('Biometric authentication error:', error);
+        logger.error('Biometric authentication error:', error, 'biometricService');
         throw new Error(error.message || 'فشل التحقق من البصمة');
     }
 };

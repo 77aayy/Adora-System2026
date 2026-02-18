@@ -5,6 +5,7 @@
 
 import { collection, query, where, getDocs, addDoc, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // 16. BACKUP & RESTORE
@@ -30,7 +31,7 @@ export const createBackup = async (collections: string[]): Promise<string> => {
     });
 
     // Would export data to Cloud Storage
-    console.log(`Creating backup: ${backupId} for collections: ${collections.join(', ')}`);
+    logger.info(`Creating backup: ${backupId} for collections: ${collections.join(', ')}`, undefined, 'systemService');
 
     return backupId;
 };
@@ -45,7 +46,7 @@ export const getBackups = async (): Promise<BackupMetadata[]> => {
 };
 
 export const restoreFromBackup = async (backupId: string, collections?: string[]): Promise<boolean> => {
-    console.log(`Restoring from backup: ${backupId}`);
+    logger.info(`Restoring from backup: ${backupId}`, undefined, 'systemService');
     // Would restore data from Cloud Storage
     return true;
 };
@@ -128,7 +129,7 @@ export const logError = async (error: Error, userId?: string, context?: Record<s
         resolved: false
     });
 
-    console.error(`Error logged: ${error.message}`);
+    logger.error(`Error logged: ${error.message}`, error, 'systemService');
     return docRef.id;
 };
 
@@ -222,7 +223,7 @@ export const getBranchSettings = async (branchId: string): Promise<Record<string
 
 export const updateBranchSettings = async (branchId: string, settings: Record<string, any>): Promise<void> => {
     // Would update branch settings
-    console.log(`Updating settings for branch ${branchId}`);
+    logger.info(`Updating settings for branch ${branchId}`, undefined, 'systemService');
 };
 
 export const getBranchComparison = async (branchIds: string[], metric: string): Promise<Record<string, number>> => {
@@ -234,6 +235,6 @@ export const getBranchComparison = async (branchIds: string[], metric: string): 
 };
 
 export const syncBranches = async (): Promise<void> => {
-    console.log('Syncing data across all branches');
+    logger.info('Syncing data across all branches', undefined, 'systemService');
     // Would sync configurations, templates, etc.
 };

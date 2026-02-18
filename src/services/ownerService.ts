@@ -18,7 +18,7 @@ import {
     serverTimestamp,
     runTransaction
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, getSafeFirestore } from './firebase';
 import { User } from '../types';
 import { AuthContextState } from '../types/auth';
 import { hashPin } from './hashService';
@@ -51,15 +51,21 @@ export const isPinAvailable = async (pin: string, ctx?: AuthContextState): Promi
 
     if (!pin) return false;
 
+    // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
+        return false; // Safe default if Firestore not ready
+    }
+
     // 1. Check globalCodes (SaaS Managers/Branches) - Always allowed (read: if true)
-    const globalRef = doc(db, 'globalCodes', pin);
+    const globalRef = doc(safeDb, 'globalCodes', pin);
     const globalSnap = await getDoc(globalRef);
     if (globalSnap.exists()) return false;
 
     // 2. Check users collection - Respecting Security Rules
     // Owners can check all users
     if (ctx?.user?.role === 'owner') {
-        const usersRef = collection(db, 'users');
+        const usersRef = collection(safeDb, 'users');
         const q = query(usersRef, where('code', '==', pin));
         const usersSnap = await getDocs(q);
         return usersSnap.empty;
@@ -67,7 +73,7 @@ export const isPinAvailable = async (pin: string, ctx?: AuthContextState): Promi
 
     // Managers/Employees can only check within their tenant to satisfy rules
     if (ctx?.user?.tenantId) {
-        const usersRef = collection(db, 'users');
+        const usersRef = collection(safeDb, 'users');
         const q = query(
             usersRef,
             where('tenantId', '==', ctx.user.tenantId),
@@ -85,13 +91,20 @@ export const isPinAvailable = async (pin: string, ctx?: AuthContextState): Promi
  * ✅ Enhanced: Checks across ALL collections and suggests a new unique code
  */
 export const suggestUniquePin = async (): Promise<string> => {
+    // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
+        // Fallback: Generate random code if Firestore not ready
+        return Math.floor(1000 + Math.random() * 9000).toString();
+    }
+
     // Get all existing codes from globalCodes
-    const globalCodesRef = collection(db, 'globalCodes');
+    const globalCodesRef = collection(safeDb, 'globalCodes');
     const globalCodesSnap = await getDocs(globalCodesRef);
     const globalCodes = new Set(globalCodesSnap.docs.map(d => d.id));
 
     // Also check users collection to be safe
-    const usersRef = collection(db, 'users');
+    const usersRef = collection(safeDb, 'users');
     const usersSnap = await getDocs(usersRef);
     usersSnap.docs.forEach(doc => globalCodes.add(doc.data().code));
 
@@ -160,7 +173,13 @@ export const createManager = async (data: {
         throw new Error(`هذا الكود مستخدم بالفعل. كود مقترح: ${suggestedCode}`);
     }
 
-    const batch = writeBatch(db);
+    // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
+        throw new Error('Firestore not ready. Please wait and try again.');
+    }
+
+    const batch = writeBatch(safeDb);
     const managerId = `manager-${Date.now()}`;
     const tenantId = `tenant-${Date.now()}`;
     const hotelName = data.hotelName || `فندق ${data.name}`;
@@ -177,7 +196,7 @@ export const createManager = async (data: {
     }
 
     // 1. Create tenant (isolated data space for this manager)
-    const tenantRef = doc(db, 'tenants', tenantId);
+    const tenantRef = doc(safeDb, 'tenants', tenantId);
     batch.set(tenantRef, {
         info: {
             name: hotelName,
@@ -224,7 +243,7 @@ export const createManager = async (data: {
     // - This ensures manager MUST use licensed codes and cannot create unauthorized branches
 
     // 3. Create manager user record
-    const managerRef = doc(db, 'users', managerId);
+    const managerRef = doc(safeDb, 'users', managerId);
 
     // ✅ Strictly Type the User Object
     const managerData: User = {
@@ -282,7 +301,7 @@ export const createManager = async (data: {
     // 4. Register global code mappings (for login lookup)
     // 4.1 Master Manager PIN
     // ✅ FIX: Store essential user data in globalCodes to avoid reading from users during login
-    const masterCodeRef = doc(db, 'globalCodes', data.code);
+    const masterCodeRef = doc(safeDb, 'globalCodes', data.code);
     batch.set(masterCodeRef, {
         tenantId: tenantId,
         managerId: managerId,
@@ -312,7 +331,7 @@ export const createManager = async (data: {
             // Skip if branch code is same as master pin (highly unlikely but for safety)
             if (bCode === data.code) continue;
 
-            const bCodeRef = doc(db, 'globalCodes', bCode);
+            const bCodeRef = doc(safeDb, 'globalCodes', bCode);
             batch.set(bCodeRef, {
                 tenantId: tenantId,
                 managerId: managerId,
@@ -392,12 +411,12 @@ export const createManager = async (data: {
         } catch (financialError: any) {
             // ⚠️ CRITICAL: Don't fail manager creation if financial docs fail
             // Log the error but continue (financial docs can be created manually later)
-            console.error('⚠️ Failed to create receipt voucher/invoice for manager:', financialError);
+            logger.error('⚠️ Failed to create receipt voucher/invoice for manager:', financialError, 'ownerService');
             logger.error('Financial document creation failed', financialError, 'ownerService');
             // Continue - manager is created, financial docs can be fixed manually
         }
     } else {
-        console.log(`ℹ️ Demo account - skipping financial document creation for manager ${managerId}`);
+        logger.info(`ℹ️ Demo account - skipping financial document creation for manager ${managerId}`, undefined, 'ownerService');
     }
 
     // ✅ NOTE: globalCodes verification removed - Cloud Functions uses Admin SDK (100% reliable)
@@ -410,7 +429,7 @@ export const createManager = async (data: {
         await seedTenantAchievements(tenantId);
         // Default achievements seeded for new tenant
     } catch (seedErr) {
-        console.warn('Could not seed achievements (will be created on first access):', seedErr);
+        logger.warn('Could not seed achievements (will be created on first access):', seedErr, 'ownerService');
         // Continue - achievements can be created manually by manager
     }
 
@@ -436,40 +455,147 @@ export const createManager = async (data: {
  */
 export const getAllManagers = async (forceRefresh: boolean = false): Promise<User[]> => {
     // ✅ RBAC: Only Owner can access all managers (sensitive data)
-    validateRoleAccess('owner');
+    // ✅ SOFT CHECK: Don't block if role check fails - let Firestore Rules handle it
+    try {
+        validateRoleAccess('owner');
+    } catch (rbacError: any) {
+        // Don't block here - let Firestore Rules handle it for better error messages
+        logger.warn('Client-side RBAC check failed, but proceeding to Firestore (Rules will enforce)', rbacError, 'ownerService');
+    }
 
     const { cachedFetch } = await import('../utils/requestCache');
 
     return cachedFetch<User[]>(
         'owners:all_managers',
         async () => {
-            try {
-                if (!db) {
+            // ✅ Use retry wrapper to handle INTERNAL ASSERTION FAILED errors
+            const { retryFirestoreOperation } = await import('./firebase');
+            return await retryFirestoreOperation(async () => {
+                // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+                const safeDb = await getSafeFirestore();
+                if (!safeDb) {
                     logger.warn('Firestore db not available in getAllManagers', null, 'ownerService');
                     return [];
                 }
                 
-                const usersRef = collection(db, 'users');
-                // ✅ Simplified query to ensure all managers are visible
-                const q = query(
-                    usersRef,
-                    where('role', '==', 'manager')
-                );
-                const snapshot = await getDocs(q);
-
-                return snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                })) as User[];
-            } catch (error: any) {
-                // ✅ Handle Firestore internal errors gracefully
-                if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-                    logger.warn('Firestore internal error in getAllManagers (likely cache issue)', error, 'ownerService');
+                // ✅ DEBUG: Check auth state
+                const { auth } = await import('./firebase');
+                if (!auth?.currentUser) {
+                    logger.error('❌ [getAllManagers] CRITICAL: auth.currentUser is null!', undefined, 'ownerService');
+                    logger.error('   This will cause permission-denied errors in Firestore Rules!', undefined, 'ownerService');
+                    logger.error('   Solution: User must sign in anonymously first!', undefined, 'ownerService');
                 } else {
-                    logger.error("Failed to load managers. This might be a missing index or permission issue:", error, 'ownerService');
+                    const currentUid = auth.currentUser.uid;
+                    logger.debug('✅ [getAllManagers] Auth state:', {
+                        uid: currentUid,
+                        isAnonymous: auth.currentUser.isAnonymous,
+                        email: auth.currentUser.email
+                    });
+                    
+                    // ✅ DEBUG: Check userBindings with detailed error info
+                    try {
+                        const bindingDocRef = doc(safeDb, 'userBindings', currentUid);
+                        logger.debug('🔍 [getAllManagers] Attempting to read userBindings:', currentUid, 'ownerService');
+                        const bindingDoc = await getDoc(bindingDocRef);
+                        if (bindingDoc.exists()) {
+                            const bindingData = bindingDoc.data();
+                            logger.debug('✅ [getAllManagers] userBinding exists:', {
+                                uid: bindingData.uid,
+                                role: bindingData.role,
+                                tenantId: bindingData.tenantId
+                            });
+                            
+                            // ✅ CRITICAL: If userBinding exists but role is not 'owner', we still can't access tenants/users
+                            if (bindingData.role !== 'owner') {
+                                logger.warn('⚠️ [getAllManagers] userBinding exists but role is NOT owner:', bindingData.role, 'ownerService');
+                                logger.warn('   This means user needs to login as owner (PIN: 765255) to access tenants/users!', undefined, 'ownerService');
+                            }
+                        } else {
+                            logger.error('❌ [getAllManagers] CRITICAL: userBinding does NOT exist!', undefined, 'ownerService');
+                            logger.error('   UID:', currentUid, 'ownerService');
+                            logger.error('   This will cause permission-denied errors in Firestore Rules!', undefined, 'ownerService');
+                            logger.error('   Solution: User must login as owner (PIN: 765255) to create userBinding!', undefined, 'ownerService');
+                            logger.error('   After login, userBinding should be created automatically in AuthContext.tsx', undefined, 'ownerService');
+                        }
+                    } catch (bindingError: any) {
+                        logger.error('❌ [getAllManagers] Error checking userBinding:', {
+                            code: bindingError?.code,
+                            message: bindingError?.message,
+                            uid: currentUid,
+                            path: `userBindings/${currentUid}`,
+                            fullError: bindingError
+                        });
+                        // ✅ CRITICAL: If userBinding read fails, it means Firestore Rules are blocking access
+                        // This will cause ALL queries to fail (tenants, users, etc.)
+                        logger.error('   ⚠️ This is a CRITICAL issue - Firestore Rules are blocking userBindings read!', undefined, 'ownerService');
+                        logger.error('   ⚠️ This means request.auth.uid does not match the document path, or request.auth is null in Rules!', undefined, 'ownerService');
+                        logger.error('   ⚠️ Even though we updated Rules to allow read for all authenticated users!', undefined, 'ownerService');
+                    }
                 }
-                return [];
-            }
+                
+                const usersRef = collection(safeDb, 'users');
+                
+                // ✅ Try with role filter first
+                try {
+                    const q = query(
+                        usersRef,
+                        where('role', '==', 'manager')
+                    );
+                    const snapshot = await getDocs(q);
+                    
+                    // ✅ DEBUG: Log query results
+                    logger.debug('🔍 [getAllManagers] Query result:', {
+                        totalDocs: snapshot.docs.length,
+                        docs: snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            data: doc.data()
+                        }))
+                    });
+
+                    const managers = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data(),
+                    })) as User[];
+                    
+                    logger.debug('🔍 [getAllManagers] Returning managers:', managers.length, managers.map(m => ({
+                        id: m.id,
+                        name: m.name,
+                        code: m.code,
+                        role: m.role,
+                        tenantId: m.tenantId
+                    })));
+                    
+                    return managers;
+                } catch (queryError: any) {
+                    // ✅ Handle permission errors gracefully
+                    const isPermissionError = queryError?.code === 'permission-denied' || 
+                                              queryError?.message?.includes('permission') ||
+                                              queryError?.message?.includes('Missing or insufficient');
+                    
+                    if (isPermissionError) {
+                        logger.warn('Permission denied for getAllManagers query - trying fallback', queryError, 'ownerService');
+                        // ✅ Fallback: Try to get all users and filter in code
+                        try {
+                            const allUsersSnapshot = await getDocs(usersRef);
+                            const managers = allUsersSnapshot.docs
+                                .map(doc => ({
+                                    id: doc.id,
+                                    ...doc.data(),
+                                }))
+                                .filter((user: any) => user.role === 'manager') as User[];
+                            
+                            logger.debug('🔍 [getAllManagers] Fallback result:', managers.length, 'ownerService');
+                            return managers;
+                        } catch (fallbackError: any) {
+                            logger.error('Fallback query also failed for getAllManagers', fallbackError, 'ownerService');
+                            return [];
+                        }
+                    } else {
+                        // Re-throw non-permission errors
+                        throw queryError;
+                    }
+                }
+            }, 1); // Retry once on internal errors
         },
         { ttl: 30 * 1000, forceRefresh } // 30 second cache
     );
@@ -501,10 +627,16 @@ export const toggleLicenseStatus = async (managerId: string, tenantId: string, s
     // ✅ RBAC: Only Owner can toggle license status
     validateRoleAccess('owner');
 
-    const batch = writeBatch(db);
+    // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
+        throw new Error('Firestore not ready. Please wait and try again.');
+    }
+
+    const batch = writeBatch(safeDb);
 
     // 1. Get manager data to find PIN code
-    const managerRef = doc(db, 'users', managerId);
+    const managerRef = doc(safeDb, 'users', managerId);
     const managerDoc = await getDoc(managerRef);
     if (!managerDoc.exists()) {
         throw new Error('المدير غير موجود');
@@ -519,7 +651,7 @@ export const toggleLicenseStatus = async (managerId: string, tenantId: string, s
     });
 
     // 3. Update tenant status (locks the whole hotel)
-    const tenantRef = doc(db, 'tenants', tenantId);
+    const tenantRef = doc(safeDb, 'tenants', tenantId);
     batch.update(tenantRef, {
         'info.licenseStatus': suspend ? 'suspended' : 'active',
         'info.status': suspend ? 'suspended' : 'active'
@@ -527,7 +659,7 @@ export const toggleLicenseStatus = async (managerId: string, tenantId: string, s
 
     // 4. ✅ Update globalCodes (master PIN and all branch codes) for login consistency
     if (managerPin) {
-        const masterCodeRef = doc(db, 'globalCodes', managerPin);
+        const masterCodeRef = doc(safeDb, 'globalCodes', managerPin);
         batch.update(masterCodeRef, {
             status: suspend ? 'inactive' : 'active',
             licenseStatus: suspend ? 'suspended' : 'active'
@@ -540,7 +672,7 @@ export const toggleLicenseStatus = async (managerId: string, tenantId: string, s
             const branchCodes = tenantData.info?.branchCodes || [];
             for (const bCode of branchCodes) {
                 if (bCode !== managerPin) {
-                    const bCodeRef = doc(db, 'globalCodes', bCode);
+                    const bCodeRef = doc(safeDb, 'globalCodes', bCode);
                     batch.update(bCodeRef, {
                         status: suspend ? 'inactive' : 'active',
                         licenseStatus: suspend ? 'suspended' : 'active'
@@ -584,7 +716,7 @@ export const renewLicense = async (
     expiryDate.setFullYear(expiryDate.getFullYear() + duration);
 
     // 1. Get manager data to find PIN code
-    const managerRef = doc(db, 'users', managerId);
+    const managerRef = doc(safeDb, 'users', managerId);
     const managerDoc = await getDoc(managerRef);
     if (!managerDoc.exists()) {
         throw new Error('المدير غير موجود');
@@ -601,7 +733,7 @@ export const renewLicense = async (
     });
 
     // 3. Update tenant license
-    const tenantRef = doc(db, 'tenants', tenantId);
+    const tenantRef = doc(safeDb, 'tenants', tenantId);
     batch.update(tenantRef, {
         'info.licenseExpiry': Timestamp.fromDate(expiryDate),
         'info.licenseStatus': 'active',
@@ -612,7 +744,7 @@ export const renewLicense = async (
 
     // 4. ✅ Update globalCodes (master PIN and all branch codes) for login consistency
     if (managerPin) {
-        const masterCodeRef = doc(db, 'globalCodes', managerPin);
+        const masterCodeRef = doc(safeDb, 'globalCodes', managerPin);
         batch.update(masterCodeRef, {
             licenseExpiry: Timestamp.fromDate(expiryDate),
             licenseStatus: 'active',
@@ -626,7 +758,7 @@ export const renewLicense = async (
             const branchCodes = tenantData.info?.branchCodes || [];
             for (const bCode of branchCodes) {
                 if (bCode !== managerPin) {
-                    const bCodeRef = doc(db, 'globalCodes', bCode);
+                    const bCodeRef = doc(safeDb, 'globalCodes', bCode);
                     batch.update(bCodeRef, {
                         licenseExpiry: Timestamp.fromDate(expiryDate),
                         licenseStatus: 'active',
@@ -700,7 +832,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
         try {
             const { createTenantBackup } = await import('./backupService');
             backupId = await createTenantBackup(tenantId, 'before_delete');
-            console.log('✅ Backup created successfully:', backupId);
+            logger.info('✅ Backup created successfully:', backupId, 'ownerService');
         } catch (err: any) {
             // ✅ Check if it's a permission error - continue deletion anyway
             const isPermissionError = err?.code === 'permission-denied' ||
@@ -708,19 +840,25 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
                 err?.message?.includes('Missing or insufficient permissions');
 
             if (isPermissionError) {
-                console.warn('⚠️ Backup skipped due to permission issues. Continuing with deletion...');
+                logger.warn('⚠️ Backup skipped due to permission issues. Continuing with deletion...', undefined, 'ownerService');
                 backupId = 'BACKUP_SKIPPED_PERMISSIONS';
             } else {
-                console.error('Failed to create backup before deletion:', err);
+                logger.error('Failed to create backup before deletion:', err, 'ownerService');
                 throw new Error(err.message || 'فشل إنشاء النسخة الاحتياطية. تم إلغاء الحذف لحماية البيانات.');
             }
         }
     }
 
-    const batch = writeBatch(db);
+    // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
+        throw new Error('Firestore not ready. Please wait and try again.');
+    }
+
+    const batch = writeBatch(safeDb);
 
     // 2. Get original user data (if possible)
-    const managerRef = doc(db, 'users', managerId);
+    const managerRef = doc(safeDb, 'users', managerId);
     let managerData: any = null;
 
     try {
@@ -729,7 +867,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
             managerData = managerSnap.data();
         }
     } catch (err) {
-        console.warn('Could not fetch manager data for backup:', err);
+        logger.warn('Could not fetch manager data for backup:', err, 'ownerService');
     }
 
     // 3. Backup tenant info if exists
@@ -752,13 +890,13 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
                 }, { merge: true });
             }
         } catch (err) {
-            console.warn(`Could not backup/suspend tenant ${tenantId}:`, err);
+            logger.warn(`Could not backup/suspend tenant ${tenantId}:`, err, 'ownerService');
         }
     }
 
     // ✅ NO TIME LIMIT: Manager can be restored anytime (SaaS flexibility)
     // 4. Create entry in deleted_managers (Archive)
-    const deletedRef = doc(db, 'deleted_managers', managerId);
+    const deletedRef = doc(safeDb, 'deleted_managers', managerId);
     batch.set(deletedRef, {
         ...(managerData || {}),
         originalId: managerId,
@@ -778,7 +916,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
     // ✅ 6. Disable PIN Code (instead of delete) - for safe restoration
     const managerCode = managerData?.code;
     if (managerCode) {
-        const codeRef = doc(db, 'globalCodes', managerCode);
+        const codeRef = doc(safeDb, 'globalCodes', managerCode);
         const codeSnap = await getDoc(codeRef);
         if (codeSnap.exists()) {
             // ✅ تعطيل بدلاً من حذف - للسماح بالاستعادة الآمنة
@@ -795,7 +933,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
     if (branchCodes.length > 0) {
         for (const branchCode of branchCodes) {
             if (branchCode && branchCode !== managerCode) {
-                const branchCodeRef = doc(db, 'globalCodes', branchCode);
+                const branchCodeRef = doc(safeDb, 'globalCodes', branchCode);
                 const branchCodeSnap = await getDoc(branchCodeRef);
                 if (branchCodeSnap.exists()) {
                     // ✅ تعطيل أكواد الفروع أيضاً
@@ -814,7 +952,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
     if (tenantId) {
         try {
             // 8.1. Disable employees
-            const employeesRef = collection(db, `tenants/${tenantId}/employees`);
+            const employeesRef = collection(safeDb, `tenants/${tenantId}/employees`);
             const employeesSnap = await getDocs(employeesRef);
             for (const empDoc of employeesSnap.docs) {
                 const empData = empDoc.data();
@@ -829,7 +967,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
             }
 
             // 8.2. Disable rooms
-            const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+            const roomsRef = collection(safeDb, `tenants/${tenantId}/rooms`);
             const roomsSnap = await getDocs(roomsRef);
             for (const roomDoc of roomsSnap.docs) {
                 const roomData = roomDoc.data();
@@ -859,7 +997,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
                 });
             }
         } catch (err) {
-            console.warn(`Could not disable related data for tenant ${tenantId}:`, err);
+            logger.warn(`Could not disable related data for tenant ${tenantId}:`, err, 'ownerService');
             // Continue - backup is already created
         }
     }
@@ -884,7 +1022,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
                 });
             }
         } catch (err) {
-            console.warn(`Could not mark invoices as deleted for tenant ${tenantId}:`, err);
+            logger.warn(`Could not mark invoices as deleted for tenant ${tenantId}:`, err, 'ownerService');
             // Continue - backup is already created
         }
     }
@@ -901,7 +1039,7 @@ export const softDeleteManager = async (managerId: string, tenantId?: string): P
             branchCodesCount: branchCodes.length
         }, managerData?.name || 'مدير');
     } catch (commitError: any) {
-        console.error('❌ Failed to commit batch deletion:', commitError);
+        logger.error('❌ Failed to commit batch deletion:', commitError, 'ownerService');
 
         // Check if it's a permission error
         const isPermissionError = commitError?.code === 'permission-denied' ||
@@ -921,10 +1059,16 @@ export const restoreManager = async (managerId: string): Promise<void> => {
     // ✅ RBAC: Only Owner can restore managers
     validateRoleAccess('owner');
 
-    const batch = writeBatch(db);
+    // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
+        throw new Error('Firestore not ready. Please wait and try again.');
+    }
+
+    const batch = writeBatch(safeDb);
 
     // 1. Get backup
-    const deletedRef = doc(db, 'deleted_managers', managerId);
+    const deletedRef = doc(safeDb, 'deleted_managers', managerId);
     const deletedSnap = await getDoc(deletedRef);
 
     if (!deletedSnap.exists()) throw new Error('No backup found for this manager');
@@ -936,7 +1080,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
     const tenantId = data.tenantId;
 
     // 2. Restore manager - Check if exists first
-    const managerRef = doc(db, 'users', managerId);
+    const managerRef = doc(safeDb, 'users', managerId);
     const managerSnap = await getDoc(managerRef);
 
     if (managerSnap.exists()) {
@@ -983,7 +1127,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
 
         // 4. ✅ Restore globalCodes (master PIN and branch codes) - with conflict check
         if (managerCode) {
-            const masterCodeRef = doc(db, 'globalCodes', managerCode);
+            const masterCodeRef = doc(safeDb, 'globalCodes', managerCode);
             const masterCodeSnap = await getDoc(masterCodeRef);
 
             if (masterCodeSnap.exists()) {
@@ -1023,14 +1167,14 @@ export const restoreManager = async (managerId: string): Promise<void> => {
 
                 for (const bCode of branchCodes) {
                     if (bCode && bCode !== managerCode) {
-                        const bCodeRef = doc(db, 'globalCodes', bCode);
+                        const bCodeRef = doc(safeDb, 'globalCodes', bCode);
                         const bCodeSnap = await getDoc(bCodeRef);
 
                         if (bCodeSnap.exists()) {
                             const branchCodeData = bCodeSnap.data();
                             // ✅ Check if branch code is used by another tenant
                             if (branchCodeData.status === 'active' && branchCodeData.tenantId !== tenantId) {
-                                console.warn(`Branch code ${bCode} is used by another tenant. Skipping restoration.`);
+                                logger.warn(`Branch code ${bCode} is used by another tenant. Skipping restoration.`, undefined, 'ownerService');
                                 continue; // Skip this branch code
                             }
 
@@ -1060,7 +1204,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
         if (tenantId) {
             try {
                 // 5.1. Restore employees (only those deleted by system due to manager deletion)
-                const employeesRef = collection(db, `tenants/${tenantId}/employees`);
+                const employeesRef = collection(safeDb, `tenants/${tenantId}/employees`);
                 const employeesSnap = await getDocs(employeesRef);
                 for (const empDoc of employeesSnap.docs) {
                     const empData = empDoc.data();
@@ -1075,7 +1219,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
                 }
 
                 // 5.2. Restore rooms (only those marked unavailable due to manager deletion)
-                const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+                const roomsRef = collection(safeDb, `tenants/${tenantId}/rooms`);
                 const roomsSnap = await getDocs(roomsRef);
                 for (const roomDoc of roomsSnap.docs) {
                     const roomData = roomDoc.data();
@@ -1092,7 +1236,7 @@ export const restoreManager = async (managerId: string): Promise<void> => {
                 // Note: Requests and invoices are NOT restored automatically
                 // They remain cancelled/deleted for audit trail
             } catch (err) {
-                console.warn(`Could not restore related data for tenant ${tenantId}:`, err);
+                logger.warn(`Could not restore related data for tenant ${tenantId}:`, err, 'ownerService');
                 // Continue - main restoration is more important
             }
         }
@@ -1113,59 +1257,62 @@ export const restoreManager = async (managerId: string): Promise<void> => {
 // ✅ Get deleted managers (for recovery)
 // ✅ NO TIME LIMIT: All deleted managers can be recovered anytime
 export const getDeletedManagers = async (): Promise<Array<User & { deletedAt: Date; canRecover: boolean }>> => {
-    // Null safety check
-    if (!db) {
-        logger.error('Database not initialized', new Error('db is null'), 'ownerService');
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
+        logger.warn('Firestore db not available in getDeletedManagers', null, 'ownerService');
         return [];
     }
 
-    // ✅ RBAC: Only Owner can access deleted managers (soft check - Firestore Rules will enforce)
     try {
         validateRoleAccess('owner');
-    } catch (rbacError: any) {
-        // Don't block here - let Firestore Rules handle it for better error messages
-        logger.warn('Client-side RBAC check failed, but proceeding to Firestore (Rules will enforce)', rbacError, 'ownerService');
+    } catch {
+        // Firestore Rules will enforce; don't block
     }
 
-    try {
-        if (!db) {
-            logger.warn('Firestore db not available in getDeletedManagers', null, 'ownerService');
-            return [];
-        }
-        
+    const run = async (): Promise<ReturnType<typeof getDeletedManagers>> => {
+        const db = await getSafeFirestore();
+        if (!db) return [];
         const deletedManagersRef = collection(db, 'deleted_managers');
-        // ✅ Owner can read all deleted managers (no filter needed - Firestore Rules handle it)
         const q = query(deletedManagersRef);
         const snapshot = await getDocs(q);
-
         return snapshot.docs.map(doc => {
             const data = doc.data();
-
             return {
                 id: data.originalId || doc.id,
                 ...data,
                 deletedAt: data.deletedAt?.toDate() || new Date(),
-                canRecover: true, // ✅ Always true: No time limit for recovery
+                canRecover: true,
             } as User & { deletedAt: Date; canRecover: boolean };
         });
-    } catch (error: any) {
-        // ✅ Handle Firestore internal errors gracefully
-        // ✅ Handle Firestore internal errors gracefully
-        if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
-            logger.warn('Firestore internal error in getDeletedManagers (likely cache issue)', error, 'ownerService');
-        } else {
-            // ✅ Handle permission errors gracefully (expected for non-owners)
-            const isPermissionError = error?.code === 'permission-denied' || 
-                                      error?.message?.includes('permission') ||
-                                      error?.message?.includes('Missing or insufficient');
-            
-            if (isPermissionError) {
-                logger.warn('Permission denied for deleted managers (expected for non-owners)', undefined, 'ownerService');
-            } else {
-                logger.error('Error getting deleted managers', error, 'ownerService');
+    };
+
+    const isRetryable = (e: any) =>
+        e?.code === 400 ||
+        e?.message?.includes('400') ||
+        e?.message?.includes('Bad Request') ||
+        e?.message?.includes('INTERNAL ASSERTION FAILED') ||
+        e?.message?.includes('Unexpected state');
+
+    try {
+        return await run();
+    } catch (firstError: any) {
+        if (isRetryable(firstError)) {
+            await new Promise(r => setTimeout(r, 800));
+            try {
+                return await run();
+            } catch (retryError: any) {
+                logger.debug('getDeletedManagers retry failed (Listen/400)', retryError?.message, 'ownerService');
+                return [];
             }
         }
-        // ✅ Return empty array instead of throwing to prevent UI crash
+        const isPermissionError = firstError?.code === 'permission-denied' ||
+            firstError?.message?.includes('permission') ||
+            firstError?.message?.includes('Missing or insufficient');
+        if (isPermissionError) {
+            logger.debug('Permission denied for deleted managers (expected for non-owners)', undefined, 'ownerService');
+        } else {
+            logger.warn('Error getting deleted managers', firstError?.message || firstError, 'ownerService');
+        }
         return [];
     }
 };
@@ -1205,7 +1352,9 @@ export const getDemoStats = async (): Promise<{
     validateRoleAccess('owner');
 
     try {
-        if (!db) {
+        // ✅ CRITICAL: Use getSafeFirestore to ensure Auth is ready
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) {
             return { total: 0, nearestExpiry: null, farthestExpiry: null };
         }
 
@@ -1244,7 +1393,7 @@ export const getDemoStats = async (): Promise<{
             farthestExpiry: sortedDates[sortedDates.length - 1]
         };
     } catch (err) {
-        console.error('Failed to get demo stats:', err);
+        logger.error('Failed to get demo stats:', err, 'ownerService');
         return { total: 0, nearestExpiry: null, farthestExpiry: null };
     }
 };

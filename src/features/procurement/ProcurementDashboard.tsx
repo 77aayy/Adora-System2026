@@ -47,6 +47,7 @@ import {
     updateDoc,
     doc
 } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
 import {
     ProcurementRequest,
     ProcurementStatus,
@@ -220,7 +221,7 @@ export const ProcurementDashboard: React.FC = () => {
     useEffect(() => {
         const fastUITimeout = setTimeout(() => {
             if (loading) {
-                console.log('⚡ Fast UI: Showing Procurement page now');
+                logger.info('⚡ Fast UI: Showing Procurement page now', undefined, 'ProcurementDashboard');
                 setLoading(false);
             }
         }, 2000);
@@ -322,7 +323,7 @@ export const ProcurementDashboard: React.FC = () => {
                     setShowLocationWarning(true);
                 }
             } catch (err) {
-                console.error('Location check error:', err);
+                logger.error('Location check error:', err, 'ProcurementDashboard');
                 // Fail open - allow access
             }
         };
@@ -340,7 +341,7 @@ export const ProcurementDashboard: React.FC = () => {
 
         // ✅ FIX: Use tenant-scoped collection (tenants/${tenantId}/procurementRequests)
         if (!tenantId) {
-            console.warn('⚠️ [ProcurementDashboard] Cannot subscribe to requests: tenantId is missing');
+            logger.warn('⚠️ [ProcurementDashboard] Cannot subscribe to requests: tenantId is missing', undefined, 'ProcurementDashboard');
             setLoading(false);
             return;
         }
@@ -384,10 +385,10 @@ export const ProcurementDashboard: React.FC = () => {
                     setLoading(false);
                 },
                 (error: any) => {
-                    console.error('Query error:', error);
+                    logger.error('Query error:', error, 'ProcurementDashboard');
                     // If index error, try without orderBy (only once)
                     if (useOrderBy && error.code === 'failed-precondition' && !fallbackAttempted) {
-                        console.warn('Index not ready, using fallback query without orderBy');
+                        logger.warn('Index not ready, using fallback query without orderBy', undefined, 'ProcurementDashboard');
                         fallbackAttempted = true;
                         // Unsubscribe from current query before trying fallback
                         if (unsubscribe) {
@@ -455,7 +456,7 @@ export const ProcurementDashboard: React.FC = () => {
             await approveProcurement(id, user?.id || '', user?.name || '', tenantId);
             success(t('procurement.approvedSuccess') || 'تم التعميد بنجاح');
         } catch (err) {
-            console.error('Error approving:', err);
+            logger.error('Error approving:', err, 'ProcurementDashboard');
             error(t('procurement.approvalFailed') || 'فشل التعميد');
         }
     };
@@ -465,7 +466,7 @@ export const ProcurementDashboard: React.FC = () => {
             await rejectProcurement(id, user?.id || '', user?.name || '', 'مرفوض من المدير', tenantId);
             haptic('medium');
         } catch (error) {
-            console.error('Error rejecting:', error);
+            logger.error('Error rejecting:', error, 'ProcurementDashboard');
             haptic('error');
         }
     };
@@ -480,14 +481,14 @@ export const ProcurementDashboard: React.FC = () => {
                 try {
                     const { checkDailyAttendance } = await import('../../services/challengeService');
                     checkDailyAttendance(tenantId, user.id).catch(err => {
-                        console.warn('Failed to check daily attendance:', err);
+                        logger.warn('Failed to check daily attendance:', err, 'ProcurementDashboard');
                     });
                 } catch (err) {
-                    console.warn('Could not load challengeService:', err);
+                    logger.warn('Could not load challengeService:', err, 'ProcurementDashboard');
                 }
             }
         } catch (error) {
-            console.error('Error starting purchase:', error);
+            logger.error('Error starting purchase:', error, 'ProcurementDashboard');
             haptic('error');
         }
     };
@@ -507,8 +508,13 @@ export const ProcurementDashboard: React.FC = () => {
         if (!selectedRequest) return;
         
         try {
+            if (!tenantId) {
+                error('tenantId مطلوب للمتابعة');
+                return;
+            }
+
             // 1. تسجيل الشراء مع الكميات المحددة
-            const newRequestId = await completePurchase(selectedRequest.id, items, totalCost, notes);
+            const newRequestId = await completePurchase(selectedRequest.id, items, totalCost, tenantId, notes);
 
             // 2. تسليم للقسم الطالب (DELIVERED)
             await deliverItems(selectedRequest.id, user?.id || '', user?.name || '', tenantId);
@@ -530,16 +536,16 @@ export const ProcurementDashboard: React.FC = () => {
                 try {
                     const { checkDailyAttendance } = await import('../../services/challengeService');
                     checkDailyAttendance(tenantId, user.id).catch(err => {
-                        console.warn('Failed to check daily attendance:', err);
+                        logger.warn('Failed to check daily attendance:', err, 'ProcurementDashboard');
                     });
                 } catch (err) {
-                    console.warn('Could not load challengeService:', err);
+                    logger.warn('Could not load challengeService:', err, 'ProcurementDashboard');
                 }
             }
 
             haptic('success');
         } catch (err) {
-            console.error('Error completing purchase:', err);
+            logger.error('Error completing purchase:', err, 'ProcurementDashboard');
             error('فشل إكمال الشراء');
             haptic('error');
         }

@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Cloud, CloudOff, Check, AlertTriangle, WifiOff } from 'lucide-react';
 import { AdoraLoaderInline } from './AdoraLoader';
 import { useTranslation } from 'react-i18next';
+import { formatTimeGregorianEn } from '../../utils/dateUtils';
 import {
     isOnline,
     getQueuedActions,
@@ -174,7 +175,7 @@ export const OfflineQueuePanel: React.FC<OfflineQueuePanelProps> = ({ isOpen, on
                                             {action.type}
                                         </span>
                                         <span className="text-xs text-white/70"> {/* ✅ Improved contrast (was 40%) */}
-                                            {new Date(action.timestamp).toLocaleTimeString('ar-SA')}
+                                            {formatTimeGregorianEn(new Date(action.timestamp), { showSeconds: false })}
                                         </span>
                                     </div>
                                     <p className="text-xs text-white/80 truncate"> {/* ✅ Improved contrast (was 50%) */}

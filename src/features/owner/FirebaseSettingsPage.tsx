@@ -28,6 +28,7 @@ import {
     hasTenantConfig,
     getFullConfig
 } from '../../services/firebase';
+import { logger } from '../../services/loggerService';
 import { seedTenantDatabase, checkMissingCollections } from '../../services/tenantSeedingService';
 import { getDatabaseHealthReport, DatabaseHealthReport } from '../../services/dataDoctorService';
 import { useAuth } from '../../context/AuthContext';
@@ -153,11 +154,6 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
     
-    // 📱 Demo links
-    match /demoLinks/{linkId} {
-      allow read, write: if request.auth != null;
-    }
-    
     // 📜 License notifications
     match /licenseNotifications/{notificationId} {
       allow read, write: if request.auth != null;
@@ -226,7 +222,7 @@ export const FirebaseSettingsPage: React.FC = () => {
                         const report = await getDatabaseHealthReport(user.tenantId);
                         setHealthReport(report);
                     } catch (e) {
-                        console.error('Failed to load health report:', e);
+                        logger.error('Failed to load health report:', e, 'FirebaseSettingsPage');
                     }
                     setLoadingHealth(false);
                 }
@@ -300,7 +296,7 @@ export const FirebaseSettingsPage: React.FC = () => {
             }, 1500);
 
         } catch (error) {
-            console.error('Save error:', error);
+            logger.error('Save error:', error, 'FirebaseSettingsPage');
             setConnectionMessage('❌ فشل في حفظ الإعدادات');
             setSaving(false);
         }

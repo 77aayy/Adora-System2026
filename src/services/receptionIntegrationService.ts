@@ -3,6 +3,8 @@
  * PMS, Payment, CRM integrations + AI/ML features
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // INTEGRATION (7 Functions)
 // ============================================================
@@ -16,16 +18,16 @@ export interface PMSIntegration {
 
 export const pmsIntegration: PMSIntegration = {
     syncReservations: async () => {
-        console.log('PMS sync started...');
+        logger.info('PMS sync started...', undefined, 'receptionIntegrationService');
         // Would connect to Opera, Fidelio, etc.
         return 0;
     },
     pushRoomStatus: async (roomNumber: string, status: string) => {
-        console.log(`Pushing room ${roomNumber} status: ${status} to PMS`);
+        logger.info(`Pushing room ${roomNumber} status: ${status} to PMS`, undefined, 'receptionIntegrationService');
         return true;
     },
     getGuestProfile: async (guestId: string) => {
-        console.log(`Fetching guest profile: ${guestId}`);
+        logger.info(`Fetching guest profile: ${guestId}`, undefined, 'receptionIntegrationService');
         return null;
     }
 };
@@ -39,11 +41,11 @@ export interface PaymentGateway {
 
 export const paymentGateway: PaymentGateway = {
     processPayment: async (amount: number, method: string) => {
-        console.log(`Processing payment: ${amount} via ${method}`);
+        logger.info(`Processing payment: ${amount} via ${method}`, undefined, 'receptionIntegrationService');
         return { success: true, transactionId: `TXN_${Date.now()}` };
     },
     refund: async (transactionId: string, amount: number) => {
-        console.log(`Refunding ${amount} for ${transactionId}`);
+        logger.info(`Refunding ${amount} for ${transactionId}`, undefined, 'receptionIntegrationService');
         return true;
     },
     getTransactions: async () => []
@@ -51,7 +53,7 @@ export const paymentGateway: PaymentGateway = {
 
 // 3. Channel Manager Sync
 export const channelManagerSync = async (channels: string[]): Promise<{ synced: string[]; failed: string[] }> => {
-    console.log('Syncing with channels:', channels);
+    logger.info('Syncing with channels:', channels, 'receptionIntegrationService');
     // Would sync with Booking.com, Expedia, etc.
     return { synced: channels, failed: [] };
 };
@@ -79,7 +81,7 @@ export interface CRMIntegration {
 
 export const crmIntegration: CRMIntegration = {
     createContact: async (guest: any) => {
-        console.log('Creating CRM contact:', guest.name);
+        logger.info('Creating CRM contact:', guest.name, 'receptionIntegrationService');
         return `CRM_${Date.now()}`;
     },
     updateContact: async () => true,
@@ -94,7 +96,7 @@ export const exportReports = async (
     branch: string,
     dateRange: { start: Date; end: Date }
 ): Promise<string> => {
-    console.log(`Exporting ${reportType} report as ${format}`);
+    logger.info(`Exporting ${reportType} report as ${format}`, undefined, 'receptionIntegrationService');
     // Would generate and return download URL
     return `https://exports.adora.com/report_${Date.now()}.${format}`;
 };
@@ -108,12 +110,12 @@ export interface WebhookConfig {
 }
 
 export const registerWebhook = async (config: WebhookConfig): Promise<string> => {
-    console.log('Registering webhook:', config.url);
+    logger.info('Registering webhook:', config.url, 'receptionIntegrationService');
     return `WEBHOOK_${Date.now()}`;
 };
 
 export const triggerWebhook = async (webhookId: string, event: string, payload: any): Promise<boolean> => {
-    console.log(`Triggering webhook ${webhookId} for event ${event}`);
+    logger.info(`Triggering webhook ${webhookId} for event ${event}`, undefined, 'receptionIntegrationService');
     return true;
 };
 

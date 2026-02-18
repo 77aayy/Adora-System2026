@@ -17,6 +17,7 @@ import {
     DEMO_CONSTANTS 
 } from '../../services/demoFactory';
 import { useTranslation } from 'react-i18next';
+import { logger } from '../../services/loggerService';
 
 export const DemoEntry: React.FC = () => {
     const navigate = useNavigate();
@@ -76,7 +77,7 @@ export const DemoEntry: React.FC = () => {
                 // 7. Navigate to reception dashboard
                 navigate('/reception', { replace: true });
             } catch (err: any) {
-                console.error('Demo initialization error:', err);
+                logger.error('Demo initialization error:', err, 'DemoEntry');
                 setError(err.message || t('demo.initFailed') || 'Failed to initialize demo');
                 setStatus('error');
                 setTimeout(() => navigate('/login'), 3000);

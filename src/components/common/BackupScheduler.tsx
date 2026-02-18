@@ -35,13 +35,13 @@ export const BackupScheduler: React.FC = () => {
 
             try {
                 isRunningRef.current = true;
-                logger.info('Starting daily backups for all tenants...', undefined, 'BackupScheduler');
+                logger.debug('Starting daily backups for all tenants...', undefined, 'BackupScheduler');
 
                 const result = await createDailyBackupsForAllTenants();
 
                 lastBackupDateRef.current = today;
 
-                logger.info(
+                logger.debug(
                     `Daily backups completed: ${result.success} succeeded, ${result.failed} failed`,
                     result,
                     'BackupScheduler'

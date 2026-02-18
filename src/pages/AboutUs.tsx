@@ -1,58 +1,18 @@
 /**
  * About Us Page
  * Professional About page for Adora Hotel Management System
- * 
- * Features:
- * - Modern design with Adora Turquoise branding
- * - Clean sections highlighting system features
- * - Adora-specific features (Data Doctor, Tenant Isolation, Physics-based Logic)
- * - Responsive mobile-first design
- * 
  * Adora Hotel Management System V3
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-// ✅ Inspired by juleb.com/ar - Scroll animations
-import { useScrollAnimation, useCounterAnimation } from '../hooks/useScrollAnimation';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import {
-    Sparkles,
-    Shield,
-    Zap,
-    Database,
-    Brain,
-    Lock,
-    Users,
-    BarChart3,
-    TrendingUp,
-    Award,
-    Globe,
-    Heart,
-    ArrowRight,
-    Home,
-    CheckCircle2,
-    Send,
-    Phone,
-    User,
-    Bed,
-    Luggage,
-    Wrench,
-    Coffee,
-    ShoppingCart,
-    MessageSquare,
-    Bell,
-    CreditCard,
-    Calendar,
-    Clock,
-    Star,
-    Target,
-    PieChart,
-    Languages,
-    ChevronDown,
-    DoorOpen,
-    Key,
-    Moon,
-    Sun
+    Sparkles, Shield, Zap, Database, Brain, Lock, Users, BarChart3, TrendingUp,
+    Award, Globe, Heart, ArrowRight, Home, CheckCircle2, Send, Phone, User, Bed,
+    Luggage, Wrench, Coffee, ShoppingCart, MessageSquare, Bell, CreditCard,
+    Calendar, Clock, Star, Target, PieChart, Languages, ChevronDown, DoorOpen,
+    Key, Moon, Sun
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
@@ -61,9 +21,31 @@ import { UnifiedModal, ModalActions } from '../components/common/UnifiedModal';
 import { toast } from '../components/common/EnhancedToast';
 import { submitTrialRequest } from '../services/trialRequestService';
 
-// ============================================================
-// SECTION COMPONENTS
-// ============================================================
+// -----------------------------------------------------------------------------
+// ثوابت الصفحة (لون العلامة التجارية + إعدادات الرادار)
+// -----------------------------------------------------------------------------
+
+const THEME = {
+    turquoise: '#20B2AA',
+    turquoiseLight: 'rgba(32, 178, 170, 0.1)',
+    turquoiseDark: 'rgba(32, 178, 170, 0.2)',
+} as const;
+
+const RADAR_CONFIG = {
+    ROOM_COUNT: 16,
+    SCAN_DURATION_SEC: 8,
+    RINGS: 4,
+    RAYS: 24,
+    SWEEP_WEDGE_DEG: 28,
+    SIZE_SCALE: 0.7,
+    ROOM_RADIUS_MIN: 22,
+    ROOM_RADIUS_MAX: 38,
+    SEED: 12345,
+} as const;
+
+// -----------------------------------------------------------------------------
+// مكوّنات التخطيط
+// -----------------------------------------------------------------------------
 
 interface SectionProps {
     children: React.ReactNode;
@@ -71,32 +53,31 @@ interface SectionProps {
 }
 
 const Section: React.FC<SectionProps> = ({ children, className = '' }) => (
-    <section className={`py-8 sm:py-12 md:py-16 px-4 sm:px-6 lg:px-8 ${className}`}>
+    <section className={`py-4 sm:py-5 md:py-6 lg:py-8 px-4 sm:px-5 lg:px-6 ${className}`}>
         {children}
     </section>
 );
 
 const Container: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-    <div className={`max-w-7xl mx-auto ${className}`}>
+    <div className={`max-w-7xl mx-auto w-full ${className}`}>
         {children}
     </div>
 );
 
-// ============================================================
-// ANIMATED COMPONENTS (Inspired by juleb.com/ar)
-// ============================================================
+// -----------------------------------------------------------------------------
+// مكوّنات الواجهة (بطاقات المميزات، أقسام متحركة)
+// -----------------------------------------------------------------------------
 
 interface FeatureCardProps {
     icon: React.ReactNode;
     title: string;
     description: string;
     delay?: number;
+    compact?: boolean;
 }
 
-const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, delay = 0 }) => {
+const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, delay = 0, compact = false }) => {
     const { ref, isVisible } = useScrollAnimation({ threshold: 0.1, delay });
-    const turquoise = '#20B2AA';
-    const turquoiseLight = 'rgba(32, 178, 170, 0.1)';
     const [isHovered, setIsHovered] = React.useState(false);
 
     return (
@@ -104,7 +85,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, del
             ref={ref as React.RefObject<HTMLDivElement>}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={`p-4 sm:p-5 rounded-xl transition-all duration-500 ease-out cursor-pointer ${
+            className={`${compact ? 'p-3 sm:p-3.5' : 'p-4 sm:p-5'} rounded-xl transition-all duration-500 ease-out cursor-pointer ${
                 isVisible 
                     ? 'opacity-100 translate-y-0 scale-100' 
                     : 'opacity-0 translate-y-12 scale-95'
@@ -152,11 +133,11 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, del
                 />
             )}
             <div 
-                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg mb-3 sm:mb-4 flex items-center justify-center transition-all duration-500 ${
+                className={`${compact ? 'w-9 h-9 sm:w-10 sm:h-10 mb-2' : 'w-10 h-10 sm:w-12 sm:h-12 mb-3 sm:mb-4'} rounded-lg flex items-center justify-center transition-all duration-500 ${
                     isVisible ? 'rotate-0 scale-100 float-animation' : 'rotate-12 scale-0'
                 }`}
                 style={{ 
-                    backgroundColor: isHovered ? 'rgba(32, 178, 170, 0.2)' : turquoiseLight,
+                    backgroundColor: isHovered ? THEME.turquoiseDark : THEME.turquoiseLight,
                     transition: 'all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
                     boxShadow: isHovered 
                         ? '0 8px 30px rgba(32, 178, 170, 0.4), 0 4px 15px rgba(32, 178, 170, 0.3)'
@@ -170,7 +151,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, del
             </div>
             <div style={{ position: 'relative', zIndex: 1 }}>
                 <h3 
-                    className={`text-lg sm:text-xl font-semibold mb-2 transition-all duration-700 ${
+                    className={`${compact ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'} font-semibold mb-2 transition-all duration-700 ${
                         isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'
                     }`}
                     style={{ 
@@ -182,7 +163,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, del
                     {title}
                 </h3>
                 <p 
-                    className={`text-sm sm:text-base transition-all duration-700 ${
+                    className={`${compact ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} transition-all duration-700 ${
                         isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'
                     }`}
                     style={{ 
@@ -224,228 +205,138 @@ const AnimatedSection: React.FC<AnimatedSectionProps> = ({ children, delay = 0 }
     );
 };
 
-// ============================================================
-// MAIN COMPONENT
-// ============================================================
+// -----------------------------------------------------------------------------
+// الصفحة الرئيسية: AboutUs
+// -----------------------------------------------------------------------------
 
 export const AboutUs: React.FC = () => {
     const { isDark, toggleTheme } = useTheme();
     const { i18n, t } = useTranslation();
-    const navigate = useNavigate();
-    
-    // ✅ Parallax scroll effect (inspired by juleb.com/ar)
-    useEffect(() => {
-        const handleScroll = () => {
-            const scrolled = window.pageYOffset;
-            const parallaxElements = document.querySelectorAll('.parallax-slow');
-            parallaxElements.forEach((el) => {
-                const speed = 0.5;
-                (el as HTMLElement).style.transform = `translateY(${scrolled * speed}px)`;
-            });
-        };
-        
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-    
-    // ✅ Redirect to production domain if accessed locally
-    useEffect(() => {
-        // Only redirect if not already on production domain
-        if (window.location.hostname !== 'adora-hotels.com' && 
-            window.location.hostname !== 'www.adora-hotels.com' &&
-            !window.location.hostname.includes('localhost') &&
-            !window.location.hostname.includes('127.0.0.1')) {
-            // For production, redirect to https://adora-hotels.com/about
-            window.location.href = 'https://adora-hotels.com/about';
-        }
-    }, []);
-    
-    // ✅ Inject star animation styles into document head
-    useEffect(() => {
-        if (typeof document === 'undefined') return;
-        
-        const styleId = 'about-us-star-animation';
-        if (document.getElementById(styleId)) return; // Already injected
-        
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-            @keyframes starTwinkle {
-                0% { 
-                    opacity: 0.2; 
-                    transform: scale(0.9);
-                }
-                25% { 
-                    opacity: 0.6; 
-                    transform: scale(1);
-                }
-                50% { 
-                    opacity: 1; 
-                    transform: scale(1.1);
-                }
-                75% { 
-                    opacity: 0.5; 
-                    transform: scale(1);
-                }
-                100% { 
-                    opacity: 0.2; 
-                    transform: scale(0.9);
-                }
-            }
-        `;
-        document.head.appendChild(style);
-        
-        return () => {
-            const existingStyle = document.getElementById(styleId);
-            if (existingStyle) {
-                existingStyle.remove();
-            }
-        };
-    }, []);
+
+    // —— حالة النموذج والواجهة ——
     const [showTrialModal, setShowTrialModal] = useState(false);
     const [trialName, setTrialName] = useState('');
     const [trialPhone, setTrialPhone] = useState('');
     const [trialRequiredBranches, setTrialRequiredBranches] = useState<number>(1);
-    const [scrollPosition, setScrollPosition] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [showLangMenu, setShowLangMenu] = useState(false);
-    const [scannedRooms, setScannedRooms] = useState<Set<number>>(new Set());
-    const [scannedRoomsOrder, setScannedRoomsOrder] = useState<number[]>([]);
-    const [previousScannedRoom, setPreviousScannedRoom] = useState<number | null>(null);
-    const radarAnimationRef = useRef<number>(0);
-
-    const turquoise = '#20B2AA';
-    const turquoiseLight = 'rgba(32, 178, 170, 0.1)';
-    const turquoiseDark = 'rgba(32, 178, 170, 0.2)';
-    
-    // ✅ FIX: Use state to track language changes and trigger re-render
     const [currentLang, setCurrentLang] = useState<string>(i18n.language || 'ar');
-    
-    // ✅ Update language when i18n changes - Listen to i18n events
+    const [scannedRoomIndex, setScannedRoomIndex] = useState<number | null>(null);
+
+    // —— بيانات مشتقة (رادار، نجوم) ——
+    const radarRoomPositions = useMemo(() => {
+        const { ROOM_COUNT, ROOM_RADIUS_MIN, ROOM_RADIUS_MAX, SEED } = RADAR_CONFIG;
+        const rnd = (i: number) => (Math.sin(SEED + i * 1.5) * 0.5 + 0.5);
+        const positions: Array<{ roomNum: number; angleDeg: number; x: number; y: number; colorIndex: number }> = [];
+        for (let i = 0; i < ROOM_COUNT; i++) {
+            const angleDeg = rnd(i) * 360;
+            const radius = ROOM_RADIUS_MIN + rnd(i + 10) * (ROOM_RADIUS_MAX - ROOM_RADIUS_MIN);
+            const rad = (angleDeg * Math.PI) / 180;
+            positions.push({
+                roomNum: 100 + i + 1,
+                angleDeg,
+                x: 50 + radius * Math.cos(rad),
+                y: 50 - radius * Math.sin(rad),
+                colorIndex: i % 4,
+            });
+        }
+        return positions;
+    }, []);
+
+    const starsData = useMemo(() =>
+        Array.from({ length: 50 }, (_, i) => ({
+            key: `star-${i}`,
+            delay: (i * 0.1) % 5,
+            duration: 6 + (i % 4),
+            size: 1 + ((i % 3) * 0.5),
+            top: (i * 7.3) % 70,
+            left: (i * 11.7) % 100,
+        })),
+        []
+    );
+
+    // —— تأثيرات (Parallax، إعادة توجيه، حقن أنيميشن) ——
     useEffect(() => {
-        const updateLanguage = () => {
-            setCurrentLang(i18n.language || 'ar');
+        const handleScroll = () => {
+            const scrolled = window.pageYOffset;
+            document.querySelectorAll('.parallax-slow').forEach((el) => {
+                (el as HTMLElement).style.transform = `translateY(${scrolled * 0.5}px)`;
+            });
         };
-        
-        // Initial update
-        updateLanguage();
-        
-        // Listen to language change events
-        i18n.on('languageChanged', updateLanguage);
-        
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    useEffect(() => {
+        const host = window.location.hostname;
+        if (
+            host !== 'adora-hotels.com' &&
+            host !== 'www.adora-hotels.com' &&
+            !host.includes('localhost') &&
+            !host.includes('127.0.0.1')
+        ) {
+            window.location.href = 'https://adora-hotels.com/about';
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const styleId = 'about-us-radar-sweep';
+        if (document.getElementById(styleId)) return;
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `@keyframes radarSweepRotate { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }`;
+        document.head.appendChild(style);
         return () => {
-            i18n.off('languageChanged', updateLanguage);
+            const el = document.getElementById(styleId);
+            if (el) el.remove();
         };
+    }, []);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const styleId = 'about-us-star-animation';
+        if (document.getElementById(styleId)) return;
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `@keyframes starTwinkle { 0% { opacity: 0.2; transform: scale(0.9); } 25% { opacity: 0.6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); } 75% { opacity: 0.5; transform: scale(1); } 100% { opacity: 0.2; transform: scale(0.9); } }`;
+        document.head.appendChild(style);
+        return () => {
+            const el = document.getElementById(styleId);
+            if (el) el.remove();
+        };
+    }, []);
+
+    useEffect(() => {
+        const updateLanguage = () => setCurrentLang(i18n.language || 'ar');
+        updateLanguage();
+        i18n.on('languageChanged', updateLanguage);
+        return () => i18n.off('languageChanged', updateLanguage);
     }, [i18n]);
-    
-    const handleLanguageChange = async (lang: 'ar' | 'en') => {
-        await changeLanguage(lang);
-        setCurrentLang(lang); // ✅ Update state immediately
-        setShowLangMenu(false);
-    };
 
-    // Room numbers - Reduced count, all inside circle
-    const roomNumbers = [102, 103, 104, 105, 106, 107, 108];
-    
-    // ✅ Generate stars data once with useMemo to prevent re-rendering
-    const starsData = React.useMemo(() => {
-        return Array.from({ length: 50 }, (_, i) => {
-            return {
-                key: `star-${i}`,
-                delay: (i * 0.1) % 5,
-                duration: 6 + (i % 4),
-                size: 1 + ((i % 3) * 0.5),
-                top: (i * 7.3) % 70,
-                left: (i * 11.7) % 100
-            };
-        });
-    }, []);
-    
-    // Color palette for room borders - Turquoise Theme Variations
-    const roomBorderColors = [
-        '#20B2AA', // Turquoise (Primary)
-        '#14B8A6', // Teal
-        '#0D9488', // Teal Dark
-        '#2DD4BF', // Cyan
-        '#06B6D4', // Sky Cyan
-        '#0891B2', // Sky Blue
-        '#0EA5E9', // Blue
-        '#0284C7', // Blue Dark
-        '#20B2AA', // Turquoise (repeat)
-        '#14B8A6', // Teal (repeat)
-        '#0D9488', // Teal Dark (repeat)
-        '#2DD4BF', // Cyan (repeat)
-        '#06B6D4', // Sky Cyan (repeat)
-        '#0891B2'  // Sky Blue (repeat)
-    ];
-    
-    // Calculate room positions - useMemo to prevent recalculation
-    // All rooms inside Saudi Arabia map shape, evenly distributed, no overlap
-    const roomPositions = React.useMemo(() => {
-        const totalRooms = roomNumbers.length;
-        // Use fixed distance inside map shape (max 30% from center to stay inside)
-        const baseDistance = 25; // Fixed distance for all rooms to prevent overlap
-        
-        return roomNumbers.map((roomNum, i) => {
-            // Distribute rooms evenly around the map (360 degrees divided equally)
-            const angle = (i * 360 / totalRooms) * (Math.PI / 180);
-            // All rooms at same distance to prevent overlap
-            const distance = baseDistance;
-            const x = 50 + Math.cos(angle) * distance;
-            const y = 50 + Math.sin(angle) * distance;
-            // Assign color based on room number (consistent per room)
-            const colorIndex = roomNum % roomBorderColors.length;
-            const borderColor = roomBorderColors[colorIndex];
-            return { roomNum, angle: angle * (180 / Math.PI), x, y, borderColor };
-        });
-    }, []);
-
-    // Detect when scanning line passes over rooms with smooth transitions
     useEffect(() => {
         const interval = setInterval(() => {
-            // Calculate current sweep angle (0-360 degrees)
-            // Animation is 8s per rotation (slower)
-            const sweepSpeed = 360 / 8; // degrees per second
-            const currentTime = Date.now() / 1000;
-            const currentAngle = (currentTime * sweepSpeed) % 360;
-            
-            const newlyScanned = new Set<number>();
-            const newOrder: number[] = [];
-            let currentScannedRoom: number | null = null;
-            
-            // Find which room is currently being scanned
-            roomPositions.forEach(({ roomNum, angle }) => {
-                // Normalize angles to 0-360
-                const normalizedRoomAngle = ((angle % 360) + 360) % 360;
-                const normalizedSweepAngle = ((currentAngle % 360) + 360) % 360;
-                
-                // Check if sweep is within 20 degrees of room (wider detection zone)
-                const angleDiff = Math.abs(normalizedSweepAngle - normalizedRoomAngle);
-                const minDiff = Math.min(angleDiff, 360 - angleDiff);
-                
-                if (minDiff < 20) {
-                    newlyScanned.add(roomNum);
-                    newOrder.push(roomNum);
-                    if (!currentScannedRoom || minDiff < 5) {
-                        currentScannedRoom = roomNum;
-                    }
-                }
+            const t = (Date.now() / 1000) % RADAR_CONFIG.SCAN_DURATION_SEC;
+            const sweepAngle = (t / RADAR_CONFIG.SCAN_DURATION_SEC) * 360;
+            const half = RADAR_CONFIG.SWEEP_WEDGE_DEG / 2;
+            let index: number | null = null;
+            radarRoomPositions.forEach(({ angleDeg }, i) => {
+                let diff = Math.abs(sweepAngle - angleDeg);
+                if (diff > 180) diff = 360 - diff;
+                if (diff < half) index = i;
             });
-            
-            // Track room transitions for path animation
-            if (currentScannedRoom && currentScannedRoom !== previousScannedRoom) {
-                setPreviousScannedRoom(currentScannedRoom);
-            }
-            
-            setScannedRooms(newlyScanned);
-            setScannedRoomsOrder(newOrder);
-        }, 30); // Check every 30ms for smooth detection
-        
+            setScannedRoomIndex(index);
+        }, 100);
         return () => clearInterval(interval);
-    }, [roomPositions, previousScannedRoom]);
+    }, [radarRoomPositions]);
 
-    // Handle trial request submission
+    // —— معالجات الأحداث ——
+    const handleLanguageChange = async (lang: 'ar' | 'en') => {
+        await changeLanguage(lang);
+        setCurrentLang(lang);
+        setShowLangMenu(false);
+    };
     const handleTrialSubmit = async () => {
         if (!trialName.trim() || !trialPhone.trim()) {
             toast.error(t('aboutUs.trialForm.namePhoneRequired'));
@@ -562,23 +453,32 @@ export const AboutUs: React.FC = () => {
             }`} />
             
             <div 
-                className="min-h-screen relative z-10"
+                className="min-h-screen h-full relative z-10 flex flex-col"
                 style={{
                     color: 'var(--theme-text-primary)',
                     position: 'relative',
                     overflowX: 'hidden'
                 }}
             >
-            {/* ✅ Language Switcher & Theme Toggle - Floating Top Right */}
-            <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+            {/* ✅ ترويسة ثابتة — أزرار اللغة والثيم داخل الشريط */}
+            <header
+                className="fixed top-0 left-0 right-0 z-50 border-b transition-colors duration-300"
+                style={{
+                    background: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                    borderColor: isDark ? 'rgba(51, 65, 85, 0.5)' : 'rgba(226, 232, 240, 0.8)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)'
+                }}
+            >
+                <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-end gap-1.5">
                 <div className="relative">
                     {/* Language Button */}
                     <button
                         onClick={() => setShowLangMenu(!showLangMenu)}
                         className={`
-                            flex items-center gap-2 px-4 py-2.5 rounded-xl
+                            flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
                             transition-all duration-200
-                            font-medium text-sm
+                            font-medium text-xs
                             active:scale-95
                             ${isDark
                                 ? 'bg-slate-800/80 backdrop-blur-sm text-white hover:bg-slate-700/90 border border-slate-700/50 shadow-lg'
@@ -591,12 +491,12 @@ export const AboutUs: React.FC = () => {
                                 : '0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(32, 178, 170, 0.1)'
                         }}
                     >
-                        <Languages className="w-5 h-5" style={{ color: turquoise }} />
+                        <Languages className="w-4 h-4 flex-shrink-0" style={{ color: THEME.turquoise }} />
                         <span className="font-semibold">
                             {currentLang === 'ar' ? t('languages.arabic') : t('languages.english')}
                         </span>
                         <ChevronDown 
-                            className={`w-4 h-4 transition-transform duration-200 ${showLangMenu ? 'rotate-180' : ''}`}
+                            className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${showLangMenu ? 'rotate-180' : ''}`}
                         />
                     </button>
                     
@@ -609,7 +509,7 @@ export const AboutUs: React.FC = () => {
                             />
                             <div 
                                 className={`
-                                    absolute top-full mt-2 right-0 rounded-xl shadow-2xl border z-50 min-w-[140px]
+                                    absolute top-full mt-1.5 right-0 rounded-lg shadow-2xl border z-50 min-w-[120px]
                                     overflow-hidden
                                     animate-in fade-in slide-in-from-top-2 duration-200
                                     ${isDark
@@ -626,7 +526,7 @@ export const AboutUs: React.FC = () => {
                                 <button
                                     onClick={() => handleLanguageChange('ar')}
                                     className={`
-                                        w-full px-4 py-3 text-right flex items-center justify-between gap-3 
+                                        w-full px-3 py-2 text-right flex items-center justify-between gap-2 text-sm
                                         transition-all duration-150
                                         ${currentLang === 'ar'
                                             ? isDark
@@ -640,14 +540,14 @@ export const AboutUs: React.FC = () => {
                                 >
                                     <span>عربي</span>
                                     {currentLang === 'ar' && (
-                                        <CheckCircle2 className="w-4 h-4" style={{ color: turquoise }} />
+                                        <CheckCircle2 className="w-4 h-4" style={{ color: THEME.turquoise }} />
                                     )}
                                 </button>
                                 <div className={`h-px ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} />
                                 <button
                                     onClick={() => handleLanguageChange('en')}
                                     className={`
-                                        w-full px-4 py-3 text-right flex items-center justify-between gap-3 
+                                        w-full px-3 py-2 text-right flex items-center justify-between gap-2 text-sm
                                         transition-all duration-150
                                         ${currentLang === 'en'
                                             ? isDark
@@ -661,7 +561,7 @@ export const AboutUs: React.FC = () => {
                                 >
                                     <span>English</span>
                                     {currentLang === 'en' && (
-                                        <CheckCircle2 className="w-4 h-4" style={{ color: turquoise }} />
+                                        <CheckCircle2 className="w-4 h-4" style={{ color: THEME.turquoise }} />
                                     )}
                                 </button>
                             </div>
@@ -673,7 +573,7 @@ export const AboutUs: React.FC = () => {
                 <button
                     onClick={toggleTheme}
                     className={`
-                        flex items-center justify-center px-4 py-2.5 rounded-xl
+                        flex items-center justify-center w-8 h-8 rounded-lg
                         transition-all duration-300
                         active:scale-95
                         ${isDark
@@ -690,13 +590,15 @@ export const AboutUs: React.FC = () => {
                     title={isDark ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن'}
                 >
                     {isDark ? (
-                        <Sun className="w-5 h-5 transition-all duration-1000" style={{ color: turquoise }} />
+                        <Sun className="w-4 h-4 transition-all duration-1000" style={{ color: THEME.turquoise }} />
                     ) : (
-                        <Moon className="w-5 h-5 transition-all duration-1000" style={{ color: turquoise }} />
+                        <Moon className="w-4 h-4 transition-all duration-1000" style={{ color: THEME.turquoise }} />
                     )}
                 </button>
-            </div>
+                </div>
+            </header>
 
+            <div className="flex-1 flex flex-col pt-12 sm:pt-14">
             {/* Hero Section - Unified Background */}
             <Section 
                 style={{
@@ -709,7 +611,7 @@ export const AboutUs: React.FC = () => {
                     <div className="text-center space-y-3 sm:space-y-4 hero-content" style={{ position: 'relative', zIndex: 1 }}>
                         {/* Logo Container - Mobile Responsive, Centered */}
                         <div 
-                            className="flex justify-center items-center mb-4 sm:mb-6 relative mx-auto"
+                            className="flex justify-center items-center mb-3 sm:mb-4 relative mx-auto"
                             style={{ 
                                 width: 'clamp(200px, 50vw, 300px)',
                                 height: 'clamp(200px, 50vw, 300px)',
@@ -893,9 +795,9 @@ export const AboutUs: React.FC = () => {
                                 style={{ color: 'var(--theme-text-primary)' }}
                             >
                                 {currentLang === 'ar' ? (
-                                    <>نظام ادورا - <span key="adora" style={{ color: turquoise, fontWeight: '700', letterSpacing: '1px' }}>ADORA</span> لإدارة الفنادق</>
+                                    <>نظام ادورا - <span key="adora" style={{ color: THEME.turquoise, fontWeight: '700', letterSpacing: '1px' }}>ADORA</span> لإدارة الفنادق</>
                                 ) : (
-                                    <>Adora System - <span key="adora" style={{ color: turquoise, fontWeight: '700', letterSpacing: '1px' }}>ADORA</span> Hotel Management</>
+                                    <>Adora System - <span key="adora" style={{ color: THEME.turquoise, fontWeight: '700', letterSpacing: '1px' }}>ADORA</span> Hotel Management</>
                                 )}
                             </h1>
                         </AnimatedSection>
@@ -908,19 +810,19 @@ export const AboutUs: React.FC = () => {
                             <br className="hidden sm:block" />
                             <span className="sm:hidden"> </span>
                             {currentLang === 'ar' ? (
-                                <>يوفر <span style={{ color: turquoise, fontWeight: '600' }}>{t('aboutUs.hero.subtitleHighlight1')}</span> ويزيد من <span style={{ color: turquoise, fontWeight: '600' }}>{t('aboutUs.hero.subtitleHighlight2')}</span></>
+                                <>يوفر <span style={{ color: THEME.turquoise, fontWeight: '600' }}>{t('aboutUs.hero.subtitleHighlight1')}</span> ويزيد من <span style={{ color: THEME.turquoise, fontWeight: '600' }}>{t('aboutUs.hero.subtitleHighlight2')}</span></>
                             ) : (
-                                <>Saves <span style={{ color: turquoise, fontWeight: '600' }}>{t('aboutUs.hero.subtitleHighlight1')}</span> and increases <span style={{ color: turquoise, fontWeight: '600' }}>{t('aboutUs.hero.subtitleHighlight2')}</span></>
+                                <>Saves <span style={{ color: THEME.turquoise, fontWeight: '600' }}>{t('aboutUs.hero.subtitleHighlight1')}</span> and increases <span style={{ color: THEME.turquoise, fontWeight: '600' }}>{t('aboutUs.hero.subtitleHighlight2')}</span></>
                             )}
                             </p>
                         </AnimatedSection>
                         <AnimatedSection delay={300}>
-                            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mt-6 sm:mt-8 px-4">
+                            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-4 sm:mt-5 px-4">
                                 <button
                                     onClick={() => setShowTrialModal(true)}
                                     className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-300 flex items-center gap-2 hover:scale-110 hover:shadow-2xl active:scale-95 shadow-lg group"
                                     style={{ 
-                                        backgroundColor: turquoise,
+                                        backgroundColor: THEME.turquoise,
                                         transform: 'translateY(0)',
                                         transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
                                     }}
@@ -938,6 +840,89 @@ export const AboutUs: React.FC = () => {
                                 </button>
                             </div>
                         </AnimatedSection>
+                    </div>
+                </Container>
+            </Section>
+
+            {/* Statistics Section - Adora by the Numbers */}
+            <Section 
+                style={{
+                    background: 'transparent',
+                    position: 'relative'
+                }}
+            >
+                <Container>
+                    <AnimatedSection delay={0}>
+                        <div className="text-center mb-3 sm:mb-4 px-4">
+                            <div 
+                                className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center transition-all duration-500 hover:scale-110 hover:rotate-12"
+                                style={{ 
+                                    backgroundColor: THEME.turquoiseLight,
+                                    boxShadow: '0 4px 20px rgba(32, 178, 170, 0.2)',
+                                    animation: 'bounceIn 0.8s ease-out'
+                                }}
+                            >
+                                <BarChart3 className="w-8 h-8" style={{ color: THEME.turquoise }} />
+                            </div>
+                            <h2 
+                                className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3"
+                                style={{ 
+                                    color: 'var(--theme-text-primary)',
+                                    textShadow: '0 2px 10px rgba(32, 178, 170, 0.1)'
+                                }}
+                            >
+                                {t('aboutUs.statistics.title')}
+                            </h2>
+                            <p 
+                                className="text-base sm:text-lg"
+                                style={{ color: 'var(--theme-text-secondary)' }}
+                            >
+                                {t('aboutUs.statistics.subtitle')}
+                            </p>
+                        </div>
+                    </AnimatedSection>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 px-4">
+                        {[
+                            { key: 'timeSaving', icon: <Clock className="w-6 h-6" style={{ color: THEME.turquoise }} /> },
+                            { key: 'guestSatisfaction', icon: <Star className="w-6 h-6" style={{ color: THEME.turquoise }} /> },
+                            { key: 'responseTime', icon: <Zap className="w-6 h-6" style={{ color: THEME.turquoise }} /> },
+                            { key: 'efficiency', icon: <TrendingUp className="w-6 h-6" style={{ color: THEME.turquoise }} /> },
+                            { key: 'cloudBased', icon: <Globe className="w-6 h-6" style={{ color: THEME.turquoise }} /> }
+                        ].map((stat, index) => {
+                            const { ref, isVisible } = useScrollAnimation({ threshold: 0.1, delay: index * 100 });
+                            return (
+                                <div
+                                    key={stat.key}
+                                    ref={ref as React.RefObject<HTMLDivElement>}
+                                    className={`p-6 rounded-xl text-center transition-all duration-700 ${
+                                        isVisible 
+                                            ? 'opacity-100 translate-y-0 scale-100' 
+                                            : 'opacity-0 translate-y-12 scale-95'
+                                    } hover:scale-105 hover:shadow-2xl hover:-translate-y-2 glass-hover`}
+                                    style={{
+                                        background: 'var(--theme-bg-tertiary)',
+                                        border: '1px solid var(--theme-border-primary)',
+                                        transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                        transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(48px) scale(0.95)'
+                                    }}
+                                >
+                                    <div className="mb-3 flex justify-center">{stat.icon}</div>
+                                    <div 
+                                        className="text-3xl sm:text-4xl font-bold mb-2"
+                                        style={{ color: THEME.turquoise }}
+                                    >
+                                        {t(`aboutUs.statistics.${stat.key}.value`)}
+                                    </div>
+                                    <div 
+                                        className="text-sm sm:text-base"
+                                        style={{ color: 'var(--theme-text-secondary)' }}
+                                    >
+                                        {t(`aboutUs.statistics.${stat.key}.label`)}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </Container>
             </Section>
@@ -964,7 +949,7 @@ export const AboutUs: React.FC = () => {
                 />
                 <Container>
                     <AnimatedSection delay={0}>
-                        <div className="text-center mb-6 sm:mb-8 px-4">
+                        <div className="text-center mb-3 sm:mb-4 px-4">
                             <h2 
                                 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3"
                                 style={{ 
@@ -972,7 +957,7 @@ export const AboutUs: React.FC = () => {
                                     textShadow: '0 2px 10px rgba(32, 178, 170, 0.1)'
                                 }}
                             >
-                                {t('aboutUs.features.title', { adora: <span key="adora" style={{ color: turquoise }}>أدورا</span> })}
+                                {t('aboutUs.features.title', { adora: <span key="adora" style={{ color: THEME.turquoise }}>أدورا</span> })}
                             </h2>
                             <p 
                                 className="text-base sm:text-lg"
@@ -983,78 +968,88 @@ export const AboutUs: React.FC = () => {
                         </div>
                     </AnimatedSection>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 px-4">
-                        {/* Feature 1: إدارة الاستقبال */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3 px-4">
+                        {/* 4 كروت في الصف على الشاشات الكبيرة — حجم compact */}
                         <FeatureCard
-                            icon={<Users className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<Users className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.reception.title')}
                             description={t('aboutUs.features.reception.desc')}
                             delay={0}
                         />
-
-                        {/* Feature 2-12: Using FeatureCard component with staggered animations */}
                         <FeatureCard
-                            icon={<Bed className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<Bed className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.housekeeping.title')}
                             description={t('aboutUs.features.housekeeping.desc')}
                             delay={50}
                         />
                         <FeatureCard
-                            icon={<Luggage className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<Luggage className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.bellman.title')}
                             description={t('aboutUs.features.bellman.desc')}
                             delay={100}
                         />
                         <FeatureCard
-                            icon={<Wrench className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<Wrench className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.maintenance.title')}
                             description={t('aboutUs.features.maintenance.desc')}
                             delay={150}
                         />
                         <FeatureCard
-                            icon={<ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.procurement.title')}
                             description={t('aboutUs.features.procurement.desc')}
                             delay={200}
                         />
                         <FeatureCard
-                            icon={<Coffee className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<Coffee className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.coffee.title')}
                             description={t('aboutUs.features.coffee.desc')}
                             delay={250}
                         />
                         <FeatureCard
-                            icon={<MessageSquare className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.chat.title')}
                             description={t('aboutUs.features.chat.desc')}
                             delay={300}
                         />
                         <FeatureCard
-                            icon={<Target className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<Target className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.points.title')}
                             description={t('aboutUs.features.points.desc')}
                             delay={350}
                         />
                         <FeatureCard
-                            icon={<Star className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<Star className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.loyalty.title')}
                             description={t('aboutUs.features.loyalty.desc')}
                             delay={400}
                         />
                         <FeatureCard
-                            icon={<BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.reports.title')}
                             description={t('aboutUs.features.reports.desc')}
                             delay={450}
                         />
                         <FeatureCard
-                            icon={<Globe className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<Globe className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.multiBranch.title')}
                             description={t('aboutUs.features.multiBranch.desc')}
                             delay={500}
                         />
                         <FeatureCard
-                            icon={<Bell className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: turquoise }} />}
+                            compact
+                            icon={<Bell className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: THEME.turquoise }} />}
                             title={t('aboutUs.features.alerts.title')}
                             description={t('aboutUs.features.alerts.desc')}
                             delay={550}
@@ -1063,45 +1058,360 @@ export const AboutUs: React.FC = () => {
                 </Container>
             </Section>
 
-            {/* Security Section - Unified Background */}
+            {/* Why Adora Section - What Sets Us Apart */}
             <Section 
                 style={{
-                    background: 'transparent'
+                    background: 'transparent',
+                    position: 'relative'
                 }}
             >
                 <Container>
-                    <div className="max-w-4xl mx-auto">
-                        <AnimatedSection delay={0}>
-                            <div className="text-center mb-6 sm:mb-8">
-                                <div 
-                                    className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center transition-all duration-500 hover:scale-110 hover:rotate-12"
-                                    style={{ 
-                                        backgroundColor: turquoiseLight,
-                                        boxShadow: '0 4px 20px rgba(32, 178, 170, 0.2)',
-                                        animation: 'bounceIn 0.8s ease-out'
+                    <AnimatedSection delay={0}>
+                        <div className="text-center mb-3 sm:mb-4 px-4">
+                            <div 
+                                className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center transition-all duration-500 hover:scale-110 hover:rotate-12"
+                                style={{ 
+                                    backgroundColor: THEME.turquoiseLight,
+                                    boxShadow: '0 4px 20px rgba(32, 178, 170, 0.2)',
+                                    animation: 'bounceIn 0.8s ease-out'
+                                }}
+                            >
+                                <Award className="w-8 h-8" style={{ color: THEME.turquoise }} />
+                            </div>
+                            <h2 
+                                className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3"
+                                style={{ 
+                                    color: 'var(--theme-text-primary)',
+                                    textShadow: '0 2px 10px rgba(32, 178, 170, 0.1)'
+                                }}
+                            >
+                                {t('aboutUs.whyAdora.title')}
+                            </h2>
+                            <p 
+                                className="text-base sm:text-lg"
+                                style={{ color: 'var(--theme-text-secondary)' }}
+                            >
+                                {t('aboutUs.whyAdora.subtitle')}
+                            </p>
+                        </div>
+                    </AnimatedSection>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 px-4">
+                        {[
+                            { key: 'local', icon: <Globe className="w-5 h-5" style={{ color: THEME.turquoise }} /> },
+                            { key: 'noCommissions', icon: <CreditCard className="w-5 h-5" style={{ color: THEME.turquoise }} /> },
+                            { key: 'support', icon: <Phone className="w-5 h-5" style={{ color: THEME.turquoise }} /> },
+                            { key: 'training', icon: <Users className="w-5 h-5" style={{ color: THEME.turquoise }} /> },
+                            { key: 'updates', icon: <Sparkles className="w-5 h-5" style={{ color: THEME.turquoise }} /> },
+                            { key: 'integration', icon: <Database className="w-5 h-5" style={{ color: THEME.turquoise }} /> }
+                        ].map((item, index) => {
+                            const { ref, isVisible } = useScrollAnimation({ threshold: 0.1, delay: index * 100 });
+                            return (
+                                <div
+                                    key={item.key}
+                                    ref={ref as React.RefObject<HTMLDivElement>}
+                                    className={`p-5 rounded-lg flex items-start gap-3 transition-all duration-700 ${
+                                        isVisible 
+                                            ? 'opacity-100 translate-x-0 scale-100' 
+                                            : 'opacity-0 translate-x-12 scale-95'
+                                    } hover:scale-[1.03] hover:shadow-xl hover:-translate-y-1 glass-hover`}
+                                    style={{
+                                        background: 'var(--theme-bg-tertiary)',
+                                        border: '1px solid var(--theme-border-primary)',
+                                        transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                        transform: isVisible ? 'translateX(0) scale(1)' : 'translateX(48px) scale(0.95)'
                                     }}
                                 >
-                                    <Lock className="w-8 h-8" style={{ color: turquoise }} />
+                                    <div className="flex-shrink-0 mt-0.5">{item.icon}</div>
+                                    <div>
+                                        <h3 
+                                            className="font-semibold mb-1"
+                                            style={{ color: 'var(--theme-text-primary)' }}
+                                        >
+                                            {t(`aboutUs.whyAdora.${item.key}.title`)}
+                                        </h3>
+                                        <p style={{ color: 'var(--theme-text-secondary)' }}>
+                                            {t(`aboutUs.whyAdora.${item.key}.desc`)}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Container>
+            </Section>
+
+            {/* Before/After Comparison Section */}
+            <Section 
+                style={{
+                    background: 'transparent',
+                    position: 'relative'
+                }}
+            >
+                <Container>
+                    <AnimatedSection delay={0}>
+                        <div className="text-center mb-3 sm:mb-4 px-4">
+                            <div 
+                                className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center transition-all duration-500 hover:scale-110 hover:rotate-12"
+                                style={{ 
+                                    backgroundColor: THEME.turquoiseLight,
+                                    boxShadow: '0 4px 20px rgba(32, 178, 170, 0.2)',
+                                    animation: 'bounceIn 0.8s ease-out'
+                                }}
+                            >
+                                <ArrowRight className="w-8 h-8" style={{ color: THEME.turquoise }} />
+                            </div>
+                            <h2 
+                                className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3"
+                                style={{ 
+                                    color: 'var(--theme-text-primary)',
+                                    textShadow: '0 2px 10px rgba(32, 178, 170, 0.1)'
+                                }}
+                            >
+                                {t('aboutUs.beforeAfter.title')}
+                            </h2>
+                            <p 
+                                className="text-base sm:text-lg"
+                                style={{ color: 'var(--theme-text-secondary)' }}
+                            >
+                                {t('aboutUs.beforeAfter.subtitle')}
+                            </p>
+                        </div>
+                    </AnimatedSection>
+
+                    <div className="max-w-4xl mx-auto space-y-4 px-4">
+                        {[
+                            { key: 'paperwork' },
+                            { key: 'feedback' },
+                            { key: 'tracking' },
+                            { key: 'delays' },
+                            { key: 'reports' }
+                        ].map((item, index) => {
+                            const { ref, isVisible } = useScrollAnimation({ threshold: 0.1, delay: index * 100 });
+                            return (
+                                <div
+                                    key={item.key}
+                                    ref={ref as React.RefObject<HTMLDivElement>}
+                                    className={`p-5 rounded-xl transition-all duration-700 ${
+                                        isVisible 
+                                            ? 'opacity-100 translate-x-0 scale-100' 
+                                            : 'opacity-0 translate-x-12 scale-95'
+                                    } hover:scale-[1.02] hover:shadow-xl glass-hover`}
+                                    style={{
+                                        background: 'var(--theme-bg-tertiary)',
+                                        border: '1px solid var(--theme-border-primary)',
+                                        transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                        transform: isVisible ? 'translateX(0) scale(1)' : 'translateX(48px) scale(0.95)'
+                                    }}
+                                >
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                        <div className="flex-1 text-center sm:text-right">
+                                            <div 
+                                                className="text-base sm:text-lg font-semibold mb-1"
+                                                style={{ color: isDark ? 'rgba(239, 68, 68, 0.9)' : '#dc2626' }}
+                                            >
+                                                ❌ {t(`aboutUs.beforeAfter.${item.key}.before`)}
+                                            </div>
+                                        </div>
+                                        <ArrowRight className="w-6 h-6 flex-shrink-0" style={{ color: THEME.turquoise }} />
+                                        <div className="flex-1 text-center sm:text-left">
+                                            <div 
+                                                className="text-base sm:text-lg font-semibold mb-1"
+                                                style={{ color: THEME.turquoise }}
+                                            >
+                                                ✅ {t(`aboutUs.beforeAfter.${item.key}.after`)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Container>
+            </Section>
+
+            {/* Testimonials Section - What They Say About Adora */}
+            <Section 
+                style={{
+                    background: 'transparent',
+                    position: 'relative'
+                }}
+            >
+                <Container>
+                    <AnimatedSection delay={0}>
+                        <div className="text-center mb-3 sm:mb-4 px-4">
+                            <div 
+                                className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center transition-all duration-500 hover:scale-110 hover:rotate-12"
+                                style={{ 
+                                    backgroundColor: THEME.turquoiseLight,
+                                    boxShadow: '0 4px 20px rgba(32, 178, 170, 0.2)',
+                                    animation: 'bounceIn 0.8s ease-out'
+                                }}
+                            >
+                                <Heart className="w-8 h-8" style={{ color: THEME.turquoise }} />
+                            </div>
+                            <h2 
+                                className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3"
+                                style={{ 
+                                    color: 'var(--theme-text-primary)',
+                                    textShadow: '0 2px 10px rgba(32, 178, 170, 0.1)'
+                                }}
+                            >
+                                {t('aboutUs.testimonials.title')}
+                            </h2>
+                            <p 
+                                className="text-base sm:text-lg"
+                                style={{ color: 'var(--theme-text-secondary)' }}
+                            >
+                                {t('aboutUs.testimonials.subtitle')}
+                            </p>
+                        </div>
+                    </AnimatedSection>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 px-4">
+                        {[1, 2, 3].map((num, index) => {
+                            const { ref, isVisible } = useScrollAnimation({ threshold: 0.1, delay: index * 150 });
+                            return (
+                                <div
+                                    key={num}
+                                    ref={ref as React.RefObject<HTMLDivElement>}
+                                    className={`p-6 rounded-xl transition-all duration-700 ${
+                                        isVisible 
+                                            ? 'opacity-100 translate-y-0 scale-100' 
+                                            : 'opacity-0 translate-y-12 scale-95'
+                                    } hover:scale-105 hover:shadow-2xl hover:-translate-y-2 glass-hover`}
+                                    style={{
+                                        background: 'var(--theme-bg-tertiary)',
+                                        border: '1px solid var(--theme-border-primary)',
+                                        transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                        transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(48px) scale(0.95)'
+                                    }}
+                                >
+                                    <div className="flex items-start gap-3 mb-4">
+                                        <div 
+                                            className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                                            style={{ backgroundColor: THEME.turquoiseLight }}
+                                        >
+                                            <Star className="w-6 h-6" style={{ color: THEME.turquoise }} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div 
+                                                className="text-sm leading-relaxed mb-3"
+                                                style={{ color: 'var(--theme-text-secondary)' }}
+                                            >
+                                                "{t(`aboutUs.testimonials.testimonial${num}.text`)}"
+                                            </div>
+                                            <div 
+                                                className="text-sm font-semibold"
+                                                style={{ color: 'var(--theme-text-primary)' }}
+                                            >
+                                                {t(`aboutUs.testimonials.testimonial${num}.author`)}
+                                            </div>
+                                            <div 
+                                                className="text-xs"
+                                                style={{ color: 'var(--theme-text-tertiary)' }}
+                                            >
+                                                {t(`aboutUs.testimonials.testimonial${num}.location`)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Container>
+            </Section>
+
+            {/* Trust Indicators Section */}
+            <Section 
+                style={{
+                    background: 'transparent',
+                    position: 'relative'
+                }}
+            >
+                <Container>
+                    <AnimatedSection delay={0}>
+                        <div className="text-center mb-3 sm:mb-4 px-4">
+                            <h2 
+                                className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3"
+                                style={{ 
+                                    color: 'var(--theme-text-primary)',
+                                    textShadow: '0 2px 10px rgba(32, 178, 170, 0.1)'
+                                }}
+                            >
+                                {t('aboutUs.trustIndicators.title')}
+                            </h2>
+                            <p 
+                                className="text-base sm:text-lg"
+                                style={{ color: 'var(--theme-text-secondary)' }}
+                            >
+                                {t('aboutUs.trustIndicators.subtitle')}
+                            </p>
+                        </div>
+                    </AnimatedSection>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-4 max-w-3xl mx-auto">
+                        {[
+                            { key: 'secure', icon: <Shield className="w-6 h-6" style={{ color: THEME.turquoise }} /> },
+                            { key: 'local', icon: <Globe className="w-6 h-6" style={{ color: THEME.turquoise }} /> },
+                            { key: 'support', icon: <Phone className="w-6 h-6" style={{ color: THEME.turquoise }} /> },
+                            { key: 'satisfaction', icon: <CheckCircle2 className="w-6 h-6" style={{ color: THEME.turquoise }} /> }
+                        ].map((item, index) => {
+                            const { ref, isVisible } = useScrollAnimation({ threshold: 0.1, delay: index * 100 });
+                            return (
+                                <div
+                                    key={item.key}
+                                    ref={ref as React.RefObject<HTMLDivElement>}
+                                    className={`p-5 rounded-xl text-center transition-all duration-700 ${
+                                        isVisible 
+                                            ? 'opacity-100 translate-y-0 scale-100' 
+                                            : 'opacity-0 translate-y-12 scale-95'
+                                    } hover:scale-105 hover:shadow-xl glass-hover`}
+                                    style={{
+                                        background: 'var(--theme-bg-tertiary)',
+                                        border: '1px solid var(--theme-border-primary)',
+                                        transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                        transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(48px) scale(0.95)'
+                                    }}
+                                >
+                                    <div className="mb-3 flex justify-center">{item.icon}</div>
+                                    <div 
+                                        className="text-sm sm:text-base font-semibold"
+                                        style={{ color: 'var(--theme-text-primary)' }}
+                                    >
+                                        {t(`aboutUs.trustIndicators.${item.key}`)}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Container>
+            </Section>
+
+            {/* Security Section — فوق الرادار، 3 في الصف */}
+            <Section style={{ background: 'transparent' }}>
+                <Container>
+                    <div className="max-w-5xl mx-auto">
+                        <AnimatedSection delay={0}>
+                            <div className="text-center mb-2 sm:mb-3">
+                                <div 
+                                    className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
+                                    style={{ backgroundColor: THEME.turquoiseLight, boxShadow: '0 2px 12px rgba(32, 178, 170, 0.2)' }}
+                                >
+                                    <Lock className="w-5 h-5" style={{ color: THEME.turquoise }} />
                                 </div>
                                 <h2 
-                                    className="text-3xl sm:text-4xl font-bold mb-2 sm:mb-3"
-                                    style={{ 
-                                        color: 'var(--theme-text-primary)',
-                                        textShadow: '0 2px 10px rgba(32, 178, 170, 0.1)'
-                                    }}
+                                    className="text-lg sm:text-xl font-bold mb-1"
+                                    style={{ color: 'var(--theme-text-primary)' }}
                                 >
                                     {t('aboutUs.security.title')}
                                 </h2>
-                                <p 
-                                    className="text-lg"
-                                    style={{ color: 'var(--theme-text-secondary)' }}
-                                >
+                                <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
                                     {t('aboutUs.security.subtitle')}
                                 </p>
                             </div>
                         </AnimatedSection>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 px-2">
                             {[
                                 { titleKey: 'aboutUs.security.tenantIsolation.title', descKey: 'aboutUs.security.tenantIsolation.desc' },
                                 { titleKey: 'aboutUs.security.rbac.title', descKey: 'aboutUs.security.rbac.desc' },
@@ -1110,32 +1420,27 @@ export const AboutUs: React.FC = () => {
                                 { titleKey: 'aboutUs.security.auditLogs.title', descKey: 'aboutUs.security.auditLogs.desc' },
                                 { titleKey: 'aboutUs.security.monitoring.title', descKey: 'aboutUs.security.monitoring.desc' }
                             ].map((item, index) => {
-                                const { ref, isVisible } = useScrollAnimation({ threshold: 0.1, delay: index * 100 });
+                                const { ref, isVisible } = useScrollAnimation({ threshold: 0.1, delay: index * 80 });
                                 return (
                                     <div
                                         key={index}
                                         ref={ref as React.RefObject<HTMLDivElement>}
-                                        className={`p-4 rounded-lg flex items-start gap-3 transition-all duration-700 ${
-                                            isVisible 
-                                                ? 'opacity-100 translate-x-0 scale-100' 
-                                                : 'opacity-0 translate-x-12 scale-95'
-                                        } hover:scale-[1.03] hover:shadow-xl hover:-translate-y-1 glass-hover`}
+                                        className={`p-2.5 rounded-lg flex items-start gap-2 transition-all duration-500 ${
+                                            isVisible ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 translate-x-8 scale-95'
+                                        } hover:scale-[1.02] hover:shadow-lg`}
                                         style={{
                                             background: 'var(--theme-bg-tertiary)',
                                             border: '1px solid var(--theme-border-primary)',
-                                            transition: 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                            transform: isVisible ? 'translateX(0) scale(1)' : 'translateX(48px) scale(0.95)'
+                                            transition: 'all 0.5s ease',
+                                            transform: isVisible ? 'translateX(0) scale(1)' : 'translateX(24px) scale(0.95)'
                                         }}
                                     >
-                                        <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5 transition-transform duration-300 hover:scale-110" style={{ color: turquoise }} />
-                                        <div>
-                                            <h3 
-                                                className="font-semibold mb-1"
-                                                style={{ color: 'var(--theme-text-primary)' }}
-                                            >
+                                        <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: THEME.turquoise }} />
+                                        <div className="min-w-0">
+                                            <h3 className="text-sm font-semibold mb-0.5" style={{ color: 'var(--theme-text-primary)' }}>
                                                 {t(item.titleKey)}
                                             </h3>
-                                            <p style={{ color: 'var(--theme-text-secondary)' }}>
+                                            <p className="text-xs leading-snug" style={{ color: 'var(--theme-text-secondary)' }}>
                                                 {t(item.descKey)}
                                             </p>
                                         </div>
@@ -1147,585 +1452,370 @@ export const AboutUs: React.FC = () => {
                 </Container>
             </Section>
 
-            {/* CTA Section - Elegant Light Background */}
+            {/* CTA Section - 2026 Premium Design (جاهز للبدء؟ + الرادار) */}
             <Section 
                 style={{
                     background: isDark 
-                        ? 'rgba(15, 23, 42, 0.95)'
-                        : '#fefefe',
+                        ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(15, 23, 42, 0.95) 100%)'
+                        : 'linear-gradient(180deg, #fefefe 0%, #fafafa 100%)',
                     position: 'relative',
-                    overflow: 'hidden',
-                    minHeight: 'clamp(400px, 50vh, 600px)',
+                    overflow: 'visible',
+                    minHeight: 'clamp(320px, 46vh, 500px)',
                     display: 'flex',
                     alignItems: 'center',
                     width: '100%',
-                    paddingTop: 'clamp(24px, 6vw, 48px)',
-                    paddingBottom: 'clamp(24px, 6vw, 48px)'
+                    paddingTop: 'clamp(16px, 3vw, 28px)',
+                    paddingBottom: 'clamp(16px, 3vw, 28px)'
                 }}
             >
                 <Container>
-                    <AnimatedSection delay={0}>
-                        <div className="text-center max-w-3xl mx-auto relative z-10 py-8 sm:py-12">
-                            <h2 
-                                className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 md:mb-6"
-                                style={{ 
-                                    color: isDark ? '#ffffff' : 'var(--theme-text-primary)',
-                                    textShadow: isDark ? '0 2px 8px rgba(0, 0, 0, 0.3)' : 'none'
-                                }}
-                            >
-                                {t('aboutUs.cta.title')}
-                            </h2>
-                            <p 
-                                className="text-base sm:text-lg md:text-xl font-medium mb-6 sm:mb-8 md:mb-10 px-4"
-                                style={{ 
-                                    color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'var(--theme-text-secondary)',
-                                    textShadow: isDark ? '0 1px 4px rgba(0, 0, 0, 0.3)' : 'none'
-                                }}
-                            >
-                                {t('aboutUs.cta.subtitle')}
-                            </p>
-                        </div>
-                    </AnimatedSection>
-                        
-                        {/* 🗺️ Saudi Arabia Map Radar - Premium Professional Design */}
+                    {/* CTA + Radar — توسيط متوازن، بدون تراكب */}
+                    <div 
+                        className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-center justify-items-center"
+                        style={{ isolation: 'isolate' }}
+                    >
+                        {/* عمود النص — منتصف */}
                         <div 
-                            className="relative w-full flex items-center justify-center mb-8 sm:mb-10 md:mb-12"
-                            style={{
-                                minHeight: 'clamp(350px, min(55vw, 55vh), 600px)',
-                                maxHeight: 'clamp(350px, min(55vw, 55vh), 600px)',
-                                marginTop: 'clamp(20px, 5vw, 40px)',
-                                marginBottom: 'clamp(30px, 7vw, 60px)',
-                                padding: 'clamp(15px, 3vw, 30px)'
-                            }}
+                            className="lg:col-span-6 w-full max-w-xl flex flex-col items-center justify-center text-center space-y-3 lg:space-y-4"
+                            style={{ position: 'relative', zIndex: 1 }}
                         >
-                            <div 
-                                className="saudi-map-radar-premium"
-                                style={{
-                                    position: 'relative',
-                                    width: 'clamp(350px, min(55vw, 55vh), 600px)',
-                                    height: 'clamp(350px, min(55vw, 55vh), 600px)',
-                                    maxWidth: 'min(98vw, 98vh)',
-                                    maxHeight: 'min(98vw, 98vh)',
-                                    aspectRatio: '1 / 1',
-                                    margin: '0 auto',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    overflow: 'visible'
-                                }}
-                            >
-                                
-                                {/* Premium Wave Circles - 8 Concentric Circles from Center */}
-                                {[1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3].map((scale, i) => (
-                                    <div
-                                        key={`premium-wave-${i}`}
-                                        style={{
-                                            position: 'absolute',
-                                            top: '50%',
-                                            left: '50%',
-                                            width: `${scale * 100}%`,
-                                            height: `${scale * 100}%`,
-                                            transform: 'translate(-50%, -50%)',
-                                            borderRadius: '50%',
-                                            border: `2.5px dashed ${isDark ? `rgba(32, 178, 170, ${0.3 - i * 0.035})` : `rgba(32, 178, 170, ${0.25 - i * 0.03})`}`,
-                                            zIndex: 2,
-                                            opacity: 0.7 - (i * 0.08),
-                                            animation: `waveCircleExpand ${5 + i * 0.6}s ease-out infinite`,
-                                            animationDelay: `${i * 0.5}s`,
-                                            boxShadow: `0 0 ${25 + i * 10}px ${isDark ? `rgba(32, 178, 170, ${0.15 - i * 0.018})` : `rgba(32, 178, 170, ${0.12 - i * 0.015})`}`,
-                                            filter: 'blur(0.5px)'
+                            <AnimatedSection delay={0}>
+                                <div className="space-y-2 lg:space-y-3">
+                                    <h2 
+                                        className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight"
+                                        style={{ 
+                                            color: 'var(--theme-text-primary)',
+                                            background: 'linear-gradient(135deg, var(--theme-text-primary) 0%, var(--theme-text-secondary) 100%)',
+                                            WebkitBackgroundClip: 'text',
+                                            WebkitTextFillColor: 'transparent',
+                                            backgroundClip: 'text'
                                         }}
-                                    />
-                                ))}
-                                
-                                {/* Premium Wave Lines - 20 Radial Lines from Center */}
-                                {Array.from({ length: 20 }).map((_, i) => {
-                                    const angle = (i * 18) * (Math.PI / 180);
-                                    return (
-                                        <div
-                                            key={`premium-wave-line-${i}`}
-                                            style={{
-                                                position: 'absolute',
-                                                top: '50%',
-                                                left: '50%',
-                                                width: '1.5px',
-                                                height: '45%',
-                                                background: isDark
-                                                    ? 'linear-gradient(to bottom, rgba(32, 178, 170, 0.35) 0%, rgba(32, 178, 170, 0.15) 40%, rgba(32, 178, 170, 0.05) 70%, transparent 100%)'
-                                                    : 'linear-gradient(to bottom, rgba(32, 178, 170, 0.3) 0%, rgba(32, 178, 170, 0.12) 40%, rgba(32, 178, 170, 0.04) 70%, transparent 100%)',
-                                                transformOrigin: 'bottom center',
-                                                transform: `translate(-50%, -100%) rotate(${angle * (180 / Math.PI)}deg)`,
-                                                zIndex: 2,
-                                                opacity: 0.75,
-                                                animation: `waveLinePulse ${3 + (i % 5) * 0.4}s ease-in-out infinite`,
-                                                animationDelay: `${i * 0.18}s`,
-                                                boxShadow: `0 0 8px ${isDark ? 'rgba(32, 178, 170, 0.2)' : 'rgba(32, 178, 170, 0.15)'}`
-                                            }}
-                                        />
-                                    );
-                                })}
-                                
-                                {/* Premium Center Point - Riyadh */}
-                                <div 
+                                    >
+                                        {t('aboutUs.cta.title')}
+                                    </h2>
+                                    <p 
+                                        className="text-base sm:text-lg md:text-xl lg:text-2xl font-medium leading-relaxed max-w-2xl mx-auto"
+                                        style={{ 
+                                            color: isDark ? 'rgba(255, 255, 255, 0.85)' : 'var(--theme-text-secondary)',
+                                            textShadow: isDark ? '0 1px 4px rgba(0, 0, 0, 0.3)' : 'none'
+                                        }}
+                                    >
+                                        {t('aboutUs.cta.subtitle')}
+                                    </p>
+                                </div>
+                            </AnimatedSection>
+
+                            {/* زر طلب التجربة — في المنتصف */}
+                            <div className="flex justify-center pt-2">
+                                <button
+                                    type="button"
+                                    aria-label={t('aboutUs.cta.button') || undefined}
+                                    onClick={() => setShowTrialModal(true)}
+                                    className="group relative px-8 py-4 rounded-2xl font-semibold text-white transition-all duration-500 flex items-center gap-3 overflow-hidden"
                                     style={{
-                                        position: 'absolute',
-                                        top: '50%',
-                                        left: '50%',
-                                        transform: 'translate(-50%, -50%)',
-                                        width: '12px',
-                                        height: '12px',
-                                        borderRadius: '50%',
-                                        background: 'radial-gradient(circle, rgba(32, 178, 170, 1) 0%, rgba(32, 178, 170, 0.8) 60%, rgba(32, 178, 170, 0.4) 100%)',
-                                        boxShadow: '0 0 25px rgba(32, 178, 170, 1), 0 0 50px rgba(32, 178, 170, 0.9), 0 0 80px rgba(32, 178, 170, 0.6)',
-                                        zIndex: 6,
-                                        border: '3px solid rgba(255, 255, 255, 0.98)',
-                                        animation: 'centerPulse 2s ease-in-out infinite'
+                                        background: `linear-gradient(135deg, ${THEME.turquoise} 0%, #0D9488 100%)`,
+                                        boxShadow: `0 8px 32px rgba(20, 184, 166, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) inset`,
+                                        transform: 'translateY(0)',
                                     }}
-                                />
-                                
-                                {/* Pulsing Circles - Expanding from Center with Fade Out */}
-                                {[1, 2, 3, 4, 5].map((i) => (
-                                    <div
-                                        key={`pulse-circle-${i}`}
-                                        style={{
-                                            position: 'absolute',
-                                            top: '50%',
-                                            left: '50%',
-                                            transform: 'translate(-50%, -50%) scale(0.5)',
-                                            width: '20px',
-                                            height: '20px',
-                                            borderRadius: '50%',
-                                            border: `2px solid ${isDark ? 'rgba(32, 178, 170, 0.8)' : 'rgba(32, 178, 170, 0.7)'}`,
-                                            zIndex: 5,
-                                            animation: `pulseExpand ${2 + i * 0.3}s ease-out infinite`,
-                                            animationDelay: `${i * 0.4}s`,
-                                            opacity: 0.8,
-                                            pointerEvents: 'none'
-                                        }}
-                                    />
-                                ))}
-                                
-                                {/* Room Numbers (102-110) - Representing Active Rooms */}
-                        {roomPositions.map(({ roomNum, angle, x, y, borderColor }, index) => {
-                            const isScanned = scannedRooms.has(roomNum);
-                            const distance = Math.sqrt(Math.pow(x - 50, 2) + Math.pow(y - 50, 2));
-                            const scanIndex = scannedRoomsOrder.indexOf(roomNum);
-                            const isRecentlyScanned = scanIndex >= 0 && scanIndex < 3; // Last 3 scanned rooms
-                            
-                            // Find next room for path connection
-                            const nextRoomIndex = (index + 1) % roomPositions.length;
-                            const nextRoom = roomPositions[nextRoomIndex];
-                            const nextRoomScanned = scannedRooms.has(nextRoom.roomNum);
-                            // Show path if current room is scanned AND next room is also scanned (for smooth transition)
-                            const shouldShowPath = isScanned && nextRoomScanned;
-                            
-                            return (
-                                <div
-                                    key={roomNum}
-                                    className="radar-room-number"
-                                    data-room={roomNum}
-                                    style={{
-                                        position: 'absolute',
-                                        left: `${x}%`,
-                                        top: `${y}%`,
-                                        transform: 'translate(-50%, -50%)',
-                                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+                                        e.currentTarget.style.boxShadow = '0 16px 48px rgba(20, 184, 166, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.2) inset';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                        e.currentTarget.style.boxShadow = '0 8px 32px rgba(20, 184, 166, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) inset';
                                     }}
                                 >
-                                    {/* Path line to next room - Animated - Shows when both rooms are scanned */}
-                                    {shouldShowPath && (() => {
-                                        const pathAngle = Math.atan2(nextRoom.y - y, nextRoom.x - x) * (180 / Math.PI);
-                                        const pathLength = Math.sqrt(Math.pow(nextRoom.x - x, 2) + Math.pow(nextRoom.y - y, 2)) * 2;
-                                        
-                                        return (
-                                            <>
-                                                <div
-                                                    className="room-path-line"
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '50%',
-                                                        left: '50%',
-                                                        width: `${pathLength}%`,
-                                                        height: '4px',
-                                                        background: `linear-gradient(to right, 
-                                                            rgba(32, 178, 170, 0.5) 0%,
-                                                            rgba(32, 178, 170, 0.9) 30%,
-                                                            rgba(32, 178, 170, 1) 50%,
-                                                            rgba(32, 178, 170, 0.9) 70%,
-                                                            rgba(32, 178, 170, 0.5) 100%
-                                                        )`,
-                                                        transformOrigin: 'left center',
-                                                        transform: `translate(-50%, -50%) rotate(${pathAngle}deg)`,
-                                                        opacity: 1,
-                                                        animation: 'pathPulse 1.5s ease-in-out infinite',
-                                                        boxShadow: '0 0 15px rgba(32, 178, 170, 0.8), 0 0 30px rgba(32, 178, 170, 0.5)',
-                                                        zIndex: 0,
-                                                        transition: 'opacity 0.3s ease',
-                                                        pointerEvents: 'none'
-                                                    }}
-                                                />
-                                                
-                                                {/* Moving dot along path - Like someone running between rooms */}
-                                                <div
-                                                    className="path-dot"
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '50%',
-                                                        left: '50%',
-                                                        width: '14px',
-                                                        height: '14px',
-                                                        borderRadius: '50%',
-                                                        background: 'radial-gradient(circle, rgba(32, 178, 170, 1) 0%, rgba(32, 178, 170, 0.9) 30%, rgba(32, 178, 170, 0.6) 60%, transparent 100%)',
-                                                        transformOrigin: 'left center',
-                                                        transform: `translate(-50%, -50%) rotate(${pathAngle}deg)`,
-                                                        animation: `pathDotMove 1.8s ease-in-out infinite`,
-                                                        boxShadow: '0 0 25px rgba(32, 178, 170, 1), 0 0 50px rgba(32, 178, 170, 0.8)',
-                                                        zIndex: 2,
-                                                        transition: 'all 0.3s ease',
-                                                        pointerEvents: 'none'
-                                                    }}
-                                                />
-                                                
-                                                {/* Trail effect behind moving dot */}
-                                                <div
-                                                    className="path-trail"
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '50%',
-                                                        left: '50%',
-                                                        width: '10px',
-                                                        height: '10px',
-                                                        borderRadius: '50%',
-                                                        background: 'radial-gradient(circle, rgba(32, 178, 170, 0.8) 0%, rgba(32, 178, 170, 0.4) 50%, transparent 100%)',
-                                                        transformOrigin: 'left center',
-                                                        transform: `translate(-50%, -50%) rotate(${pathAngle}deg)`,
-                                                        animation: `pathDotMove 1.8s ease-in-out infinite 0.2s`,
-                                                        opacity: 0.7,
-                                                        zIndex: 1,
-                                                        pointerEvents: 'none'
-                                                    }}
-                                                />
-                                            </>
-                                        );
-                                    })()}
-                                    {/* Modern Hotel Room Badge - Premium 3D Design */}
-                                    <div
-                                        className="room-badge"
+                                    {/* Shimmer Effect */}
+                                    <span 
+                                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
                                         style={{
-                                            position: 'relative',
+                                            background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%)',
+                                            transform: 'translateX(-100%)',
+                                            animation: 'shimmer2026 2s infinite'
+                                        }}
+                                    />
+                                    <span className="relative z-10 flex items-center gap-3">
+                                        {t('aboutUs.cta.button')}
+                                        <Send className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1 group-hover:scale-110" />
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* عمود الرادار — الدائرة كاملة ظاهرة بدون قص */}
+                        <div 
+                            className="lg:col-span-6 w-full flex items-center justify-center"
+                            style={{ position: 'relative', zIndex: 0, isolation: 'isolate' }}
+                        >
+                            <div 
+                                className="relative w-full flex flex-col items-center justify-center"
+                                style={{
+                                    minHeight: 'clamp(154px, min(26.6vw, 26.6vh), 252px)',
+                                    maxHeight: 'clamp(154px, min(26.6vw, 26.6vh), 252px)',
+                                    padding: 'clamp(6px, 1.2vw, 12px)'
+                                }}
+                                aria-hidden="true"
+                            >
+                                <div 
+                                    className="radar-dome radar-dome-square"
+                                    style={{
+                                        position: 'relative',
+                                        flexShrink: 0,
+                                        isolation: 'isolate',
+                                        width: `clamp(${280 * RADAR_CONFIG.SIZE_SCALE}px, min(${48 * RADAR_CONFIG.SIZE_SCALE}vw, ${48 * RADAR_CONFIG.SIZE_SCALE}vh), ${480 * RADAR_CONFIG.SIZE_SCALE}px)`,
+                                        height: `clamp(${280 * RADAR_CONFIG.SIZE_SCALE}px, min(${48 * RADAR_CONFIG.SIZE_SCALE}vw, ${48 * RADAR_CONFIG.SIZE_SCALE}vh), ${480 * RADAR_CONFIG.SIZE_SCALE}px)`,
+                                        minWidth: `clamp(${280 * RADAR_CONFIG.SIZE_SCALE}px, min(${48 * RADAR_CONFIG.SIZE_SCALE}vw, ${48 * RADAR_CONFIG.SIZE_SCALE}vh), ${480 * RADAR_CONFIG.SIZE_SCALE}px)`,
+                                        minHeight: `clamp(${280 * RADAR_CONFIG.SIZE_SCALE}px, min(${48 * RADAR_CONFIG.SIZE_SCALE}vw, ${48 * RADAR_CONFIG.SIZE_SCALE}vh), ${480 * RADAR_CONFIG.SIZE_SCALE}px)`,
+                                        borderRadius: '50%',
+                                        background: isDark
+                                            ? 'radial-gradient(circle at 50% 50%, #0f172a 0%, #1e293b 55%, #334155 100%)'
+                                            : 'radial-gradient(circle at 50% 50%, #f8fafc 0%, #f0fdfa 50%, rgba(20, 184, 166, 0.15) 100%)',
+                                        border: `2px solid ${isDark ? 'rgba(20, 184, 166, 0.5)' : 'rgba(13, 148, 136, 0.6)'}`,
+                                        boxShadow: isDark
+                                            ? '0 0 0 1px rgba(0,0,0,0.3) inset, 0 20px 50px rgba(0,0,0,0.4)'
+                                            : '0 0 0 1px rgba(255,255,255,0.5) inset, 0 20px 50px rgba(20, 184, 166, 0.15)',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    {/* دوائر متحدة المركز */}
+                                    {Array.from({ length: RADAR_CONFIG.RINGS }, (_, i) => {
+                                        const r = ((i + 1) / RADAR_CONFIG.RINGS) * 50;
+                                        return (
+                                            <div
+                                                key={`ring-${i}`}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '50%',
+                                                    left: '50%',
+                                                    width: `${r * 2}%`,
+                                                    height: `${r * 2}%`,
+                                                    marginLeft: `-${r}%`,
+                                                    marginTop: `-${r}%`,
+                                                    borderRadius: '50%',
+                                                    border: `1px solid ${isDark ? 'rgba(20, 184, 166, 0.45)' : 'rgba(13, 148, 136, 0.6)'}`,
+                                                    zIndex: 1
+                                                }}
+                                            />
+                                        );
+                                    })}
+                                    {/* خطوط شعاعية */}
+                                    {Array.from({ length: RADAR_CONFIG.RAYS }, (_, i) => {
+                                        const angle = (i / RADAR_CONFIG.RAYS) * 360;
+                                        return (
+                                            <div
+                                                key={`ray-${i}`}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '50%',
+                                                    left: '50%',
+                                                    width: '2px',
+                                                    height: '50%',
+                                                    transformOrigin: '50% 100%',
+                                                    transform: `translate(-50%, -100%) rotate(${angle}deg)`,
+                                                    background: `linear-gradient(to top, ${isDark ? 'rgba(20, 184, 166, 0.5)' : 'rgba(255,255,255,0.5)'}, transparent)`,
+                                                    zIndex: 1
+                                                }}
+                                            />
+                                        );
+                                    })}
+                                    {/* نقطة المركز — في الفاتح: تيل بدون إطار؛ في الداكن: أبيض */}
+                                    <div
+                                        className="radar-center-dot"
+                                        role="presentation"
+                                        tabIndex={-1}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '50%',
+                                            left: '50%',
+                                            width: '8px',
+                                            height: '8px',
+                                            marginLeft: '-4px',
+                                            marginTop: '-4px',
+                                            borderRadius: '50%',
+                                            outline: 'none',
+                                            border: 'none',
+                                            background: isDark ? 'rgba(255,255,255,0.95)' : 'rgba(13, 148, 136, 0.95)',
+                                            boxShadow: isDark
+                                                ? '0 0 12px rgba(255,255,255,0.9), 0 0 24px rgba(255,255,255,0.5)'
+                                                : '0 0 12px rgba(13, 148, 136, 0.8), 0 0 24px rgba(13, 148, 136, 0.4)',
+                                            zIndex: 6
+                                        }}
+                                    />
+                                    {/* شعاع wedge دوّار — ساطع أماماً وظل خلف المؤشر */}
+                                    <div
+                                        className="radar-sweep-wedge radar-sweep-wedge-rotate"
+                                        style={{
+                                            position: 'absolute',
+                                            inset: 0,
+                                            borderRadius: '50%',
+                                            background: isDark
+                                                ? `conic-gradient(from 90deg, rgba(20, 184, 166, 0.15) 0deg, rgba(20, 184, 166, 0.35) 10deg, rgba(20, 184, 166, 0.5) 20deg, rgba(20, 184, 166, 0.7) ${RADAR_CONFIG.SWEEP_WEDGE_DEG}deg, transparent ${RADAR_CONFIG.SWEEP_WEDGE_DEG}deg, transparent 360deg)`
+                                                : `conic-gradient(from 90deg, rgba(13, 148, 136, 0.25) 0deg, rgba(13, 148, 136, 0.45) 10deg, rgba(13, 148, 136, 0.6) 20deg, rgba(13, 148, 136, 0.8) ${RADAR_CONFIG.SWEEP_WEDGE_DEG}deg, transparent ${RADAR_CONFIG.SWEEP_WEDGE_DEG}deg, transparent 360deg)`,
+                                            transformOrigin: 'center',
+                                            zIndex: 4,
+                                            pointerEvents: 'none',
+                                            willChange: 'transform',
+                                            animation: `radarSweepRotate ${RADAR_CONFIG.SCAN_DURATION_SEC}s linear infinite`
+                                        }}
+                                    />
+                                    {/* غرف = blips — أنيميشن ألوان أغمق/أفتح للغرفة تحت المؤشر فقط */}
+                                    {radarRoomPositions.map(({ roomNum, x, y, colorIndex }, i) => {
+                                        const isScanned = scannedRoomIndex === i;
+                                        const hue = [182, 175, 168, 178][colorIndex % 4];
+                                        return (
+                                            <div
+                                                key={roomNum}
+                                                style={{
+                                                    position: 'absolute',
+                                                    left: `${x}%`,
+                                                    top: `${y}%`,
+                                                    transform: 'translate(-50%, -50%)',
+                                                    zIndex: 5,
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                }}
+                                            >
+                                                <div
+                                                    className={isScanned ? 'radar-blip-animated' : undefined}
+                                                    style={{
+                                                        width: isScanned ? '18px' : '12px',
+                                                        height: isScanned ? '18px' : '12px',
+                                                        borderRadius: '50%',
+                                                        background: isScanned
+                                                            ? `hsl(${hue}, 75%, 55%)`
+                                                            : (isDark ? 'rgba(20, 184, 166, 0.5)' : 'rgba(20, 184, 166, 0.5)'),
+                                                        boxShadow: isScanned
+                                                            ? `0 0 20px hsla(${hue}, 80%, 60%, 0.9), 0 0 40px hsla(${hue}, 80%, 55%, 0.5)`
+                                                            : '0 0 10px rgba(32, 178, 170, 0.5)',
+                                                        transition: 'width 0.2s ease, height 0.2s ease, background 0.2s ease',
+                                                        ['--blip-hue' as string]: hue
+                                                    }}
+                                                />
+                                                {isScanned && (
+                                                    <span
+                                                        style={{
+                                                            fontSize: '11px',
+                                                            fontWeight: '700',
+                                                            color: `hsl(${hue}, 80%, 60%)`,
+                                                            textShadow: `0 0 8px hsla(${hue}, 80%, 60%, 0.9)`,
+                                                            animation: 'roomScanCheckIn 0.35s ease-out'
+                                                        }}
+                                                    >
+                                                        {roomNum}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                
+                                {/* شارة عمليات تلقائية — أكبر 30% من الحجم السابق، بدون outline */}
+                                <div
+                                    role="presentation"
+                                    tabIndex={-1}
+                                    className="mt-2 lg:mt-3 flex items-center justify-center origin-center [outline:none] focus:[outline:none] focus-visible:[outline:none]"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '8px 16px',
+                                        borderRadius: '13px',
+                                        background: isDark 
+                                            ? 'linear-gradient(135deg, rgba(20, 184, 166, 0.2) 0%, rgba(20, 184, 166, 0.12) 100%)'
+                                            : 'linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(20, 184, 166, 0.08) 100%)',
+                                        backdropFilter: 'blur(12px) saturate(180%)',
+                                        border: `1px solid ${isDark ? 'rgba(20, 184, 166, 0.4)' : 'rgba(20, 184, 166, 0.3)'}`,
+                                        boxShadow: isDark
+                                            ? `0 3px 12px rgba(20, 184, 166, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.05) inset`
+                                            : `0 3px 12px rgba(20, 184, 166, 0.12), 0 0 0 1px rgba(13, 148, 136, 0.15) inset`,
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        transform: 'scale(0.624)',
+                                        outline: 'none'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'scale(0.624) translateY(-1px)';
+                                        e.currentTarget.style.boxShadow = isDark
+                                            ? `0 4px 16px rgba(20, 184, 166, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08) inset`
+                                            : `0 4px 16px rgba(20, 184, 166, 0.18), 0 0 0 1px rgba(13, 148, 136, 0.2) inset`;
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'scale(0.624)';
+                                        e.currentTarget.style.boxShadow = isDark
+                                            ? `0 3px 12px rgba(20, 184, 166, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.05) inset`
+                                            : `0 3px 12px rgba(20, 184, 166, 0.12), 0 0 0 1px rgba(13, 148, 136, 0.15) inset`;
+                                    }}
+                                >
+                                    <div
+                                        className="cta-badge-gear"
+                                        style={{
+                                            width: '27px',
+                                            height: '27px',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            gap: '4px',
-                                            minWidth: 'clamp(48px, 7vw, 68px)',
-                                            height: 'clamp(26px, 4vw, 34px)',
-                                            padding: '0 clamp(8px, 1.2vw, 12px)',
-                                            background: isScanned 
-                                                ? `linear-gradient(135deg, ${borderColor} 0%, ${borderColor}DD 100%)`
-                                                : (isDark
-                                                    ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)'
-                                                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)'),
-                                            backdropFilter: 'blur(20px) saturate(180%)',
-                                            border: isScanned 
-                                                ? `1.5px solid ${borderColor}` 
-                                                : `1px solid ${borderColor}40`,
-                                            borderRadius: '12px',
-                                            color: isScanned 
-                                                ? '#ffffff'
-                                                : (isDark
-                                                    ? 'rgba(255, 255, 255, 0.9)'
-                                                    : 'rgba(30, 41, 59, 0.9)'),
-                                            fontSize: 'clamp(10px, 1.5vw, 13px)',
-                                            fontWeight: '700',
-                                            fontFamily: 'system-ui, -apple-system, "SF Pro Display", sans-serif',
-                                            letterSpacing: '0.2px',
-                                            textShadow: isScanned ? '0 1px 4px rgba(0, 0, 0, 0.2)' : 'none',
-                                            boxShadow: isScanned
-                                                ? `0 8px 32px ${borderColor}66, 0 4px 16px ${borderColor}33, inset 0 1px 0 rgba(255, 255, 255, 0.2)`
-                                                : (isDark
-                                                    ? `0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)`
-                                                    : `0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8)`),
-                                            transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                            transform: isScanned ? 'scale(1.1) translateY(-3px)' : 'scale(1)',
-                                            zIndex: isScanned ? 10 : 1,
-                                            animation: isScanned ? 'roomBounce 0.6s ease-out' : 'none',
-                                            overflow: 'hidden'
+                                            animation: 'autoGearRotate 3s linear infinite',
+                                            filter: isDark ? 'drop-shadow(0 0 8px rgba(20, 184, 166, 0.6))' : 'drop-shadow(0 0 6px rgba(13, 148, 136, 0.5))',
+                                            outline: 'none',
+                                            boxShadow: 'none',
+                                            border: 'none'
                                         }}
+                                        tabIndex={-1}
                                     >
-                                        {/* Shimmer effect overlay */}
-                                        {isScanned && (
-                                            <div 
-                                                style={{
-                                                    position: 'absolute',
-                                                    inset: 0,
-                                                    background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%)',
-                                                    animation: 'shimmer 2s ease-in-out infinite',
-                                                    pointerEvents: 'none'
-                                                }}
-                                            />
-                                        )}
-                                        
-                                        {/* Modern Room Icon */}
-                                        <DoorOpen 
-                                            style={{
-                                                width: 'clamp(16px, 2.4vw, 22px)',
-                                                height: 'clamp(16px, 2.4vw, 22px)',
-                                                opacity: isScanned ? 1 : 0.8,
-                                                color: isScanned ? '#ffffff' : borderColor,
-                                                transition: 'all 0.3s ease',
-                                                filter: isScanned ? 'drop-shadow(0 0 6px rgba(255, 255, 255, 0.6))' : 'none',
-                                                transform: isScanned ? 'scale(1.1)' : 'scale(1)'
-                                            }}
-                                        />
-                                        
-                                        {/* Room Number - Modern Typography */}
-                                        <span style={{
-                                            fontSize: 'clamp(11px, 1.6vw, 14px)',
-                                            fontWeight: '800',
-                                            lineHeight: '1',
-                                            letterSpacing: '0.4px',
-                                            position: 'relative',
-                                            zIndex: 1
-                                        }}>
-                                            {roomNum}
-                                        </span>
-                                        
-                                        {/* Status Indicator Dot */}
-                                        <div 
-                                            style={{
-                                                width: '5px',
-                                                height: '5px',
-                                                borderRadius: '50%',
-                                                background: isScanned ? '#ffffff' : borderColor,
-                                                opacity: isScanned ? 1 : 0.6,
-                                                transition: 'all 0.3s ease',
-                                                boxShadow: isScanned 
-                                                    ? '0 0 8px rgba(255, 255, 255, 0.8), 0 0 16px rgba(255, 255, 255, 0.4)' 
-                                                    : `0 0 4px ${borderColor}80`,
-                                                animation: isScanned ? 'pulse 1.5s ease-in-out infinite' : 'none'
-                                            }}
-                                        />
-                                        
-                                        {/* Glow effect when scanned - Reduced Size */}
-                                        <div 
-                                            className="room-glow"
-                                            style={{
-                                                position: 'absolute',
-                                                inset: '-4px',
-                                                borderRadius: '24px',
-                                                background: `radial-gradient(circle, ${borderColor}60 0%, ${borderColor}20 50%, transparent 100%)`,
-                                                opacity: isScanned ? 0.7 : 0,
-                                                transition: 'opacity 0.2s ease',
-                                                pointerEvents: 'none',
-                                                zIndex: -1,
-                                                animation: isScanned ? 'roomGlow 1s ease-out infinite' : 'none',
-                                                filter: isScanned ? `drop-shadow(0 0 4px ${borderColor}60)` : 'none'
-                                            }}
-                                        />
-                                        
-                                        {/* Pulse ring when scanned - Reduced Size */}
-                                        <div 
-                                            className="room-pulse-ring"
-                                            style={{
-                                                position: 'absolute',
-                                                inset: '-6px',
-                                                borderRadius: '26px',
-                                                border: `2px solid ${borderColor}CC`,
-                                                opacity: isScanned ? 0.6 : 0,
-                                                transform: isScanned ? 'scale(1)' : 'scale(0.8)',
-                                                transition: 'all 0.3s ease',
-                                                pointerEvents: 'none',
-                                                zIndex: -2,
-                                                animation: isScanned ? 'roomPulse 1.2s ease-out infinite' : 'none',
-                                                boxShadow: isScanned 
-                                                    ? `0 0 15px ${borderColor}66, 0 0 30px ${borderColor}33`
-                                                    : 'none'
-                                            }}
-                                        />
-                                        
-                                        {/* Additional sparkle effect when scanned */}
-                                        {isScanned && (
-                                            <>
-                                                <div 
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: '-8px',
-                                                        right: '-8px',
-                                                        width: '12px',
-                                                        height: '12px',
-                                                        borderRadius: '50%',
-                                                        background: 'radial-gradient(circle, rgba(32, 178, 170, 1) 0%, transparent 70%)',
-                                                        animation: 'roomSparkle 1s ease-in-out infinite',
-                                                        boxShadow: '0 0 15px rgba(32, 178, 170, 0.9)'
-                                                    }}
-                                                />
-                                                <div 
-                                                    style={{
-                                                        position: 'absolute',
-                                                        bottom: '-8px',
-                                                        left: '-8px',
-                                                        width: '10px',
-                                                        height: '10px',
-                                                        borderRadius: '50%',
-                                                        background: 'radial-gradient(circle, rgba(32, 178, 170, 0.9) 0%, transparent 70%)',
-                                                        animation: 'roomSparkle 1s ease-in-out infinite 0.3s',
-                                                        boxShadow: '0 0 12px rgba(32, 178, 170, 0.7)'
-                                                    }}
-                                                />
-                                            </>
-                                        )}
+                                        <svg
+                                            width="27"
+                                            height="27"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke={THEME.turquoise}
+                                            strokeWidth="2.2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            focusable={false}
+                                            aria-hidden={true}
+                                        >
+                                            <circle cx="12" cy="12" r="3"/>
+                                            <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
+                                        </svg>
                                     </div>
                                     
-                                    {/* Connection line to center (subtle) */}
-                                    <div
-                                        className="room-connection-line"
+                                    <span
                                         style={{
-                                            position: 'absolute',
-                                            top: '50%',
-                                            left: '50%',
-                                            width: `${distance * 2}%`,
-                                            height: '1px',
-                                            background: `linear-gradient(to right, 
-                                                transparent 0%,
-                                                ${isScanned ? 'rgba(32, 178, 170, 0.4)' : isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.12)'} 50%,
-                                                transparent 100%
-                                            )`,
-                                            transformOrigin: 'left center',
-                                            transform: `translate(-50%, -50%) rotate(${angle}deg)`,
-                                            opacity: isScanned ? 0.7 : 0.3,
-                                            transition: 'opacity 0.2s ease',
-                                            boxShadow: isScanned ? '0 0 10px rgba(32, 178, 170, 0.5)' : 'none'
+                                            fontSize: '16px',
+                                            fontWeight: '700',
+                                            color: isDark ? 'rgba(255, 255, 255, 0.98)' : 'rgba(30, 41, 59, 0.95)',
+                                            letterSpacing: '0.3px',
+                                            textShadow: isDark ? '0 1px 2px rgba(0, 0, 0, 0.3)' : 'none'
                                         }}
-                                    />
-                                </div>
-                            );
-                        })}
-                        
-                                {/* Radar Waves (Expanding from center) */}
-                                {[0, 1, 2].map((i) => (
-                                    <div
-                                        key={`wave-${i}`}
-                                        className="radar-wave"
-                                        style={{
-                                            position: 'absolute',
-                                            top: '50%',
-                                            left: '50%',
-                                            transform: 'translate(-50%, -50%)',
-                                            width: '100%',
-                                            height: '100%',
-                                            borderRadius: '50%',
-                                            border: `2px solid ${isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.25)'}`,
-                                            animation: `radarWave 3s ease-out infinite ${i * 1}s`,
-                                            opacity: 0
-                                        }}
-                                    />
-                                ))}
-                                
-                                {/* 🎯 Elegant Radar Pointer - Sophisticated Design for Adora */}
-                                <div
-                                    className="radar-elegant-pointer"
-                                    style={{
-                                        position: 'absolute',
-                                        top: '50%',
-                                        left: '50%',
-                                        transform: 'translate(-50%, -50%)',
-                                        transformOrigin: 'center center',
-                                        width: '2px',
-                                        height: '40%',
-                                        zIndex: 15,
-                                        animation: 'radarSweep 10s linear infinite'
-                                    }}
-                                >
-                                    {/* Main Pointer - Elegant Turquoise/Teal Gradient */}
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: '50%',
-                                            transform: 'translateX(-50%)',
-                                            width: '2px',
-                                            height: '100%',
-                                            background: `linear-gradient(to bottom, 
-                                                ${turquoise} 0%, 
-                                                rgba(32, 178, 170, 0.8) 30%,
-                                                rgba(20, 184, 166, 0.6) 60%,
-                                                rgba(20, 184, 166, 0.3) 90%,
-                                                transparent 100%
-                                            )`,
-                                            borderRadius: '1px',
-                                            boxShadow: `0 0 8px ${turquoise}40, 0 0 16px ${turquoise}30, 0 0 24px ${turquoise}20`,
-                                            filter: 'drop-shadow(0 0 2px rgba(32, 178, 170, 0.6))'
-                                        }}
-                                    />
+                                    >
+                                        {t('aboutUs.whyAdora.automaticOperations') || 'عمليات تلقائية'}
+                                    </span>
                                     
-                                    {/* Subtle Glow Trail */}
                                     <div
+                                        className="cta-badge-dot"
                                         style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: '50%',
-                                            transform: 'translateX(-50%)',
-                                            width: '6px',
-                                            height: '25%',
-                                            background: `linear-gradient(to bottom, ${turquoise}30 0%, transparent 100%)`,
-                                            borderRadius: '3px',
-                                            filter: 'blur(2px)',
-                                            opacity: 0.6
-                                        }}
-                                    />
-                                    
-                                    {/* Elegant Center Point */}
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            top: '50%',
-                                            left: '50%',
-                                            transform: 'translate(-50%, -50%)',
-                                            width: 'clamp(10px, 1.5vw, 14px)',
-                                            height: 'clamp(10px, 1.5vw, 14px)',
+                                            width: '7px',
+                                            height: '7px',
                                             borderRadius: '50%',
-                                            background: `radial-gradient(circle, ${turquoise} 0%, rgba(32, 178, 170, 0.8) 50%, rgba(20, 184, 166, 0.4) 100%)`,
-                                            boxShadow: `0 0 12px ${turquoise}60, 0 0 24px ${turquoise}40, inset 0 0 8px rgba(255, 255, 255, 0.2)`,
-                                            border: `1.5px solid rgba(32, 178, 170, 0.4)`,
-                                            zIndex: 20,
-                                            animation: 'pulse 3s ease-in-out infinite'
+                                            background: `radial-gradient(circle, ${THEME.turquoise} 0%, ${THEME.turquoise}CC 100%)`,
+                                            boxShadow: '0 0 6px rgba(32, 178, 170, 0.6), 0 0 12px rgba(32, 178, 170, 0.3)',
+                                            animation: 'autoDotPulse 2s ease-in-out infinite'
                                         }}
                                     />
                                 </div>
                             </div>
                         </div>
-                        
-                        <div className="flex flex-wrap items-center justify-center gap-4 mt-4 sm:mt-6">
-                            <button
-                                onClick={() => {
-                                    setScrollPosition(window.scrollY);
-                                    setShowTrialModal(true);
-                                }}
-                                className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-300 flex items-center gap-2 hover:scale-110 hover:shadow-2xl active:scale-95 shadow-lg group"
-                                style={{
-                                    backgroundColor: turquoise,
-                                    transform: 'translateY(0)',
-                                    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
-                                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(32, 178, 170, 0.4), 0 0 0 1px rgba(32, 178, 170, 0.2)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(32, 178, 170, 0.3)';
-                                }}
-                            >
-                                {t('aboutUs.cta.button')}
-                                <Send className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
-                            </button>
-                        </div>
+                    </div>
                 </Container>
             </Section>
 
-            {/* Footer */}
+            </div>
+
+            {/* Footer — آخر المحتوى قبل توقيع المطور */}
             <footer 
-                className="py-8 px-4 border-t"
+                className="py-4 px-4 border-t mt-auto"
                 style={{
                     background: 'var(--theme-bg-primary)',
                     borderColor: 'var(--theme-border-primary)'
@@ -1734,7 +1824,7 @@ export const AboutUs: React.FC = () => {
                 <Container>
                     <div className="text-center space-y-4">
                         <div className="flex items-center justify-center gap-2">
-                            <Heart className="w-5 h-5" style={{ color: turquoise }} />
+                            <Heart className="w-5 h-5" style={{ color: THEME.turquoise }} />
                             <p style={{ color: 'var(--theme-text-secondary)' }}>
                                 {t('aboutUs.footer.text')}
                             </p>
@@ -1780,12 +1870,13 @@ export const AboutUs: React.FC = () => {
                     <div className="space-y-4">
                         {/* Name Input */}
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2">
+                            <label htmlFor="trial-name" className="block text-sm font-medium text-white/80 mb-2">
                                 {t('aboutUs.trialForm.nameLabel')} <span className="text-red-400">*</span>
                             </label>
                             <div className="relative">
                                 <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                                 <input
+                                    id="trial-name"
                                     type="text"
                                     value={trialName}
                                     onChange={(e) => setTrialName(e.target.value)}
@@ -1793,18 +1884,20 @@ export const AboutUs: React.FC = () => {
                                     className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
                                     dir="rtl"
                                     disabled={isSubmitting}
+                                    autoComplete="name"
                                 />
                             </div>
                         </div>
 
                         {/* Phone Input */}
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2">
+                            <label htmlFor="trial-phone" className="block text-sm font-medium text-white/80 mb-2">
                                 {t('aboutUs.trialForm.phoneLabel')} <span className="text-red-400">*</span>
                             </label>
                             <div className="relative">
                                 <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                                 <input
+                                    id="trial-phone"
                                     type="tel"
                                     value={trialPhone}
                                     onChange={(e) => setTrialPhone(e.target.value.replace(/[^\d+]/g, ''))}
@@ -1813,6 +1906,7 @@ export const AboutUs: React.FC = () => {
                                     dir="ltr"
                                     disabled={isSubmitting}
                                     maxLength={20}
+                                    autoComplete="tel"
                                 />
                             </div>
                             <p className="text-xs text-white/50 mt-1">{t('aboutUs.trialForm.phoneExample')}</p>
@@ -1820,7 +1914,7 @@ export const AboutUs: React.FC = () => {
 
                         {/* Required Branches Input - Enhanced with Dropdown */}
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-2">
+                            <label htmlFor="trial-branches" className="block text-sm font-medium text-white/80 mb-2">
                                 عدد التراخيص المطلوبة (كل فرع = ترخيص واحد)
                             </label>
                             <div className="space-y-3">
@@ -1847,22 +1941,24 @@ export const AboutUs: React.FC = () => {
                                 <div className="relative">
                                     <Key className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                                     <input
+                                        id="trial-branches"
                                         type="number"
-                                        min="1"
-                                        max="100"
+                                        min={1}
+                                        max={100}
                                         value={trialRequiredBranches}
                                         onChange={(e) => {
-                                            const val = parseInt(e.target.value) || 1;
+                                            const val = parseInt(e.target.value, 10) || 1;
                                             setTrialRequiredBranches(Math.max(1, Math.min(100, val)));
                                         }}
                                         placeholder="أو أدخل عدد مخصص (1-100)"
                                         className="w-full pr-10 pl-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
                                         dir="ltr"
                                         disabled={isSubmitting}
+                                        aria-describedby="trial-branches-hint"
                                     />
                                 </div>
                             </div>
-                            <p className="text-xs text-white/50 mt-2">
+                            <p id="trial-branches-hint" className="text-xs text-white/50 mt-2">
                                 عدد الفروع التي تحتاجها (كل فرع يحتاج ترخيص واحد) • المحدد: <span className="text-teal-400 font-semibold">{trialRequiredBranches} ترخيص</span>
                             </p>
                         </div>
@@ -1889,7 +1985,7 @@ export const AboutUs: React.FC = () => {
             </UnifiedModal>
             </div>
 
-            {/* Logo Animation Styles - Same as Login Screen */}
+            {/* أنماط الصفحة: شعار، رادار، نجوم، أزرار، خلفيات (للصيانة: تعديل الأنيميشن من هنا) */}
             <style>{`
                 /* Logo floating animation - Only Logo Moves, Page Stays Fixed */
                 .logo-float {
@@ -2042,12 +2138,42 @@ export const AboutUs: React.FC = () => {
                 }
                 
                 /* 🎯 Active Requests Radar - Real Radar Screen Animation */
-                @keyframes radarSweep {
+                
+                /* ✅ Auto Badge Pulse Animation */
+                @keyframes autoBadgePulse {
+                    0%, 100% {
+                        transform: scale(1);
+                        opacity: 1;
+                        box-shadow: 0 2px 8px rgba(32, 178, 170, 0.6), 0 0 12px rgba(32, 178, 170, 0.4);
+                    }
+                    50% {
+                        transform: scale(1.05);
+                        opacity: 0.95;
+                        box-shadow: 0 4px 16px rgba(32, 178, 170, 0.8), 0 0 20px rgba(32, 178, 170, 0.6);
+                    }
+                }
+                
+                /* ✅ Auto Gear Rotate Animation */
+                @keyframes autoGearRotate {
                     from {
-                        transform: translate(-50%, -50%) rotate(0deg);
+                        transform: rotate(0deg);
                     }
                     to {
-                        transform: translate(-50%, -50%) rotate(360deg);
+                        transform: rotate(360deg);
+                    }
+                }
+                
+                /* ✅ Auto Dot Pulse Animation */
+                @keyframes autoDotPulse {
+                    0%, 100% {
+                        opacity: 1;
+                        transform: scale(1);
+                        box-shadow: 0 0 12px rgba(32, 178, 170, 0.8), 0 0 24px rgba(32, 178, 170, 0.4);
+                    }
+                    50% {
+                        opacity: 0.7;
+                        transform: scale(1.2);
+                        box-shadow: 0 0 20px rgba(32, 178, 170, 1), 0 0 40px rgba(32, 178, 170, 0.6);
                     }
                 }
                 
@@ -2409,9 +2535,6 @@ export const AboutUs: React.FC = () => {
                 }
                 
                 /* When scanning line passes over room - Premium Animation */
-                .radar-sweep {
-                    will-change: transform;
-                }
                 
                 /* Detect when sweep passes over room using CSS */
                 .radar-container {
@@ -2486,6 +2609,286 @@ export const AboutUs: React.FC = () => {
                     100% {
                         transform: translate(-50%, -50%) translateX(100%);
                         opacity: 0;
+                    }
+                }
+                
+                /* ============================================
+                   🎯 2026 PROFESSIONAL RADAR ANIMATIONS
+                   Advanced Frontend Design with 20 Years Experience
+                   ============================================ */
+                
+                /* 2026 Radar Background Pulse */
+                @keyframes radarBgPulse {
+                    0%, 100% {
+                        opacity: 0.6;
+                        transform: scale(1);
+                    }
+                    50% {
+                        opacity: 0.8;
+                        transform: scale(1.02);
+                    }
+                }
+                
+                /* 2026 Grid Circle Pulse */
+                @keyframes gridCirclePulse {
+                    0%, 100% {
+                        opacity: 0.5;
+                        transform: translate(-50%, -50%) scale(1);
+                    }
+                    50% {
+                        opacity: 0.3;
+                        transform: translate(-50%, -50%) scale(1.03);
+                    }
+                }
+                
+                /* 2026 Radial Grid Pulse */
+                @keyframes radialGridPulse {
+                    0%, 100% {
+                        opacity: 0.6;
+                    }
+                    50% {
+                        opacity: 0.4;
+                    }
+                }
+                
+                /* 2026 Center Hub Pulse */
+                @keyframes centerHubPulse {
+                    0%, 100% {
+                        transform: translate(-50%, -50%) scale(1);
+                        box-shadow: 
+                            0 0 20px rgba(32, 178, 170, 0.8),
+                            0 0 40px rgba(32, 178, 170, 0.6),
+                            0 0 60px rgba(32, 178, 170, 0.4);
+                    }
+                    50% {
+                        transform: translate(-50%, -50%) scale(1.15);
+                        box-shadow: 
+                            0 0 30px rgba(32, 178, 170, 1),
+                            0 0 60px rgba(32, 178, 170, 0.8),
+                            0 0 90px rgba(32, 178, 170, 0.6);
+                    }
+                }
+                
+                /* 2026 Advanced Pulse Expand */
+                @keyframes advancedPulseExpand {
+                    0% {
+                        transform: translate(-50%, -50%) scale(0.3);
+                        opacity: 0.9;
+                    }
+                    30% {
+                        opacity: 0.7;
+                    }
+                    60% {
+                        opacity: 0.4;
+                    }
+                    100% {
+                        transform: translate(-50%, -50%) scale(15);
+                        opacity: 0;
+                    }
+                }
+                
+                /* 2026 Particle Float */
+                @keyframes particleFloat {
+                    0%, 100% {
+                        transform: translate(-50%, -50%) translate(var(--tx, 0), var(--ty, 0)) scale(1);
+                        opacity: 0.6;
+                    }
+                    50% {
+                        transform: translate(-50%, -50%) translate(calc(var(--tx, 0) * 1.2), calc(var(--ty, 0) * 1.2)) scale(1.2);
+                        opacity: 0.9;
+                    }
+                }
+                
+                /* 2026 Advanced Radar Wave */
+                @keyframes advancedRadarWave {
+                    0% {
+                        transform: translate(-50%, -50%) scale(0);
+                        opacity: 0.9;
+                    }
+                    50% {
+                        opacity: 0.5;
+                    }
+                    100% {
+                        transform: translate(-50%, -50%) scale(1.1);
+                        opacity: 0;
+                    }
+                }
+                
+                /* رادار دائري: شعاع wedge دوّار + blips */
+                @keyframes radarSweepRotate {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(-360deg); }
+                }
+                .radar-dome-square { aspect-ratio: 1 / 1; box-sizing: border-box; }
+                .radar-sweep-wedge-rotate { animation: radarSweepRotate 8s linear infinite; }
+                @keyframes radarBlipPulse {
+                    0% { transform: scale(1); filter: brightness(0.8); }
+                    40% { transform: scale(1.3); filter: brightness(1.4); }
+                    70% { transform: scale(1.15); filter: brightness(0.95); }
+                    100% { transform: scale(1); filter: brightness(0.8); }
+                }
+                .radar-blip-animated { animation: radarBlipPulse 0.55s ease-in-out infinite; }
+                /* إزالة المربع/الإطار الأسود حول مؤشر مركز الرادار في الوضع الفاتح */
+                [data-theme="light"] .radar-center-dot,
+                .radar-center-dot,
+                .radar-center-dot:focus,
+                .radar-center-dot:focus-visible {
+                    outline: none !important;
+                    border: none !important;
+                    box-shadow: 0 0 12px rgba(13, 148, 136, 0.8), 0 0 24px rgba(13, 148, 136, 0.4) !important;
+                }
+                /* إزالة أي outline/مربع أسود حول شارة عمليات تلقائية والترس */
+                .cta-badge-gear,
+                .cta-badge-gear svg,
+                .cta-badge-gear:focus,
+                .cta-badge-gear:focus-visible { outline: none !important; border: none !important; }
+                @media (prefers-reduced-motion: reduce) {
+                    .radar-sweep-wedge,
+                    .radar-sweep-wedge-rotate,
+                    .radar-blip-animated,
+                    .cta-badge-gear,
+                    .cta-badge-dot { animation: none !important; }
+                }
+                @keyframes roomScanCheckIn {
+                    0% { opacity: 0; transform: scale(0.3); }
+                    100% { opacity: 1; transform: scale(1); }
+                }
+                
+                /* 2026 Shimmer Effects */
+                @keyframes shimmer2026 {
+                    0% {
+                        transform: translateX(-100%) skewX(-15deg);
+                    }
+                    100% {
+                        transform: translateX(200%) skewX(-15deg);
+                    }
+                }
+                
+                /* 2026 Button Shimmer Animation */
+                @keyframes buttonShimmer2026 {
+                    0% {
+                        transform: translateX(-100%) translateY(0) skewX(-15deg);
+                    }
+                    100% {
+                        transform: translateX(200%) translateY(0) skewX(-15deg);
+                    }
+                }
+                
+                @keyframes shimmer2026Secondary {
+                    0% {
+                        transform: translateX(-100%) skewX(15deg);
+                    }
+                    100% {
+                        transform: translateX(200%) skewX(15deg);
+                    }
+                }
+                
+                /* 2026 Room Badge Activate */
+                @keyframes roomBadge2026Activate {
+                    0% {
+                        transform: scale(1) translateY(0) rotate(0deg);
+                    }
+                    25% {
+                        transform: scale(1.25) translateY(-6px) rotate(2deg);
+                    }
+                    50% {
+                        transform: scale(1.2) translateY(-5px) rotate(-1deg);
+                    }
+                    75% {
+                        transform: scale(1.18) translateY(-4px) rotate(0.5deg);
+                    }
+                    100% {
+                        transform: scale(1.15) translateY(-4px) rotate(0deg);
+                    }
+                }
+                
+                /* 2026 Status Dot Pulse */
+                @keyframes statusDot2026Pulse {
+                    0%, 100% {
+                        opacity: 1;
+                        transform: scale(1);
+                        box-shadow: 
+                            0 0 12px rgba(255, 255, 255, 1),
+                            0 0 24px rgba(255, 255, 255, 0.6),
+                            0 0 36px rgba(255, 255, 255, 0.3);
+                    }
+                    50% {
+                        opacity: 0.8;
+                        transform: scale(1.3);
+                        box-shadow: 
+                            0 0 20px rgba(255, 255, 255, 1),
+                            0 0 40px rgba(255, 255, 255, 0.8),
+                            0 0 60px rgba(255, 255, 255, 0.5);
+                    }
+                }
+                
+                /* 2026 Auto Badge Pulse */
+                @keyframes autoBadge2026Pulse {
+                    0%, 100% {
+                        transform: scale(1);
+                        opacity: 1;
+                        box-shadow: 
+                            0 3px 12px rgba(32, 178, 170, 0.7),
+                            0 0 20px rgba(32, 178, 170, 0.5),
+                            0 0 30px rgba(32, 178, 170, 0.3);
+                    }
+                    50% {
+                        transform: scale(1.08);
+                        opacity: 0.95;
+                        box-shadow: 
+                            0 5px 18px rgba(32, 178, 170, 0.9),
+                            0 0 30px rgba(32, 178, 170, 0.7),
+                            0 0 45px rgba(32, 178, 170, 0.5);
+                    }
+                }
+                
+                /* 2026 Room Glow */
+                @keyframes roomGlow2026 {
+                    0%, 100% {
+                        opacity: 0.6;
+                        transform: scale(1);
+                        filter: blur(8px) drop-shadow(0 0 8px rgba(32, 178, 170, 0.7));
+                    }
+                    50% {
+                        opacity: 0.9;
+                        transform: scale(1.1);
+                        filter: blur(10px) drop-shadow(0 0 12px rgba(32, 178, 170, 0.9));
+                    }
+                }
+                
+                /* 2026 Room Pulse */
+                @keyframes roomPulse2026 {
+                    0% {
+                        opacity: 0.7;
+                        transform: scale(0.95);
+                    }
+                    50% {
+                        opacity: 0.4;
+                        transform: scale(1.15);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: scale(1.4);
+                    }
+                }
+                
+                /* 2026 Sparkle Float */
+                @keyframes sparkle2026Float {
+                    0%, 100% {
+                        transform: translate(-50%, -50%) translate(var(--sx, 0), var(--sy, 0)) scale(1);
+                        opacity: 0.8;
+                    }
+                    25% {
+                        transform: translate(-50%, -50%) translate(calc(var(--sx, 0) * 1.3), calc(var(--sy, 0) * 0.9)) scale(1.1);
+                        opacity: 1;
+                    }
+                    50% {
+                        transform: translate(-50%, -50%) translate(calc(var(--sx, 0) * 1.1), calc(var(--sy, 0) * 1.2)) scale(1.2);
+                        opacity: 0.9;
+                    }
+                    75% {
+                        transform: translate(-50%, -50%) translate(calc(var(--sx, 0) * 0.9), calc(var(--sy, 0) * 1.1)) scale(1.05);
+                        opacity: 0.7;
                     }
                 }
                 

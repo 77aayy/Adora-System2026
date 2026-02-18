@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -40,7 +42,7 @@ export const initKeyboardShortcuts = (): void => {
     // Register default shortcuts
     registerDefaultShortcuts();
 
-    console.log('✅ Keyboard shortcuts initialized');
+    logger.info('✅ Keyboard shortcuts initialized', undefined, 'keyboardShortcutsService');
 };
 
 /**

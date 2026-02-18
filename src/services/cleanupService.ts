@@ -21,6 +21,7 @@ import {
     writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // CONFIGURATION
@@ -88,7 +89,7 @@ const archiveDocument = async (docData: any, collectionName: string): Promise<vo
             _originalId: docData.id,
         });
     } catch (error) {
-        console.error(`Error archiving document to ${collectionName}:`, error);
+        logger.error(`Error archiving document to ${collectionName}:`, error, 'cleanupService');
     }
 };
 
@@ -103,7 +104,7 @@ const cleanupCollection = async (config: CleanupConfig): Promise<number> => {
     const cutoffDate = getDaysAgo(config.retentionDays);
     let cleanedCount = 0;
 
-    console.log(`Starting cleanup for ${config.collectionName} (older than ${cutoffDate.toISOString().split('T')[0]})...`);
+    logger.info(`Starting cleanup for ${config.collectionName} (older than ${cutoffDate.toISOString().split('T')[0]})...`, undefined, 'cleanupService');
 
     try {
         const colRef = collection(db, config.collectionName);
@@ -152,11 +153,11 @@ const cleanupCollection = async (config: CleanupConfig): Promise<number> => {
             await batch.commit();
         }
 
-        console.log(`✅ Cleaned ${cleanedCount} items from ${config.collectionName}`);
+        logger.info(`✅ Cleaned ${cleanedCount} items from ${config.collectionName}`, undefined, 'cleanupService');
         return cleanedCount;
 
     } catch (error) {
-        console.error(`❌ Error cleaning ${config.collectionName}:`, error);
+        logger.error(`❌ Error cleaning ${config.collectionName}:`, error, 'cleanupService');
         return 0;
     }
 };
@@ -173,7 +174,7 @@ export const runCleanup = async (): Promise<{
     totalItems: number;
     totalSaved: string;
 }> => {
-    console.log('🧹 Starting System Cleanup...');
+    logger.info('🧹 Starting System Cleanup...', undefined, 'cleanupService');
     const details: Record<string, number> = {};
     let totalItems = 0;
 
@@ -187,7 +188,7 @@ export const runCleanup = async (): Promise<{
     const savedBytes = totalItems * 2048;
     const savedKB = (savedBytes / 1024).toFixed(2);
 
-    console.log(`✨ Cleanup Complete! Removed ${totalItems} items. Saved ~${savedKB} KB.`);
+    logger.info(`✨ Cleanup Complete! Removed ${totalItems} items. Saved ~${savedKB} KB.`, undefined, 'cleanupService');
 
     return {
         details,
@@ -221,7 +222,7 @@ export const autoCleanupOnAdminLoad = async (): Promise<void> => {
         markCleanupDone();
 
         if (results.totalItems > 0) {
-            console.log('Daily Cleanup Report:', results);
+            logger.info('Daily Cleanup Report:', results, 'cleanupService');
         }
     }
 };
@@ -230,7 +231,7 @@ export const autoCleanupOnAdminLoad = async (): Promise<void> => {
  * Force run cleanup immediately (Debug/Manual)
  */
 export const forceRunCleanup = async (): Promise<void> => {
-    console.log('⚠️ Force running cleanup...');
+    logger.info('⚠️ Force running cleanup...', undefined, 'cleanupService');
     const results = await runCleanup();
     alert(`Cleanup Complete!\nRemoved: ${results.totalItems} items\nSpace Saved: ${results.totalSaved}`);
 };

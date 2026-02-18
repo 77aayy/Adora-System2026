@@ -9,6 +9,7 @@ import {
     collection, getDocs, query, where, orderBy, Timestamp
 } from 'firebase/firestore';
 import { logger } from './loggerService';
+import { formatDateGregorianEn, formatTimeGregorianEn } from '../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -123,10 +124,11 @@ export const getDepartmentFromServiceType = (serviceType: string): string => {
  */
 export const loadAllRecords = async (branchId: string, tenantId: string): Promise<ReportRecord[]> => {
     try {
+        if (!tenantId) return [];
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const requestsQuery = query(
-            collection(db, 'requests'),
-            where('branch', '==', branchId),
-            where('tenantId', '==', tenantId)
+            requestsRef,
+            where('branch', '==', branchId)
         );
 
         const snapshot = await getDocs(requestsQuery);
@@ -164,10 +166,10 @@ export const loadRecordsForDateRange = async (
         const fromTimestamp = Timestamp.fromDate(dateFrom);
         const toTimestamp = Timestamp.fromDate(dateTo);
 
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const requestsQuery = query(
-            collection(db, 'requests'),
+            requestsRef,
             where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
             where('createdAt', '>=', fromTimestamp),
             where('createdAt', '<=', toTimestamp),
             orderBy('createdAt', 'desc')
@@ -412,7 +414,7 @@ export const exportToCSV = (records: ReportRecord[], filename?: string): void =>
     let csv = 'رقم السجل,القسم,نوع الخدمة,الغرفة,الموظف,التاريخ,الحالة\n';
 
     records.forEach((record, index) => {
-        const date = record.createdDate.toLocaleDateString('ar-SA');
+        const date = formatDateGregorianEn(record.createdDate instanceof Date ? record.createdDate : new Date(record.createdDate));
         const deptName = getDepartmentName(record.department);
         const serviceName = getServiceTypeName(record.serviceType);
         const statusName = getStatusName(record.status);
@@ -427,7 +429,7 @@ export const exportToCSV = (records: ReportRecord[], filename?: string): void =>
     const url = URL.createObjectURL(blob);
 
     link.href = url;
-    link.download = filename || `تقرير_السجلات_${new Date().toLocaleDateString('ar-SA')}.csv`;
+    link.download = filename || `تقرير_السجلات_${formatDateGregorianEn(new Date(), 'short')}.csv`;
     link.style.visibility = 'hidden';
 
     document.body.appendChild(link);
@@ -489,16 +491,8 @@ export const printReport = (
     if (records.length === 0) return;
 
     const currentDate = new Date();
-    const printDate = currentDate.toLocaleDateString('ar-SA', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-    const printTime = currentDate.toLocaleTimeString('ar-SA', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    const printDate = formatDateGregorianEn(currentDate, 'full');
+    const printTime = formatTimeGregorianEn(currentDate, { showSeconds: false });
 
     const printContent = `
         <!DOCTYPE html>
@@ -653,7 +647,7 @@ export const printReport = (
                             <td>${getServiceTypeName(record.serviceType)}</td>
                             <td>${record.roomNumber || '--'}</td>
                             <td>${record.createdBy?.name || record.assignedTo?.name || '--'}</td>
-                            <td>${record.createdDate.toLocaleDateString('ar-SA')}</td>
+                            <td>${formatDateGregorianEn(record.createdDate instanceof Date ? record.createdDate : new Date(record.createdDate))}</td>
                             <td><span class="status-badge ${record.status}">${getStatusName(record.status)}</span></td>
                         </tr>
                     `).join('')}

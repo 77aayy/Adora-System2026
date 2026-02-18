@@ -69,10 +69,13 @@ export const getMaintenanceHistory = async (
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const requestsRef = collection(db, 'requests');
+    // ✅ FIX: Use tenant-scoped collection for SaaS isolation
+    if (!tenantId) {
+        throw new Error('tenantId is required for SaaS isolation');
+    }
+    const requestsRef = collection(db, `tenants/${tenantId}/requests`);
     const q = query(
         requestsRef,
-        where('tenantId', '==', tenantId),
         where('type', '==', 'maintenance'),
         where('createdAt', '>=', Timestamp.fromDate(startDate)),
         orderBy('createdAt', 'desc')
@@ -235,11 +238,10 @@ export const applyPredictiveFlags = async (
 
     for (const prediction of highPriority) {
         // Find room by roomNumber and tenantId (Security Standard)
-        const roomsRef = collection(db, 'rooms');
+        const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
         const q = query(
             roomsRef,
-            where('roomNumber', '==', prediction.roomNumber),
-            where('tenantId', '==', tenantId), // 🛡️ Security Check
+            where('number', '==', prediction.roomNumber),
             limit(1)
         );
         const snapshot = await getDocs(q);

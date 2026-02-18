@@ -8,6 +8,7 @@ import {
     collection, query, where, getDocs, Timestamp, orderBy, limit
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -92,7 +93,7 @@ export const getSmartAlerts = async (branchId: string, tenantId: string): Promis
         // alerts.push(...deficitAlerts);
 
     } catch (err) {
-        console.error('Error generating smart alerts:', err);
+        logger.error('Error generating smart alerts:', err, 'smartAlertsService');
     }
 
     // Sort by severity (critical first) then by timestamp
@@ -147,7 +148,7 @@ const checkDelayedRequests = async (branchId: string, now: Date, tenantId: strin
             }
         });
     } catch (error) {
-        console.error("Error checking delayed requests", error);
+        logger.error("Error checking delayed requests", error, 'smartAlertsService');
     }
     return alerts;
 };
@@ -182,7 +183,7 @@ const checkRequestBacklog = async (branchId: string, tenantId: string): Promise<
             });
         }
     } catch (error) {
-        console.error("Error checking backlog", error);
+        logger.error("Error checking backlog", error, 'smartAlertsService');
     }
     return alerts;
 };
@@ -225,15 +226,14 @@ const checkProcurementPending = async (branchId: string, tenantId: string): Prom
 const checkSentimentAlerts = async (branchId: string, tenantId: string): Promise<SmartAlert[]> => {
     const alerts: SmartAlert[] = [];
     try {
-        const constraints: any[] = [
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+        const constraints: unknown[] = [
             where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
-            where('sentimentResult.severity', '==', 'MODERATE')
+            where('sentimentResult.severity', '==', 'MODERATE'),
+            orderBy('createdAt', 'desc'),
+            limit(10)
         ];
-        constraints.push(orderBy('createdAt', 'desc'));
-        constraints.push(limit(10));
-
-        const q = query(collection(db, 'requests'), ...constraints);
+        const q = query(requestsRef, ...constraints);
 
         const snapshot = await getDocs(q);
         snapshot.forEach(doc => {
@@ -255,7 +255,7 @@ const checkSentimentAlerts = async (branchId: string, tenantId: string): Promise
             });
         });
     } catch (error) {
-        console.error("Error checking sentiment alerts", error);
+        logger.error("Error checking sentiment alerts", error, 'smartAlertsService');
     }
     return alerts;
 };
@@ -310,7 +310,7 @@ const checkLaundryDeficit = async (branchId: string): Promise<SmartAlert[]> => {
             }
         }
     } catch (err) {
-        console.error('Error checking laundry deficit:', err);
+        logger.error('Error checking laundry deficit:', err, 'smartAlertsService');
     }
 
     return alerts;

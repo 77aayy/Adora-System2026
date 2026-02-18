@@ -7,6 +7,7 @@
 
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -95,7 +96,7 @@ export const extractCoordinatesFromLink = (link: string): LocationCoordinates | 
         
         return null;
     } catch (error) {
-        console.error('Error extracting coordinates from link:', error);
+        logger.error('Error extracting coordinates from link:', error, 'locationService');
         return null;
     }
 };
@@ -126,7 +127,7 @@ export const getLocationSettings = async (
             autoDetect: true
         };
     } catch (error) {
-        console.error('Error getting location settings:', error);
+        logger.error('Error getting location settings:', error, 'locationService');
         return null;
     }
 };
@@ -155,7 +156,7 @@ export const saveLocationSettings = async (
         
         return true;
     } catch (error) {
-        console.error('Error saving location settings:', error);
+        logger.error('Error saving location settings:', error, 'locationService');
         return false;
     }
 };
@@ -196,7 +197,7 @@ export const saveLocationPermission = (granted: boolean, coordinates?: GuestLoca
             }));
         }
     } catch (error) {
-        console.error('Error saving location permission:', error);
+        logger.error('Error saving location permission:', error, 'locationService');
     }
 };
 
@@ -222,7 +223,7 @@ export const getSavedLocationPermission = (): { granted: boolean; coordinates?: 
             timestamp: data.timestamp ? new Date(data.timestamp) : undefined
         };
     } catch (error) {
-        console.error('Error reading location permission:', error);
+        logger.error('Error reading location permission:', error, 'locationService');
         return null;
     }
 };
@@ -253,7 +254,7 @@ export const getSavedLocationData = (): GuestLocation | null => {
             accuracy: data.accuracy
         };
     } catch (error) {
-        console.error('Error reading location data:', error);
+        logger.error('Error reading location data:', error, 'locationService');
         return null;
     }
 };
@@ -265,7 +266,7 @@ export const saveDeviceFingerprint = (fingerprint: string): void => {
     try {
         localStorage.setItem(STORAGE_KEYS.DEVICE_FINGERPRINT, fingerprint);
     } catch (error) {
-        console.error('Error saving device fingerprint:', error);
+        logger.error('Error saving device fingerprint:', error, 'locationService');
     }
 };
 
@@ -276,7 +277,7 @@ export const getSavedDeviceFingerprint = (): string | null => {
     try {
         return localStorage.getItem(STORAGE_KEYS.DEVICE_FINGERPRINT);
     } catch (error) {
-        console.error('Error reading device fingerprint:', error);
+        logger.error('Error reading device fingerprint:', error, 'locationService');
         return null;
     }
 };
@@ -289,7 +290,7 @@ export const saveLastVerification = (tenantId: string, branchId: string, roomNum
         const key = `${STORAGE_KEYS.LAST_VERIFICATION}_${tenantId}_${branchId}_${roomNumber}`;
         localStorage.setItem(key, new Date().toISOString());
     } catch (error) {
-        console.error('Error saving last verification:', error);
+        logger.error('Error saving last verification:', error, 'locationService');
     }
 };
 
@@ -303,7 +304,7 @@ export const getLastVerification = (tenantId: string, branchId: string, roomNumb
         if (!saved) return null;
         return new Date(saved);
     } catch (error) {
-        console.error('Error reading last verification:', error);
+        logger.error('Error reading last verification:', error, 'locationService');
         return null;
     }
 };
@@ -324,7 +325,7 @@ export const getCurrentLocation = (useCache: boolean = true): Promise<GuestLocat
                 // Use cached location if it's recent (less than 10 minutes old)
                 const ageInMinutes = (Date.now() - cached.timestamp.getTime()) / (1000 * 60);
                 if (ageInMinutes < 10) {
-                    console.log('✅ Using cached location data');
+                    logger.info('✅ Using cached location data', undefined, 'locationService');
                     resolve(cached);
                     return;
                 }
@@ -361,7 +362,7 @@ export const getCurrentLocation = (useCache: boolean = true): Promise<GuestLocat
                 if (useCache) {
                     const cached = getSavedLocationData();
                     if (cached) {
-                        console.log('⚠️ Using cached location due to error');
+                        logger.warn('⚠️ Using cached location due to error', undefined, 'locationService');
                         resolve(cached);
                         return;
                     }
@@ -415,7 +416,7 @@ export const verifyGuestLocation = async (
             distance: Math.round(distance)
         };
     } catch (error: any) {
-        console.error('Location verification error:', error);
+        logger.error('Location verification error:', error, 'locationService');
         
         // Error code constants
         const PERMISSION_DENIED = 1;
@@ -511,7 +512,7 @@ export const getDeviceLimitSettings = async (
             maxDevices: 2 // Default: 2 devices
         };
     } catch (error) {
-        console.error('Error getting device limit settings:', error);
+        logger.error('Error getting device limit settings:', error, 'locationService');
         return {
             enabled: true,
             maxDevices: 2
@@ -574,7 +575,7 @@ export const checkDeviceLimit = async (
         
         return { allowed: true, deviceCount: deviceCount + 1 };
     } catch (error) {
-        console.error('Error checking device limit:', error);
+        logger.error('Error checking device limit:', error, 'locationService');
         // On error, allow access (fail open for better UX, but log error)
         return { allowed: true };
     }
@@ -605,7 +606,7 @@ export const removeDevice = async (
         
         return true;
     } catch (error) {
-        console.error('Error removing device:', error);
+        logger.error('Error removing device:', error, 'locationService');
         return false;
     }
 };
@@ -623,16 +624,13 @@ export const verifyRoomStatus = async (
     roomNumber: string
 ): Promise<{ valid: boolean; qrActive: boolean; error?: string }> => {
     try {
-        // Get active room card - use tenant-scoped query if tenantId is provided
-        const roomCardsRef = collection(db, 'roomCards');
+        const roomCardsRef = tenantId
+            ? collection(db, `tenants/${tenantId}/roomCards`)
+            : collection(db, 'roomCards');
         const constraints: any[] = [
             where('roomNumber', '==', roomNumber),
             where('status', '==', 'active')
         ];
-        if (tenantId) {
-            constraints.push(where('tenantId', '==', tenantId));
-        }
-        
         const q = query(roomCardsRef, ...constraints);
         const snapshot = await getDocs(q);
         
@@ -646,8 +644,7 @@ export const verifyRoomStatus = async (
         
         const roomCard = snapshot.docs[0].data();
         
-        // Verify branch match
-        if (branchId && roomCard.branch !== branchId) {
+        if (branchId && roomCard.branch !== branchId && roomCard.branchId !== branchId) {
             return {
                 valid: false,
                 qrActive: false,
@@ -671,7 +668,7 @@ export const verifyRoomStatus = async (
             qrActive: true
         };
     } catch (error: any) {
-        console.error('Room status verification error:', error);
+        logger.error('Room status verification error:', error, 'locationService');
         return {
             valid: false,
             qrActive: false,
@@ -836,7 +833,7 @@ export const isDeviceBlocked = (): { blocked: boolean; remainingMinutes?: number
         localStorage.setItem(BLOCKED_DEVICES_KEY, JSON.stringify(blocked));
         return { blocked: false };
     } catch (error) {
-        console.error('Error checking device block:', error);
+        logger.error('Error checking device block:', error, 'locationService');
         return { blocked: false };
     }
 };
@@ -874,7 +871,7 @@ export const recordFailedAttempt = (): { shouldBlock: boolean; attempts: number 
         
         return { shouldBlock: false, attempts: deviceAttempts.count };
     } catch (error) {
-        console.error('Error recording failed attempt:', error);
+        logger.error('Error recording failed attempt:', error, 'locationService');
         return { shouldBlock: false, attempts: 0 };
     }
 };
@@ -902,9 +899,9 @@ const blockDevice = (fingerprint: string): void => {
             localStorage.setItem(FAILED_ATTEMPTS_KEY, JSON.stringify(attempts));
         }
         
-        console.log(`🚫 Device blocked: ${fingerprint.substring(0, 8)}...`);
+        logger.info(`🚫 Device blocked: ${fingerprint.substring(0, 8)}...`, undefined, 'locationService');
     } catch (error) {
-        console.error('Error blocking device:', error);
+        logger.error('Error blocking device:', error, 'locationService');
     }
 };
 
@@ -937,9 +934,9 @@ export const notifyReceptionOfSuspiciousActivity = async (
             severity: 'warning'
         });
 
-        console.log(`🚨 Reception notified: Suspicious activity from room ${roomNumber}`);
+        logger.info(`🚨 Reception notified: Suspicious activity from room ${roomNumber}`, undefined, 'locationService');
     } catch (error) {
-        console.error('Error notifying reception:', error);
+        logger.error('Error notifying reception:', error, 'locationService');
     }
 };
 
@@ -958,6 +955,6 @@ export const clearFailedAttempts = (): void => {
             localStorage.setItem(FAILED_ATTEMPTS_KEY, JSON.stringify(attempts));
         }
     } catch (error) {
-        console.error('Error clearing failed attempts:', error);
+        logger.error('Error clearing failed attempts:', error, 'locationService');
     }
 };

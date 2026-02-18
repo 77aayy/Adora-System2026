@@ -11,8 +11,9 @@ import {
     onSnapshot,
     Unsubscribe,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { getSafeFirestore } from './firebase';
 import { playSound, hapticFeedback } from './soundService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -78,29 +79,33 @@ export function startPendingAlerts(
 
     if (!currentConfig.enabled) return;
 
-    // Build query based on department
-    const requestsRef = collection(db, 'requests');
-    let q;
-
-    if (department === 'reception') {
-        q = query(
-            requestsRef,
-            where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
-            where('currentDepartment', '==', 'reception'),
-            where('status', 'in', ['PENDING', 'PENDING_RECEPTION'])
-        );
-    } else {
-        q = query(
-            requestsRef,
-            where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
-            where('currentDepartment', '==', department),
-            where('status', '==', 'CONFIRMED')
-        );
+    // ✅ FIX: Use tenant-scoped collection for SaaS isolation
+    if (!tenantId) {
+        throw new Error('tenantId is required for SaaS isolation');
     }
 
-    unsubscribe = onSnapshot(q, (snapshot) => {
+    getSafeFirestore().then((safeDb) => {
+        if (!safeDb) return;
+        const requestsRef = collection(safeDb, 'tenants', tenantId, 'requests');
+        let q;
+
+        if (department === 'reception') {
+            q = query(
+                requestsRef,
+                where('branch', '==', branchId),
+                where('currentDepartment', '==', 'reception'),
+                where('status', 'in', ['PENDING', 'PENDING_RECEPTION'])
+            );
+        } else {
+            q = query(
+                requestsRef,
+                where('branch', '==', branchId),
+                where('currentDepartment', '==', department),
+                where('status', '==', 'CONFIRMED')
+            );
+        }
+
+        unsubscribe = onSnapshot(q, (snapshot) => {
         const newRequests: PendingRequest[] = [];
         const newIds: Set<string> = new Set();
 
@@ -136,16 +141,17 @@ export function startPendingAlerts(
         callbacks.forEach(cb => cb(pendingRequests));
     });
 
-    // Start repeat alerts for pending items
-    if (currentConfig.repeatIntervalMs > 0) {
-        repeatInterval = setInterval(() => {
-            if (pendingRequests.length > 0) {
-                repeatAlert();
-            }
-        }, currentConfig.repeatIntervalMs);
-    }
+        // Start repeat alerts for pending items
+        if (currentConfig.repeatIntervalMs > 0) {
+            repeatInterval = setInterval(() => {
+                if (pendingRequests.length > 0) {
+                    repeatAlert();
+                }
+            }, currentConfig.repeatIntervalMs);
+        }
 
-    console.log(`🔔 Pending alerts started for ${department}`);
+        logger.info(`🔔 Pending alerts started for ${department}`, undefined, 'pendingAlertService');
+    });
 }
 
 /**

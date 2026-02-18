@@ -22,6 +22,7 @@ import {
     writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -607,7 +608,7 @@ export const seedTenantAchievements = async (tenantId: string): Promise<number> 
         }
     }
 
-    console.log(`  ✅ ${count} achievements seeded for tenant ${tenantId}`);
+    logger.info(`  ✅ ${count} achievements seeded for tenant ${tenantId}`, undefined, 'tenantSeedingService');
     return count;
 };
 
@@ -681,7 +682,7 @@ export const seedTenantDatabase = async (
 
     const { forceReseed = false, includeDemoRoom = true } = options || {};
 
-    console.log(`🌱 Starting database seeding for tenant: ${tenantId}...`);
+    logger.info(`🌱 Starting database seeding for tenant: ${tenantId}...`, undefined, 'tenantSeedingService');
 
     try {
         // ✅ FIX: Add delay between collections to prevent overwhelming Firestore
@@ -691,7 +692,7 @@ export const seedTenantDatabase = async (
                 const count = await seedSettings(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('settings');
-                console.log('  ✅ settings seeded');
+                logger.info('  ✅ settings seeded', undefined, 'tenantSeedingService');
                 await new Promise(resolve => setTimeout(resolve, 200)); // Delay between collections
             }
         } catch (e: any) {
@@ -702,29 +703,31 @@ export const seedTenantDatabase = async (
             
             if (isPermissionError) {
                 result.errors.push(`settings: Permission denied (expected)`);
-                console.warn('⚠️ Permission denied for seeding settings (expected)', e);
+                logger.debug('Permission denied for seeding settings (expected)', e, 'tenantSeedingService');
             } else {
                 result.errors.push(`settings: ${e.message}`);
-                console.error('❌ Error seeding settings:', e);
+                logger.error('❌ Error seeding settings:', e, 'tenantSeedingService');
             }
         }
 
         // Room Statuses
         try {
             const isEmpty = await isCollectionEmpty('roomStatuses', tenantId);
-            console.log(`  🔍 roomStatuses empty check: ${isEmpty} (forceReseed: ${forceReseed})`);
+            logger.debug(`  🔍 roomStatuses empty check: ${isEmpty} (forceReseed: ${forceReseed})`, undefined, 'tenantSeedingService');
             if (forceReseed || isEmpty) {
                 const count = await seedRoomStatuses(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('roomStatuses');
-                console.log(`  ✅ roomStatuses seeded (${count} documents)`);
+                logger.debug(`  ✅ roomStatuses seeded (${count} documents)`, undefined, 'tenantSeedingService');
                 await new Promise(resolve => setTimeout(resolve, 200));
             } else {
-                console.log('  ⏭️ roomStatuses skipped (not empty)');
+                logger.debug('  ⏭️ roomStatuses skipped (not empty)', undefined, 'tenantSeedingService');
             }
         } catch (e: any) {
-            result.errors.push(`roomStatuses: ${e.message}`);
-            console.error('❌ Error seeding roomStatuses:', e);
+            const isPermissionError = e?.code === 'permission-denied' || e?.message?.includes('permission') || e?.message?.includes('Missing or insufficient');
+            result.errors.push(isPermissionError ? 'roomStatuses: Permission denied (expected)' : `roomStatuses: ${e.message}`);
+            if (isPermissionError) logger.debug('Permission denied for seeding roomStatuses (expected)', undefined, 'tenantSeedingService');
+            else logger.error('❌ Error seeding roomStatuses:', e, 'tenantSeedingService');
         }
 
         // Departments
@@ -733,12 +736,14 @@ export const seedTenantDatabase = async (
                 const count = await seedDepartments(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('departments');
-                console.log('  ✅ departments seeded');
+                logger.info('  ✅ departments seeded', undefined, 'tenantSeedingService');
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch (e: any) {
-            result.errors.push(`departments: ${e.message}`);
-            console.error('❌ Error seeding departments:', e);
+            const isPermissionError = e?.code === 'permission-denied' || e?.message?.includes('permission') || e?.message?.includes('Missing or insufficient');
+            result.errors.push(isPermissionError ? 'departments: Permission denied (expected)' : `departments: ${e.message}`);
+            if (isPermissionError) logger.debug('Permission denied for seeding departments (expected)', undefined, 'tenantSeedingService');
+            else logger.error('❌ Error seeding departments:', e, 'tenantSeedingService');
         }
 
         // Roles
@@ -747,12 +752,14 @@ export const seedTenantDatabase = async (
                 const count = await seedRoles(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('roles');
-                console.log('  ✅ roles seeded');
+                logger.info('  ✅ roles seeded', undefined, 'tenantSeedingService');
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch (e: any) {
-            result.errors.push(`roles: ${e.message}`);
-            console.error('❌ Error seeding roles:', e);
+            const isPermissionError = e?.code === 'permission-denied' || e?.message?.includes('permission') || e?.message?.includes('Missing or insufficient');
+            result.errors.push(isPermissionError ? 'roles: Permission denied (expected)' : `roles: ${e.message}`);
+            if (isPermissionError) logger.debug('Permission denied for seeding roles (expected)', undefined, 'tenantSeedingService');
+            else logger.error('❌ Error seeding roles:', e, 'tenantSeedingService');
         }
 
         // Maintenance Templates
@@ -761,12 +768,14 @@ export const seedTenantDatabase = async (
                 const count = await seedMaintenanceTemplates(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('maintenanceTemplates');
-                console.log('  ✅ maintenanceTemplates seeded');
+                logger.info('  ✅ maintenanceTemplates seeded', undefined, 'tenantSeedingService');
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch (e: any) {
-            result.errors.push(`maintenanceTemplates: ${e.message}`);
-            console.error('❌ Error seeding maintenanceTemplates:', e);
+            const isPermissionError = e?.code === 'permission-denied' || e?.message?.includes('permission') || e?.message?.includes('Missing or insufficient');
+            result.errors.push(isPermissionError ? 'maintenanceTemplates: Permission denied (expected)' : `maintenanceTemplates: ${e.message}`);
+            if (isPermissionError) logger.debug('Permission denied for seeding maintenanceTemplates (expected)', undefined, 'tenantSeedingService');
+            else logger.error('❌ Error seeding maintenanceTemplates:', e, 'tenantSeedingService');
         }
 
         // Ranks
@@ -775,12 +784,14 @@ export const seedTenantDatabase = async (
                 const count = await seedRanks(tenantId);
                 result.totalDocuments += count;
                 result.collectionsCreated.push('ranks');
-                console.log('  ✅ ranks seeded');
+                logger.info('  ✅ ranks seeded', undefined, 'tenantSeedingService');
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
         } catch (e: any) {
-            result.errors.push(`ranks: ${e.message}`);
-            console.error('❌ Error seeding ranks:', e);
+            const isPermissionError = e?.code === 'permission-denied' || e?.message?.includes('permission') || e?.message?.includes('Missing or insufficient');
+            result.errors.push(isPermissionError ? 'ranks: Permission denied (expected)' : `ranks: ${e.message}`);
+            if (isPermissionError) logger.debug('Permission denied for seeding ranks (expected)', undefined, 'tenantSeedingService');
+            else logger.error('❌ Error seeding ranks:', e, 'tenantSeedingService');
         }
 
         // Health Check
@@ -788,7 +799,7 @@ export const seedTenantDatabase = async (
             const count = await seedHealthCheck(tenantId);
             result.totalDocuments += count;
             result.collectionsCreated.push('health_check');
-            console.log('  ✅ health_check seeded');
+            logger.info('  ✅ health_check seeded', undefined, 'tenantSeedingService');
         } catch (e: any) {
             result.errors.push(`health_check: ${e.message}`);
         }
@@ -800,7 +811,7 @@ export const seedTenantDatabase = async (
                 if (count > 0) {
                     result.totalDocuments += count;
                     result.collectionsCreated.push('rooms (demo)');
-                    console.log('  ✅ demo room created');
+                    logger.info('  ✅ demo room created', undefined, 'tenantSeedingService');
                 }
             } catch (e: any) {
                 result.errors.push(`demo room: ${e.message}`);
@@ -810,15 +821,15 @@ export const seedTenantDatabase = async (
         result.success = result.errors.length === 0;
 
         if (result.success) {
-            console.log(`✅ Seeding complete! ${result.totalDocuments} documents created.`);
+            logger.info(`✅ Seeding complete! ${result.totalDocuments} documents created.`, undefined, 'tenantSeedingService');
         } else {
-            console.warn(`⚠️ Seeding completed with ${result.errors.length} errors.`);
+            logger.debug(`Seeding completed with ${result.errors.length} errors (may include expected permission denials).`, undefined, 'tenantSeedingService');
         }
 
         return result;
 
     } catch (error: any) {
-        console.error('❌ Seeding failed:', error);
+        logger.error('❌ Seeding failed:', error, 'tenantSeedingService');
         result.errors.push(error.message);
         return result;
     }

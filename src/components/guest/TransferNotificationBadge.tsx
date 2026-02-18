@@ -14,6 +14,7 @@ import {
     markTransferNotificationAsRead,
     TransferNotification
 } from '../../services/roomTransferService';
+import { formatTimeGregorianEn } from '../../utils/dateUtils';
 
 interface TransferNotificationBadgeProps {
     department: string;
@@ -53,7 +54,7 @@ export const TransferNotificationBadge: React.FC<TransferNotificationBadgeProps>
 
     const handleMarkAsRead = async (notificationId: string) => {
         try {
-            await markTransferNotificationAsRead(notificationId);
+            await markTransferNotificationAsRead(tenantId, notificationId);
             haptic('light');
         } catch (err) {
             console.error('Error marking notification as read:', err);
@@ -63,7 +64,7 @@ export const TransferNotificationBadge: React.FC<TransferNotificationBadgeProps>
     const handleMarkAllAsRead = async () => {
         for (const notification of notifications) {
             if (notification.id) {
-                await markTransferNotificationAsRead(notification.id);
+                await markTransferNotificationAsRead(tenantId, notification.id);
             }
         }
         haptic('success');
@@ -154,8 +155,8 @@ export const TransferNotificationBadge: React.FC<TransferNotificationBadgeProps>
                                             {notification.createdAt && (
                                                 <p className="text-[10px] mt-1" style={{ color: 'var(--theme-text-tertiary)' }}>
                                                     {typeof notification.createdAt.toDate === 'function'
-                                                        ? notification.createdAt.toDate().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
-                                                        : new Date(notification.createdAt).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+                                                        ? formatTimeGregorianEn(notification.createdAt.toDate(), { showSeconds: false })
+                                                        : formatTimeGregorianEn(new Date(notification.createdAt), { showSeconds: false })
                                                     }
                                                 </p>
                                             )}

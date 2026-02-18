@@ -25,13 +25,34 @@
     --glass-blur: 0px; /* Disabled blur */
   }
 
+  /* تمرير الصفحة على html فقط — شريط التمرير ظاهر، لا تعارض */
   html {
     @apply scroll-smooth;
     max-width: 100vw;
-    overflow-x: hidden;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    min-height: 100%;
+    height: 100%;
+    -webkit-overflow-scrolling: touch;
   }
 
-  /* Prevent any horizontal overflow on mobile */
+  html[dir="rtl"] {
+    direction: rtl;
+  }
+  html[dir="rtl"] body,
+  html[dir="ltr"] body {
+    overflow: visible !important;
+    overflow-x: hidden !important;
+    min-height: 100%;
+  }
+
+  #root {
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
+    display: block;
+  }
+
   html, body, #root {
     max-width: 100vw;
     overflow-x: hidden;
@@ -49,7 +70,11 @@
     font-family: 'Inter', 'Tajawal', 'Cairo', sans-serif;
   }
 
-  /* ✅ THEME-AWARE BODY STYLES */
+  /* ✅ THEME-AWARE BODY STYLES + انتقال سلس بين الوضع الداكن والفاتح */
+  html {
+    transition: background-color 0.5s ease, color 0.5s ease;
+  }
+
   body {
     @apply font-sans antialiased;
     background: var(--theme-bg-primary);
@@ -57,8 +82,10 @@
     background-attachment: fixed;
     color: var(--theme-text-primary);
     direction: rtl;
-    overflow-x: hidden;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    min-height: 100%;
+    transition: background 0.5s ease, background-color 0.5s ease, color 0.5s ease;
   }
 
   /* Dark mode ONLY when explicitly set */
@@ -133,26 +160,58 @@
     color: var(--theme-text-secondary);
   }
   
-  /* ✅ THEME-AWARE SCROLLBAR */
+  /* ✅ شريط تمرير واضح — عرض أكبر وتباين أعلى */
   ::-webkit-scrollbar {
-    @apply w-2;
+    width: 12px;
+    height: 12px;
   }
 
   ::-webkit-scrollbar-track {
     background: var(--theme-scrollbar-bg);
     border-radius: 9999px;
+    border: 1px solid var(--theme-scrollbar-thumb);
   }
 
   ::-webkit-scrollbar-thumb {
     background: var(--theme-scrollbar-thumb);
     border-radius: 9999px;
+    border: 3px solid var(--theme-scrollbar-bg);
+    min-height: 48px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--theme-scrollbar-thumb-hover);
   }
 
-  /* Hide scrollbar but keep functionality */
+  ::-webkit-scrollbar-thumb:active {
+    background: var(--theme-scrollbar-thumb-hover);
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: var(--theme-scrollbar-thumb) var(--theme-scrollbar-bg);
+  }
+
+  /* ✅ شريط التمرير ظاهر دائماً على الصفحة (html/body) — لا إخفاء */
+  html, body {
+    scrollbar-width: auto !important;
+    -ms-overflow-style: auto !important;
+  }
+  html::-webkit-scrollbar, body::-webkit-scrollbar {
+    display: block !important;
+    width: 10px;
+    height: 10px;
+  }
+  html::-webkit-scrollbar-track, body::-webkit-scrollbar-track {
+    background: var(--theme-scrollbar-bg);
+  }
+  html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb {
+    background: var(--theme-scrollbar-thumb);
+    border-radius: 9999px;
+  }
+
+  /* Hide scrollbar but keep functionality (للعناصر التي تستخدم .scrollbar-hide فقط) */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -594,6 +653,25 @@ input[type=number] {
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
   }
 
+  /* Owner dashboard header: status dot loading animation (red breathing → smooth transition to green) */
+  @keyframes status-dot-loading {
+    0%, 100% { opacity: 1; filter: brightness(1); }
+    50% { opacity: 0.8; filter: brightness(1.2); }
+  }
+  .animate-status-dot-loading {
+    animation: status-dot-loading 1.4s ease-in-out infinite;
+  }
+
+  /* Owner dashboard: 360° success ring around status dot */
+  @keyframes success-ring-360 {
+    0% { opacity: 0; transform: scale(0.6) rotate(0deg); }
+    50% { opacity: 1; transform: scale(1.05) rotate(180deg); }
+    100% { opacity: 1; transform: scale(1) rotate(360deg); }
+  }
+  .animate-success-ring-360 {
+    animation: success-ring-360 0.6s ease-out forwards;
+  }
+
   /* Professional Card - Enhanced version (NO GLASSMORPHISM) */
   .pro-card {
     background: var(--theme-bg-secondary);
@@ -865,8 +943,8 @@ input[type=number] {
 
   .input:focus {
     @apply outline-none;
-    border-color: var(--theme-border-focus);
-    box-shadow: 0 0 0 3px var(--theme-input-focus-ring);
+    border-color: #14b8a6;
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
   }
 
   [data-theme="dark"] .input {
@@ -974,18 +1052,17 @@ input[type=number] {
      🎨 PREMIUM STAT CARDS - Light Mode (Like Reference Images)
      ============================================================ */
   
-  /* Force stat cards in light mode - COMPACT & SIMPLE (No excessive padding) */
-  html[data-theme="light"] .stat-card-pro-compact,
-  html.light .stat-card-pro-compact {
+  /* Unified stat card - light mode (one design for all) */
+  html[data-theme="light"] .stat-card-unified,
+  html.light .stat-card-unified {
     background: #ffffff !important;
     border: 1px solid #e2e8f0 !important;
-    border-radius: 12px !important;
-    padding: 12px 14px !important; /* ✅ Reduced from 28px 24px - Compact padding */
-    min-height: auto !important; /* ✅ Auto height - no fixed min-height */
-    /* Subtle shadow - no excessive depth */
+    border-radius: 8px !important;
+    padding: 6px 8px !important;
+    min-height: auto !important;
     box-shadow: 
-      0 2px 8px rgba(0, 0, 0, 0.06),
-      0 1px 3px rgba(0, 0, 0, 0.04) !important;
+      0 2px 6px rgba(0, 0, 0, 0.05),
+      0 1px 2px rgba(0, 0, 0, 0.03) !important;
     transition: all 0.2s ease !important;
   }
   
@@ -998,22 +1075,21 @@ input[type=number] {
       0 2px 4px rgba(0, 0, 0, 0.06) !important;
   }
   
-  /* Force stat card values - Bold but proportional */
+  /* Force stat card values - ~50% smaller */
   html[data-theme="light"] .stat-card-pro-value,
   html[data-theme="light"] .stat-card-pro-compact .stat-card-pro-value,
   html.light .stat-card-pro-value,
   html.light .stat-card-pro-compact .stat-card-pro-value {
     color: #0f172a !important;
-    font-size: 2rem !important;
+    font-size: 1rem !important;
     font-weight: 700 !important;
     letter-spacing: -0.02em !important;
     line-height: 1.2 !important;
   }
   
-  /* Smaller font for billing/currency cards */
   html[data-theme="light"] .stat-card-billing .stat-card-pro-value,
   html.light .stat-card-billing .stat-card-pro-value {
-    font-size: 1.5rem !important;
+    font-size: 0.875rem !important;
     font-weight: 600 !important;
   }
   
@@ -1022,9 +1098,9 @@ input[type=number] {
   html.light .stat-card-pro-label,
   html.light .stat-card-pro-compact .stat-card-pro-label {
     color: #475569 !important;
-    font-size: 1rem !important;
+    font-size: 0.75rem !important;
     font-weight: 500 !important;
-    margin-top: 8px !important;
+    margin-top: 4px !important;
   }
   
   html[data-theme="light"] .stat-card-pro-meta,
@@ -1032,36 +1108,51 @@ input[type=number] {
   html.light .stat-card-pro-meta,
   html.light .stat-card-pro-compact .stat-card-pro-meta {
     color: #94a3b8 !important;
+    font-size: 0.65rem !important;
   }
   
   /* ============================================================
      🎨 ICON WRAPPERS - Colored Backgrounds (Like Reference Images)
      ============================================================ */
   
-  /* Force icon visibility in Light Mode - Size only, colors from component */
+  /* Force icon size in Light Mode - ~50% smaller for compact cards */
   html[data-theme="light"] .stat-card-pro-icon,
   html[data-theme="light"] .stat-card-pro .stat-card-pro-icon,
   html[data-theme="light"] .stat-card-pro-compact .stat-card-pro-icon,
   html.light .stat-card-pro-icon,
   html.light .stat-card-pro .stat-card-pro-icon,
   html.light .stat-card-pro-compact .stat-card-pro-icon {
-    width: 60px !important;
-    height: 60px !important;
-    min-width: 60px !important;
-    min-height: 60px !important;
-    border-radius: 18px !important;
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    min-height: 30px !important;
+    border-radius: 10px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    margin-bottom: 20px !important;
-    /* Let inline styles from component handle background/shadow */
+    margin-bottom: 10px !important;
   }
   
-  /* Force icon SVG size */
+  html[data-theme="light"] .stat-card-pro-compact .stat-card-pro-icon,
+  html.light .stat-card-pro-compact .stat-card-pro-icon {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    border-radius: 8px !important;
+    margin-bottom: 6px !important;
+  }
+  
   html[data-theme="light"] .stat-card-pro-icon svg,
   html.light .stat-card-pro-icon svg {
-    width: 28px !important;
-    height: 28px !important;
+    width: 14px !important;
+    height: 14px !important;
+  }
+  
+  html[data-theme="light"] .stat-card-pro-compact .stat-card-pro-icon svg,
+  html.light .stat-card-pro-compact .stat-card-pro-icon svg {
+    width: 12px !important;
+    height: 12px !important;
   }
   
   /* Tailwind gradient classes - Force visibility in Light Mode */

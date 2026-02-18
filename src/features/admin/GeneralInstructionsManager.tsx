@@ -23,6 +23,7 @@ import {
     type DepartmentType
 } from '../../services/generalInstructionsService';
 import { Timestamp } from 'firebase/firestore';
+import { formatDateGregorianEn } from '../../utils/dateUtils';
 
 const DEPARTMENTS: { value: DepartmentType; label: string; icon: React.ReactNode }[] = [
     { value: 'general', label: 'عام (دستور الفندق)', icon: <BookOpen className="w-4 h-4" /> },
@@ -421,7 +422,7 @@ export const GeneralInstructionsManager: React.FC = () => {
                                         </span>
                                         <span>الترتيب: {instruction.order || 0}</span>
                                         {instruction.updatedAt && (
-                                            <span>آخر تحديث: {new Date(instruction.updatedAt.toDate ? instruction.updatedAt.toDate() : instruction.updatedAt).toLocaleDateString('ar-SA')}</span>
+                                            <span>آخر تحديث: {formatDateGregorianEn(instruction.updatedAt.toDate ? instruction.updatedAt.toDate() : instruction.updatedAt)}</span>
                                         )}
                                     </div>
                                 </div>

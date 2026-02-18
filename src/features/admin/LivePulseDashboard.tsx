@@ -22,6 +22,7 @@ import { useLiveTimer, getElapsedMinutes, getElapsedWithColor } from '../../serv
 import { haptic, playSound } from '../../utils/uxEffects';
 import { getSystemSettings } from '../../services/systemSettingsService';
 import { logger } from '../../services/loggerService';
+import { formatTimeGregorianEn } from '../../utils/dateUtils';
 // ✅ Architecture: Use services instead of direct Firebase calls
 // Note: subscribeToLivePulse is already in dashboardStatsService
 
@@ -323,11 +324,11 @@ export const LivePulseDashboard: React.FC = () => {
 
         const unsubscribes: (() => void)[] = [];
 
+        // ✅ FIX: Use tenant-scoped collection
         // Subscribe to cleaning requests (Housekeeping)
         const cleaningQuery = query(
-            collection(db, 'requests'),
-            where('tenantId', '==', tenantId),
-            where('branchId', '==', branchId),
+            collection(db, `tenants/${tenantId}/requests`),
+            where('branch', '==', branchId),
             where('type', '==', 'cleaning'),
             where('status', 'in', ['CONFIRMED', 'IN_PROGRESS'])
         );
@@ -355,11 +356,11 @@ export const LivePulseDashboard: React.FC = () => {
         });
         unsubscribes.push(cleaningUnsub);
 
+        // ✅ FIX: Use tenant-scoped collection
         // Subscribe to maintenance requests
         const maintenanceQuery = query(
-            collection(db, 'requests'),
-            where('tenantId', '==', tenantId),
-            where('branchId', '==', branchId),
+            collection(db, `tenants/${tenantId}/requests`),
+            where('branch', '==', branchId),
             where('type', '==', 'maintenance'),
             where('status', 'in', ['CONFIRMED', 'IN_PROGRESS'])
         );
@@ -387,11 +388,11 @@ export const LivePulseDashboard: React.FC = () => {
         });
         unsubscribes.push(maintenanceUnsub);
 
+        // ✅ FIX: Use tenant-scoped collection
         // Subscribe to bellman requests
         const bellmanQuery = query(
-            collection(db, 'requests'),
-            where('tenantId', '==', tenantId),
-            where('branchId', '==', branchId),
+            collection(db, `tenants/${tenantId}/requests`),
+            where('branch', '==', branchId),
             where('type', '==', 'bellman'),
             where('status', 'in', ['CONFIRMED', 'IN_PROGRESS'])
         );
@@ -450,11 +451,11 @@ export const LivePulseDashboard: React.FC = () => {
         });
         unsubscribes.push(coffeeUnsub);
 
+        // ✅ FIX: Use tenant-scoped collection
         // Subscribe to reception requests
         const receptionQuery = query(
-            collection(db, 'requests'),
-            where('tenantId', '==', tenantId),
-            where('branchId', '==', branchId),
+            collection(db, `tenants/${tenantId}/requests`),
+            where('branch', '==', branchId),
             where('status', '==', 'PENDING_RECEPTION')
         );
 
@@ -594,7 +595,7 @@ export const LivePulseDashboard: React.FC = () => {
 
                     {/* Last Refresh */}
                     <span className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
-                        آخر تحديث: {lastRefresh.toLocaleTimeString('ar-SA')}
+                        آخر تحديث: {formatTimeGregorianEn(lastRefresh)}
                     </span>
                 </div>
             </div>

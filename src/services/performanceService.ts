@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -47,7 +49,7 @@ export const initPerformanceMonitor = (): void => {
     // Log initial metrics
     logInitialMetrics();
 
-    console.log('✅ Performance monitor initialized');
+    logger.info('✅ Performance monitor initialized', undefined, 'performanceService');
 };
 
 /**
@@ -151,15 +153,15 @@ const logInitialMetrics = (): void => {
     window.addEventListener('load', () => {
         setTimeout(() => {
             const metrics = getPerformanceMetrics();
-            console.log('📊 Performance Metrics:', metrics);
+            logger.info('📊 Performance Metrics:', metrics, 'performanceService');
 
             // Warn if slow
             if (metrics.pageLoadTime > 3000) {
-                console.warn('⚠️ Slow page load:', metrics.pageLoadTime, 'ms');
+                logger.warn(`⚠️ Slow page load: ${metrics.pageLoadTime}ms`, undefined, 'performanceService');
             }
 
             if (metrics.firstContentfulPaint > 2000) {
-                console.warn('⚠️ Slow FCP:', metrics.firstContentfulPaint, 'ms');
+                logger.warn(`⚠️ Slow FCP: ${metrics.firstContentfulPaint}ms`, undefined, 'performanceService');
             }
         }, 100);
     });
@@ -241,7 +243,7 @@ export const measureAsync = async <T>(
     const result = await fn();
     const duration = Math.round(performance.now() - start);
 
-    console.log(`⏱️ ${label}: ${duration}ms`);
+    logger.info(`⏱️ ${label}: ${duration}ms`, undefined, 'performanceService');
 
     return { result, duration };
 };

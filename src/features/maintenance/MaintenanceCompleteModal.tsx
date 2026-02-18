@@ -28,6 +28,7 @@ import {
     getMaintenanceTypeLabel,
     MaintenanceType,
 } from '../../utils/pointsCalculator';
+import { logger } from '../../services/loggerService';
 import { AdoraLoaderInline } from '../../components/common/AdoraLoader';
 import { uploadFileToImgBB, validateImageFile } from '../../services/imageUploadService';
 
@@ -95,7 +96,7 @@ export const MaintenanceCompleteModal: React.FC<MaintenanceCompleteModalProps> =
 
         try {
             const result = await uploadFileToImgBB(file, (progress) => {
-                console.log('Upload progress:', progress);
+                logger.info(`Upload progress: ${progress}%`, undefined, 'MaintenanceCompleteModal');
             });
 
             if (result.success && result.url) {
@@ -105,7 +106,7 @@ export const MaintenanceCompleteModal: React.FC<MaintenanceCompleteModalProps> =
                 setUploadError(result.error || 'فشل رفع الصورة');
             }
         } catch (error: any) {
-            console.error('Upload error:', error);
+            logger.error('Upload error:', error, 'MaintenanceCompleteModal');
             setUploadError(error.message || 'حدث خطأ أثناء رفع الصورة');
         } finally {
             setIsUploading(false);

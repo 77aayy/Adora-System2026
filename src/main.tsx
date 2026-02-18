@@ -164,15 +164,3 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </I18nProvider>
   </React.StrictMode>
 );
-
-// ✅ Hide #initial-loader from index.html after React loads
-setTimeout(() => {
-  const initialLoader = document.getElementById('initial-loader');
-  if (initialLoader) {
-    initialLoader.style.transition = 'opacity 0.5s ease-out';
-    initialLoader.style.opacity = '0';
-    setTimeout(() => {
-      initialLoader.style.display = 'none';
-    }, 500);
-  }
-}, 100); // Hide after 100ms (React is already rendering)

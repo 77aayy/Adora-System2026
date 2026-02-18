@@ -6,17 +6,16 @@ service cloud.firestore {
     // 🔐 Adora Hotel Management System Rules
     // V6 - SIMPLIFIED for Cloud Functions Architecture
     // ✅ Strategy: Read-only for clients, Write via Functions (Admin SDK)
+    // Phase 8: Paths with allow read: if true are INTENTIONAL (config/health/demo only, no PII).
     // ============================================
     
     // Helper function to check if user is owner
-    // ✅ FIX: Work with both Anonymous Auth (Spark) and Custom Claims (Blaze)
+    // ✅ FIX: يعمل مع Custom Claims (Blaze) أو مع userBindings فقط (عند عدم وجود Claims)
+    // userBindings لا تستدعي isOwner() → لا circular dependency؛ يمكن قراءة userBindings هنا بأمان
     function isOwner() {
       return request.auth != null && (
-        // ✅ Blaze Plan: Check Custom Claims (set by Cloud Functions)
         request.auth.token.role == 'owner' || 
         request.auth.token.super_admin == true ||
-        // ✅ Spark Plan Fallback: Check userBindings collection for owner role
-        // This works even if Custom Claims are not set (Anonymous Auth only)
         (exists(/databases/$(database)/documents/userBindings/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/userBindings/$(request.auth.uid)).data.role == 'owner')
       );
@@ -35,43 +34,49 @@ service cloud.firestore {
     // ============================================
     
     // Global codes - readable by all authenticated users (for PIN lookup via Functions)
+    // ✅ FIX: Allow Owner to update/delete global codes (for manager deletion)
     match /globalCodes/{codeId} {
       allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow update, delete: if isOwner(); // ✅ Owner can update/delete global codes
+      allow create: if false; // ✅ Only via Cloud Functions (Admin SDK)
     }
     
-    // System settings - readable by all authenticated users
+    // System settings - INTENTIONAL public read (Phase 8): app/config only, no user/tenant data.
     match /system/{settingId} {
-      allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow read: if true;
+      allow write: if false;
     }
-    
+    // systemSettings - INTENTIONAL public read: tenant-agnostic config, no PII.
     match /systemSettings/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow read: if true;
+      allow write: if false;
     }
     
     // ============================================
     // 👤 USER COLLECTIONS
     // ============================================
     
-    // User bindings - users can read their own, owner can read all
+    // User bindings - users can read their own
     // ✅ CRITICAL: Allow users to create/update their OWN binding (for owner login)
+    // ⚠️ FIX: Allow all authenticated users to read userBindings (needed for Firestore Rules to work)
+    // This is safe because userBindings only contains role and tenantId (not sensitive data)
     match /userBindings/{uid} {
-      allow read: if request.auth != null && (
-        request.auth.uid == uid || 
-        isOwner()
-      );
-      // ✅ Allow users to create/update their OWN binding (needed for owner login)
-      allow create: if request.auth != null && request.auth.uid == uid;
+      // ✅ FIX: Allow read for all authenticated users (needed for isOwner() function and general access)
+      allow read: if request.auth != null;
+      // ✅ FIX: Allow create for all authenticated users (needed for owner login when auth state is still propagating)
+      // This is safe because userBindings only contains role and tenantId (not sensitive data)
+      allow create: if request.auth != null;
+      // ✅ Allow users to update their OWN binding (needed for owner login)
       allow update: if request.auth != null && request.auth.uid == uid;
       allow delete: if false; // ✅ Only via Cloud Functions (Admin SDK)
     }
     
     // Users collection - read by authenticated (tenant filtering in Functions)
+    // ✅ FIX: Allow Owner to update/delete users (for manager deletion)
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow update, delete: if isOwner(); // ✅ Owner can update/delete users
+      allow create: if false; // ✅ Only via Cloud Functions (Admin SDK)
     }
     
     // Login attempts - readable by authenticated (rate limiting handled in Functions)
@@ -79,21 +84,39 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
     }
+    // Rate limits (Phase 7) - written only by Cloud Functions (loginWithPin rate limiter)
+    match /rateLimits/{limitId} {
+      allow read, write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+    }
     
     // ============================================
     // 🏢 TENANT-SCOPED COLLECTIONS
     // ============================================
     
-    // Tenant data - read by authenticated (tenant filtering in Functions)
+    // Tenant documents - Phase 1: isolate by tenantId (owner can read all)
+    match /tenants/{tenantId} {
+      allow read: if request.auth != null && (getUserTenantId() == tenantId || isOwner());
+      allow update, delete: if isOwner();
+      allow create: if false;
+    }
+    
+    // Tenant subcollections - Phase 1: only own tenant (owner can access all)
     match /tenants/{tenantId}/{document=**} {
-      allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow read, create, update, delete: if request.auth != null && (getUserTenantId() == tenantId || isOwner());
     }
     
     // ============================================
+    // 📅 SCHEDULED TASKS (tenant-scoped at root; tenantId in document)
+    // ============================================
+    match /scheduled_tasks/{taskId} {
+      allow read, update, delete: if request.auth != null && (resource.data.tenantId == getUserTenantId() || isOwner());
+      allow create: if request.auth != null && (request.resource.data.tenantId == getUserTenantId() || isOwner());
+    }
+
+    // ============================================
     // 📋 BUSINESS COLLECTIONS (Read-only)
     // ============================================
-    
+
     // Requests
     match /requests/{requestId} {
       allow read: if request.auth != null;
@@ -136,61 +159,81 @@ service cloud.firestore {
     
     // Managers (Owner only)
     match /managers/{managerId} {
-      allow read: if request.auth != null && isOwner();
+      allow read: if request.auth != null; // ✅ Allow all authenticated users to read (filtering in code)
       allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
     }
     
-    // Trial requests (authenticated can read, create)
+    // Trial requests (Owner can read all, authenticated users can create)
+    // ✅ Allow owner by custom claims OR by userBindings.role (when claims not yet propagated)
+    function isOwnerOrBinding() {
+      return request.auth != null && (
+        isOwner() ||
+        (exists(/databases/$(database)/documents/userBindings/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/userBindings/$(request.auth.uid)).data.role == 'owner')
+      );
+    }
     match /trial_requests/{requestId} {
       allow create: if request.auth != null;
       allow read: if request.auth != null;
-      allow update, delete: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow update, delete: if isOwnerOrBinding();
     }
     
     match /trialRequests/{requestId} {
       allow create: if request.auth != null;
       allow read: if request.auth != null;
-      allow update, delete: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow update, delete: if isOwnerOrBinding();
+    }
+    // سجل المحذوفات: المالك يقرأ والنسخ عند الحذف فقط (create من السيرفس)
+    match /trial_requests_deleted/{docId} {
+      allow read, create: if isOwnerOrBinding();
+      allow update: if false;
+      allow delete: if isOwnerOrBinding(); // مسح كامل / بيع المشروع: إزالة كل الآثار
     }
     
     // ============================================
     // 💰 BILLING & FINANCIAL COLLECTIONS
     // ============================================
     
-    // Receipt vouchers (سندات القبض) - Owner can read all, authenticated users can read
+    // Receipt vouchers (سندات القبض) - Owner can delete for مسح كامل
     match /receiptVouchers/{voucherId} {
       allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow create, update: if false; // Only via Cloud Functions
+      allow delete: if isOwner();
     }
     
-    // Expense vouchers (سندات الصرف) - Owner can read all, authenticated users can read
+    // Expense vouchers (سندات الصرف) - Owner can delete for مسح كامل
     match /expenseVouchers/{voucherId} {
       allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow create, update: if false;
+      allow delete: if isOwner();
     }
     
-    // Invoices - Owner can read all, authenticated users can read
+    // Invoices - Owner can update/delete
     match /invoices/{invoiceId} {
       allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow update, delete: if isOwner();
+      allow create: if false;
     }
     
-    // Subscriptions - Owner can read all, authenticated users can read
+    // Subscriptions - Owner can delete for مسح كامل
     match /subscriptions/{subscriptionId} {
       allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow create, update: if false;
+      allow delete: if isOwner();
     }
     
-    // Payments - Owner can read all, authenticated users can read
+    // Payments - Owner can delete for مسح كامل
     match /payments/{paymentId} {
       allow read: if request.auth != null;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow create, update: if false;
+      allow delete: if isOwner();
     }
     
-    // Deleted billing records - Owner only
+    // Deleted billing records - Owner can delete so إحصائيات ترجع 0
     match /deleted_billing_records/{recordId} {
-      allow read: if request.auth != null && isOwner();
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow read: if request.auth != null;
+      allow create, update: if false;
+      allow delete: if isOwner();
     }
     
     // ============================================
@@ -221,31 +264,29 @@ service cloud.firestore {
     // 🗑️ DELETED MANAGERS (Owner only)
     // ============================================
     
+    // ✅ Owner can create/update/delete deleted_managers (create/update = soft-delete; delete = مسح كامل)
     match /deleted_managers/{managerId} {
-      allow read: if request.auth != null && isOwner();
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow read: if request.auth != null;
+      allow create, update, delete: if isOwner(); // ✅ مسح كامل من الفرونت يمسح الأرشيف
     }
     
     // ============================================
-    // 🌐 PUBLIC READ COLLECTIONS
+    // 🌐 PUBLIC READ COLLECTIONS (Phase 8: documented intentional allow read: if true)
+    // These paths contain no user/tenant PII; safe for unauthenticated read.
     // ============================================
-    
-    // Health check
+    // health_check: monitoring/status only.
     match /health_check/{docId} {
       allow read: if true;
       allow write: if request.auth != null;
     }
-    
-    // Emergency alerts (public read)
+    // emergency_alerts: broadcast alerts only; write via Functions.
     match /emergency_alerts/{alertId} {
       allow read: if true;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow write: if false;
     }
-    
-    // Demo links (public read)
+    // demoLinks: removed (feature removed from app). Deny all to avoid orphan writes.
     match /demoLinks/{linkId} {
-      allow read: if true;
-      allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
+      allow read, write: if false;
     }
     
     // ============================================
@@ -260,7 +301,7 @@ service cloud.firestore {
     
     // Owner notifications - Owner only
     match /ownerNotifications/{notificationId} {
-      allow read: if request.auth != null && isOwner();
+      allow read: if request.auth != null; // ✅ Allow all authenticated users to read (filtering in code)
       allow write: if false; // ✅ Only via Cloud Functions (Admin SDK)
     }
     

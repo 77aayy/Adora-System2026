@@ -8,6 +8,7 @@
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
 import { autoTranslateNewText } from './dynamicTranslationService'; // ✅ Auto-translation
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -85,7 +86,7 @@ export interface AnnouncementAuditLog {
 
 const getAnnouncementsCollectionRef = (tenantId: string) => {
     if (!db) {
-        console.error('[managerAnnouncementService] Firestore not initialized');
+        logger.error('[managerAnnouncementService] Firestore not initialized', undefined, 'managerAnnouncementService');
         throw new Error('Firestore not initialized');
     }
     return collection(db, 'tenants', tenantId, 'manager_announcements');
@@ -142,13 +143,13 @@ export const createManagerAnnouncement = async (
                 }
             } catch (translationError) {
                 // Don't fail the announcement creation if translation fails
-                console.warn('Auto-translation failed for announcement:', translationError);
+                logger.warn('Auto-translation failed for announcement:', translationError, 'managerAnnouncementService');
             }
         }
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating manager announcement:', error);
+        logger.error('Error creating manager announcement:', error, 'managerAnnouncementService');
         throw error;
     }
 };
@@ -170,7 +171,7 @@ export const updateManagerAnnouncement = async (
             updatedBy: { id: managerId, name: managerName }
         });
     } catch (error) {
-        console.error('Error updating manager announcement:', error);
+        logger.error('Error updating manager announcement:', error, 'managerAnnouncementService');
         throw error;
     }
 };
@@ -185,7 +186,7 @@ export const deactivateManagerAnnouncement = async (tenantId: string, announceme
             deactivatedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error deactivating manager announcement:', error);
+        logger.error('Error deactivating manager announcement:', error, 'managerAnnouncementService');
         throw error;
     }
 };
@@ -261,7 +262,7 @@ export const getActiveAnnouncementsForDepartment = async (
             return bTime.getTime() - aTime.getTime(); // Newest first
         });
     } catch (error) {
-        console.error('Error getting active announcements:', error);
+        logger.error('Error getting active announcements:', error, 'managerAnnouncementService');
         return [];
     }
 };
@@ -276,12 +277,12 @@ export const subscribeToManagerAnnouncements = (
     callback: (announcements: ManagerAnnouncement[]) => void
 ): (() => void) => {
     if (!db) {
-        console.error('[managerAnnouncementService] Firestore not initialized');
+        logger.error('[managerAnnouncementService] Firestore not initialized', undefined, 'managerAnnouncementService');
         callback([]);
         return () => {};
     }
 
-    console.log('[managerAnnouncementService] Subscribing to announcements:', { tenantId, department, branchId });
+    logger.info('[managerAnnouncementService] Subscribing to announcements:', { tenantId, department, branchId }, 'managerAnnouncementService');
     
     // ✅ FIX: Try with orderBy first, fallback to simple query if index missing
     let q = query(
@@ -293,7 +294,7 @@ export const subscribeToManagerAnnouncements = (
     return onSnapshot(
         q,
         (snapshot) => {
-            console.log('[managerAnnouncementService] ✅ Snapshot received:', snapshot.size, 'documents');
+            logger.info('[managerAnnouncementService] ✅ Snapshot received:', snapshot.size, 'documents', 'managerAnnouncementService');
             const now = new Date();
             const announcements: ManagerAnnouncement[] = [];
 
@@ -352,7 +353,7 @@ export const subscribeToManagerAnnouncements = (
             callback(sorted);
         },
         (error: any) => {
-            console.error('[managerAnnouncementService] ❌ Error subscribing:', error.code, error.message);
+            logger.error('[managerAnnouncementService] ❌ Error subscribing:', error.code, error.message, 'managerAnnouncementService');
             
             // ✅ FIX: Fallback to simple query without orderBy if index missing
             if (error.code === 'failed-precondition') {
@@ -412,7 +413,7 @@ export const subscribeToManagerAnnouncements = (
                         callback(sorted);
                     },
                     (fallbackError) => {
-                        console.error('[managerAnnouncementService] ❌ Fallback query also failed:', fallbackError);
+                        logger.error('[managerAnnouncementService] ❌ Fallback query also failed:', fallbackError, 'managerAnnouncementService');
                         callback([]);
                     }
                 );
@@ -475,7 +476,7 @@ export const markManagerAnnouncementAsViewed = async (
             });
         }
     } catch (error) {
-        console.error('Error marking announcement as viewed:', error);
+        logger.error('Error marking announcement as viewed:', error, 'managerAnnouncementService');
     }
 };
 
@@ -530,7 +531,7 @@ export const dismissManagerAnnouncement = async (
             });
         }
     } catch (error) {
-        console.error('Error dismissing announcement:', error);
+        logger.error('Error dismissing announcement:', error, 'managerAnnouncementService');
     }
 };
 
@@ -549,7 +550,7 @@ export const getAllManagerAnnouncements = async (tenantId: string): Promise<Mana
             ...doc.data()
         } as ManagerAnnouncement));
     } catch (error) {
-        console.error('Error getting all announcements:', error);
+        logger.error('Error getting all announcements:', error, 'managerAnnouncementService');
         return [];
     }
 };
@@ -576,7 +577,7 @@ export const subscribeToAllManagerAnnouncements = (
             callback(announcements);
         },
         (error) => {
-            console.error('Error subscribing to all announcements:', error);
+            logger.error('Error subscribing to all announcements:', error, 'managerAnnouncementService');
             callback([]);
         }
     );
@@ -638,7 +639,7 @@ export const getManagerAnnouncementStats = async (
             dismissalsByDepartment: dismissalsByDept
         };
     } catch (error) {
-        console.error('Error getting announcement stats:', error);
+        logger.error('Error getting announcement stats:', error, 'managerAnnouncementService');
         return {
             totalViews: 0,
             totalDismissals: 0,
@@ -681,7 +682,7 @@ export const getAnnouncementAuditLog = async (
             dismissedBy
         };
     } catch (error) {
-        console.error('Error getting announcement audit log:', error);
+        logger.error('Error getting announcement audit log:', error, 'managerAnnouncementService');
         return {
             announcementId,
             views: [],

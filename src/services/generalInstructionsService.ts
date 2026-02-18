@@ -8,6 +8,7 @@
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
 import { autoTranslateNewText } from './dynamicTranslationService'; // ✅ Auto-translation
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -107,13 +108,13 @@ export const createGeneralInstruction = async (
                 }
             } catch (translationError) {
                 // Don't fail the instruction creation if translation fails
-                console.warn('Auto-translation failed for instruction:', translationError);
+                logger.warn('Auto-translation failed for instruction:', translationError, 'generalInstructionsService');
             }
         }
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating general instruction:', error);
+        logger.error('Error creating general instruction:', error, 'generalInstructionsService');
         throw error;
     }
 };
@@ -135,7 +136,7 @@ export const updateGeneralInstruction = async (
             updatedBy: { id: managerId, name: managerName }
         });
     } catch (error) {
-        console.error('Error updating general instruction:', error);
+        logger.error('Error updating general instruction:', error, 'generalInstructionsService');
         throw error;
     }
 };
@@ -150,7 +151,7 @@ export const deactivateGeneralInstruction = async (tenantId: string, instruction
             updatedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error deactivating general instruction:', error);
+        logger.error('Error deactivating general instruction:', error, 'generalInstructionsService');
         throw error;
     }
 };
@@ -236,7 +237,7 @@ export const getInstructionsForDepartment = async (
 
         return constitution;
     } catch (error) {
-        console.error('Error getting instructions:', error);
+        logger.error('Error getting instructions:', error, 'generalInstructionsService');
         return {
             generalPolicies: [],
             employeeRights: [],
@@ -338,7 +339,7 @@ export const subscribeToInstructions = (
             callback(constitution);
         },
         (error) => {
-            console.error('Error subscribing to instructions:', error);
+            logger.error('Error subscribing to instructions:', error, 'generalInstructionsService');
             callback({
                 generalPolicies: [],
                 employeeRights: [],
@@ -366,7 +367,7 @@ export const getAllInstructions = async (tenantId: string): Promise<GeneralInstr
             ...doc.data()
         } as GeneralInstruction));
     } catch (error) {
-        console.error('Error getting all instructions:', error);
+        logger.error('Error getting all instructions:', error, 'generalInstructionsService');
         return [];
     }
 };
@@ -394,7 +395,7 @@ export const subscribeToAllInstructions = (
             callback(instructions);
         },
         (error) => {
-            console.error('Error subscribing to all instructions:', error);
+            logger.error('Error subscribing to all instructions:', error, 'generalInstructionsService');
             callback([]);
         }
     );

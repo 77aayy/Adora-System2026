@@ -330,12 +330,16 @@ export const KPIDashboard: React.FC<KPIDashboardProps> = ({ period = 'week' }) =
         setRefreshing(true);
         try {
             const { start, end } = getDateRange(selectedPeriod);
-            const requestsRef = collection(db, 'requests');
+            // ✅ FIX: Use tenant-scoped collection
+            if (!tenantId) {
+                logger.error('KPIDashboard: tenantId is required', undefined, 'KPIDashboard');
+                return;
+            }
+            const requestsRef = collection(db, `tenants/${tenantId}/requests`);
 
             // Get requests in period
             // SIMPLIFIED QUERY: Fetch recent requests by branch and filter in memory to avoid index issues
             const constraints: any[] = [where('branch', '==', branchId)];
-            if (tenantId) constraints.push(where('tenantId', '==', tenantId));
             constraints.push(orderBy('createdAt', 'desc'));
             constraints.push(limit(500));
 

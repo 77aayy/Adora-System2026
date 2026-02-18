@@ -1,10 +1,15 @@
 /**
  * Bellman Service - Complete Implementation
  * Luggage, Concierge, Operations, Reporting
+ *
+ * SaaS/tenant: Uses root collections (luggage, carts, vehicles, scheduledPickups, damageReports,
+ * insuranceClaims, lostAndFound, conciergeRequests, etc.). For SaaS isolation, consider
+ * tenants/${tenantId}/... paths and passing tenantId in all functions.
  */
 
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // CORE FUNCTIONS (20)
@@ -46,9 +51,9 @@ export const getLuggageByRoom = async (roomNumber: string, branch: string): Prom
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as LuggageItem));
 };
 
-// 2-5. Cart & Vehicle Management
-export const assignCart = async (requestId: string, cartId: string): Promise<void> => {
-    await updateDoc(doc(db, 'requests', requestId), { assignedCart: cartId, 'timeline.cartAssigned': Timestamp.now() });
+// 2-5. Cart & Vehicle Management (tenant-scoped requests path)
+export const assignCart = async (tenantId: string, requestId: string, cartId: string): Promise<void> => {
+    await updateDoc(doc(db, 'tenants', tenantId, 'requests', requestId), { assignedCart: cartId, 'timeline.cartAssigned': Timestamp.now() });
 };
 
 export const getAvailableCarts = async (branch: string): Promise<any[]> => {
@@ -88,16 +93,16 @@ export const getScheduledPickups = async (branch: string, date: Date): Promise<a
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
-export const coordinateMultiGuest = async (requestIds: string[], bellmanId: string): Promise<void> => {
+export const coordinateMultiGuest = async (tenantId: string, requestIds: string[], bellmanId: string): Promise<void> => {
     const batch = writeBatch(db);
     requestIds.forEach(id => {
-        batch.update(doc(db, 'requests', id), { coordinatedWith: requestIds, assignedTo: bellmanId });
+        batch.update(doc(db, 'tenants', tenantId, 'requests', id), { coordinatedWith: requestIds, assignedTo: bellmanId });
     });
     await batch.commit();
 };
 
-export const handleVIPProtocol = async (requestId: string, vipLevel: string): Promise<void> => {
-    await updateDoc(doc(db, 'requests', requestId), { isVIP: true, vipLevel, priority: 'urgent' });
+export const handleVIPProtocol = async (tenantId: string, requestId: string, vipLevel: string): Promise<void> => {
+    await updateDoc(doc(db, 'tenants', tenantId, 'requests', requestId), { isVIP: true, vipLevel, priority: 'urgent' });
 };
 
 export const getRouteOptimization = (pickups: { roomNumber: string; floor: number }[]): string[] => {
@@ -298,8 +303,8 @@ export const calculateCommission = async (employeeId: string, period: { start: D
     return 500;
 };
 
-export const collectGuestFeedback = async (requestId: string, rating: number, comments: string): Promise<void> => {
-    await updateDoc(doc(db, 'requests', requestId), { feedback: { rating, comments, submittedAt: Timestamp.now() } });
+export const collectGuestFeedback = async (tenantId: string, requestId: string, rating: number, comments: string): Promise<void> => {
+    await updateDoc(doc(db, 'tenants', tenantId, 'requests', requestId), { feedback: { rating, comments, submittedAt: Timestamp.now() } });
 };
 
 export const conductServiceAudit = async (branch: string, auditorId: string, findings: any[]): Promise<string> => {
@@ -347,7 +352,7 @@ export const getSmartRouting = async (tasks: any[]): Promise<string[]> => {
 };
 
 export const balanceBellmanLoad = async (branch: string): Promise<void> => {
-    console.log('Balancing bellman workload for:', branch);
+    logger.info(`Balancing bellman workload for: ${branch}`, undefined, 'bellmanService');
 };
 
 export const forecastDemand = async (branch: string, days: number): Promise<number[]> => {

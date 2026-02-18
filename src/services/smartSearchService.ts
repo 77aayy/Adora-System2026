@@ -13,6 +13,7 @@
 
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -104,7 +105,7 @@ export const searchRooms = async (
             });
         });
     } catch (error) {
-        console.warn('Room search error:', error);
+        logger.warn('Room search error:', error, 'smartSearchService');
     }
 
     return results;
@@ -145,7 +146,7 @@ export const searchRequests = async (
             });
         });
     } catch (error) {
-        console.warn('Request search error:', error);
+        logger.warn('Request search error:', error, 'smartSearchService');
     }
 
     return results;
@@ -185,7 +186,7 @@ export const searchMaintenance = async (
             });
         });
     } catch (error) {
-        console.warn('Maintenance search error:', error);
+        logger.warn('Maintenance search error:', error, 'smartSearchService');
     }
 
     return results;
@@ -225,7 +226,7 @@ export const searchEmployees = async (
             });
         });
     } catch (error) {
-        console.warn('Employee search error:', error);
+        logger.warn('Employee search error:', error, 'smartSearchService');
     }
 
     return results;
@@ -260,7 +261,7 @@ export const searchHistory = async (
             });
         });
     } catch (error) {
-        console.warn('History search error:', error);
+        logger.warn('History search error:', error, 'smartSearchService');
     }
 
     return results;
@@ -426,7 +427,7 @@ export const useSmartSearch = (
             const searchResults = await performSearch(queryText, session, fullConfig);
             setResults(searchResults);
         } catch (error) {
-            console.error('Search error:', error);
+            logger.error('Search error:', error, 'smartSearchService');
             setResults([]);
         } finally {
             setLoading(false);

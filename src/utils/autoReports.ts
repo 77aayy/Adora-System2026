@@ -34,9 +34,9 @@ export interface ShiftData {
 // ============================================================
 
 /**
- * Get report statistics from Firebase
+ * Get report statistics from Firebase (tenant-scoped when tenantId provided)
  */
-export const getReportStats = async (): Promise<ReportStats> => {
+export const getReportStats = async (tenantId?: string): Promise<ReportStats> => {
     const stats: ReportStats = {
         cleanedRooms: 0,
         checkouts: 0,
@@ -54,8 +54,10 @@ export const getReportStats = async (): Promise<ReportStats> => {
         today.setHours(0, 0, 0, 0);
         const startOfDay = Timestamp.fromDate(today);
 
-        // Get today's completed requests
-        const requestsRef = collection(db, 'requests');
+        // ✅ Tenant-scoped: pass tenantId for production (root 'requests' is read-disallowed in rules)
+        const requestsRef = tenantId
+            ? collection(db, 'tenants', tenantId, 'requests')
+            : collection(db, 'requests');
         const completedQuery = query(
             requestsRef,
             where('status', '==', 'COMPLETED'),
@@ -113,8 +115,8 @@ export const getReportStats = async (): Promise<ReportStats> => {
 /**
  * Generate 8PM daily report
  */
-export const generate8PMReport = async (branchName = 'الفندق'): Promise<string> => {
-    const stats = await getReportStats();
+export const generate8PMReport = async (branchName = 'الفندق', tenantId?: string): Promise<string> => {
+    const stats = await getReportStats(tenantId);
     const today = new Date().toLocaleDateString('ar-EG', {
         weekday: 'long',
         year: 'numeric',
@@ -152,9 +154,10 @@ export const generate8PMReport = async (branchName = 'الفندق'): Promise<st
 export const generateShiftReport = async (
     employeeName: string,
     branchName: string,
-    shiftData: ShiftData = {}
+    shiftData: ShiftData = {},
+    tenantId?: string
 ): Promise<string> => {
-    const stats = await getReportStats();
+    const stats = await getReportStats(tenantId);
     const now = new Date();
 
     return `📋 *تقرير نهاية الشفت*

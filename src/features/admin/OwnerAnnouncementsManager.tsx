@@ -23,6 +23,7 @@ import {
     type OwnerAnnouncement
 } from '../../services/ownerAnnouncementService';
 import { Timestamp } from 'firebase/firestore';
+import { formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 export const OwnerAnnouncementsManager: React.FC = () => {
     const { user } = useAuth();
@@ -375,7 +376,7 @@ export const OwnerAnnouncementsManager: React.FC = () => {
                                     {announcement.expiresAt && (
                                         <span className="flex items-center gap-1">
                                             <Clock className="w-3 h-3" />
-                                            {new Date(announcement.expiresAt.toDate ? announcement.expiresAt.toDate() : announcement.expiresAt).toLocaleString('ar-SA')}
+                                            {formatDateTimeGregorianEn(announcement.expiresAt.toDate ? announcement.expiresAt.toDate() : announcement.expiresAt, { showSeconds: false })}
                                         </span>
                                     )}
                                 </div>

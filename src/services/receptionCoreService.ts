@@ -112,7 +112,7 @@ export const handleConcurrentRequests = async (
 export const mergeRequests = async (requestIds: string[], mergedType: string): Promise<string | null> => {
     if (requestIds.length < 2) return null;
     // Simplified merge - would combine multiple requests into one
-    console.log('Merging requests:', requestIds, 'into type:', mergedType);
+    logger.info(`Merging requests: ${requestIds.join(', ')} into type: ${mergedType}`, undefined, 'receptionCoreService');
     return requestIds[0]; // Return first as merged
 };
 
@@ -174,7 +174,7 @@ export const suggestOptimalSchedule = async (serviceType: string, branch: string
 // ============================================================
 
 export const balanceWorkload = async (department: string, branch: string): Promise<void> => {
-    console.log('Balancing workload for:', department, branch);
+    logger.info(`Balancing workload for: ${department} in branch: ${branch}`, undefined, 'receptionCoreService');
     // Would redistribute unassigned tasks to least-loaded employees
 };
 

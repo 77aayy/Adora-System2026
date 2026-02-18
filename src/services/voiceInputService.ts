@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -114,7 +116,7 @@ const MAX_INIT_RETRIES = 3;
 
 export const initVoiceInput = (options: VoiceInputOptions = {}): boolean => {
     if (!isVoiceInputSupported()) {
-        console.warn('Speech recognition not supported');
+        logger.warn('Speech recognition not supported', undefined, 'voiceInputService');
         return false;
     }
 
@@ -123,7 +125,7 @@ export const initVoiceInput = (options: VoiceInputOptions = {}): boolean => {
         try {
             recognition.abort();
         } catch (e) {
-            console.warn('Failed to abort previous recognition:', e);
+            logger.warn('Failed to abort previous recognition:', e, 'voiceInputService');
         }
         recognition = null;
     }
@@ -144,35 +146,35 @@ export const initVoiceInput = (options: VoiceInputOptions = {}): boolean => {
         isListening = true;
         initRetryCount = 0; // Reset retry count on success
         options.onStart?.();
-        console.log('🎤 Voice input started');
+        logger.info('🎤 Voice input started', undefined, 'voiceInputService');
     };
 
     recognition.onend = () => {
         const wasListening = isListening;
         isListening = false;
         options.onEnd?.();
-        console.log('🎤 Voice input ended', wasListening ? '(was listening)' : '(was not listening)');
+        logger.info('🎤 Voice input ended', wasListening ? '(was listening)' : '(was not listening)', 'voiceInputService');
     };
 
     // 🛡️ Handle audio events for debugging
     recognition.onaudiostart = () => {
-        console.log('🔊 Audio capture started');
+        logger.info('🔊 Audio capture started', undefined, 'voiceInputService');
     };
 
     recognition.onaudioend = () => {
-        console.log('🔇 Audio capture ended');
+        logger.info('🔇 Audio capture ended', undefined, 'voiceInputService');
     };
 
     recognition.onspeechstart = () => {
-        console.log('🗣️ Speech detected');
+        logger.info('🗣️ Speech detected', undefined, 'voiceInputService');
     };
 
     recognition.onspeechend = () => {
-        console.log('🤐 Speech ended');
+        logger.info('🤐 Speech ended', undefined, 'voiceInputService');
     };
 
     recognition.onnomatch = () => {
-        console.warn('❓ No speech recognized (nomatch)');
+        logger.warn('❓ No speech recognized (nomatch)', undefined, 'voiceInputService');
         options.onError?.('no-speech');
     };
 
@@ -182,12 +184,12 @@ export const initVoiceInput = (options: VoiceInputOptions = {}): boolean => {
         const isFinal = result.isFinal;
         const confidence = result[0].confidence;
 
-        console.log(`🎯 Result: "${transcript}" (final: ${isFinal}, confidence: ${(confidence * 100).toFixed(1)}%)`);
+        logger.info(`🎯 Result: "${transcript}" (final: ${isFinal}, confidence: ${(confidence * 100).toFixed(1)}%)`, undefined, 'voiceInputService');
 
         // 🧠 Apply Genius Refiner
         if (isFinal) {
             transcript = refineTranscript(transcript);
-            console.log(`🧠 Refined: "${result[0].transcript}" -> "${transcript}"`);
+            logger.debug(`🧠 Refined: "${result[0].transcript}" -> "${transcript}"`, undefined, 'voiceInputService');
         }
 
         options.onResult?.(transcript, isFinal);
@@ -198,7 +200,7 @@ export const initVoiceInput = (options: VoiceInputOptions = {}): boolean => {
 
         (window as any).silenceTimer = setTimeout(() => {
             if (isListening && transcript.trim().length > 0) {
-                console.log("🤫 Silence detected, auto-sending...");
+                logger.info("🤫 Silence detected, auto-sending...", undefined, 'voiceInputService');
                 stopListening();
             }
         }, 2500); // 2.5 seconds silence = Done talking (increased from 2s)
@@ -206,42 +208,42 @@ export const initVoiceInput = (options: VoiceInputOptions = {}): boolean => {
 
     recognition.onerror = (event: any) => {
         const error = event.error;
-        console.error('🔴 Voice input error:', error, event);
+        logger.error('🔴 Voice input error:', { error, event }, 'voiceInputService');
         
         // 🛡️ Handle specific errors
         switch (error) {
             case 'no-speech':
-                console.warn('⚠️ No speech detected - user may not have spoken');
+                logger.warn('⚠️ No speech detected - user may not have spoken', undefined, 'voiceInputService');
                 // Don't call error callback for no-speech, just end silently
                 isListening = false;
                 options.onEnd?.();
                 break;
                 
             case 'aborted':
-                console.warn('⚠️ Recognition aborted (intentional stop)');
+                logger.warn('⚠️ Recognition aborted (intentional stop)', undefined, 'voiceInputService');
                 isListening = false;
                 break;
                 
             case 'audio-capture':
-                console.error('🎤 No microphone found or microphone error');
+                logger.error('🎤 No microphone found or microphone error', undefined, 'voiceInputService');
                 options.onError?.('لم يتم العثور على ميكروفون أو حدث خطأ في التسجيل');
                 isListening = false;
                 break;
                 
             case 'not-allowed':
-                console.error('🚫 Microphone permission denied');
+                logger.error('🚫 Microphone permission denied', undefined, 'voiceInputService');
                 options.onError?.('لم يتم السماح بالوصول للميكروفون');
                 isListening = false;
                 break;
                 
             case 'network':
-                console.error('🌐 Network error during speech recognition');
+                logger.error('🌐 Network error during speech recognition', undefined, 'voiceInputService');
                 options.onError?.('خطأ في الشبكة أثناء التعرف على الصوت');
                 isListening = false;
                 // 🔄 Auto-retry for network errors
                 if (initRetryCount < MAX_INIT_RETRIES) {
                     initRetryCount++;
-                    console.log(`🔄 Retrying... (${initRetryCount}/${MAX_INIT_RETRIES})`);
+                    logger.info(`🔄 Retrying... (${initRetryCount}/${MAX_INIT_RETRIES})`, undefined, 'voiceInputService');
                     setTimeout(() => {
                         if (initVoiceInput(lastInitOptions)) {
                             startListening(currentCallback || undefined);
@@ -251,7 +253,7 @@ export const initVoiceInput = (options: VoiceInputOptions = {}): boolean => {
                 break;
                 
             case 'service-not-allowed':
-                console.error('🚫 Speech recognition service not allowed');
+                logger.error('🚫 Speech recognition service not allowed', undefined, 'voiceInputService');
                 options.onError?.('خدمة التعرف على الصوت غير متاحة');
                 isListening = false;
                 break;
@@ -262,7 +264,7 @@ export const initVoiceInput = (options: VoiceInputOptions = {}): boolean => {
         }
     };
 
-    console.log('✅ Voice input initialized with lang:', recognition.lang);
+    logger.info('✅ Voice input initialized with lang:', recognition.lang, 'voiceInputService');
     return true;
 };
 
@@ -287,7 +289,7 @@ export const startListening = (
 
     // 🛡️ Prevent multiple starts
     if (startPending) {
-        console.warn('⚠️ Start already pending, ignoring...');
+        logger.warn('⚠️ Start already pending, ignoring...', undefined, 'voiceInputService');
         return false;
     }
 
@@ -295,7 +297,7 @@ export const startListening = (
 
     // If already listening, stop first and wait
     if (isListening) {
-        console.log('🔄 Stopping current session before restart...');
+        logger.info('🔄 Stopping current session before restart...', undefined, 'voiceInputService');
         startPending = true;
         stopListening();
         
@@ -304,12 +306,12 @@ export const startListening = (
             startPending = false;
             try {
                 recognition.start();
-                console.log('🎤 Recognition restarted after stop');
+                logger.info('🎤 Recognition restarted after stop', undefined, 'voiceInputService');
             } catch (error: any) {
-                console.error('Failed to restart voice input:', error);
+                logger.error('Failed to restart voice input:', error, 'voiceInputService');
                 // 🛡️ Handle "already started" error
                 if (error.name === 'InvalidStateError') {
-                    console.warn('⚠️ Recognition already running, ignoring...');
+                    logger.warn('⚠️ Recognition already running, ignoring...', undefined, 'voiceInputService');
                 }
             }
         }, 300); // 300ms delay to ensure clean restart
@@ -318,19 +320,19 @@ export const startListening = (
 
     try {
         recognition.start();
-        console.log('🎤 Recognition started');
+        logger.info('🎤 Recognition started', undefined, 'voiceInputService');
         return true;
     } catch (error: any) {
-        console.error('Failed to start voice input:', error);
+        logger.error('Failed to start voice input:', error, 'voiceInputService');
         // 🛡️ Handle "already started" error
         if (error.name === 'InvalidStateError') {
-            console.warn('⚠️ Recognition already running, attempting restart...');
+            logger.warn('⚠️ Recognition already running, attempting restart...', undefined, 'voiceInputService');
             stopListening();
             setTimeout(() => {
                 try {
                     recognition.start();
                 } catch (e) {
-                    console.error('Restart failed:', e);
+                    logger.error('Restart failed:', e, 'voiceInputService');
                 }
             }, 300);
         }
@@ -352,7 +354,7 @@ export const stopListening = (): void => {
         try {
             recognition.stop();
         } catch (e) {
-            console.warn('Error stopping recognition:', e);
+            logger.warn('Error stopping recognition:', e, 'voiceInputService');
         }
         isListening = false;
         currentCallback = null;

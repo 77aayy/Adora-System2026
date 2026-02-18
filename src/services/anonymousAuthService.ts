@@ -28,6 +28,7 @@ import {
     serverTimestamp,
     Timestamp
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 import { generateDeviceFingerprint, getSavedDeviceFingerprint, saveDeviceFingerprint } from './locationService';
 
 // ============================================================
@@ -87,33 +88,33 @@ export interface RateLimitCheckResult {
  */
 export const ensureAnonymousAuth = async (): Promise<User | null> => {
     if (!isFirebaseConfigured() || !auth) {
-        console.warn('⚠️ Firebase not configured, cannot create anonymous user');
+        logger.warn('⚠️ Firebase not configured, cannot create anonymous user', undefined, 'anonymousAuthService');
         return null;
     }
 
     // Check if already signed in
     if (auth.currentUser) {
-        console.log('✅ Already authenticated:', auth.currentUser.uid);
+        logger.info('✅ Already authenticated:', auth.currentUser.uid, 'anonymousAuthService');
         return auth.currentUser;
     }
 
     try {
-        console.log('🔐 Creating anonymous session for guest...');
+        logger.info('🔐 Creating anonymous session for guest...', undefined, 'anonymousAuthService');
         const userCredential = await signInAnonymously(auth);
         const user = userCredential.user;
         
         // Save UID locally for tracking
         localStorage.setItem(ANON_USER_STORAGE_KEY, user.uid);
         
-        console.log('✅ Anonymous auth successful:', user.uid);
+        logger.info('✅ Anonymous auth successful:', user.uid, 'anonymousAuthService');
         return user;
     } catch (error: any) {
-        console.error('❌ Anonymous auth failed:', error);
+        logger.error('❌ Anonymous auth failed:', error, 'anonymousAuthService');
         
         // Handle specific errors
         if (error.code === 'auth/operation-not-allowed') {
-            console.error('⚠️ Anonymous auth not enabled in Firebase Console!');
-            console.error('   Go to: Firebase Console → Authentication → Sign-in method → Anonymous → Enable');
+            logger.error('⚠️ Anonymous auth not enabled in Firebase Console!', undefined, 'anonymousAuthService');
+            logger.error('   Go to: Firebase Console → Authentication → Sign-in method → Anonymous → Enable', undefined, 'anonymousAuthService');
         }
         
         return null;
@@ -146,9 +147,9 @@ export const signOutAnonymous = async (): Promise<void> => {
     try {
         await signOut(auth);
         localStorage.removeItem(ANON_USER_STORAGE_KEY);
-        console.log('✅ Anonymous session ended');
+        logger.info('✅ Anonymous session ended', undefined, 'anonymousAuthService');
     } catch (error) {
-        console.error('Error signing out:', error);
+        logger.error('Error signing out:', error, 'anonymousAuthService');
     }
 };
 
@@ -216,10 +217,10 @@ export const initializeGuestRateLimit = async (
             updatedAt: serverTimestamp()
         }, { merge: true });
 
-        console.log('✅ Rate limit initialized for guest:', uid);
+        logger.info('✅ Rate limit initialized for guest:', uid, 'anonymousAuthService');
         return rateLimitData;
     } catch (error) {
-        console.error('Error initializing rate limit:', error);
+        logger.error('Error initializing rate limit:', error, 'anonymousAuthService');
         return null;
     }
 };
@@ -331,7 +332,7 @@ export const checkRateLimit = async (
                 return { allowed: true };
         }
     } catch (error) {
-        console.error('Error checking rate limit:', error);
+        logger.error('Error checking rate limit:', error, 'anonymousAuthService');
         // Allow on error (don't block legitimate users)
         return { allowed: true };
     }
@@ -372,7 +373,7 @@ export const recordRateLimitedAction = async (
 
         await updateDoc(docRef, updates);
     } catch (error) {
-        console.error('Error recording rate limited action:', error);
+        logger.error('Error recording rate limited action:', error, 'anonymousAuthService');
     }
 };
 
@@ -394,9 +395,9 @@ export const blockGuest = async (
             blockedUntil: Timestamp.fromDate(new Date(Date.now() + durationMinutes * 60 * 1000)),
             updatedAt: serverTimestamp()
         });
-        console.log(`⛔ Guest ${uid} blocked for ${durationMinutes} minutes: ${reason}`);
+        logger.info(`⛔ Guest ${uid} blocked for ${durationMinutes} minutes: ${reason}`, undefined, 'anonymousAuthService');
     } catch (error) {
-        console.error('Error blocking guest:', error);
+        logger.error('Error blocking guest:', error, 'anonymousAuthService');
     }
 };
 
@@ -414,9 +415,9 @@ export const unblockGuest = async (uid: string): Promise<void> => {
             blockedUntil: null,
             updatedAt: serverTimestamp()
         });
-        console.log(`✅ Guest ${uid} unblocked`);
+        logger.info(`✅ Guest ${uid} unblocked`, undefined, 'anonymousAuthService');
     } catch (error) {
-        console.error('Error unblocking guest:', error);
+        logger.error('Error unblocking guest:', error, 'anonymousAuthService');
     }
 };
 
@@ -453,7 +454,7 @@ export const cleanupGuestRateLimitOnCheckout = async (
         const snapshot = await getDocs(q);
         
         if (snapshot.empty) {
-            console.log(`ℹ️ No rate limit data found for room ${roomNumber}`);
+            logger.info(`ℹ️ No rate limit data found for room ${roomNumber}`, undefined, 'anonymousAuthService');
             return { success: true, deletedCount: 0 };
         }
 
@@ -463,18 +464,18 @@ export const cleanupGuestRateLimitOnCheckout = async (
             try {
                 await deleteDoc(docSnapshot.ref);
                 deletedCount++;
-                console.log(`🗑️ Deleted rate limit for guest UID: ${docSnapshot.id}`);
+                logger.info(`🗑️ Deleted rate limit for guest UID: ${docSnapshot.id}`, undefined, 'anonymousAuthService');
             } catch (err) {
-                console.warn(`Failed to delete rate limit ${docSnapshot.id}:`, err);
+                logger.warn(`Failed to delete rate limit ${docSnapshot.id}:`, err, 'anonymousAuthService');
             }
         });
 
         await Promise.all(deletePromises);
         
-        console.log(`✅ Cleaned up ${deletedCount} guest rate limit record(s) for room ${roomNumber}`);
+        logger.info(`✅ Cleaned up ${deletedCount} guest rate limit record(s) for room ${roomNumber}`, undefined, 'anonymousAuthService');
         return { success: true, deletedCount };
     } catch (error) {
-        console.error('Error cleaning up guest rate limits:', error);
+        logger.error('Error cleaning up guest rate limits:', error, 'anonymousAuthService');
         return { success: false, deletedCount: 0 };
     }
 };

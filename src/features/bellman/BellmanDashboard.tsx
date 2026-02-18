@@ -41,6 +41,7 @@ import {
 import { checkIn, checkOut, subscribeToActiveRoomCards } from '../../services/roomCardService';
 import { subscribeToRooms } from '../../services/roomService'; // ✅ Added import
 import * as ShiftNotesService from '../../services/shiftNotesService';
+import { logger } from '../../services/loggerService';
 
 // Shared Components
 import { ShiftNotes } from '../../components/shared/ShiftNotes';
@@ -72,6 +73,10 @@ import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide
 // DeveloperSignature is now in GlobalFooter (App.tsx)
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline';
 import { useBrandName } from '../../hooks/useBrandName';
+// ✅ Universal Action Card (New System)
+import { UniversalActionCard } from '../../components/cards/UniversalActionCard';
+import { shouldUseUniversalCard } from '../../services/featureFlagsService';
+import { moveRequest } from '../../services/stateTransitionService';
 
 // Types
 import { RoomCard } from '../../types';
@@ -507,6 +512,24 @@ export const BellmanDashboard: React.FC = () => {
     const { success, error, haptic, playSound } = useUX();
     const { t } = useTranslation();
     const brandName = useBrandName();
+    const tenantId = useMemo(() => (user as any)?.tenantId, [user]); // ✅ Get tenantId
+
+    // ✅ Feature Flag: Check if Universal Card should be used
+    const [useUniversalCard, setUseUniversalCard] = useState(false);
+    
+    useEffect(() => {
+        if (!tenantId) return;
+        
+        shouldUseUniversalCard(tenantId, 'bellman')
+            .then(enabled => {
+                setUseUniversalCard(enabled);
+                logger.info(`🎯 Universal Action Card ${enabled ? 'ENABLED' : 'DISABLED'} for Bellman`, undefined, 'BellmanDashboard');
+            })
+            .catch(err => {
+                logger.error('Error checking feature flag:', err, 'BellmanDashboard');
+                setUseUniversalCard(false); // Safe default
+            });
+    }, [tenantId]);
 
     // State
     const [roomCards, setRoomCards] = useState<RoomCard[]>([]);
@@ -530,7 +553,7 @@ export const BellmanDashboard: React.FC = () => {
     useEffect(() => {
         const fastUITimeout = setTimeout(() => {
             if (loading) {
-                console.log('⚡ Fast UI: Showing Bellman page now');
+                logger.info('⚡ Fast UI: Showing Bellman page now', undefined, 'BellmanDashboard');
                 setLoading(false);
             }
         }, 2000);
@@ -579,11 +602,10 @@ export const BellmanDashboard: React.FC = () => {
         }, [searchParams]);
     } catch {}
 
-    // Branch and Tenant
+    // Branch and Tenant (tenantId already declared above)
     // ✅ FIX: Use branchId from AuthContext (updates when manager switches branches)
     const { branchId: authBranchId } = useAuth();
     const branchId = authBranchId || (user as any)?.branchId || (user as any)?.branch;
-    const tenantId = useMemo(() => (user as any)?.tenantId, [user]); // ✅ Get tenantId
 
     // ✅ Check branch location on mount and branch change
     useEffect(() => {
@@ -602,7 +624,7 @@ export const BellmanDashboard: React.FC = () => {
                     setShowLocationWarning(true);
                 }
             } catch (err) {
-                console.error('Location check error:', err);
+                logger.error('Location check error:', err, 'BellmanDashboard');
                 // Fail open - allow access
             }
         };
@@ -662,23 +684,28 @@ export const BellmanDashboard: React.FC = () => {
 
                 setReceptionEmployees(employees);
             } catch (error: any) {
-                console.error('Error loading reception employees:', {
+                logger.error('Error loading reception employees:', {
                     code: error?.code,
                     message: error?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || error?.message
-                });
+                }, 'BellmanDashboard');
             }
         };
 
         loadReceptionEmployees();
 
+        // ✅ FIX: Use tenant-scoped collection
+        if (!tenantId) {
+            logger.warn('⚠️ [BellmanDashboard] Cannot subscribe to requests: tenantId is missing', undefined, 'BellmanDashboard');
+            setLoading(false);
+            return;
+        }
         // Subscribe to bellman requests
-        const requestsRef = collection(db, 'requests');
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         // ✅ Fix: Remove orderBy to avoid composite index requirement
         const reqConstraints = [
             where('branch', '==', branchId),
             where('type', '==', 'bellman')
         ];
-        if (tenantId) reqConstraints.push(where('tenantId', '==', tenantId));
 
         const reqQuery = query(requestsRef, ...reqConstraints);
 
@@ -696,7 +723,7 @@ export const BellmanDashboard: React.FC = () => {
             setRequests(loadedRequests);
             setLoading(false);
         }, (error: any) => {
-            console.error('Error loading bellman requests:', error);
+            logger.error('Error loading bellman requests:', error, 'BellmanDashboard');
             setLoading(false);
         });
 
@@ -722,10 +749,10 @@ export const BellmanDashboard: React.FC = () => {
             setLuggage(loadedLuggage);
             setLoading(false);
         }, (error: any) => {
-            console.error('Error loading luggage:', {
+            logger.error('Error loading luggage:', {
                 code: error?.code,
                 message: error?.message,
-            });
+            }, 'BellmanDashboard');
         });
 
         return () => {
@@ -784,7 +811,7 @@ export const BellmanDashboard: React.FC = () => {
     // ✅ Show Points Notification for new CONFIRMED requests
     useEffect(() => {
         const firstConfirmed = activeRequests.find(
-            req => req.status === 'CONFIRMED' && !activeNotifications.has(req.id)
+            req => (req.status === 'CONFIRMED' || req.status === 'NEW') && !activeNotifications.has(req.id)
         );
 
         if (firstConfirmed && tenantId) {
@@ -853,9 +880,9 @@ export const BellmanDashboard: React.FC = () => {
                             limitChildren: data.capacityLimit.children 
                         })
                     });
-                    console.warn(`⚠️ Capacity violation logged for room ${data.roomNumber} by ${user?.name}`);
+                    logger.warn(`⚠️ Capacity violation logged for room ${data.roomNumber} by ${user?.name}`, undefined, 'BellmanDashboard');
                 } catch (logErr) {
-                    console.error('Failed to log capacity violation:', logErr);
+                    logger.error('Failed to log capacity violation:', logErr, 'BellmanDashboard');
                 }
             }
 
@@ -864,7 +891,7 @@ export const BellmanDashboard: React.FC = () => {
                 try {
                     await awardPoints(tenantId, user.id, 10, 'تسجيل دخول نزيل');
                 } catch (e) {
-                    console.warn('Failed to award checkin points:', e);
+                    logger.warn('Failed to award checkin points:', e, 'BellmanDashboard');
                 }
             }
 
@@ -877,10 +904,10 @@ export const BellmanDashboard: React.FC = () => {
                 }, 1000);
             }
         } catch (err: any) {
-            console.error('Check-in error:', {
+            logger.error('Check-in error:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
-            });
+            }, 'BellmanDashboard');
             error(err?.message || 'فشل تسجيل الدخول');
         }
     };
@@ -902,7 +929,7 @@ export const BellmanDashboard: React.FC = () => {
             );
 
             if (inspectionId) {
-                console.log('✅ Inspection request created:', inspectionId);
+                logger.info(`✅ Inspection request created: ${inspectionId}`, undefined, 'BellmanDashboard');
             }
 
             // Archive shift notes for this room
@@ -920,10 +947,10 @@ export const BellmanDashboard: React.FC = () => {
 
             success(t('bellman.checkOutSuccess'));
         } catch (err: any) {
-            console.error('Checkout error:', {
+            logger.error('Checkout error:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
-            });
+            }, 'BellmanDashboard');
             error(t('bellman.checkOutFailed'));
         }
     };
@@ -976,25 +1003,25 @@ export const BellmanDashboard: React.FC = () => {
                         try {
                             const { checkDailyAttendance } = await import('../../services/challengeService');
                             checkDailyAttendance(tenantId, user.id).catch(err => {
-                                console.warn('Failed to check daily attendance:', err);
+                                logger.warn('Failed to check daily attendance:', err, 'BellmanDashboard');
                             });
                         } catch (err) {
-                            console.warn('Could not load challengeService:', err);
+                            logger.warn('Could not load challengeService:', err, 'BellmanDashboard');
                         }
                     }
                     
-                    console.log('✅ Created housekeeping inspection for room:', requestData.roomNumber);
+                    logger.info(`✅ Created housekeeping inspection for room: ${requestData.roomNumber}`, undefined, 'BellmanDashboard');
                 } catch (inspectionErr) {
-                    console.warn('Could not create housekeeping inspection:', inspectionErr);
+                    logger.warn('Could not create housekeeping inspection:', inspectionErr, 'BellmanDashboard');
                 }
             }
 
             success(t('bellman.requestStarted'));
         } catch (err: any) {
-            console.error('Error starting request:', {
+            logger.error('Error starting request:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
-            });
+            }, 'BellmanDashboard');
             error(t('bellman.requestStartFailed'));
         }
     };
@@ -1022,10 +1049,10 @@ export const BellmanDashboard: React.FC = () => {
 
             success(t('bellman.requestCompleted'));
         } catch (err: any) {
-            console.error('Error completing request:', {
+            logger.error('Error completing request:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
-            });
+            }, 'BellmanDashboard');
             error(t('bellman.requestCompleteFailed'));
         }
     };
@@ -1227,7 +1254,56 @@ export const BellmanDashboard: React.FC = () => {
 
                     return (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
-                            {currentRequests.map(request => (
+                            {currentRequests.map(request => {
+                                // ✅ Feature Flag: Use Universal Card if enabled, otherwise use old card
+                                if (useUniversalCard && tenantId && user?.id && user?.name) {
+                                    return (
+                                        <UniversalActionCard
+                                            key={request.id}
+                                            request={request as any}
+                                            viewMode="bellman"
+                                            onAction={async (action) => {
+                                                if (action === 'start' && request.status === 'CONFIRMED') {
+                                                    try {
+                                                        await moveRequest(
+                                                            tenantId,
+                                                            request.id,
+                                                            'IN_PROGRESS',
+                                                            'bellman',
+                                                            user.id,
+                                                            user.name || 'Bellman',
+                                                            'بدأ العمل'
+                                                        );
+                                                        handleStartRequest(request.id);
+                                                        success(t('bellman.requestStarted') || 'تم بدء الطلب');
+                                                    } catch (err: any) {
+                                                        error(err.message || t('common.error') || 'حدث خطأ');
+                                                    }
+                                                } else if (action === 'complete' && request.status === 'IN_PROGRESS') {
+                                                    try {
+                                                        await moveRequest(
+                                                            tenantId,
+                                                            request.id,
+                                                            'COMPLETED',
+                                                            'reception', // Return to reception
+                                                            user.id,
+                                                            user.name || 'Bellman',
+                                                            'تم الإكمال'
+                                                        );
+                                                        handleCompleteRequest(request);
+                                                        success(t('bellman.requestCompleted') || 'تم إكمال الطلب');
+                                                    } catch (err: any) {
+                                                        error(err.message || t('common.error') || 'حدث خطأ');
+                                                    }
+                                                }
+                                            }}
+                                            onView={() => handleBellmanCardClick(request.id)}
+                                        />
+                                    );
+                                }
+                                
+                                // Legacy card
+                                return (
                                 <div key={request.id} 
                                     className="p-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] adora-card border shadow-sm adora-border"
                                     onClick={() => handleBellmanCardClick(request.id)}>
@@ -1274,7 +1350,7 @@ export const BellmanDashboard: React.FC = () => {
                                     {/* Row 4: Actions - Only for new/in_progress */}
                                     {currentTab !== 'completed' && (
                                         <div className="flex gap-2 pt-2 border-t adora-border">
-                                            {request.status === 'CONFIRMED' && (
+                                            {(request.status === 'CONFIRMED' || request.status === 'NEW') && (
                                                 <button onClick={(e) => { e.stopPropagation(); handleStartRequest(request.id); }}
                                                     className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
                                                     <Play className="w-3 h-3" /> بدء
@@ -1293,7 +1369,8 @@ export const BellmanDashboard: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     );
                 })()}

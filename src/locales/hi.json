@@ -161,21 +161,8 @@
         "security": "सुरक्षा"
     },
     "sidebar": {
-        "overview": "अवलोकन",
-        "dashboard": "डैशबोर्ड",
-        "rooms": "कमरे",
-        "employees": "कर्मचारी",
-        "reports": "रिपोर्ट",
-        "settings": "सेटिंग्स",
-        "requests": "अनुरोध",
-        "inventory": "इन्वेंट्री",
-        "branches": "शाखाएं",
-        "branch": "शाखा",
-        "points": "अंक",
-        "history": "इतिहास",
-        "notifications": "सूचनाएं",
-        "help": "मदद",
-        "openAdminMenu": "एडमिन मेनू खोलें"
+        "expand": "विस्तार करें",
+        "collapse": "संकुचित करें"
     },
     "auth": {
         "login": "लॉगिन",
@@ -205,6 +192,7 @@
         "enterOwnerCode": "मालिक कोड (6 अंक) दर्ज करें",
         "afterBranchEnterPin": "शाखा कोड दर्ज करने के बाद, जारी रखने के लिए \"कर्मचारी कोड\" दबाएं",
         "loginSuccess": "लॉगिन सफल! ✨",
+        "loggingIn": "लॉग इन हो रहा है...",
         "wrongCode": "गलत कोड",
         "biometricFailed": "बायोमेट्रिक सत्यापन विफल",
         "forgotCode": "कोड भूल गए?",
@@ -297,13 +285,7 @@
             "urgent": "जरूरी",
             "scheduled": "शेड्यूल"
         },
-        "guest": {
-            "guest": "अतिथि",
-            "identity": "पहचान",
-            "phone": "फोन",
-            "inRoom": "कमरे में",
-            "outRoom": "कमरे से बाहर"
-        },
+        "guest": "अतिथि",
         "room": {
             "room": "कमरा",
             "roomShort": "क."
@@ -340,7 +322,6 @@
         "by": "द्वारा",
         "approvalRequired": "अनुमोदन आवश्यक",
         "qrRequestNeedsConfirm": "QR अनुरोध - पुष्टि चाहिए",
-        "guest": "अतिथि",
         "notSpecified": "निर्दिष्ट नहीं",
         "pleaseVerify": "कृपया डेटा सत्यापित करें और संबंधित विभाग को अनुरोध भेजने से पहले पुष्टि करें",
         "damagesInRoom": "कमरे में क्षति",
@@ -435,9 +416,9 @@
         "noOperationsRecorded": "कोई संचालन दर्ज नहीं",
         "createdAt": "बनाया गया:",
         "inspectionResult": "निरीक्षण परिणाम",
-        "roomComplete": "✅ कमरा पूर्ण - तैयार",
-        "roomWithDamages": "⚠️ कमरे में क्षति है",
-        "roomWithMissingItems": "📦 कमरे में खोई वस्तुएं हैं",
+        "roomComplete": "कमरा पूर्ण - तैयार",
+        "roomWithDamages": "कमरे में क्षति है",
+        "roomWithMissingItems": "कमरे में खोई वस्तुएं हैं",
         "inspectionNotes": "निरीक्षण नोट्स",
         "inspectedBy": "द्वारा निरीक्षित",
         "minibarConsumptionTitle": "मिनीबार खपत",
@@ -552,11 +533,6 @@
         "transferSuggested": "{{from}} से {{to}} तक स्थानांतरण का सुझाव दिया गया",
         "lastRequestLabel": "अंतिम अनुरोध:",
         "sarCurrency": "रु",
-        "notSpecifiedTime": "निर्दिष्ट नहीं",
-        "roomComplete": "कमरा पूर्ण - तैयार",
-        "roomWithDamages": "कमरे में क्षति है",
-        "roomWithMissingItems": "कमरे में खोई वस्तुएं हैं",
-        "minibarConsumptionTitle": "मिनीबार खपत",
         "guestRegisteredInRoom": "अतिथि वर्तमान में कमरे में पंजीकृत है",
         "transfer": "स्थानांतरण",
         "loading": "लोड हो रहा है..."
@@ -679,91 +655,50 @@
         "me": "मैं"
     },
     "maintenance": {
-        "title": "मरम्मत डैशबोर्ड",
-        "pendingMaintenance": "पेंडिंग मरम्मत",
-        "inProgress": "चल रहा है",
-        "completed": "हो गया",
-        "loadingData": "डेटा लोड हो रहा है...",
-        "operationsHistory": "ऑपरेशन इतिहास",
-        "roomNotes": "कमरे के नोट्स",
-        "procurement": "खरीद",
-        "generalInstructions": "सामान्य निर्देश",
-        "technicalSupport": "तकनीकी सहायता",
-        "lastUpdate": "अभी अपडेट हुआ",
-        "new": "नया",
-        "completedToday": "आज पूर्ण हुआ",
-        "urgent": "जरूरी",
-        "todayProgress": "आज की प्रगति",
+        "defaultRequest": "रखरखाव अनुरोध",
         "viewDetails": "विवरण देखें",
+        "generalInstructions": "सामान्य निर्देश",
+        "operationsHistory": "संचालन इतिहास",
+        "roomNotes": "कमरा नोट्स",
+        "team": "टीम",
+        "technicalSupport": "तकनीकी सहायता",
+        "generalMaintenance": "सामान्य रखरखाव",
         "noDescription": "कोई विवरण नहीं",
-        "maintenanceRequest": "मरम्मत अनुरोध",
-        "inProgressLabel": "चल रहा है",
-        "waitingLabel": "इंतजार",
-        "all": "सभी",
+        "startMaintenance": "कमरा {{roomNumber}} रखरखाव शुरू करें",
+        "maintenanceType": "रखरखाव प्रकार",
+        "general": "सामान्य",
+        "capturePhoto": "फोटो कैप्चर करें",
+        "noNewRequests": "कोई नए रखरखाव अनुरोध नहीं",
+        "noInProgressRequests": "कोई अनुरोध प्रगति में नहीं",
+        "noCompletedRequests": "आज कोई पूर्ण अनुरोध नहीं",
+        "problemDescription": "समस्या विवरण (रिसेप्शन से)",
+        "guestIn": "अतिथि अंदर",
+        "guestOut": "अतिथि बाहर",
+        "urgent": "तत्काल",
+        "normal": "सामान्य",
+        "roomType": "कमरा प्रकार",
+        "floor": "मंजिल",
+        "qrRequest": "QR अनुरोध",
+        "guest": "अतिथि",
+        "uploadPhotoError": "फोटो अपलोड करने में विफल: {{error}}",
+        "unknownError": "अज्ञात त्रुटि",
         "categories": {
-            "electrical": "बिजली",
-            "plumbing": "पानी",
+            "electrical": "विद्युत",
+            "plumbing": "प्लंबिंग",
             "ac": "एसी",
-            "carpentry": "बढ़ईगीरी",
-            "furniture": "फर्नीचर",
-            "other": "और"
-        },
-        "timeAgo": {
-            "now": "अभी",
-            "minutesAgo": "{{minutes}} मिनट पहले",
-            "hoursAgo": "{{hours}} घंटे पहले",
-            "daysAgo": "{{days}} दिन पहले"
-        },
-        "priority": {
-            "urgent": "जरूरी",
-            "normal": "सामान्य",
-            "low": "कम"
+            "carpentry": "बढ़ईगीरी"
         },
         "statusLabels": {
-            "pending": "लंबित",
-            "inProgress": "चल रहा है",
-            "completed": "पूर्ण",
-            "waiting": "इंतजार"
+            "inProgress": "प्रगति में",
+            "waiting": "प्रतीक्षा",
+            "pending": "लंबित"
         },
-        "tableHeaders": {
-            "room": "कमरा",
-            "type": "प्रकार",
-            "status": "स्थिति",
-            "cost": "लागत",
-            "date": "तारीख"
-        },
-        "photoUpload": {
-            "beforeLabel": "मरम्मत से पहले फोटो",
-            "afterLabel": "मरम्मत के बाद फोटो",
-            "beforeUploaded": "मरम्मत से पहले फोटो अपलोड हो गया",
-            "beforeUploadFailed": "फोटो अपलोड विफल: {{error}}",
-            "afterUploaded": "फोटो सफलतापूर्वक अपलोड हो गया",
-            "afterUploadFailed": "फोटो अपलोड विफल: {{error}}",
-            "afterRequired": "अनुरोध पूर्ण करने के लिए मरम्मत के बाद फोटो आवश्यक है",
-            "uploadWait": "कृपया फोटो अपलोड होने तक प्रतीक्षा करें"
-        },
-        "workflow": {
-            "started": "मरम्मत शुरू हो गई",
-            "startedSuccess": "मरम्मत सफलतापूर्वक शुरू हो गई",
-            "startedFailed": "मरम्मत शुरू करने में विफल",
-            "completed": "मरम्मत पूर्ण हो गई",
-            "completedWithNotes": "मरम्मत पूर्ण हो गई। {{notes}}",
-            "completedSentForInspection": "मरम्मत पूर्ण हो गई और हाउसकीपिंग में निरीक्षण के लिए भेजा गया ✓",
-            "completedFailed": "मरम्मत पूर्ण करने में विफल: {{error}}",
-            "suspended": "अनुरोध पार्ट्स की प्रतीक्षा में निलंबित",
-            "suspendedFailed": "अनुरोध निलंबित करने में विफल",
-            "resumed": "काम फिर से शुरू हो गया",
-            "resumedFailed": "अनुरोध फिर से शुरू करने में विफल"
-        },
-        "completionNotesPlaceholder": "पूर्ण मरम्मत के बारे में कोई नोट लिखें...",
-        "issueType": "समस्या का प्रकार",
-        "startWork": "काम शुरू करो",
-        "completeWork": "काम खत्म करो",
-        "urgentTasks": "जरूरी काम",
-        "todayTasks": "आज का काम",
-        "workDescription": "काम की जानकारी",
-        "partsUsed": "इस्तेमाल हुए पार्ट्स",
-        "timeSpent": "लगा समय"
+        "inProgressLabel": "प्रगति में",
+        "completedToday": "आज पूर्ण",
+        "urgentLabel": "तत्काल",
+        "issueType": "मुद्दा प्रकार",
+        "all": "सभी",
+        "lastUpdate": "अंतिम अद्यतन"
     },
     "bellman": {
         "title": "बेलमैन डैशबोर्ड",
@@ -967,7 +902,15 @@
         "safeWorkEnvironment": "सुरक्षित कार्य वातावरण",
         "coreSetup": "कोर सेटअप",
         "technicalSupport": "टेक्निकल सपोर्ट",
-        "supportTickets": "सपोर्ट टिकट"
+        "supportTickets": "सपोर्ट टिकट",
+        "scanPasswordTitle": "🔐 पासवर्ड",
+        "scanPasswordSubtitle": "स्कैन/पर्ज विकल्पों तक पहुंचने के लिए पासवर्ड दर्ज करें",
+        "password": "पासवर्ड",
+        "auditChoiceTitle": "कार्रवाई चुनें",
+        "auditChoiceSubtitle": "सिस्टम स्कैन या पूर्ण पर्ज के बीच चुनें",
+        "deepAudit": "🔍 सिस्टम स्कैन",
+        "purgeSystem": "☢️ सिस्टम पर्ज",
+        "deletedManagersPurgeFailed": "Purge ran but deleted-managers archive was not cleared. Deploy rules: firebase deploy --only firestore:rules"
     },
     "reports": {
         "title": "विस्तृत रिपोर्ट",
@@ -1043,32 +986,6 @@
         "morning": "सुप्रभात",
         "afternoon": "नमस्कार",
         "evening": "शुभ संध्या",
-        "night": "शुभ रात्रि"
-    },
-    "operations": {
-        "operationsBar": "ऑपरेशन बार",
-        "newRequest": "नया अनुरोध",
-        "assigning": "असाइन करना",
-        "inProgress": "प्रगति में",
-        "awaitingConfirmation": "पुष्टि की प्रतीक्षा",
-        "delayed": "देरी से",
-        "minutesRemaining": "{{minutes}} मिनट शेष",
-        "room": "कमरा",
-        "worker": "कर्मचारी",
-        "elapsed": "बीता हुआ",
-        "view": "देखें",
-        "call": "कॉल",
-        "noRequests": "कोई अनुरोध नहीं",
-        "request": "अनुरोध",
-        "activeRequest": "सक्रिय अनुरोध",
-        "new": "नया",
-        "confirmation": "पुष्टि",
-        "closed": "बंद"
-    },
-    "greetings": {
-        "morning": "सुप्रभात",
-        "afternoon": "नमस्कार",
-        "evening": "शुभ संध्या",
         "night": "शुभ रात्रि",
         "you": "आप",
         "motivationalMessages": [
@@ -1093,6 +1010,26 @@
             "दिन का सफल अंत",
             "योग्य आराम जल्द ही आ रहा है"
         ]
+    },
+    "operations": {
+        "operationsBar": "ऑपरेशन बार",
+        "newRequest": "नया अनुरोध",
+        "assigning": "असाइन करना",
+        "inProgress": "प्रगति में",
+        "awaitingConfirmation": "पुष्टि की प्रतीक्षा",
+        "delayed": "देरी से",
+        "minutesRemaining": "{{minutes}} मिनट शेष",
+        "room": "कमरा",
+        "worker": "कर्मचारी",
+        "elapsed": "बीता हुआ",
+        "view": "देखें",
+        "call": "कॉल",
+        "noRequests": "कोई अनुरोध नहीं",
+        "request": "अनुरोध",
+        "activeRequest": "सक्रिय अनुरोध",
+        "new": "नया",
+        "confirmation": "पुष्टि",
+        "closed": "बंद"
     },
     "points": {
         "point": "अंक",
@@ -1143,10 +1080,6 @@
         "scheduledTime": "समय",
         "close": "बंद करें",
         "dismiss": "खारिज करें"
-    },
-    "sidebar": {
-        "expand": "विस्तार करें",
-        "collapse": "संकुचित करें"
     },
     "placeholder": {
         "enterName": "अपना नाम दर्ज करें",
@@ -1380,52 +1313,6 @@
         "notAvailable": "उपलब्ध नहीं",
         "accountBadge": "आपका खाता",
         "cannotSuspendSelf": "आप अपना खाता निलंबित नहीं कर सकते। कृपया मालिक से संपर्क करें।"
-    },
-    "maintenance": {
-        "defaultRequest": "रखरखाव अनुरोध",
-        "viewDetails": "विवरण देखें",
-        "generalInstructions": "सामान्य निर्देश",
-        "operationsHistory": "संचालन इतिहास",
-        "roomNotes": "कमरा नोट्स",
-        "team": "टीम",
-        "technicalSupport": "तकनीकी सहायता",
-        "generalMaintenance": "सामान्य रखरखाव",
-        "noDescription": "कोई विवरण नहीं",
-        "startMaintenance": "कमरा {{roomNumber}} रखरखाव शुरू करें",
-        "maintenanceType": "रखरखाव प्रकार",
-        "general": "सामान्य",
-        "capturePhoto": "फोटो कैप्चर करें",
-        "noNewRequests": "कोई नए रखरखाव अनुरोध नहीं",
-        "noInProgressRequests": "कोई अनुरोध प्रगति में नहीं",
-        "noCompletedRequests": "आज कोई पूर्ण अनुरोध नहीं",
-        "problemDescription": "समस्या विवरण (रिसेप्शन से)",
-        "guestIn": "अतिथि अंदर",
-        "guestOut": "अतिथि बाहर",
-        "urgent": "तत्काल",
-        "normal": "सामान्य",
-        "roomType": "कमरा प्रकार",
-        "floor": "मंजिल",
-        "qrRequest": "QR अनुरोध",
-        "guest": "अतिथि",
-        "uploadPhotoError": "फोटो अपलोड करने में विफल: {{error}}",
-        "unknownError": "अज्ञात त्रुटि",
-        "categories": {
-            "electrical": "विद्युत",
-            "plumbing": "प्लंबिंग",
-            "ac": "एसी",
-            "carpentry": "बढ़ईगीरी"
-        },
-        "statusLabels": {
-            "inProgress": "प्रगति में",
-            "waiting": "प्रतीक्षा",
-            "pending": "लंबित"
-        },
-        "inProgressLabel": "प्रगति में",
-        "completedToday": "आज पूर्ण",
-        "urgentLabel": "तत्काल",
-        "issueType": "मुद्दा प्रकार",
-        "all": "सभी",
-        "lastUpdate": "अंतिम अद्यतन"
     },
     "laundry": {
         "title": "लॉन्ड्री इन्वेंटरी प्रबंधन",
@@ -1707,5 +1594,422 @@
         "expiryNotification": "लाइसेंस समाप्ति सूचना",
         "remaining": "शेष",
         "moreNotifications": "और {{count}} और सूचनाएं"
+    },
+    "aboutUs": {
+        "hero": {
+            "title": "{adora} Hotel Management System",
+            "subtitle": "A comprehensive solution to manage all your hotel operations with high efficiency",
+            "subtitleHighlight1": "your time and effort",
+            "subtitleHighlight2": "guest satisfaction",
+            "ctaButton": "Request Trial"
+        },
+        "statistics": {
+            "title": "Adora by the Numbers",
+            "subtitle": "Real statistics from hotels using Adora",
+            "timeSaving": {
+                "value": "40%",
+                "label": "Time Saved on Administration"
+            },
+            "guestSatisfaction": {
+                "value": "95%+",
+                "label": "Guest Satisfaction Rate"
+            },
+            "responseTime": {
+                "value": "30 seconds",
+                "label": "Average Response Time"
+            },
+            "efficiency": {
+                "value": "60%",
+                "label": "Increase in Employee Efficiency"
+            },
+            "cloudBased": {
+                "value": "100%",
+                "label": "Cloud-Based - No Installation"
+            }
+        },
+        "whyAdora": {
+            "title": "Why Adora?",
+            "subtitle": "What sets Adora apart from competitors",
+            "local": {
+                "title": "100% Local",
+                "desc": "First SaaS system designed specifically for Saudi hotels"
+            },
+            "noCommissions": {
+                "title": "No Commissions",
+                "desc": "Subscribe and use directly - no hidden fees or commissions"
+            },
+            "support": {
+                "title": "24/7 Support",
+                "desc": "Arabic technical support available around the clock"
+            },
+            "training": {
+                "title": "Free Training",
+                "desc": "Free training for all employees with comprehensive guide"
+            },
+            "automaticOperations": "Automatic Operations",
+            "updates": {
+                "title": "Continuous Updates",
+                "desc": "Continuous updates at no additional cost"
+            },
+            "integration": {
+                "title": "Seamless Integration",
+                "desc": "Integration with existing systems without complications"
+            }
+        },
+        "beforeAfter": {
+            "title": "Before Adora → After Adora",
+            "subtitle": "See the difference yourself",
+            "paperwork": {
+                "before": "Scattered papers + Excel",
+                "after": "Unified digital system"
+            },
+            "feedback": {
+                "before": "Lost guest feedback",
+                "after": "Instant ratings and reports"
+            },
+            "tracking": {
+                "before": "Manual task tracking",
+                "after": "Smart automatic tracking"
+            },
+            "delays": {
+                "before": "Unnoticed delays",
+                "after": "Instant delay alerts"
+            },
+            "reports": {
+                "before": "Monthly manual reports",
+                "after": "Automatic real-time reports"
+            }
+        },
+        "testimonials": {
+            "title": "What They Say About Adora",
+            "subtitle": "Real experiences from hotels using Adora",
+            "testimonial1": {
+                "text": "We saved 20 hours weekly in management after using Adora",
+                "author": "5-Star Hotel",
+                "location": "Riyadh"
+            },
+            "testimonial2": {
+                "text": "Our guest satisfaction rose from 3.5 to 4.8 stars after implementing Adora",
+                "author": "4-Star Hotel",
+                "location": "Jeddah"
+            },
+            "testimonial3": {
+                "text": "We now track everything in real-time - excellent and easy-to-use system",
+                "author": "3-Star Hotel",
+                "location": "Makkah"
+            }
+        },
+        "trustIndicators": {
+            "title": "Trust & Commitment",
+            "subtitle": "We are committed to serving you",
+            "secure": "100% Secure",
+            "local": "100% Local",
+            "support": "24/7 Support",
+            "satisfaction": "Satisfaction Guaranteed"
+        },
+        "features": {
+            "title": "{adora} Features",
+            "subtitle": "A comprehensive system to manage all aspects of the hotel with high efficiency",
+            "reception": {
+                "title": "Integrated Reception Management 🏨",
+                "desc": "Comprehensive guest request management through QR Code, real-time tracking of all requests, and automatic distribution to appropriate departments"
+            },
+            "housekeeping": {
+                "title": "Housekeeping & Room Management 🛏️",
+                "desc": "Track room status, comprehensive minibar inspection, housekeeping team management, and detailed reports on room consumption"
+            },
+            "bellman": {
+                "title": "Smart Bellman Service 🧳",
+                "desc": "Luggage transfer management, room transfers, real-time task tracking, and instant notifications for guests upon service completion"
+            },
+            "maintenance": {
+                "title": "Instant Maintenance Management 🔧",
+                "desc": "Track maintenance requests, prioritize tasks, manage technicians, and reports on response time and completion rate"
+            },
+            "procurement": {
+                "title": "Procurement & Inventory Management 📦",
+                "desc": "Inventory management, purchase orders, supplier tracking, stock-out alerts, and monthly consumption reports"
+            },
+            "coffee": {
+                "title": "Coffee Shop Management ☕",
+                "desc": "Receive guest orders through QR Code, manage menu and prices, and track orders in real-time"
+            },
+            "chat": {
+                "title": "Smart Chat with Guests 💬",
+                "desc": "Direct communication with guests, instant notifications, smart automated responses, and comprehensive conversation tracking"
+            },
+            "points": {
+                "title": "Points & Rewards System 🎮",
+                "desc": "Motivate employees with points and ranks system, 20 different ranks, badges and achievements, and cash point redemption"
+            },
+            "loyalty": {
+                "title": "Guest Loyalty System ⭐",
+                "desc": "Track Respect Score for guests, VIP levels (Platinum, Gold, Silver), and customized services for premium guests"
+            },
+            "reports": {
+                "title": "Comprehensive Reports & Analytics 📊",
+                "desc": "KPI dashboard, performance reports, revenue analysis, employee reports, and customizable exportable reports"
+            },
+            "multiBranch": {
+                "title": "Multi-Branch Management 🌐",
+                "desc": "Manage multiple branches from one dashboard, unified reports, comprehensive statistics, and centralized employee management"
+            },
+            "alerts": {
+                "title": "Instant Smart Alerts 🔔",
+                "desc": "Critical delay alerts, urgent request notifications, stock-out alerts, and Push notifications for employees"
+            }
+        },
+        "security": {
+            "title": "Security First 🔐",
+            "subtitle": "System protected with the highest security standards",
+            "tenantIsolation": {
+                "title": "Tenant Isolation",
+                "desc": "Complete data isolation for each tenant"
+            },
+            "rbac": {
+                "title": "RBAC",
+                "desc": "Role-based Access Control at all levels"
+            },
+            "encryptedTokens": {
+                "title": "Encrypted Tokens",
+                "desc": "Encrypted and secure QR Tokens for guests"
+            },
+            "atomicOps": {
+                "title": "Atomic Operations",
+                "desc": "All critical operations protected with Transactions"
+            },
+            "auditLogs": {
+                "title": "Audit Logs",
+                "desc": "Comprehensive logs for all sensitive operations"
+            },
+            "monitoring": {
+                "title": "Real-time Monitoring",
+                "desc": "Real-time monitoring to detect any suspicious activity"
+            }
+        },
+        "cta": {
+            "title": "Ready to Start?",
+            "subtitle": "Join the hotels that trust Adora system to manage their operations",
+            "button": "Request Trial"
+        },
+        "footer": {
+            "text": "An integrated system to manage all hotel operations efficiently and professionally",
+            "copyright": "© {year} Adora Hotel Management System. All rights reserved."
+        },
+        "trialForm": {
+            "title": "Trial Request",
+            "subtitle": "Fill in the following information and we will contact you soon",
+            "nameLabel": "Full Name",
+            "phoneLabel": "Phone Number",
+            "namePlaceholder": "Enter your full name",
+            "phonePlaceholder": "Enter your phone number (8-15 digits)",
+            "phoneExample": "Example: 966501234567 or 201234567890",
+            "cancel": "Cancel",
+            "submit": "Send Request",
+            "successTitle": "Your request has been sent successfully!",
+            "successMessage": "We will contact you soon on the provided phone number",
+            "namePhoneRequired": "Please enter name and phone number",
+            "phoneInvalid": "Please enter a valid phone number (8-15 digits)",
+            "success": "Your request has been sent successfully! We will contact you soon",
+            "error": "An error occurred while sending the request. Please try again"
+        }
+    },
+    "billing": {
+        "paymentMethods": {
+            "cash": "Cash",
+            "credit": "Credit",
+            "bankTransfer": "Bank Transfer",
+            "deferred": "Deferred Payment",
+            "cashLabel": "Cash",
+            "creditLabel": "Credit",
+            "bankTransferLabel": "Bank Transfer",
+            "deferredLabel": "Deferred Payment"
+        },
+        "vouchers": {
+            "voucher": "Voucher",
+            "vouchers": "Vouchers",
+            "receiptVoucher": "Receipt Voucher",
+            "expenseVoucher": "Expense Voucher",
+            "voucherNumber": "Voucher Number",
+            "total": "Total",
+            "totalAmount": "Total Amount",
+            "branchInfo": "Branch Info",
+            "branchCode": "Branch Code",
+            "mainBranch": "Main Branch",
+            "managerInfo": "Subscriber Info",
+            "managerName": "Subscriber Name",
+            "managerCode": "Subscriber Code",
+            "subscriptionDuration": "Subscription Duration",
+            "oneYear": "year",
+            "twoYears": "two years",
+            "oneYearFull": "one year",
+            "twoYearsFull": "two years",
+            "gregorianDate": "Gregorian Date",
+            "hijriDate": "Hijri Date",
+            "paymentMethod": "Payment Method",
+            "preview": "Preview",
+            "print": "Print",
+            "printAll": "Print All",
+            "noVouchers": "No receipt vouchers",
+            "noExpenseVouchers": "No expense vouchers",
+            "noInvoices": "No invoices",
+            "selectAll": "Select All",
+            "voucherDeleted": "Deleted",
+            "showFilters": "Show",
+            "hideFilters": "Hide",
+            "filtersAndSearch": "Filters & Search",
+            "confirmDelete": "Confirm Delete",
+            "deleteVouchersConfirm": "{{count}} voucher{{plural}} will be deleted. This action cannot be undone.",
+            "deleteVouchersQuestion": "Are you sure you want to delete {{count}} voucher{{plural}}?",
+            "deleteVouchersNote": "This action cannot be undone.",
+            "cancel": "Cancel",
+            "delete": "Delete",
+            "deleted": "Deleted",
+            "invoices": "Invoices",
+            "invoice": "Invoice",
+            "invoicesCount": "{{count}} {{singular}}",
+            "invoicesCountPlural": "{{count}} invoices"
+        },
+        "subscription": {
+            "subscription": "Subscription",
+            "duration": "Subscription Duration",
+            "oneYear": "year",
+            "twoYears": "two years",
+            "oneYearFull": "one year",
+            "twoYearsFull": "two years",
+            "branches": "branches",
+            "branch": "branch",
+            "branchesCount": "{{count}} {{singular}}",
+            "branchesCountPlural": "{{count}} branches"
+        },
+        "stats": {
+            "cash": "💵 Cash",
+            "credit": "💳 Credit",
+            "bankTransfer": "🏦 Bank Transfer",
+            "deferred": "⏰ Deferred Payment",
+            "total": "Total"
+        }
+    },
+    "chatSettings": {
+        "welcomeMessage": "Welcome Message",
+        "welcomeMessageDescription": "This message appears to the guest when they first open the chat"
+    },
+    "demoLink": {
+        "demoClient": "Demo Client",
+        "phonePlaceholder": "05xxxxxxxx",
+        "codePlaceholder": "• • • •",
+        "demoHotel": "Demo Hotel",
+        "pasteFirebaseConfig": "Paste Firebase Config code here...",
+        "apiKeyPlaceholder": "AIzaSy...",
+        "projectIdPlaceholder": "my-project",
+        "whatsappPlaceholder": "966501234567",
+        "demoLinks": "Demo Links",
+        "createDemoSubscribers": "Create demo subscribers to test the system",
+        "createDemoSubscriber": "Create Demo Subscriber",
+        "totalLinks": "Total Links"
+    },
+    "emergencyAlerts": {
+        "fireExample": "Fire Alert - Immediate Evacuation",
+        "fireMessageExample": "There is a fire. Please evacuate the building immediately..."
+    },
+    "goldenAlert": {
+        "goldenCard": "Golden Card",
+        "timeLeft": "{{minutes}} minutes left",
+        "noViewersYet": "No one has viewed this card yet",
+        "viewedCount": "{{count}} viewed card",
+        "displayDuration": "Display Duration",
+        "targetDepartments": "Target Departments",
+        "titleLabel": "Title",
+        "messageLabel": "Message",
+        "sendTimeLabel": "Send Time"
+    },
+    "guestMessaging": {
+        "weeklyLimitReached": "Weekly message limit reached (40 messages)"
+    },
+    "healthReport": {
+        "reportGenerated": "✅ Report generated successfully",
+        "firebaseNotConnected": "Firebase not connected - Please check connection",
+        "loadFailed": "Failed to load report - Please try again",
+        "generateFailed": "Failed to generate report - Please try again",
+        "copyFailed": "Failed to copy report - Please try again",
+        "exportFailed": "Failed to export Excel",
+        "exportSuccess": "Report exported to Excel successfully",
+        "noPermission": "You don't have permission to generate report",
+        "invalidTenantId": "Invalid tenant ID"
+    },
+    "owner": {
+        "suspend": "Suspend",
+        "activate": "Activate",
+        "suspended": "Suspended",
+        "activated": "Activated",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "restore": "Restore",
+        "confirmRestore": "Confirm Restore",
+        "confirmRestoreMessage": "Are you sure you want to restore this manager?",
+        "title": "Title",
+        "message": "Message",
+        "subscribers": "Subscribers",
+        "employees": "Employees",
+        "stepBasic": "Basic",
+        "stepBranches": "Branches",
+        "stepSubscription": "Subscription",
+        "stepReview": "Review",
+        "branchCode": "Code",
+        "branchCodeError": "Branch Code",
+        "numberOfBranches": "Number of Branches",
+        "subscriptionDuration": "Subscription Duration",
+        "managerNameExample": "Muhammad Ahmed",
+        "hotelNameExample": "Pyramids Hotel Chain",
+        "codePlaceholder": "0000",
+        "exampleCommercialRegistration": "Example: 4030284941",
+        "exampleCompanyAddress": "Example: Jeddah - Al-Ruwais, Al-Jazeera Street next to United Doctors",
+        "exampleContactPhone": "Example: +966 12 6076060, +966 570707121",
+        "exampleContactEmail": "Example: info@adora.com",
+        "exampleWebsite": "Example: https://www.adora.com",
+        "exampleLogoUrl": "https://example.com/logo.png",
+        "examplePhoneSA": "966570707121",
+        "examplePhoneEG": "201500000162",
+        "exampleEmail": "77aayy@gmail.com",
+        "exampleDeveloperName": "Ayman Abu Warda",
+        "exampleCraftedBy": "Crafted by Ayman Abu Warda",
+        "exampleName": "Ayman Abu Warda",
+        "enterPhoneWithCountryCode": "Enter phone number with country code without + (example: 966570707121)",
+        "appearsInDeveloperSignature": "Appears in developer signature at the bottom of pages"
+    },
+    "pricing": {
+        "calendarAndSeasons": "Calendar & Seasons",
+        "priceMatrix": "Price Matrix",
+        "editBasePrice": "Edit Base Price",
+        "basePriceEdit": "Base Price - Edit"
+    },
+    "system": {
+        "purgeSystem": "Purge System",
+        "purging": "Purging system...",
+        "deletingAllData": "Deleting all data...",
+        "purgeCompleted": "Purge completed successfully!",
+        "purgeSuccess": "✅ System purge completed successfully!",
+        "purgeSuccessDetails": "🗑️ Deleted: {{count}} records\n✨ System is now clean and ready to start fresh",
+        "purgeFailed": "❌ System purge failed",
+        "purgeFailedDetails": "{{error}}\n\n💡 Try the \"Sync Security\" button then try again",
+        "incorrectCode": "⚠️ You didn't type the correct word. Please type (RESET) in English.",
+        "wrongResetCode": "⚠️ You didn't type the correct word. Please type (RESET) in English.",
+        "cannotDeleteSelf": "⚠️ Action rejected: You cannot delete your own account!",
+        "managerCreated": "Manager created successfully",
+        "managerCreatedError": "An error occurred while creating manager",
+        "managerDeleted": "Manager deleted successfully and moved to archive",
+        "deleteFailed": "Delete failed: {{error}}",
+        "connectionError": "Connection error",
+        "userDataIncomplete": "User data incomplete",
+        "permissionsUpdated": "Permissions updated successfully",
+        "noActiveSession": "No active session found",
+        "updateFailed": "Update failed",
+        "pleaseWait": "⏳ Please wait until user data is loaded...",
+        "userNotRecognized": "⚠️ Technical error: User not recognized. Please logout and login again.",
+        "ownerOnly": "⚠️ Error: This operation is only available to the owner.",
+        "ownerIdentityNotRecognized": "⚠️ Technical error: Owner identity not recognized. Please logout and login again.",
+        "unknownError": "Unknown error",
+        "activate": "Activate",
+        "deactivate": "Deactivate"
     }
 }

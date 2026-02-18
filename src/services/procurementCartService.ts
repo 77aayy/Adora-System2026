@@ -10,6 +10,7 @@ import {
     query, where, orderBy, limit, serverTimestamp
 } from 'firebase/firestore';
 import { uploadFileToImgBB } from './imageUploadService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -130,7 +131,7 @@ export const loadCartFromStorage = (): CartItem[] => {
             return cartItems;
         }
     } catch (e) {
-        console.warn('Error loading cart:', e);
+        logger.warn('Error loading cart:', e, 'procurementCartService');
     }
     return [];
 };
@@ -142,7 +143,7 @@ export const saveCartToStorage = (): void => {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(cartItems));
     } catch (e) {
-        console.warn('Error saving cart:', e);
+        logger.warn('Error saving cart:', e, 'procurementCartService');
     }
 };
 
@@ -296,7 +297,7 @@ export const submitCart = async (
     // 🔐 Security: Validate tenantId
     const tenantId = employeeData.tenantId || employeeData.hotelId;
     if (!tenantId) {
-        console.error('🚨 Security Error: tenantId is required for procurement request');
+        logger.error('🚨 Security Error: tenantId is required for procurement request', undefined, 'procurementCartService');
         return { success: false, count: 0, error: 'خطأ: معرف المستأجر مطلوب' };
     }
 
@@ -346,7 +347,7 @@ export const submitCart = async (
 
         return { success: true, count };
     } catch (error: any) {
-        console.error('Error submitting cart:', error);
+        logger.error('Error submitting cart:', error, 'procurementCartService');
         return { success: false, count: 0, error: error.message || 'حدث خطأ أثناء الإرسال' };
     }
 };
@@ -356,12 +357,14 @@ export const submitCart = async (
 // ============================================================
 
 /**
- * Load pending receiving items
+ * Load pending receiving items (tenant-scoped)
  */
-export const loadPendingReceiving = async (branchId: string): Promise<ReceivingItem[]> => {
+export const loadPendingReceiving = async (tenantId: string, branchId: string): Promise<ReceivingItem[]> => {
     try {
+        if (!tenantId) return [];
+        const ref = collection(db, `tenants/${tenantId}/procurementRequests`);
         const receivingQuery = query(
-            collection(db, 'procurement_requests'),
+            ref,
             where('branch', '==', branchId),
             where('status', 'in', ['PURCHASED', 'DELIVERED']),
             orderBy('purchasedAt', 'desc'),
@@ -377,20 +380,23 @@ export const loadPendingReceiving = async (branchId: string): Promise<ReceivingI
 
         return items;
     } catch (error) {
-        console.error('Error loading pending receiving:', error);
+        logger.error('Error loading pending receiving:', error, 'procurementCartService');
         return [];
     }
 };
 
 /**
- * Confirm receiving
+ * Confirm receiving (tenant-scoped)
  */
 export const confirmReceiving = async (
+    tenantId: string,
     requestId: string,
     employeeData: EmployeeData
 ): Promise<boolean> => {
     try {
-        await updateDoc(doc(db, 'procurement_requests', requestId), {
+        if (!tenantId) return false;
+        const docRef = doc(db, `tenants/${tenantId}/procurementRequests`, requestId);
+        await updateDoc(docRef, {
             status: 'RECEIVED',
             receivedAt: serverTimestamp(),
             receivedBy: {
@@ -402,7 +408,7 @@ export const confirmReceiving = async (
         });
         return true;
     } catch (error) {
-        console.error('Error confirming receiving:', error);
+        logger.error('Error confirming receiving:', error, 'procurementCartService');
         return false;
     }
 };

@@ -7,6 +7,7 @@ import { db } from './firebase';
 import {
     collection, doc, getDoc, getDocs, updateDoc, query, orderBy, limit, increment, addDoc, runTransaction, serverTimestamp
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -91,7 +92,7 @@ let cachedConfigs: Record<string, any> = {};
 export async function getPointsConfig(tenantId: string, branchId?: string): Promise<FullPointsConfig> {
     // ✅ CRITICAL: Check db before use
     if (!db) {
-        console.error('Firebase Firestore not initialized - returning default config');
+        logger.error('Firebase Firestore not initialized - returning default config', undefined, 'pointsService');
         return DEFAULT_POINTS_CONFIG as unknown as FullPointsConfig;
     }
 
@@ -109,7 +110,7 @@ export async function getPointsConfig(tenantId: string, branchId?: string): Prom
 
         return cachedConfigs[tenantId];
     } catch (error) {
-        console.error('Error loading points config:', error);
+        logger.error('Error loading points config:', error, 'pointsService');
         return DEFAULT_POINTS_CONFIG as unknown as FullPointsConfig;
     }
 }
@@ -204,7 +205,7 @@ export async function logSuspiciousSpeed(
     
     // ✅ SECURITY FIX: Check db before Firestore operations
     if (!db) {
-        console.error('Firebase not initialized - cannot log suspicious speed');
+        logger.error('Firebase not initialized - cannot log suspicious speed', undefined, 'pointsService');
         return;
     }
     
@@ -225,9 +226,9 @@ export async function logSuspiciousSpeed(
             action: null // 'approved' | 'flagged' | 'dismissed'
         });
         
-        console.warn(`⚠️ Suspicious speed logged for ${employeeName} in ${department}`);
+        logger.warn(`⚠️ Suspicious speed logged for ${employeeName} in ${department}`, undefined, 'pointsService');
     } catch (error) {
-        console.error('Error logging suspicious speed:', error);
+        logger.error('Error logging suspicious speed:', error, 'pointsService');
     }
 }
 
@@ -319,7 +320,7 @@ export async function updateStreak(
         const employeeDoc = await getDoc(employeeRef);
 
         if (!employeeDoc.exists()) {
-            console.warn('Employee not found for streak update:', employeeId);
+            logger.warn('Employee not found for streak update:', employeeId, 'pointsService');
             return;
         }
 
@@ -331,9 +332,9 @@ export async function updateStreak(
             lastStreakUpdate: serverTimestamp()
         });
 
-        console.log(`📊 Streak ${isSuccess ? 'extended' : 'reset'} for ${employeeId}: ${newStreak}`);
+        logger.info(`📊 Streak ${isSuccess ? 'extended' : 'reset'} for ${employeeId}: ${newStreak}`, undefined, 'pointsService');
     } catch (error) {
-        console.error('Error updating streak:', error);
+        logger.error('Error updating streak:', error, 'pointsService');
     }
 }
 
@@ -348,7 +349,7 @@ export async function getStreak(tenantId: string, employeeId: string): Promise<n
         if (!employeeDoc.exists()) return 0;
         return employeeDoc.data().confirmationStreak || 0;
     } catch (error) {
-        console.error('Error getting streak:', error);
+        logger.error('Error getting streak:', error, 'pointsService');
         return 0;
     }
 }
@@ -385,7 +386,7 @@ export async function awardPerformancePoints(
     const userRef = doc(db, `tenants/${tenantId}/employees/${employeeId}`);
     const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) {
-        console.error(`🚨 Security Alert: Attempt to award points to non-existent user ${employeeId} in tenant ${tenantId}`);
+        logger.error(`🚨 Security Alert: Attempt to award points to non-existent user ${employeeId} in tenant ${tenantId}`, undefined, 'pointsService');
         return 0;
     }
 
@@ -394,7 +395,7 @@ export async function awardPerformancePoints(
         const deptConfig = config[department];
 
         if (!deptConfig) {
-            console.warn(`⚠️ No points config found for department: ${department}`);
+            logger.warn(`⚠️ No points config found for department: ${department}`, undefined, 'pointsService');
             // Fallback to minimal points
             await awardPoints(tenantId, employeeId, 1, baseAction);
             return 1;
@@ -499,7 +500,7 @@ export async function awardPerformancePoints(
         return totalPoints;
 
     } catch (error) {
-        console.error('Error awarding performance points:', error);
+        logger.error('Error awarding performance points:', error, 'pointsService');
         return 0;
     }
 }
@@ -538,7 +539,7 @@ export async function awardRatingPoints(
 
         return points;
     } catch (error) {
-        console.error('Error awarding rating points:', error);
+        logger.error('Error awarding rating points:', error, 'pointsService');
         return 0;
     }
 }
@@ -567,7 +568,7 @@ export async function deductPoints(
 ): Promise<boolean> {
     // ✅ SECURITY FIX: Check db before Firestore operations
     if (!db) {
-        console.error('Firebase not initialized - cannot deduct points');
+        logger.error('Firebase not initialized - cannot deduct points', undefined, 'pointsService');
         return false;
     }
     
@@ -609,7 +610,7 @@ export async function deductPoints(
 
         return true;
     } catch (error) {
-        console.error('Points deduction failed:', error);
+        logger.error('Points deduction failed:', error, 'pointsService');
         return false;
     }
 }
@@ -626,7 +627,7 @@ export async function awardPoints(
 ): Promise<void> {
     // ✅ SECURITY FIX: Check db before Firestore operations
     if (!db) {
-        console.error('Firebase not initialized - cannot award points');
+        logger.error('Firebase not initialized - cannot award points', undefined, 'pointsService');
         return;
     }
     
@@ -641,7 +642,7 @@ export async function awardPoints(
             
             // ✅ FIX: Use whichever exists (employees collection preferred, users as fallback)
             if (!employeeDoc.exists() && !userDoc.exists()) {
-                console.warn(`⚠️ Employee/User not found in both collections: ${employeeId}. Skipping points award.`);
+                logger.warn(`⚠️ Employee/User not found in both collections: ${employeeId}. Skipping points award.`, undefined, 'pointsService');
                 return; // Skip points award but don't fail the request creation
             }
             
@@ -710,14 +711,14 @@ export async function awardPoints(
                     });
                 }
             } catch (err) {
-                console.error('Error in achievement check:', err);
+                logger.error('Error in achievement check:', err, 'pointsService');
             }
-        }).catch(err => console.error('Failed to load rewards module:', err));
+        }).catch(err => logger.error('Failed to load rewards module:', err, 'pointsService'));
 
-        console.log(`✅ Awarded ${points} points to ${employeeId}`, reason);
+        logger.info(`✅ Awarded ${points} points to ${employeeId}`, reason, 'pointsService');
 
     } catch (error) {
-        console.error('Error awarding points (Transaction failed):', error);
+        logger.error('Error awarding points (Transaction failed):', error, 'pointsService');
         throw error;
     }
 }
@@ -743,7 +744,7 @@ export async function getEmployeePoints(
 
         return employeeDoc.data().points || employeeDoc.data().personalPoints || 0;
     } catch (error) {
-        console.error('Error getting employee points:', error);
+        logger.error('Error getting employee points:', error, 'pointsService');
         return 0;
     }
 }
@@ -786,7 +787,7 @@ export async function getPointsSummary(
         return result;
 
     } catch (error) {
-        console.error('Error getting points summary:', error);
+        logger.error('Error getting points summary:', error, 'pointsService');
         throw error;
     }
 }
@@ -807,7 +808,7 @@ export async function getPointsHistory(context: EmployeeContext, limitCount: num
 
         return history;
     } catch (error) {
-        console.error('Error getting points history:', error);
+        logger.error('Error getting points history:', error, 'pointsService');
         return [];
     }
 }
@@ -836,7 +837,7 @@ export async function getLeaderboard(tenantId: string, limitCount: number = 10):
 
         return leaderboard;
     } catch (error) {
-        console.error('Error getting leaderboard:', error);
+        logger.error('Error getting leaderboard:', error, 'pointsService');
         return [];
     }
 }
@@ -865,7 +866,7 @@ export async function getTeamLeaderboard(tenantId: string, limitCount: number = 
 
         return leaderboard;
     } catch (error) {
-        console.error('Error getting team leaderboard:', error);
+        logger.error('Error getting team leaderboard:', error, 'pointsService');
         return [];
     }
 }

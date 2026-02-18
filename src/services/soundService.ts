@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -46,7 +48,7 @@ export const initSoundManager = (): void => {
     if (savedEnabled !== null) enabled = savedEnabled === 'true';
     if (savedVolume !== null) volume = parseFloat(savedVolume);
 
-    console.log('✅ Sound manager initialized');
+    logger.info('✅ Sound manager initialized', undefined, 'soundService');
 };
 
 // ============================================================

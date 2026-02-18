@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useUX } from '../../context/UXContext';
 import { AdoraLoader } from '../common/AdoraLoader';
 import { useTranslation } from 'react-i18next';
+import { formatDateTimeGregorianEn } from '../../utils/dateUtils';
 import {
     getProcurementLogs, getDepartmentProcurementLogs, getDepartmentReceipts,
     ProcurementLogEntry, ReceiptRecord, STAGE_CONFIG, ProcurementStage
@@ -140,7 +141,7 @@ export const ProcurementLogViewer: React.FC<ProcurementLogViewerProps> = ({
 <body>
     <div class="header">
         <h1>سجل المشتريات - ${deptName}</h1>
-        <p>تاريخ الطباعة: ${new Date().toLocaleString('ar-SA')}</p>
+        <p>تاريخ الطباعة: ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}</p>
     </div>
     
     <h2>سجل العمليات</h2>
@@ -156,7 +157,7 @@ export const ProcurementLogViewer: React.FC<ProcurementLogViewerProps> = ({
         <tbody>
             ${logs.map(log => `
                 <tr>
-                    <td>${log.timestamp.toLocaleString('ar-SA')}</td>
+                    <td>${formatDateTimeGregorianEn(log.timestamp, { showSeconds: false })}</td>
                     <td><span class="stage-icon">${STAGE_CONFIG[log.stage]?.icon || '📋'}</span> ${STAGE_CONFIG[log.stage]?.title || log.stage}</td>
                     <td>${log.description}</td>
                     <td>${log.actorName}</td>
@@ -180,7 +181,7 @@ export const ProcurementLogViewer: React.FC<ProcurementLogViewerProps> = ({
         <tbody>
             ${receipts.map(receipt => `
                 <tr>
-                    <td>${receipt.receivedAt.toLocaleString('ar-SA')}</td>
+                    <td>${formatDateTimeGregorianEn(receipt.receivedAt, { showSeconds: false })}</td>
                     <td>${receipt.type === 'full' ? '✅ كامل' : receipt.type === 'shortage' ? '⚠️ عجز' : receipt.type === 'overage' ? '📈 زيادة' : '📋 جزئي'}</td>
                     <td>${receipt.totalExpected}</td>
                     <td>${receipt.totalReceived}</td>
@@ -315,7 +316,7 @@ export const ProcurementLogViewer: React.FC<ProcurementLogViewerProps> = ({
                                                         <div className="flex items-center gap-4 mt-2 text-xs text-white/40">
                                                             <span className="flex items-center gap-1">
                                                                 <Clock className="w-3 h-3" />
-                                                                {log.timestamp.toLocaleString('ar-SA')}
+                                                                {formatDateTimeGregorianEn(log.timestamp, { showSeconds: false })}
                                                             </span>
                                                             <span className="flex items-center gap-1">
                                                                 <User className="w-3 h-3" />
@@ -411,7 +412,7 @@ export const ProcurementLogViewer: React.FC<ProcurementLogViewerProps> = ({
                                                         <div>
                                                             <p className="text-white font-medium">{typeConfig.label}</p>
                                                             <p className="text-white/50 text-xs">
-                                                                {receipt.receivedAt.toLocaleString('ar-SA')}
+                                                                {formatDateTimeGregorianEn(receipt.receivedAt, { showSeconds: false })}
                                                             </p>
                                                         </div>
                                                     </div>

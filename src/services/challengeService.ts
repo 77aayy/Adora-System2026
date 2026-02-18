@@ -13,6 +13,7 @@ import {
     setDoc
 } from 'firebase/firestore';
 import { UserChallengeProgress, ChallengeMilestone, ChallengeConfig } from '../types';
+import { logger } from './loggerService';
 
 const DEFAULT_MILESTONES: ChallengeMilestone[] = [
     { day: 1, rewardPoints: 1, label: 'بداية الرحلة' },
@@ -28,7 +29,7 @@ const DEFAULT_MILESTONES: ChallengeMilestone[] = [
 export async function getChallengeConfig(tenantId: string): Promise<ChallengeConfig> {
     // ✅ CRITICAL: Check db before use
     if (!db) {
-        console.error('Firebase Firestore not initialized - returning default config');
+        logger.error('Firebase Firestore not initialized - returning default config', undefined, 'challengeService');
         return {
             isEnabled: true,
             gracePeriodDays: 2,
@@ -84,7 +85,7 @@ export async function checkDailyAttendance(tenantId: string, userId: string): Pr
 }> {
     // ✅ CRITICAL: Check db before use
     if (!db) {
-        console.error('Firebase Firestore not initialized');
+        logger.error('Firebase Firestore not initialized', undefined, 'challengeService');
         return { success: false };
     }
 
@@ -231,7 +232,7 @@ export async function checkDailyAttendance(tenantId: string, userId: string): Pr
                     `مكافأة تحدي الالتزام - اليوم ${result.unlocked.day}: ${result.unlocked.label}`
                 );
             } catch (err) {
-                console.error('Error awarding challenge points:', err);
+                logger.error('Error awarding challenge points:', err, 'challengeService');
                 // Don't fail the whole operation if points award fails
             }
         }
@@ -245,7 +246,7 @@ export async function checkDailyAttendance(tenantId: string, userId: string): Pr
             return { success: false };
         }
         // Log only unexpected errors
-        console.error('Error updating attendance:', error);
+        logger.error('Error updating attendance:', error, 'challengeService');
         return { success: false };
     }
 }

@@ -9,6 +9,7 @@ import { Trophy, Calendar, TrendingUp, Crown, Medal, Award, RefreshCw, Play } fr
 import { useAuth } from '../../context/AuthContext';
 import { useRewardsSystem, RewardResult, getRewardsHistory, RewardHistoryItem } from '../../services/advancedRewardsService';
 import { AdoraLoaderInline } from '../../components/common/AdoraLoader';
+import { formatDateGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // STYLES
@@ -321,7 +322,7 @@ export const AdvancedRewardsDashboard: React.FC<AdvancedRewardsDashboardProps> =
                                 <div>
                                     <div style={styles.bonus}>+{item.bonusPoints}</div>
                                     <div style={styles.winnerMeta}>
-                                        {item.awardedAt.toLocaleDateString('ar-SA')}
+                                        {formatDateGregorianEn(item.awardedAt)}
                                     </div>
                                 </div>
                             </div>

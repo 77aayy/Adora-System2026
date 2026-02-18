@@ -41,7 +41,7 @@ import { Room, RoomCard, User } from '../../types';
 import { useUX } from '../../context/UXContext';
 import { useTranslation } from 'react-i18next';
 import { createAdminTask } from '../../services/adminTasksService';
-import { db } from '../../services/firebase';
+import { getSafeFirestore } from '../../services/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { logger } from '../../services/loggerService';
 
@@ -224,7 +224,7 @@ const OverviewPage: React.FC = () => {
                 workerRef.current?.terminate();
             };
         } catch (error) {
-            console.error('Failed to initialize physics worker:', error);
+            logger.error('Failed to initialize physics worker:', error, 'AdminDashboard');
         }
     }, [tenantId, branchId, rooms]);
 
@@ -733,38 +733,29 @@ export const AdminDashboard: React.FC = () => {
 
     // 🦅 HAWK-EYE FIX: Sync "Phantom Toggles" (Sound/Notifications) from DB to LocalStorage
     useEffect(() => {
-        // ✅ CRITICAL FIX: Owner doesn't have tenantId/branchId - skip this for owner
-        if (isOwner || !user?.tenantId || !user?.branchId || !db) return;
+        if (isOwner || !user?.tenantId || !user?.branchId) return;
 
-        // Listen to System Settings (where soundEnabled lives)
-        // Note: Assuming 'system' doc. If it's in a different doc, this path needs to match SettingsManager.
-        // In SettingsManager, soundEnabled was in 'settings' state, loaded from... ? 
-        // Let's assume it's in 'system' or the main 'branch' doc. 
-        // Based on earlier view, 'maintenanceMode' and 'soundEnabled' were in 'settings' state.
-        // I will listen to the most likely path: branches/{id}/settings/system
-
-        // ✅ Null Safety: Check db before operations
-        if (!db || !user?.tenantId || !user?.branchId) return;
-
-        const systemSettingsRef = doc(db, `tenants/${user.tenantId}/branches/${user.branchId}/settings`, 'system');
-        const unsub = onSnapshot(systemSettingsRef, (snap) => {
-            if (snap.exists()) {
-                const data = snap.data();
-                // Sync Sound
-                if (data.soundEnabled === false) {
-                    localStorage.setItem('adora_sounds', 'off');
-                } else {
-                    localStorage.removeItem('adora_sounds'); // Default On
+        const unsubRef = { current: null as (() => void) | null };
+        getSafeFirestore().then((safeDb) => {
+            if (!safeDb) return;
+            const systemSettingsRef = doc(safeDb, 'tenants', user.tenantId, 'branches', user.branchId, 'settings', 'system');
+            unsubRef.current = onSnapshot(systemSettingsRef, (snap) => {
+                if (snap.exists()) {
+                    const data = snap.data();
+                    if (data.soundEnabled === false) {
+                        localStorage.setItem('adora_sounds', 'off');
+                    } else {
+                        localStorage.removeItem('adora_sounds');
+                    }
+                    if (data.maintenanceMode) {
+                        logger.warn('Maintenance Mode is ON', null, 'AdminDashboard');
+                    }
                 }
-                // Sync Maintenance (Optional trigger)
-                if (data.maintenanceMode) {
-                    logger.warn('Maintenance Mode is ON', null, 'AdminDashboard');
-                }
-            }
-        }, (error) => {
-            logger.error('Error in system settings subscription', error, 'AdminDashboard');
+            }, (error) => {
+                logger.error('Error in system settings subscription', error, 'AdminDashboard');
+            });
         });
-        return () => unsub();
+        return () => { unsubRef.current?.(); };
     }, [isOwner, user?.tenantId, user?.branchId]);
 
     return (
@@ -816,8 +807,8 @@ export const AdminDashboard: React.FC = () => {
             {/* Owner Announcement Banner */}
             <OwnerAnnouncementBanner />
 
-            {/* Main Content Area - Responsive margin for sidebar */}
-            <main className="flex-1 p-3 sm:p-4 pb-24 lg:pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col lg:mr-[280px]">
+            {/* Main Content Area — هامش يمين يتغير مع طي الشريط */}
+            <main className={`flex-1 p-3 sm:p-4 pb-24 lg:pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col transition-[margin-right] duration-300 ease-out ${isSidebarCollapsed ? 'lg:mr-[80px]' : 'lg:mr-[280px]'}`}>
                 <div className="flex-1">
                     <Routes>
                         <Route index element={<OverviewPage />} />

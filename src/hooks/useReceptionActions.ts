@@ -9,11 +9,12 @@ import { useState, useCallback } from 'react';
 import { TFunction } from 'i18next';
 import { db } from '../services/firebase';
 import {
-    doc, updateDoc, addDoc, deleteDoc, collection, query, where, getDocs, Timestamp
+    doc, updateDoc, addDoc, deleteDoc, collection, query, where, limit, getDocs, Timestamp
 } from 'firebase/firestore';
 import { ServiceRequest } from '../types/request';
 import { awardPoints } from '../services/pointsService';
-import { transferRequestToDepartment, confirmCompletion, completeRequest } from '../services/requestService';
+import { transferRequestToDepartment, confirmCompletion, completeRequest, getRequest } from '../services/requestService';
+import { updateRoomStatus } from '../services/roomService';
 import { haptic, playSound } from '../utils/uxEffects';
 
 export interface UseReceptionActionsParams {
@@ -42,6 +43,7 @@ export interface UseReceptionActionsReturn {
         guestsInRoom?: boolean;
         scheduledAt?: Date;
         emergencyTargetDepartment?: string;
+        idempotencyKey?: string;
     }, existingRequests?: ServiceRequest[]) => Promise<void>;
     
     // State
@@ -132,8 +134,9 @@ export const useReceptionActions = ({
             }
 
             // ✅ QR Request Confirmation - Transfer to appropriate department
+            // Use department from QR service config (currentDepartment/emergencyTargetDepartment) when set; else derive from type
             if (requestData.source === 'QR' && requestData.status === 'PENDING_RECEPTION') {
-                const getTargetDepartment = (type: string): string => {
+                const getTargetDepartmentFromType = (type: string): string => {
                     switch (type) {
                         case 'cleaning': return 'housekeeping';
                         case 'maintenance': return 'maintenance';
@@ -146,7 +149,9 @@ export const useReceptionActions = ({
                     }
                 };
 
-                const targetDepartment = getTargetDepartment(requestData.type || requestData.serviceType);
+                const targetDepartment =
+                    (requestData.currentDepartment || requestData.emergencyTargetDepartment) ||
+                    getTargetDepartmentFromType(requestData.type || requestData.serviceType || '');
 
                 await updateDoc(requestRef, {
                     status: 'CONFIRMED',
@@ -237,12 +242,22 @@ export const useReceptionActions = ({
     const handleConfirmCompletion = useCallback(async (requestId: string) => {
         try {
             await confirmCompletion(requestId, tenantId, user?.id || '', user?.name || '', 'reception');
+            // F3: Update room status when reception confirms completion of a cleaning/inspection request
+            try {
+                const request = await getRequest(requestId, tenantId);
+                if (request?.roomNumber && (request.type === 'cleaning' || request.type === 'inspection')) {
+                    await updateRoomStatus(tenantId, branchId, request.roomNumber, 'ready');
+                }
+            } catch (roomErr) {
+                // Non-blocking: log but don't fail the confirm completion
+                console.warn('F3: Could not update room status after confirm completion', roomErr);
+            }
             success(t('reception.requestClosedAndCompleted'));
         } catch (err) {
             console.error('Error confirming completion:', err);
             error(t('reception.requestCloseFailed'));
         }
-    }, [user, tenantId, t, success, error]);
+    }, [user, tenantId, branchId, t, success, error]);
 
     const handleDeleteRequest = useCallback(async (requestId: string) => {
         setDeleteConfirmation(null);
@@ -336,6 +351,7 @@ export const useReceptionActions = ({
         guestsInRoom?: boolean;
         scheduledAt?: Date;
         emergencyTargetDepartment?: string;
+        idempotencyKey?: string;
     }, existingRequests?: ServiceRequest[]) => {
         try {
             if (!user || !user.id) {
@@ -385,6 +401,23 @@ export const useReceptionActions = ({
 
             const isDuplicate = activeRequests.some(r => r.type === data.type);
 
+            // F2: Idempotency — return early if duplicate within 2-min window
+            if (data.idempotencyKey) {
+                const twoMinutesAgo = Timestamp.fromDate(new Date(Date.now() - 2 * 60 * 1000));
+                const ref = collection(db, 'tenants', tenantId, 'requests');
+                const q = query(
+                    ref,
+                    where('idempotencyKey', '==', data.idempotencyKey),
+                    where('createdAt', '>=', twoMinutesAgo),
+                    limit(1)
+                );
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    success(t('reception.requestCreatedSuccess'));
+                    return;
+                }
+            }
+
             // ✅ Prepare request data
             const requestData: any = {
                 type: data.type,
@@ -416,6 +449,7 @@ export const useReceptionActions = ({
                     confirmed: Timestamp.now()
                 },
                 isPotentialDuplicate: isDuplicate,
+                ...(data.idempotencyKey && { idempotencyKey: data.idempotencyKey }),
                 workflow: {
                     originDept: 'reception',
                     targetDept: getDepartment(data.type, data.emergencyTargetDepartment),
@@ -453,7 +487,61 @@ export const useReceptionActions = ({
             }
 
             // ✅ Use tenant-scoped collection
-            await addDoc(collection(db, `tenants/${tenantId}/requests`), requestData);
+            const docRef = await addDoc(collection(db, `tenants/${tenantId}/requests`), requestData);
+
+            // ✅ Notify department (same as requestService.createRequest)
+            const currentDepartment = getDepartment(data.type, data.emergencyTargetDepartment);
+            try {
+                const { sendNotificationToDepartment } = await import('../services/notificationService');
+                const notifDept: 'housekeeping' | 'bellman' | 'maintenance' | 'reception' | 'procurement' | 'coffeeShop' =
+                    currentDepartment === 'coffee_shop' ? 'coffeeShop' : currentDepartment as 'housekeeping' | 'bellman' | 'maintenance' | 'reception' | 'procurement';
+                const titles: Record<string, string> = {
+                    housekeeping: t('reception.cleaningRequestNew') || 'طلب تنظيف جديد',
+                    maintenance: t('reception.maintenanceRequestNew') || 'طلب صيانة جديد',
+                    bellman: t('reception.bellmanRequestNew') || 'طلب بيلمان جديد',
+                    coffee_shop: t('reception.coffeeRequestNew') || 'طلب قهوة جديد',
+                    procurement: t('reception.procurementRequestNew') || 'طلب شراء جديد',
+                    reception: t('reception.newRequest') || 'طلب جديد'
+                };
+                const title = titles[currentDepartment] || titles.reception;
+                const message = `${title} - ${data.roomNumber}`;
+                sendNotificationToDepartment(
+                    notifDept,
+                    title,
+                    message,
+                    tenantId,
+                    branchId,
+                    'info',
+                    docRef.id
+                ).catch(() => {});
+            } catch (_) { /* non-blocking */ }
+
+            // ✅ Initialize Unified State Machine (if feature enabled)
+            // This ensures new requests have all unified state fields (involvedDepartments, isActionRequiredByReception, stateHistory)
+            try {
+                const { isFeatureEnabled } = await import('../services/featureFlagsService');
+                const useUnifiedStateMachine = await isFeatureEnabled(tenantId, 'useUnifiedStateMachine');
+                
+                if (useUnifiedStateMachine) {
+                    const { initializeRequest } = await import('../services/stateTransitionService');
+                    const targetDepartment = getDepartment(data.type, data.emergencyTargetDepartment);
+                    
+                    await initializeRequest(
+                        tenantId,
+                        docRef.id,
+                        data.type,
+                        'reception' as any,
+                        targetDepartment as any,
+                        user.id,
+                        user.name || t('reception.userLabel'),
+                        data.notes || 'تم إنشاء الطلب'
+                    );
+                    console.log('✅ Unified State Machine initialized for new request from Reception');
+                }
+            } catch (initError: any) {
+                // Non-critical: Log but don't fail request creation
+                console.warn('⚠️ Failed to initialize Unified State Machine (non-critical):', initError.message);
+            }
 
             // ✅ Auto-check daily attendance
             if (tenantId && user?.id) {

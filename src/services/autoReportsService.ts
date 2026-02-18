@@ -6,6 +6,7 @@
 
 import { db } from './firebase';
 import { collection, query, where, getDocs, addDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -66,12 +67,11 @@ let scheduledTimers: number[] = [];
 // ============================================================
 
 /**
- * Initialize auto reports
+ * Initialize auto reports (tenant-scoped)
  */
-export const initAutoReports = async (branch: string): Promise<void> => {
+export const initAutoReports = async (tenantId: string, branch: string): Promise<void> => {
     try {
-        // Load config from Firebase
-        const configRef = collection(db, `branches/${branch}/settings`);
+        const configRef = collection(db, `tenants/${tenantId}/branches/${branch}/settings`);
         const q = query(configRef, where('type', '==', 'auto_reports'));
         const snapshot = await getDocs(q);
 
@@ -79,37 +79,33 @@ export const initAutoReports = async (branch: string): Promise<void> => {
             scheduleConfig = { ...scheduleConfig, ...snapshot.docs[0].data() };
         }
 
-        if (scheduleConfig.enabled) {
-            setupSchedules(branch);
+        if (scheduleConfig.enabled && tenantId) {
+            setupSchedules(tenantId, branch);
         }
 
-        console.log('✅ Auto reports initialized');
+        logger.info('✅ Auto reports initialized', undefined, 'autoReportsService');
     } catch (error) {
-        console.error('Failed to init auto reports:', error);
+        logger.error('Failed to init auto reports:', error, 'autoReportsService');
     }
 };
 
 /**
  * Setup scheduled tasks
  */
-const setupSchedules = (branch: string): void => {
-    // Clear existing timers
+const setupSchedules = (tenantId: string, branch: string): void => {
     scheduledTimers.forEach(t => clearTimeout(t));
     scheduledTimers = [];
 
-    // Schedule daily report
-    scheduleDailyReport(branch);
-
-    // Schedule shift reports
+    scheduleDailyReport(tenantId, branch);
     scheduleConfig.shiftTimes.forEach(time => {
-        scheduleShiftReport(branch, time);
+        scheduleShiftReport(tenantId, branch, time);
     });
 };
 
 /**
  * Schedule daily report at configured time
  */
-const scheduleDailyReport = (branch: string): void => {
+const scheduleDailyReport = (tenantId: string, branch: string): void => {
     const [hours, minutes] = scheduleConfig.dailyTime.split(':').map(Number);
     const now = new Date();
     const next = new Date();
@@ -121,8 +117,8 @@ const scheduleDailyReport = (branch: string): void => {
 
     const delay = next.getTime() - now.getTime();
     const timer = window.setTimeout(async () => {
-        await generateDailyReport(branch);
-        scheduleDailyReport(branch); // Reschedule
+        await generateDailyReport(tenantId, branch);
+        scheduleDailyReport(tenantId, branch);
     }, delay);
 
     scheduledTimers.push(timer);
@@ -131,7 +127,7 @@ const scheduleDailyReport = (branch: string): void => {
 /**
  * Schedule shift report at specific time
  */
-const scheduleShiftReport = (branch: string, time: string): void => {
+const scheduleShiftReport = (tenantId: string, branch: string, time: string): void => {
     const [hours, minutes] = time.split(':').map(Number);
     const now = new Date();
     const next = new Date();
@@ -143,8 +139,8 @@ const scheduleShiftReport = (branch: string, time: string): void => {
 
     const delay = next.getTime() - now.getTime();
     const timer = window.setTimeout(async () => {
-        await generateShiftReport(branch);
-        scheduleShiftReport(branch, time); // Reschedule
+        await generateShiftReport(tenantId, branch);
+        scheduleShiftReport(tenantId, branch, time);
     }, delay);
 
     scheduledTimers.push(timer);
@@ -155,14 +151,14 @@ const scheduleShiftReport = (branch: string, time: string): void => {
 // ============================================================
 
 /**
- * Generate daily report
+ * Generate daily report (tenant-scoped)
  */
-export const generateDailyReport = async (branch: string): Promise<ReportData> => {
+export const generateDailyReport = async (tenantId: string, branch: string): Promise<ReportData> => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    if (!tenantId) throw new Error('tenantId required for generateDailyReport');
 
-    // Get today's requests
-    const requestsRef = collection(db, 'requests');
+    const requestsRef = collection(db, `tenants/${tenantId}/requests`);
     const q = query(
         requestsRef,
         where('branch', '==', branch),
@@ -175,11 +171,8 @@ export const generateDailyReport = async (branch: string): Promise<ReportData> =
     // Calculate stats
     const stats = calculateStats(requests);
 
-    // Get employee performance
-    const employees = await getEmployeePerformance(branch, today);
-
-    // Get room stats
-    const rooms = await getRoomStats(branch, today);
+    const employees = await getEmployeePerformance(tenantId, branch, today);
+    const rooms = await getRoomStats(tenantId, branch, today);
 
     const report: ReportData = {
         date: today.toISOString().split('T')[0],
@@ -203,15 +196,15 @@ export const generateDailyReport = async (branch: string): Promise<ReportData> =
 };
 
 /**
- * Generate shift report
+ * Generate shift report (tenant-scoped)
  */
-export const generateShiftReport = async (branch: string): Promise<ReportData> => {
+export const generateShiftReport = async (tenantId: string, branch: string): Promise<ReportData> => {
     const now = new Date();
     const shiftStart = new Date(now);
-    shiftStart.setHours(shiftStart.getHours() - 8); // 8-hour shift
+    shiftStart.setHours(shiftStart.getHours() - 8);
+    if (!tenantId) throw new Error('tenantId required for generateShiftReport');
 
-    // Get shift requests
-    const requestsRef = collection(db, 'requests');
+    const requestsRef = collection(db, `tenants/${tenantId}/requests`);
     const q = query(
         requestsRef,
         where('branch', '==', branch),
@@ -222,8 +215,8 @@ export const generateShiftReport = async (branch: string): Promise<ReportData> =
 
     const requests = snapshot.docs.map(d => d.data());
     const stats = calculateStats(requests);
-    const employees = await getEmployeePerformance(branch, shiftStart);
-    const rooms = await getRoomStats(branch, shiftStart);
+    const employees = await getEmployeePerformance(tenantId, branch, shiftStart);
+    const rooms = await getRoomStats(tenantId, branch, shiftStart);
 
     const report: ReportData = {
         date: now.toISOString(),
@@ -276,15 +269,16 @@ const calculateStats = (requests: any[]): ReportData['stats'] => {
 };
 
 /**
- * Get employee performance
+ * Get employee performance (tenant-scoped)
  */
 const getEmployeePerformance = async (
+    tenantId: string,
     branch: string,
     since: Date
 ): Promise<ReportData['employees']> => {
-    // Get employees
-    const employeesRef = collection(db, 'users');
-    const q = query(employeesRef, where('branch', '==', branch), where('role', '!=', 'guest'));
+    if (!tenantId) return [];
+    const employeesRef = collection(db, `tenants/${tenantId}/employees`);
+    const q = query(employeesRef, where('branch', '==', branch));
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map(d => {
@@ -293,20 +287,22 @@ const getEmployeePerformance = async (
             id: d.id,
             name: data.name || '',
             department: data.department || '',
-            tasksCompleted: data.tasksCompletedToday || 0,
-            points: data.points || 0
+            tasksCompleted: (data as { tasksCompletedToday?: number }).tasksCompletedToday || 0,
+            points: (data as { points?: number }).points || 0
         };
     });
 };
 
 /**
- * Get room stats
+ * Get room stats (tenant-scoped)
  */
 const getRoomStats = async (
+    tenantId: string,
     branch: string,
     since: Date
 ): Promise<ReportData['rooms']> => {
-    const cardsRef = collection(db, 'roomCards');
+    if (!tenantId) return { totalCheckIns: 0, totalCheckOuts: 0, avgOccupancy: 0 };
+    const cardsRef = collection(db, `tenants/${tenantId}/roomCards`);
     const q = query(
         cardsRef,
         where('branch', '==', branch),
@@ -320,7 +316,7 @@ const getRoomStats = async (
     return {
         totalCheckIns: checkIns,
         totalCheckOuts: checkOuts,
-        avgOccupancy: 0 // Would need room count
+        avgOccupancy: 0
     };
 };
 
@@ -329,7 +325,7 @@ const getRoomStats = async (
  */
 const sendReportEmail = async (report: ReportData): Promise<void> => {
     // In production, integrate with email service
-    console.log('📧 Sending report to:', scheduleConfig.recipients);
+    logger.info(`📧 Sending report to: ${scheduleConfig.recipients.join(', ')}`, undefined, 'autoReportsService');
 };
 
 // ============================================================

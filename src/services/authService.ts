@@ -28,6 +28,7 @@ import {
 import { db } from './firebase';
 import { Employee } from '../types/tenant';
 import { LoginResult } from '../types/auth';
+import { logger } from './loggerService';
 
 // ============================================================
 // SECURITY CONSTANTS
@@ -197,7 +198,7 @@ export async function loginWithGlobalCode(code: string): Promise<LoginResult> {
         };
 
     } catch (error) {
-        console.error('Login error:', error);
+        logger.error('Login error:', error, 'authService');
         return {
             success: false,
             error: 'حدث خطأ في تسجيل الدخول'
@@ -274,7 +275,7 @@ export async function loadSession(): Promise<LoginResult> {
         };
 
     } catch (error) {
-        console.error('Session load error:', error);
+        logger.error('Session load error:', error, 'authService');
         return { success: false, error: 'Session error' };
     }
 }

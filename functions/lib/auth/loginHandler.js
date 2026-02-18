@@ -2,6 +2,7 @@
 /**
  * ✅ Cloud Function: loginWithPin
  * Handles PIN-based login with Admin SDK (bypasses client Rules)
+ * Phase 7: Rate limit applied at start to prevent brute force
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -40,6 +41,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.loginWithPin = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
+const rateLimiter_1 = require("../security/rateLimiter");
 // Initialize Admin SDK if not already initialized
 if (!admin.apps.length) {
     admin.initializeApp();
@@ -50,15 +52,32 @@ const db = admin.firestore();
  * Uses Admin SDK - bypasses client Rules complexity
  */
 exports.loginWithPin = functions.https.onCall(async (data, context) => {
+    var _a, _b, _c;
     try {
-        const { pin, branchId } = data;
+        const rawPin = data === null || data === void 0 ? void 0 : data.pin;
+        const pin = typeof rawPin === 'string' ? rawPin.trim() : String(rawPin || '').trim();
+        const branchId = data === null || data === void 0 ? void 0 : data.branchId;
         if (!pin || pin.length < 4) {
             return {
                 success: false,
-                error: 'كود الدخول غير صحيح'
+                error: 'كود الدخول غير صحيح (4 أرقام على الأقل)'
             };
         }
-        // ✅ Check globalCodes (managers/branches)
+        // ✅ Phase 7: Rate limit by IP (or PIN+IP if IP not available)
+        const rawReq = context.rawRequest;
+        const ip = (_c = (_a = rawReq === null || rawReq === void 0 ? void 0 : rawReq.ip) !== null && _a !== void 0 ? _a : (_b = rawReq === null || rawReq === void 0 ? void 0 : rawReq.connection) === null || _b === void 0 ? void 0 : _b.remoteAddress) !== null && _c !== void 0 ? _c : 'unknown';
+        const identifier = ip !== 'unknown' ? ip : `pin_${pin.substring(0, 4)}`;
+        const rateResult = await (0, rateLimiter_1.checkRateLimit)(identifier, 'login');
+        if (!rateResult.allowed) {
+            const minutes = rateResult.blockedUntil
+                ? Math.ceil((rateResult.blockedUntil.getTime() - Date.now()) / 60000)
+                : 15;
+            return {
+                success: false,
+                error: `تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً (بعد ${minutes} دقيقة).`
+            };
+        }
+        // ✅ Check globalCodes (managers) — document ID must match PIN exactly (e.g. "1111")
         const globalCodeDoc = await db.collection('globalCodes').doc(pin).get();
         if (globalCodeDoc.exists) {
             const codeData = globalCodeDoc.data();
@@ -70,31 +89,58 @@ exports.loginWithPin = functions.https.onCall(async (data, context) => {
                     error: 'بيانات المدير غير مكتملة'
                 };
             }
-            // ✅ Load manager data from tenants collection
+            let managerData = null;
+            let availableBranches = [];
+            // ✅ 1) Try tenants/{tenantId}/managers/{managerId} (legacy)
             const managerDoc = await db.collection('tenants').doc(tenantId)
                 .collection('managers').doc(managerId).get();
-            if (!managerDoc.exists) {
-                return {
-                    success: false,
-                    error: 'المدير غير موجود'
-                };
+            if (managerDoc.exists) {
+                managerData = managerDoc.data();
+                const branchesSnapshot = await db.collection('tenants').doc(tenantId)
+                    .collection('branches').get();
+                availableBranches = branchesSnapshot.docs.map(d => ({
+                    id: d.id,
+                    name: d.data().name || '',
+                    code: d.data().code
+                }));
             }
-            const managerData = managerDoc.data();
-            // ✅ Check manager status
+            // ✅ 2) If not in tenants/.../managers, load from users/{managerId} (createManager stores here)
+            if (!managerData) {
+                const userDoc = await db.collection('users').doc(managerId).get();
+                if (!userDoc.exists) {
+                    return {
+                        success: false,
+                        error: 'المدير غير موجود. تأكد من إضافة المدير من لوحة المالك (إضافة مدير) ثم استخدام نفس الكود.'
+                    };
+                }
+                const userData = userDoc.data();
+                const userTenantId = userData.tenantId;
+                const userRole = userData.role;
+                if (userTenantId !== tenantId || (userRole !== 'manager' && userRole !== 'admin')) {
+                    return {
+                        success: false,
+                        error: 'بيانات الدخول غير مطابقة. تأكد من استخدام كود المدير الصحيح.'
+                    };
+                }
+                managerData = userData;
+                // Build branches from branchCodes / branchNames (new managers may not have branches subcollection yet)
+                const branchCodes = (userData.branchCodes || codeData.branchCodes || []);
+                const branchNames = (userData.branchNames || codeData.branchNames || {});
+                availableBranches = branchCodes.map((code) => ({
+                    id: `branch-${code}`,
+                    name: branchNames[code] || `فرع ${code}`,
+                    code
+                }));
+            }
+            if (!managerData) {
+                return { success: false, error: 'المدير غير موجود' };
+            }
             if (managerData.status === 'suspended' || managerData.status === 'deleted') {
                 return {
                     success: false,
                     error: 'تم إيقاف حسابك - يرجى التواصل مع إدارة النظام'
                 };
             }
-            // ✅ Load available branches
-            const branchesSnapshot = await db.collection('tenants').doc(tenantId)
-                .collection('branches').get();
-            const availableBranches = branchesSnapshot.docs.map(doc => ({
-                id: doc.id,
-                name: doc.data().name || '',
-                code: doc.data().code
-            }));
             return {
                 success: true,
                 user: {
@@ -116,7 +162,7 @@ exports.loginWithPin = functions.https.onCall(async (data, context) => {
         if (usersSnapshot.empty) {
             return {
                 success: false,
-                error: 'كود الدخول غير صحيح'
+                error: 'كود الدخول غير صحيح. إذا كنت مديراً، تأكد من إضافة حسابك من لوحة المالك (إضافة مدير) واستخدام نفس الكود.'
             };
         }
         const userDoc = usersSnapshot.docs[0];

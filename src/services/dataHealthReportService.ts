@@ -20,6 +20,7 @@ import {
     Timestamp, serverTimestamp, orderBy, limit
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -270,7 +271,7 @@ const safeQuery = async (
     } catch (error: any) {
         // ✅ Track missing indexes for report
         if (error?.code === 'failed-precondition' || error?.message?.includes('index')) {
-            console.warn('⚠️ Firestore index missing. Using fallback...');
+            logger.warn('⚠️ Firestore index missing. Using fallback...', undefined, 'dataHealthReportService');
             
             // ✅ Add to missing indexes array if collectionName provided and array exists
             if (collectionName && queryDescription && missingIndexes) {
@@ -284,7 +285,7 @@ const safeQuery = async (
             
             return fallback;
         }
-        console.warn('⚠️ Query failed:', error);
+        logger.warn('⚠️ Query failed:', error, 'dataHealthReportService');
         return fallback;
     }
 };
@@ -351,7 +352,7 @@ export const generateWeeklyHealthReport = async (
         timestamp: Date;
     }> = [];
 
-    console.log('🏥 [Health Report] Starting comprehensive analysis...', { tenantId, branchId });
+    logger.info('🏥 [Health Report] Starting comprehensive analysis...', { tenantId, branchId }, 'dataHealthReportService');
 
     // Initialize default report structure
     const defaultReport: Partial<DataHealthReport> = {
@@ -462,7 +463,7 @@ export const generateWeeklyHealthReport = async (
             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }, [], 'data_doctor_logs', branchId ? 'data_doctor_logs with tenantId and branchId filter' : 'data_doctor_logs with tenantId filter', missingIndexes);
     } catch (error) {
-        console.warn('⚠️ Error fetching data_doctor_logs:', error);
+        logger.warn('⚠️ Error fetching data_doctor_logs:', error, 'dataHealthReportService');
     }
 
     // ============================================================
@@ -486,7 +487,7 @@ export const generateWeeklyHealthReport = async (
             errorLogs = errorLogs.filter((log: any) => log.tenantId === tenantId);
         }
     } catch (error) {
-        console.warn('⚠️ Error fetching errorLogs:', error);
+        logger.warn('⚠️ Error fetching errorLogs:', error, 'dataHealthReportService');
     }
 
     // ============================================================
@@ -505,7 +506,7 @@ export const generateWeeklyHealthReport = async (
             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }, [], 'performanceMetrics', 'performanceMetrics with timestamp filter', missingIndexes);
     } catch (error) {
-        console.warn('⚠️ Error fetching performanceMetrics:', error);
+        logger.warn('⚠️ Error fetching performanceMetrics:', error, 'dataHealthReportService');
     }
 
     // ============================================================
@@ -538,12 +539,12 @@ export const generateWeeklyHealthReport = async (
                 if (requests.length > 0) break;
             } catch (pathError: any) {
                 // Try next path if this one fails
-                console.warn(`⚠️ Error with path ${requestsPath}:`, pathError);
+                logger.warn(`⚠️ Error with path ${requestsPath}:`, pathError, 'dataHealthReportService');
                 continue;
             }
         }
     } catch (error) {
-        console.warn('⚠️ Error fetching requests:', error);
+        logger.warn('⚠️ Error fetching requests:', error, 'dataHealthReportService');
     }
 
     // ============================================================
@@ -563,7 +564,7 @@ export const generateWeeklyHealthReport = async (
             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }, [], 'audit_logs', 'audit_logs with timestamp filter', missingIndexes);
     } catch (error) {
-        console.warn('⚠️ Error fetching audit_logs:', error);
+        logger.warn('⚠️ Error fetching audit_logs:', error, 'dataHealthReportService');
     }
 
     // ============================================================
@@ -594,7 +595,7 @@ export const generateWeeklyHealthReport = async (
             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }, [], 'errorLogs', 'previous week errorLogs with timestamp filter', missingIndexes);
     } catch (error) {
-        console.warn('⚠️ Error fetching previous week data:', error);
+        logger.warn('⚠️ Error fetching previous week data:', error, 'dataHealthReportService');
     }
 
     // ============================================================
@@ -659,7 +660,7 @@ export const generateWeeklyHealthReport = async (
                 });
             }
         } catch (err) {
-            console.warn('⚠️ Error processing error log:', err);
+            logger.warn('⚠️ Error processing error log:', err, 'dataHealthReportService');
         }
     });
 
@@ -871,7 +872,7 @@ export const generateWeeklyHealthReport = async (
                     details: log.stack
                 });
             } catch (err) {
-                console.warn('⚠️ Error adding error to timeline:', err);
+                logger.warn('⚠️ Error adding error to timeline:', err, 'dataHealthReportService');
             }
         });
 
@@ -897,7 +898,7 @@ export const generateWeeklyHealthReport = async (
                     details: log.type
                 });
             } catch (err) {
-                console.warn('⚠️ Error adding data doctor log to timeline:', err);
+                logger.warn('⚠️ Error adding data doctor log to timeline:', err, 'dataHealthReportService');
             }
         });
 
@@ -1109,7 +1110,7 @@ export const generateWeeklyHealthReport = async (
             .sort((a, b) => b.requestCount - a.requestCount)
             .slice(0, 10);
     } catch (error) {
-        console.warn('⚠️ Error calculating user activity:', error);
+        logger.warn('⚠️ Error calculating user activity:', error, 'dataHealthReportService');
     }
 
     // ============================================================
@@ -1214,11 +1215,11 @@ export const generateWeeklyHealthReport = async (
                 };
                 databaseStatistics.totalDocuments += count;
             } catch (err) {
-                console.warn(`⚠️ Error counting ${coll.name}:`, err);
+                logger.warn(`⚠️ Error counting ${coll.name}:`, err, 'dataHealthReportService');
             }
         }
     } catch (error) {
-        console.warn('⚠️ Error calculating database statistics:', error);
+        logger.warn('⚠️ Error calculating database statistics:', error, 'dataHealthReportService');
     }
 
     // ============================================================
@@ -1418,7 +1419,7 @@ export const generateWeeklyHealthReport = async (
                     });
                 }
             } catch (parseErr) {
-                console.warn('⚠️ Failed to parse stored errors:', parseErr);
+                logger.warn('⚠️ Failed to parse stored errors:', parseErr, 'dataHealthReportService');
             }
         }
         
@@ -1465,7 +1466,7 @@ export const generateWeeklyHealthReport = async (
         }).join('\n\n') : 'لا توجد أخطاء في الكونسول في هذه الفترة';
         
     } catch (consoleErr) {
-        console.warn('⚠️ Error collecting console errors:', consoleErr);
+        logger.warn('⚠️ Error collecting console errors:', consoleErr, 'dataHealthReportService');
     }
 
     // ============================================================
@@ -1621,7 +1622,7 @@ export const generateWeeklyHealthReport = async (
         report.branchId = branchId;
     }
 
-    console.log('✅ [Health Report] Comprehensive analysis completed', {
+    logger.info('✅ [Health Report] Comprehensive analysis completed', {
         totalIssues: report.totalIssues,
         totalErrors: report.errorAnalysis.totalErrors,
         healthScore: report.overallHealth
@@ -1629,7 +1630,7 @@ export const generateWeeklyHealthReport = async (
     
     return report;
     } catch (error: any) {
-        console.error('❌ [Health Report] Critical error during generation:', error);
+        logger.error('❌ [Health Report] Critical error during generation:', error, 'dataHealthReportService');
         
         // Return a minimal report with error information
         const errorReport: DataHealthReport = {
@@ -1754,11 +1755,11 @@ export const saveAndNotifyReport = async (
             createdAt: serverTimestamp()
         });
 
-        console.log(`📊 Health report generated and saved: ${reportRef.id}`);
+        logger.info(`📊 Health report generated and saved: ${reportRef.id}`, undefined, 'dataHealthReportService');
         return reportRef.id;
     } catch (saveError: any) {
-        console.error('❌ [dataHealthReportService] Failed to save health report:', saveError);
-        console.error('❌ Error details:', {
+        logger.error('❌ [dataHealthReportService] Failed to save health report:', saveError, 'dataHealthReportService');
+        logger.error('❌ Error details:', {
             code: saveError?.code,
             message: saveError?.message,
             stack: saveError?.stack
@@ -1766,10 +1767,10 @@ export const saveAndNotifyReport = async (
         
         // ✅ Check if it's a permission error
         if (saveError?.code === 'permission-denied' || saveError?.message?.includes('permission')) {
-            console.error('❌ Permission denied when saving health report. Check:');
-            console.error('   1. Firestore Rules allow write for authenticated users');
-            console.error('   2. Anonymous auth is enabled and user is signed in');
-            console.error('   3. request.auth != null in Firestore Rules');
+            logger.error('❌ Permission denied when saving health report. Check:', undefined, 'dataHealthReportService');
+            logger.error('   1. Firestore Rules allow write for authenticated users', undefined, 'dataHealthReportService');
+            logger.error('   2. Anonymous auth is enabled and user is signed in', undefined, 'dataHealthReportService');
+            logger.error('   3. request.auth != null in Firestore Rules', undefined, 'dataHealthReportService');
         }
         
         throw saveError;
@@ -1785,12 +1786,12 @@ export const getRecentHealthReports = async (
 ): Promise<DataHealthReport[]> => {
     // ✅ CRITICAL: Null safety check
     if (!db) {
-        console.warn('⚠️ Firebase Firestore is not initialized');
+        logger.warn('⚠️ Firebase Firestore is not initialized', undefined, 'dataHealthReportService');
         return [];
     }
 
     // ✅ DEBUG: Log tenantId being used
-    console.log(`🔍 [dataHealthReportService] getRecentHealthReports called with tenantId: "${tenantId}"`);
+    logger.debug(`🔍 [dataHealthReportService] getRecentHealthReports called with tenantId: "${tenantId}"`, undefined, 'dataHealthReportService');
 
     let snapshot: any;
     try {
@@ -1801,13 +1802,13 @@ export const getRecentHealthReports = async (
             limit(limitCount)
         );
 
-        console.log(`🔍 [dataHealthReportService] Attempting query with tenantId: "${tenantId}"`);
+        logger.debug(`🔍 [dataHealthReportService] Attempting query with tenantId: "${tenantId}"`, undefined, 'dataHealthReportService');
         snapshot = await getDocs(q);
-        console.log(`✅ [dataHealthReportService] Query succeeded! Found ${snapshot.docs.length} reports`);
+        logger.debug(`✅ [dataHealthReportService] Query succeeded! Found ${snapshot.docs.length} reports`, undefined, 'dataHealthReportService');
     } catch (queryError: any) {
         // ✅ Handle Firestore internal errors first
         if (queryError?.message?.includes('INTERNAL ASSERTION FAILED') || queryError?.message?.includes('Unexpected state')) {
-            console.warn('⚠️ Firestore internal error in getRecentHealthReports - trying alternative queries...', queryError);
+            logger.warn('⚠️ Firestore internal error in getRecentHealthReports - trying alternative queries...', queryError, 'dataHealthReportService');
             // Try alternative queries
             try {
                 // First try: without orderBy
@@ -1823,23 +1824,23 @@ export const getRecentHealthReports = async (
                     const bTime = b.data().generatedAt?.toDate?.()?.getTime() || 0;
                     return bTime - aTime; // Descending
                 });
-                console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (internal error workaround 1)`);
+                logger.info(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (internal error workaround 1)`, undefined, 'dataHealthReportService');
             } catch (altError1: any) {
                 // Check if it's also INTERNAL ASSERTION FAILED
                 if (altError1?.message?.includes('INTERNAL ASSERTION FAILED') || altError1?.message?.includes('Unexpected state')) {
-                    console.warn('⚠️ AltQuery1 also failed with INTERNAL ASSERTION FAILED, trying simpler queries...');
+                    logger.warn('⚠️ AltQuery1 also failed with INTERNAL ASSERTION FAILED, trying simpler queries...', undefined, 'dataHealthReportService');
                 }
                 
                 // Second try: without tenantId filter
                 try {
-                    console.log(`🔍 [dataHealthReportService] Trying query without tenantId filter...`);
+                    logger.debug(`🔍 [dataHealthReportService] Trying query without tenantId filter...`, undefined, 'dataHealthReportService');
                     const altQuery2 = query(
                         collection(db, 'health_reports'),
                         orderBy('generatedAt', 'desc'),
                         limit(limitCount * 2)
                     );
                     snapshot = await getDocs(altQuery2);
-                    console.log(`🔍 [dataHealthReportService] Query without tenantId succeeded! Found ${snapshot.docs.length} total reports`);
+                    logger.info(`🔍 [dataHealthReportService] Query without tenantId succeeded! Found ${snapshot.docs.length} total reports`, undefined, 'dataHealthReportService');
                     // Filter by tenantId manually
                     const beforeFilter = snapshot.docs.length;
                     snapshot.docs = snapshot.docs
@@ -1847,28 +1848,28 @@ export const getRecentHealthReports = async (
                             const docTenantId = doc.data().tenantId;
                             const matches = docTenantId === tenantId;
                             if (!matches && beforeFilter <= 5) {
-                                console.log(`🔍 [dataHealthReportService] Report ${doc.id} has tenantId: "${docTenantId}" (looking for: "${tenantId}")`);
+                                logger.debug(`🔍 [dataHealthReportService] Report ${doc.id} has tenantId: "${docTenantId}" (looking for: "${tenantId}")`, undefined, 'dataHealthReportService');
                             }
                             return matches;
                         })
                         .slice(0, limitCount);
-                    console.log(`🔍 [dataHealthReportService] After filtering by tenantId "${tenantId}": ${snapshot.docs.length} reports`);
-                    console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (internal error workaround 2)`);
+                    logger.info(`🔍 [dataHealthReportService] After filtering by tenantId "${tenantId}": ${snapshot.docs.length} reports`, undefined, 'dataHealthReportService');
+                    logger.info(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (internal error workaround 2)`, undefined, 'dataHealthReportService');
                 } catch (altError2: any) {
                     // Check if it's also INTERNAL ASSERTION FAILED
                     if (altError2?.message?.includes('INTERNAL ASSERTION FAILED') || altError2?.message?.includes('Unexpected state')) {
-                        console.warn('⚠️ AltQuery2 also failed with INTERNAL ASSERTION FAILED, trying simplest query...');
+                        logger.warn('⚠️ AltQuery2 also failed with INTERNAL ASSERTION FAILED, trying simplest query...', undefined, 'dataHealthReportService');
                     }
                     
                     // Third try: simplest query (no orderBy, no filters)
                     try {
-                        console.log(`🔍 [dataHealthReportService] Trying simplest query (no filters, no orderBy)...`);
+                        logger.debug(`🔍 [dataHealthReportService] Trying simplest query (no filters, no orderBy)...`, undefined, 'dataHealthReportService');
                         const altQuery3 = query(
                             collection(db, 'health_reports'),
                             limit(limitCount * 3)
                         );
                         snapshot = await getDocs(altQuery3);
-                        console.log(`🔍 [dataHealthReportService] Simplest query succeeded! Found ${snapshot.docs.length} total reports`);
+                        logger.info(`🔍 [dataHealthReportService] Simplest query succeeded! Found ${snapshot.docs.length} total reports`, undefined, 'dataHealthReportService');
                         // Filter and sort manually
                         const beforeFilter = snapshot.docs.length;
                         snapshot.docs = snapshot.docs
@@ -1876,7 +1877,7 @@ export const getRecentHealthReports = async (
                                 const docTenantId = doc.data().tenantId;
                                 const matches = docTenantId === tenantId;
                                 if (!matches && beforeFilter <= 5) {
-                                    console.log(`🔍 [dataHealthReportService] Report ${doc.id} has tenantId: "${docTenantId}" (looking for: "${tenantId}")`);
+                                    logger.debug(`🔍 [dataHealthReportService] Report ${doc.id} has tenantId: "${docTenantId}" (looking for: "${tenantId}")`, undefined, 'dataHealthReportService');
                                 }
                                 return matches;
                             })
@@ -1886,8 +1887,8 @@ export const getRecentHealthReports = async (
                                 return bTime - aTime;
                             })
                             .slice(0, limitCount);
-                        console.log(`🔍 [dataHealthReportService] After filtering and sorting: ${snapshot.docs.length} reports`);
-                        console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (internal error workaround 3)`);
+                        logger.info(`🔍 [dataHealthReportService] After filtering and sorting: ${snapshot.docs.length} reports`, undefined, 'dataHealthReportService');
+                        logger.info(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (internal error workaround 3)`, undefined, 'dataHealthReportService');
                     } catch (altError3: any) {
                         // Check if it's INTERNAL ASSERTION FAILED or permission-denied
                         const isInternalError = altError3?.message?.includes('INTERNAL ASSERTION FAILED') || altError3?.message?.includes('Unexpected state');
@@ -1896,11 +1897,11 @@ export const getRecentHealthReports = async (
                                                   altError3?.message?.includes('Missing or insufficient');
                         
                         if (isInternalError) {
-                            console.error('❌ All queries failed with INTERNAL ASSERTION FAILED - this is a Firestore SDK cache issue. Try refreshing the page.');
+                            logger.error('❌ All queries failed with INTERNAL ASSERTION FAILED - this is a Firestore SDK cache issue. Try refreshing the page.', undefined, 'dataHealthReportService');
                         } else if (isPermissionError) {
-                            console.error('❌ All queries failed with permission-denied - check Firestore Rules and userBinding for owner role.');
+                            logger.error('❌ All queries failed with permission-denied - check Firestore Rules and userBinding for owner role.', undefined, 'dataHealthReportService');
                         } else {
-                            console.error('❌ All alternative queries failed for health reports:', altError3);
+                            logger.error('❌ All alternative queries failed for health reports:', altError3, 'dataHealthReportService');
                         }
                         return [];
                     }
@@ -1909,7 +1910,7 @@ export const getRecentHealthReports = async (
         }
         // ✅ Handle missing index gracefully
         else if (queryError?.code === 'failed-precondition' || queryError?.message?.includes('index')) {
-            console.warn('⚠️ Firestore index missing for health_reports. Using fallback query...');
+            logger.warn('⚠️ Firestore index missing for health_reports. Using fallback query...', undefined, 'dataHealthReportService');
             // Fallback: query without orderBy
             const fallbackQuery = query(
                 collection(db, 'health_reports'),
@@ -1930,7 +1931,7 @@ export const getRecentHealthReports = async (
                                       queryError?.message?.includes('Missing or insufficient');
             
             if (isPermissionError) {
-                console.warn('⚠️ Permission denied for health reports - trying alternative query...', queryError);
+                logger.warn('⚠️ Permission denied for health reports - trying alternative query...', queryError, 'dataHealthReportService');
                 
                 // ✅ Try alternative query: For owner, try without tenantId filter or without orderBy
                 try {
@@ -1947,18 +1948,18 @@ export const getRecentHealthReports = async (
                         const bTime = b.data().generatedAt?.toDate?.()?.getTime() || 0;
                         return bTime - aTime; // Descending
                     });
-                    console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (alternative query 1)`);
+                    logger.info(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (alternative query 1)`, undefined, 'dataHealthReportService');
                 } catch (altError1: any) {
                     // Second try: without tenantId filter (for owner access to all reports)
                     try {
-                        console.log(`🔍 [dataHealthReportService] Trying query without tenantId filter (permission workaround)...`);
+                        logger.debug(`🔍 [dataHealthReportService] Trying query without tenantId filter (permission workaround)...`, undefined, 'dataHealthReportService');
                         const altQuery2 = query(
                             collection(db, 'health_reports'),
                             orderBy('generatedAt', 'desc'),
                             limit(limitCount * 2) // Get more to filter by tenantId in code
                         );
                         snapshot = await getDocs(altQuery2);
-                        console.log(`🔍 [dataHealthReportService] Query without tenantId filter succeeded! Found ${snapshot.docs.length} total reports`);
+                        logger.info(`🔍 [dataHealthReportService] Query without tenantId filter succeeded! Found ${snapshot.docs.length} total reports`, undefined, 'dataHealthReportService');
                         // Filter by tenantId manually
                         const beforeFilter = snapshot.docs.length;
                         snapshot.docs = snapshot.docs
@@ -1966,19 +1967,19 @@ export const getRecentHealthReports = async (
                                 const docTenantId = doc.data().tenantId;
                                 const matches = docTenantId === tenantId;
                                 if (!matches && beforeFilter <= 5) {
-                                    console.log(`🔍 [dataHealthReportService] Report ${doc.id} has tenantId: "${docTenantId}" (looking for: "${tenantId}")`);
+                                    logger.debug(`🔍 [dataHealthReportService] Report ${doc.id} has tenantId: "${docTenantId}" (looking for: "${tenantId}")`, undefined, 'dataHealthReportService');
                                 }
                                 return matches;
                             })
                             .slice(0, limitCount);
-                        console.log(`🔍 [dataHealthReportService] After filtering by tenantId "${tenantId}": ${snapshot.docs.length} reports`);
+                        logger.info(`🔍 [dataHealthReportService] After filtering by tenantId "${tenantId}": ${snapshot.docs.length} reports`, undefined, 'dataHealthReportService');
                         // Sort manually
                         snapshot.docs.sort((a: any, b: any) => {
                             const aTime = a.data().generatedAt?.toDate?.()?.getTime() || 0;
                             const bTime = b.data().generatedAt?.toDate?.()?.getTime() || 0;
                             return bTime - aTime; // Descending
                         });
-                        console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (alternative query 2 - owner access)`);
+                        logger.info(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (alternative query 2 - owner access)`, undefined, 'dataHealthReportService');
                     } catch (altError2: any) {
                         // Third try: simplest query (no filters, no orderBy)
                         try {
@@ -1996,15 +1997,15 @@ export const getRecentHealthReports = async (
                                     return bTime - aTime; // Descending
                                 })
                                 .slice(0, limitCount);
-                            console.log(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (alternative query 3 - simplest)`);
+                            logger.info(`✅ [dataHealthReportService] Loaded ${snapshot.docs.length} health reports (alternative query 3 - simplest)`, undefined, 'dataHealthReportService');
                         } catch (altError3: any) {
-                            console.error('❌ All alternative queries failed for health reports:', altError3);
+                            logger.error('❌ All alternative queries failed for health reports:', altError3, 'dataHealthReportService');
                             return [];
                         }
                     }
                 }
             } else {
-                console.error('❌ Error fetching health reports:', queryError);
+                logger.error('❌ Error fetching health reports:', queryError, 'dataHealthReportService');
                 return [];
             }
         }
@@ -2030,7 +2031,7 @@ export const getRecentHealthReports = async (
 export const markReportAsViewed = async (reportId: string): Promise<void> => {
     // ✅ CRITICAL: Null safety check
     if (!db) {
-        console.warn('⚠️ Firebase Firestore is not initialized');
+        logger.warn('⚠️ Firebase Firestore is not initialized', undefined, 'dataHealthReportService');
         return;
     }
 
@@ -2040,7 +2041,7 @@ export const markReportAsViewed = async (reportId: string): Promise<void> => {
             viewedAt: serverTimestamp()
         });
     } catch (error) {
-        console.error('❌ Error marking report as viewed:', error);
+        logger.error('❌ Error marking report as viewed:', error, 'dataHealthReportService');
         // Don't throw - this is not critical
     }
 };
@@ -2055,7 +2056,7 @@ export const checkAndGenerateWeeklyReport = async (
 ): Promise<boolean> => {
     // ✅ CRITICAL: Null safety check
     if (!db) {
-        console.warn('⚠️ Firebase Firestore is not initialized');
+        logger.warn('⚠️ Firebase Firestore is not initialized', undefined, 'dataHealthReportService');
         return false;
     }
 
@@ -2075,7 +2076,7 @@ export const checkAndGenerateWeeklyReport = async (
     } catch (queryError: any) {
         // ✅ Handle missing index gracefully
         if (queryError?.code === 'failed-precondition' || queryError?.message?.includes('index')) {
-            console.warn('⚠️ Firestore index missing. Checking reports without date filter...');
+            logger.warn('⚠️ Firestore index missing. Checking reports without date filter...', undefined, 'dataHealthReportService');
             // Fallback: check all reports for tenant and filter manually
             const fallbackQuery = query(
                 collection(db, 'health_reports'),
@@ -2095,7 +2096,7 @@ export const checkAndGenerateWeeklyReport = async (
                                       queryError?.message?.includes('Missing or insufficient');
             
             if (isPermissionError) {
-                console.warn('⚠️ Permission denied for checking health reports - trying alternative query...', queryError);
+                logger.warn('⚠️ Permission denied for checking health reports - trying alternative query...', queryError, 'dataHealthReportService');
                 try {
                     // Try without date filter
                     const altQuery = query(
@@ -2109,13 +2110,13 @@ export const checkAndGenerateWeeklyReport = async (
                         const generatedAt = doc.data().generatedAt?.toDate?.();
                         return generatedAt && generatedAt >= weekAgo;
                     });
-                    console.log(`✅ [dataHealthReportService] Checked reports using alternative query`);
+                    logger.info(`✅ [dataHealthReportService] Checked reports using alternative query`, undefined, 'dataHealthReportService');
                 } catch (altError: any) {
-                    console.error('❌ Alternative query also failed for checking reports:', altError);
+                    logger.error('❌ Alternative query also failed for checking reports:', altError, 'dataHealthReportService');
                     return false;
                 }
             } else {
-                console.error('❌ Error checking for existing reports:', queryError);
+                logger.error('❌ Error checking for existing reports:', queryError, 'dataHealthReportService');
                 return false;
             }
         }

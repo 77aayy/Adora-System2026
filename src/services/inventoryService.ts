@@ -2,12 +2,15 @@
  * Inventory Service V2
  * Smart Inventory Management with Dynamic Categories & Auto-sync from Procurement
  * Adora Hotel Management System V2
- * 
+ *
  * Features:
  * - Three inventory dimensions: Warehouse + Rooms + Purchased (with history)
  * - Dynamic categories from procurement requests
  * - Auto-registration from procurement receipts
  * - Manual entry and editing from admin dashboard
+ *
+ * SaaS/tenant: Uses root collections `inventory` and `inventory_transactions`. For multi-tenant
+ * isolation, consider migrating to tenants/${tenantId}/inventory (and transactions) and passing tenantId.
  */
 
 import { db } from './firebase';
@@ -28,6 +31,7 @@ import {
     writeBatch,
     serverTimestamp,
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -250,7 +254,7 @@ export const findInventoryItemByName = async (
         }
         return null;
     } catch (error) {
-        console.error('Error finding inventory item by name:', error);
+        logger.error('Error finding inventory item by name:', error, 'inventoryService');
         return null;
     }
 };

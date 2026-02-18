@@ -742,6 +742,51 @@
 }
 
 /* ============================================================
+   🎯 PULSE PROGRESS BAR ANIMATIONS (Universal Action Card)
+   ============================================================ */
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.6), 0 0 16px rgba(239, 68, 68, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.8), 0 0 32px rgba(239, 68, 68, 0.6);
+    }
+}
+
+@keyframes pulse-border {
+    0%, 100% {
+        border-color: rgba(64, 224, 208, 0.7); /* Turquoise #40E0D0 */
+        ring-color: rgba(64, 224, 208, 0.4);
+        box-shadow: 0 0 0 0 rgba(64, 224, 208, 0.4);
+    }
+    50% {
+        border-color: rgba(64, 224, 208, 1); /* Turquoise #40E0D0 */
+        ring-color: rgba(64, 224, 208, 0.6);
+        box-shadow: 0 0 0 4px rgba(64, 224, 208, 0.2);
+    }
+}
+
+@keyframes progress-shimmer {
+    0% {
+        background-position: -100% 0;
+    }
+    100% {
+        background-position: 100% 0;
+    }
+}
+
+/* Pulse animation for critical progress bar */
+.progress-pulse {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Reception alert pulse */
+.reception-alert-pulse {
+    animation: pulse-border 2s ease-in-out infinite;
+}
+
+/* ============================================================
    📐 UTILITIES
    ============================================================ */
 

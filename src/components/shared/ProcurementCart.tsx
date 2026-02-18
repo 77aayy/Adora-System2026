@@ -17,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 import { uploadFileToImgBB, validateImageFile } from '../../services/imageUploadService';
 import { subscribeToInventory, InventoryItem } from '../../services/inventoryService';
 import { confirmReceipt as confirmProcurementReceipt } from '../../services/procurementService';
+import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -305,7 +307,16 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
             setLoadingHistory(true);
             try {
                 const branchId = (user as any)?.branch || 'default';
-                const requestsRef = collection(db, 'procurementRequests');
+                const currentTenantId = tenantId || (user as any)?.tenantId;
+                
+                if (!currentTenantId) {
+                    logger.error('⚠️ tenantId is required for loading procurement history', undefined, 'ProcurementCart');
+                    setLoadingHistory(false);
+                    return;
+                }
+                
+                // ✅ FIX: Use tenant-scoped collection
+                const requestsRef = collection(db, `tenants/${currentTenantId}/procurementRequests`);
                 const q = query(
                     requestsRef,
                     where('department', '==', department),
@@ -347,7 +358,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
 
                 setHistoryItems(sorted);
             } catch (error) {
-                console.error('Error loading history:', error);
+                logger.error('Error loading history:', error, 'ProcurementCart');
             } finally {
                 setLoadingHistory(false);
             }
@@ -378,7 +389,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                 setCartItems(JSON.parse(saved));
             }
         } catch (e) {
-            console.error('Failed to load cart:', e);
+            logger.error('Failed to load cart:', e, 'ProcurementCart');
         }
     }, [department]);
 
@@ -389,15 +400,24 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
         setLoadingOrders(true);
         const branchId = (user as any)?.branch || 'default';
         const currentTenantId = tenantId || (user as any)?.tenantId;
-        const requestsRef = collection(db, 'procurementRequests');
+        
+        if (!currentTenantId) {
+            logger.error('⚠️ tenantId is required for loading procurement orders', undefined, 'ProcurementCart');
+            setLoadingOrders(false);
+            return;
+        }
+        
+        // ✅ FIX: Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${currentTenantId}/procurementRequests`);
 
-        // Load orders for this department that are purchased/delivered (ready to receive)
-        // ✅ FIX: Added tenantId filter for SaaS isolation
+        // Load orders for this department that are ready to receive
+        // ✅ FIX: Show PURCHASED and DELIVERED requests (ready for receipt confirmation)
+        // Note: Firestore 'in' query supports up to 10 values
         const q = query(
             requestsRef,
-            where('tenantId', '==', currentTenantId),
             where('department', '==', department),
             where('branch', '==', branchId),
+            where('status', 'in', ['PURCHASED', 'DELIVERED']), // ✅ Show purchased and delivered requests (ready for receipt)
             limit(20)
         );
 
@@ -419,7 +439,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                 setLoadingOrders(false);
             },
             (error) => {
-                console.error('Error loading orders:', error);
+                logger.error('Error loading orders:', error, 'ProcurementCart');
                 setLoadingOrders(false);
             }
         );
@@ -432,7 +452,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
         try {
             localStorage.setItem(`adora_cart_${department}`, JSON.stringify(items));
         } catch (e) {
-            console.error('Failed to save cart:', e);
+            logger.error('Failed to save cart:', e, 'ProcurementCart');
         }
     }, [department]);
 
@@ -574,7 +594,9 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                 throw new Error('tenantId is required for SaaS isolation');
             }
 
-            await addDoc(collection(db, 'procurementRequests'), {
+            // ✅ FIX: Use tenant-scoped collection
+            const requestsRef = collection(db, `tenants/${finalTenantId}/procurementRequests`);
+            await addDoc(requestsRef, {
                 items: cartItems.map(item => ({
                     itemName: item.itemName,
                     quantity: item.quantity,
@@ -602,7 +624,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
             playSound('success');
             onClose();
         } catch (error) {
-            console.error('Failed to submit cart:', error);
+            logger.error('Failed to submit cart:', error, 'ProcurementCart');
             haptic('error');
         } finally {
             setIsSubmitting(false);
@@ -634,7 +656,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
             playSound('success');
             success(backorderId ? 'تم الاستلام مع عجز — تم إنشاء طلب متبقي تلقائياً' : 'تم الاستلام بنجاح');
         } catch (e: any) {
-            console.error('Error confirming receipt:', e);
+            logger.error('Error confirming receipt:', e, 'ProcurementCart');
             error(e?.message || 'فشل تأكيد الاستلام');
             haptic('error');
         }
@@ -1145,7 +1167,7 @@ export const ProcurementCart: React.FC<ProcurementCartProps> = ({
                                                     {status.text}
                                                 </span>
                                                 <span className="text-xs" style={{ color: textTertiary }}>
-                                                    {order.createdAt?.toDate?.()?.toLocaleDateString('ar-SA')}
+                                                    {formatDateGregorianEn(order.createdAt?.toDate?.())}
                                                 </span>
                                             </div>
 

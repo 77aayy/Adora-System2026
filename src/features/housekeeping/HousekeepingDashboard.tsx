@@ -49,6 +49,7 @@ import { PhotoUpload } from '../../components/shared/PhotoUpload';
 import { updateRoomStatus } from '../../services/roomService';
 import { useTranslation } from 'react-i18next';
 import { useBrandName } from '../../hooks/useBrandName';
+import { logger } from '../../services/loggerService';
 
 // Shared Components
 import { ShiftNotes } from '../../components/shared/ShiftNotes';
@@ -64,7 +65,7 @@ import { UnifiedRequestTabs } from '../../components/shared/UnifiedRequestTabs';
 import { ChallengeTimeline } from '../../components/features/ChallengeTimeline';
 import { GoldenAlertDisplay } from '../../components/shared/GoldenAlert';
 import { awardPoints, awardPerformancePoints } from '../../services/pointsService';
-import { markAsViewed } from '../../services/requestService';
+import { markAsViewed, completeRequest } from '../../services/requestService';
 import { useLoadingState } from '../../hooks/useLoadingState';
 import { UndoToast } from '../../components/common/UndoToast';
 import { MobileMenu } from '../../components/common/MobileMenu';
@@ -81,6 +82,11 @@ import { TransferNotificationBadge } from '../../components/guest/TransferNotifi
 import { DepartmentStats, TaskProgress } from '../../components/dashboard';
 import { SwipeableRow } from '../../components/common/SwipeableRow'; // ✅ Swipe Gestures
 import { logEvent } from '../../services/analyticsService'; // ✅ Analytics
+
+// ✅ Universal Action Card (New System)
+import { UniversalActionCard } from '../../components/cards/UniversalActionCard';
+import { shouldUseUniversalCard } from '../../services/featureFlagsService';
+import { moveRequest } from '../../services/stateTransitionService';
 
 
 // ============================================================
@@ -267,7 +273,7 @@ const SwipeableTaskCard: React.FC<{
 
     // Only enable swipe for actionable states
     const canSwipeComplete = task.status === 'IN_PROGRESS';
-    const canSwipeStart = task.status === 'CONFIRMED';
+    const canSwipeStart = task.status === 'CONFIRMED' || task.status === 'NEW';
 
     return (
         <SwipeableRow
@@ -379,7 +385,7 @@ const InspectionModal: React.FC<{
                 photoUrl || undefined
             );
         } catch (err) {
-            console.error('Error during inspection submit:', err);
+            logger.error('Error during inspection submit:', err, 'HousekeepingDashboard');
         }
 
         // Reset state after successful submission
@@ -767,7 +773,7 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
                             try {
                                 await onSubmit({ cleaningType, guestStatus, roomAssignments });
                             } catch (e) {
-                                console.error(e);
+                                logger.error('Error during cleaning submit:', e, 'HousekeepingDashboard');
                             } finally {
                                 setIsSubmitting(false);
                             }
@@ -791,6 +797,29 @@ const StartCleaningModal: React.FC<StartCleaningModalProps> = ({
 };
 
 // ============================================================
+// Room status update with retry (reduces partial-write when request already updated)
+async function updateRoomStatusWithRetry(
+    tenantId: string,
+    branchId: string,
+    roomNumber: string,
+    status: 'ready' | 'maintenance'
+): Promise<void> {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await updateRoomStatus(tenantId, branchId, roomNumber, status as any);
+            return;
+        } catch (err) {
+            logger.error(`Room status update attempt ${attempt}/${maxAttempts} failed`, err, 'HousekeepingDashboard');
+            if (attempt === maxAttempts) {
+                logger.error('Room status update failed after retries', err, 'HousekeepingDashboard');
+            } else {
+                await new Promise(r => setTimeout(r, 500));
+            }
+        }
+    }
+}
+
 // MAIN COMPONENT
 
 // ============================================================
@@ -822,7 +851,7 @@ export const HousekeepingDashboard: React.FC = () => {
     useEffect(() => {
         const fastUITimeout = setTimeout(() => {
             if (loading) {
-                console.log('⚡ Fast UI: Showing Housekeeping page now');
+                logger.info('⚡ Fast UI: Showing Housekeeping page now', undefined, 'HousekeepingDashboard');
                 setLoading(false);
             }
         }, 2000);
@@ -845,6 +874,7 @@ export const HousekeepingDashboard: React.FC = () => {
 
     // ✅ STATUS_CONFIG and CLEANING_TYPE_CONFIG using t()
     const STATUS_CONFIG = useMemo(() => ({
+        NEW: { label: t('housekeeping.statusLabels.new') || 'جديد', color: 'text-orange-400', bg: 'bg-orange-500/20', icon: Clock },
         CONFIRMED: { label: t('housekeeping.statusLabels.confirmed'), color: 'text-yellow-400', bg: 'bg-yellow-500/20', icon: AlertCircle },
         IN_PROGRESS: { label: t('housekeeping.statusLabels.inProgress'), color: 'text-blue-400', bg: 'bg-blue-500/20', icon: Play },
         COMPLETED: { label: t('housekeeping.statusLabels.completed'), color: 'text-green-400', bg: 'bg-green-500/20', icon: CheckCircle2 },
@@ -871,6 +901,23 @@ export const HousekeepingDashboard: React.FC = () => {
     // ✅ Branch Location Warning State
     const [showLocationWarning, setShowLocationWarning] = useState(false);
     const [locationWarningData, setLocationWarningData] = useState<any>(null);
+    
+    // ✅ Feature Flag: Check if Universal Card should be used
+    const [useUniversalCard, setUseUniversalCard] = useState(false);
+    
+    useEffect(() => {
+        if (!tenantId) return;
+        
+        shouldUseUniversalCard(tenantId, 'housekeeping')
+            .then(enabled => {
+                setUseUniversalCard(enabled);
+                logger.info(`🎯 Universal Action Card ${enabled ? 'ENABLED' : 'DISABLED'} for Housekeeping`, undefined, 'HousekeepingDashboard');
+            })
+            .catch(err => {
+                logger.error('Error checking feature flag:', err, 'HousekeepingDashboard');
+                setUseUniversalCard(false); // Safe default
+            });
+    }, [tenantId]);
 
     // ✅ Read tab from URL query (?tab=assigned|in_progress|completed)
     try {
@@ -907,7 +954,7 @@ export const HousekeepingDashboard: React.FC = () => {
                     setShowLocationWarning(true);
                 }
             } catch (err) {
-                console.error('Location check error:', err);
+                logger.error('Location check error:', err, 'HousekeepingDashboard');
                 // Fail open - allow access
             }
         };
@@ -954,7 +1001,7 @@ export const HousekeepingDashboard: React.FC = () => {
             }
         },
         onSuccess: async (action, params) => {
-            console.log("AI Action Success (Housekeeping):", action, params);
+            logger.info(`AI Action Success (Housekeeping): ${action}`, params, 'HousekeepingDashboard');
             haptic('success');
 
             if (action === 'UPDATE_STATUS') {
@@ -1026,9 +1073,27 @@ export const HousekeepingDashboard: React.FC = () => {
             });
         }
 
-        const newTasks = filtered.filter(t => t.status === 'CONFIRMED');
-        const inProgress = filtered.filter(t => t.status === 'IN_PROGRESS' || t.status === 'NEEDS_INSPECTION');
-        const completed = filtered.filter(t => t.status === 'COMPLETED');
+        // ✅ Unified: Filter by status and currentDepartment
+        const newTasks = filtered.filter(t => {
+            const status = (t as any).status || t.status;
+            const currentDept = (t as any).currentDepartment;
+            // NEW status OR (CONFIRMED status AND currentDepartment is housekeeping)
+            return status === 'NEW' || 
+                   (status === 'CONFIRMED' && currentDept === 'housekeeping') ||
+                   (status === 'PENDING_HOUSEKEEPING');
+        });
+        const inProgress = filtered.filter(t => {
+            const status = (t as any).status || t.status;
+            const currentDept = (t as any).currentDepartment;
+            // IN_PROGRESS status AND currentDepartment is housekeeping
+            return (status === 'IN_PROGRESS' && currentDept === 'housekeeping') ||
+                   (status === 'NEEDS_INSPECTION');
+        });
+        const completed = filtered.filter(t => {
+            const status = (t as any).status || t.status;
+            // COMPLETED status (can be in any department, but we show it)
+            return status === 'COMPLETED';
+        });
 
         return { new: newTasks, inProgress, completed };
     }, [tasks, roomFilter, floorFilter]);
@@ -1045,7 +1110,7 @@ export const HousekeepingDashboard: React.FC = () => {
 
     // ✅ Show Points Notification for new CONFIRMED tasks
     useEffect(() => {
-        // Find first CONFIRMED task that hasn't been notified yet
+        // Find first NEW/CONFIRMED task that hasn't been notified yet
         const firstConfirmed = groupedTasks.new.find(
             task => task.status === 'CONFIRMED' && !activeNotifications.has(task.id)
         );
@@ -1096,7 +1161,7 @@ export const HousekeepingDashboard: React.FC = () => {
                     setTeamMembers([{ id: user?.id || '', name: user?.name || t('common.me') }]);
                 }
             } catch (e) {
-                console.error('Error loading team settings:', e);
+                logger.error('Error loading team settings:', e, 'HousekeepingDashboard');
                 // Fallback to current user
                 setTeamMembers([{ id: user?.id || '', name: user?.name || t('common.me') }]);
             }
@@ -1109,7 +1174,7 @@ export const HousekeepingDashboard: React.FC = () => {
 
         // ✅ FIX: Use tenant-scoped collection (tenants/${tenantId}/requests)
         if (!tenantId) {
-            console.warn('⚠️ [HousekeepingDashboard] Cannot subscribe to requests: tenantId is missing');
+            logger.warn('⚠️ [HousekeepingDashboard] Cannot subscribe to requests: tenantId is missing', undefined, 'HousekeepingDashboard');
             setLoading(false);
             return;
         }
@@ -1139,11 +1204,11 @@ export const HousekeepingDashboard: React.FC = () => {
             setLoading(false);
         }, (error: any) => {
             // ✅ Error handling - Log technical details but don't show Request ID to user
-            console.error('Error loading housekeeping tasks:', {
+            logger.error('Error loading housekeeping tasks:', {
                 code: error?.code,
                 message: error?.message?.replace(/Request ID: [a-f0-9-]+/gi, ''),
                 stack: error?.stack
-            });
+            }, 'HousekeepingDashboard');
             // Don't show Firebase Request ID to user - it's technical info
             setLoading(false);
         });
@@ -1178,8 +1243,11 @@ export const HousekeepingDashboard: React.FC = () => {
         }
 
         try {
+            if (!tenantId) {
+                throw new Error('tenantId is required');
+            }
             const now = Timestamp.now();
-            await updateDoc(doc(db, 'requests', startCleaningTask.id), {
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, startCleaningTask.id), {
                 status: 'IN_PROGRESS',
                 startedAt: now,
                 cleaningType: data.cleaningType,
@@ -1205,7 +1273,7 @@ export const HousekeepingDashboard: React.FC = () => {
                 try {
                     await awardPoints('default', user.id, 2, t('housekeeping.startTask'));
                 } catch (e) {
-                    console.warn('Failed to award points:', e);
+                    logger.warn('Failed to award points:', e, 'HousekeepingDashboard');
                 }
             }
 
@@ -1213,10 +1281,10 @@ export const HousekeepingDashboard: React.FC = () => {
             playSound('notification');
             setStartCleaningTask(null);
         } catch (error: any) {
-            console.error('Error starting cleaning:', {
+            logger.error('Error starting cleaning:', {
                 code: error?.code,
                 message: error?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || error?.message
-            });
+            }, 'HousekeepingDashboard');
             haptic('error');
         }
     };
@@ -1227,9 +1295,12 @@ export const HousekeepingDashboard: React.FC = () => {
             const task = tasks.find(t => t.id === taskId);
             const now = Timestamp.now();
 
+            if (!tenantId) {
+                throw new Error('tenantId is required');
+            }
             // If checkout room, needs inspection
             if (task?.cleaningType === 'checkout') {
-                await updateDoc(doc(db, 'requests', taskId), {
+                await updateDoc(doc(db, `tenants/${tenantId}/requests`, taskId), {
                     status: 'NEEDS_INSPECTION',
                     completedAt: now
                 });
@@ -1237,35 +1308,15 @@ export const HousekeepingDashboard: React.FC = () => {
                 // ⭐ Post-inspection cleaning → needs RE-inspection to check for maintenance
                 setInspectionTask(task);
             } else {
-                // Occupied room - complete directly, return to reception
-                await updateDoc(doc(db, 'requests', taskId), {
-                    status: 'COMPLETED',
-                    completedAt: now,
-                    currentDepartment: 'reception', // Return to reception
-                    
-                    // ✅ Workflow: Complete and return to origin
-                    'workflow.workflowStatus': 'COMPLETED',
-                    'workflow.completedAt': now,
-                    'workflow.returnedAt': now,
-                    'workflow.currentHolder': 'reception',
-                    'workflow.isLocked': false,
-                    'workflow.lockedBy': null,
-                    'workflow.journey': arrayUnion({
-                        department: 'housekeeping',
-                        action: 'completed',
-                        timestamp: now,
-                        userId: user?.id || '',
-                        userName: user?.name || '',
-                        notes: t('housekeeping.cleaningCompletedNote')
-                    }, {
-                        department: 'housekeeping',
-                        action: 'returned',
-                        timestamp: now,
-                        userId: user?.id || '',
-                        userName: user?.name || '',
-                        notes: t('housekeeping.returnedToReceptionNote')
-                    })
-                });
+                // Occupied room — complete via callable (server enforces state; no ghost completion)
+                await completeRequest(
+                    taskId,
+                    tenantId,
+                    user?.id || '',
+                    user?.name || 'Housekeeping',
+                    undefined,
+                    undefined
+                );
             }
 
             // Award points for completion - Dynamic based on time
@@ -1285,16 +1336,16 @@ export const HousekeepingDashboard: React.FC = () => {
                         durationMinutes
                     );
                 } catch (e) {
-                    console.warn('Failed to award completion points:', e);
+                    logger.warn('Failed to award completion points:', e, 'HousekeepingDashboard');
                 }
             }
 
             success(t('housekeeping.cleaningCompletedSuccess'));
         } catch (err: any) {
-            console.error('Error completing cleaning:', {
+            logger.error('Error completing cleaning:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
-            });
+            }, 'HousekeepingDashboard');
             error(t('housekeeping.cleaningCompletedFailed'));
         }
     };
@@ -1302,17 +1353,20 @@ export const HousekeepingDashboard: React.FC = () => {
     // ⭐ Team Assignment
     const handleAssignTask = async (taskId: string, employeeId: string, employeeName: string) => {
         try {
-            await updateDoc(doc(db, 'requests', taskId), {
+            if (!tenantId) {
+                throw new Error('tenantId is required');
+            }
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, taskId), {
                 assignedTo: { id: employeeId, name: employeeName },
                 assignedAt: Timestamp.now()
             });
 
             success(t('housekeeping.taskAssignedSuccess'));
         } catch (err: any) {
-            console.error('Error assigning task:', {
+            logger.error('Error assigning task:', {
                 code: err?.code,
                 message: err?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || err?.message
-            });
+            }, 'HousekeepingDashboard');
             error(t('housekeeping.taskAssignedFailed'));
         }
     };
@@ -1335,7 +1389,10 @@ export const HousekeepingDashboard: React.FC = () => {
         // ✅ UX: Execute with loading state
         const executionResult = await execute(
             async () => {
-                const taskRef = doc(db, 'requests', inspectionTask.id);
+                if (!tenantId) {
+                    throw new Error('tenantId is required');
+                }
+                const taskRef = doc(db, `tenants/${tenantId}/requests`, inspectionTask.id);
 
                 // Calculate minibar total
                 const minibarTotal = minibarConsumption?.reduce((sum, item) => sum + item.total, 0) || 0;
@@ -1353,8 +1410,12 @@ export const HousekeepingDashboard: React.FC = () => {
 
                     if (result === 'clean') {
                         // ✅ Approve: Maintenance is good -> Send to Reception as COMPLETED
+                        if (!tenantId) {
+                            throw new Error('tenantId is required');
+                        }
                         await transferRequestToDepartment(
                             inspectionTask.id,
+                            tenantId, // ✅ FIX: Added tenantId as 2nd parameter
                             'housekeeping',
                             'reception',
                             user?.id || '',
@@ -1373,14 +1434,18 @@ export const HousekeepingDashboard: React.FC = () => {
                             minibarTotal: minibarConsumption?.reduce((sum, item) => sum + item.total, 0) || 0
                         });
 
-                        // Update Room Status to ready
-                        await updateRoomStatus(tenantId, branchId, inspectionTask.roomNumber, 'ready' as any);
+                        // Update Room Status to ready (with retry)
+                        await updateRoomStatusWithRetry(tenantId, branchId, inspectionTask.roomNumber, 'ready');
 
                         success(t('housekeeping.maintenanceApprovedSent'));
                     } else if (result === 'damages' || result === 'missing_items') {
                         // ❌ Reject: Maintenance has issues -> Send back to Maintenance with photo and notes
+                        if (!tenantId) {
+                            throw new Error('tenantId is required');
+                        }
                         await transferRequestToDepartment(
                             inspectionTask.id,
+                            tenantId, // ✅ FIX: Added tenantId as 2nd parameter
                             'housekeeping',
                             'maintenance',
                             user?.id || '',
@@ -1401,8 +1466,8 @@ export const HousekeepingDashboard: React.FC = () => {
                             rejectedBy: { id: user?.id || '', name: user?.name || '' }
                         });
 
-                        // Room stays in maintenance status
-                        await updateRoomStatus(tenantId, branchId, inspectionTask.roomNumber, 'maintenance' as any);
+                        // Room stays in maintenance status (with retry)
+                        await updateRoomStatusWithRetry(tenantId, branchId, inspectionTask.roomNumber, 'maintenance');
 
                         error(t('housekeeping.maintenanceRejectedReturned'));
                     }
@@ -1423,8 +1488,8 @@ export const HousekeepingDashboard: React.FC = () => {
                             currentDepartment: 'reception'
                         });
 
-                        // ⭐ Update room status to READY
-                        await updateRoomStatus(tenantId, branchId, inspectionTask.roomNumber, 'ready' as any);
+                        // ⭐ Update room status to READY (with retry)
+                        await updateRoomStatusWithRetry(tenantId, branchId, inspectionTask.roomNumber, 'ready');
 
                         // Award bonus points (updates both personal and team points)
                         if (user?.id) {
@@ -1432,7 +1497,11 @@ export const HousekeepingDashboard: React.FC = () => {
                         }
                     } else if (result === 'needs_maintenance') {
                         // 🔄 Needs maintenance → create maintenance request and LOOP
-                        await addDoc(collection(db, 'requests'), {
+                        if (!tenantId) {
+                            throw new Error('tenantId is required');
+                        }
+                        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+                        await addDoc(requestsRef, {
                             type: 'maintenance',
                             roomNumber: inspectionTask.roomNumber,
                             status: 'CONFIRMED',
@@ -1453,10 +1522,10 @@ export const HousekeepingDashboard: React.FC = () => {
                             try {
                                 const { checkDailyAttendance } = await import('../../services/challengeService');
                                 checkDailyAttendance(tenantId, user.id).catch(err => {
-                                    console.warn('Failed to check daily attendance:', err);
+                                    logger.warn('Failed to check daily attendance:', err, 'HousekeepingDashboard');
                                 });
                             } catch (err) {
-                                console.warn('Could not load challengeService:', err);
+                                logger.warn('Could not load challengeService:', err, 'HousekeepingDashboard');
                             }
                         }
 
@@ -1470,8 +1539,8 @@ export const HousekeepingDashboard: React.FC = () => {
                             waitingForMaintenance: true
                         });
 
-                        // Room stays in maintenance status
-                        await updateRoomStatus(tenantId, branchId, inspectionTask.roomNumber, 'maintenance' as any);
+                        // Room stays in maintenance status (with retry)
+                        await updateRoomStatusWithRetry(tenantId, branchId, inspectionTask.roomNumber, 'maintenance');
                     }
 
                     setInspectionTask(null);
@@ -1502,18 +1571,18 @@ export const HousekeepingDashboard: React.FC = () => {
                                         t('housekeeping.productNote', { product: consumedItem.productName }),
                                         tenantId || undefined // ✅ Pass tenantId
                                     );
-                                    console.log(`✅ Deducted inventory: ${consumedItem.productName} -${consumedItem.quantity}`);
+                                    logger.info(`✅ Deducted inventory: ${consumedItem.productName} -${consumedItem.quantity}`, undefined, 'HousekeepingDashboard');
                                 } else {
-                                    console.warn(`⚠️ Inventory item "${consumedItem.productName}" not found. Minibar consumption recorded but inventory not updated.`);
+                                    logger.warn(`⚠️ Inventory item "${consumedItem.productName}" not found. Minibar consumption recorded but inventory not updated.`, undefined, 'HousekeepingDashboard');
                                 }
                             }
                         }
                     } catch (error: any) {
                         // Don't fail inspection if inventory update fails - log and continue
-                        console.error('Error updating inventory for minibar consumption:', {
+                        logger.error('Error updating inventory for minibar consumption:', {
                             code: error?.code,
                             message: error?.message?.replace(/Request ID: [a-f0-9-]+/gi, '') || error?.message
-                        });
+                        }, 'HousekeepingDashboard');
                     }
                 }
 
@@ -1533,6 +1602,11 @@ export const HousekeepingDashboard: React.FC = () => {
                         currentDepartment: 'reception' // Always return to reception
                     });
 
+                    // ✅ CRITICAL: Sync room status so DB matches physical reality (room ready for next guest)
+                    if (tenantId && branchId) {
+                        await updateRoomStatusWithRetry(tenantId, branchId, inspectionTask.roomNumber, 'ready');
+                    }
+
                     // Award bonus points
                     if (user?.id) {
                         try {
@@ -1548,7 +1622,7 @@ export const HousekeepingDashboard: React.FC = () => {
                                 durationMinutes
                             );
                         } catch (e) {
-                            console.warn('Failed to award inspection points:', e);
+                            logger.warn('Failed to award inspection points:', e, 'HousekeepingDashboard');
                         }
                     }
                 } else if (result === 'damages') {
@@ -1580,7 +1654,7 @@ export const HousekeepingDashboard: React.FC = () => {
                                 durationMinutes
                             );
                         } catch (e) {
-                            console.warn('Failed to award inspection points:', e);
+                            logger.warn('Failed to award inspection points:', e, 'HousekeepingDashboard');
                         }
                     }
                 } else if (result === 'missing_items') {
@@ -1616,7 +1690,7 @@ export const HousekeepingDashboard: React.FC = () => {
                             requestId: inspectionTask.id // Link to original request
                         });
                     } catch (e) {
-                        console.warn('Failed to create live feed entry:', e);
+                        logger.warn('Failed to create live feed entry:', e, 'HousekeepingDashboard');
                     }
 
                     // Award points
@@ -1634,7 +1708,7 @@ export const HousekeepingDashboard: React.FC = () => {
                                 durationMinutes
                             );
                         } catch (e) {
-                            console.warn('Failed to award inspection points:', e);
+                            logger.warn('Failed to award inspection points:', e, 'HousekeepingDashboard');
                         }
                     }
                 }
@@ -1663,7 +1737,7 @@ export const HousekeepingDashboard: React.FC = () => {
                                 status: 'active'
                             });
                         } catch (e) {
-                            console.warn('Failed to log ghost anomaly:', e);
+                            logger.warn('Failed to log ghost anomaly:', e, 'HousekeepingDashboard');
                         }
                     }
                 }
@@ -1675,8 +1749,11 @@ export const HousekeepingDashboard: React.FC = () => {
                         message: t('housekeeping.roomStatusUpdatedToClean', { room: inspectionTask.roomNumber }),
                         onUndo: async () => {
                             try {
+                                if (!tenantId) {
+                                    throw new Error('tenantId is required');
+                                }
                                 // Revert status
-                                await updateDoc(doc(db, 'requests', inspectionTask.id), {
+                                await updateDoc(doc(db, `tenants/${tenantId}/requests`, inspectionTask.id), {
                                     status: previousState.status,
                                     inspectionResult: previousState.inspectionResult,
                                     completedAt: null
@@ -1908,47 +1985,117 @@ export const HousekeepingDashboard: React.FC = () => {
                         <p className="text-sm adora-text-secondary">{t('housekeeping.noTasksInList')}</p>
                     </div>
                 ) : (
-                    currentTasks.map(task => (
-                        <SwipeableTaskCard
-                            key={task.id}
-                            task={task}
-                            userId={user?.id}
-                            userName={user?.name}
-                            tenantId={tenantId} // ✅ Pass tenantId
-                            statusConfig={STATUS_CONFIG}
-                            cleaningTypeConfig={CLEANING_TYPE_CONFIG}
-                            onStart={() => {
-                                if (task.status === 'CONFIRMED') {
-                                    setStartCleaningTask(task);
-                                    logEvent({
-                                        eventName: 'task_start_click',
-                                        category: 'task',
-                                        branchId: branchId,
-                                        userId: user?.id,
-                                        metadata: { taskId: task.id, room: task.roomNumber }
-                                    });
-                                }
-                            }}
-                            onComplete={() => {
-                                if (task.status === 'IN_PROGRESS') {
-                                    handleCompleteCleaning(task.id);
-                                    logEvent({
-                                        eventName: 'task_complete_click',
-                                        category: 'task',
-                                        branchId: branchId,
-                                        userId: user?.id,
-                                        metadata: { taskId: task.id, room: task.roomNumber }
-                                    });
-                                }
-                            }}
-                            onView={() => {
-                                // ✅ Open inspection modal for inspection tasks (CONFIRMED) or tasks needing inspection
-                                if ((task.type === 'inspection' && task.status === 'CONFIRMED') || task.status === 'NEEDS_INSPECTION') {
-                                    setInspectionTask(task);
-                                }
-                            }}
+                    currentTasks.map(task => {
+                        // ✅ Feature Flag: Use Universal Card if enabled, otherwise use old card
+                        if (useUniversalCard && tenantId && user?.id && user?.name) {
+                            return (
+                                <UniversalActionCard
+                                    key={task.id}
+                                    request={task as any}
+                                    viewMode="housekeeping"
+                                    onAction={async (action) => {
+                                        if (action === 'start' && (task.status === 'CONFIRMED' || task.status === 'NEW')) {
+                                            // Use State Machine
+                                            try {
+                                                await moveRequest(
+                                                    tenantId,
+                                                    task.id,
+                                                    'IN_PROGRESS',
+                                                    'housekeeping',
+                                                    user.id,
+                                                    user.name,
+                                                    'بدأ التنظيف'
+                                                );
+                                                setStartCleaningTask(task); // Still open modal for room assignment
+                                                success(t('housekeeping.cleaningStarted') || 'تم بدء التنظيف');
+                                                logEvent({
+                                                    eventName: 'task_start_click',
+                                                    category: 'task',
+                                                    branchId: branchId,
+                                                    userId: user.id,
+                                                    metadata: { taskId: task.id, room: task.roomNumber, system: 'unified' }
+                                                });
+                                            } catch (err: any) {
+                                                error(err.message || t('common.error') || 'حدث خطأ');
+                                            }
+                                        } else if (action === 'complete' && task.status === 'IN_PROGRESS') {
+                                            // Use State Machine
+                                            try {
+                                                await moveRequest(
+                                                    tenantId,
+                                                    task.id,
+                                                    'COMPLETED',
+                                                    'reception', // Return to reception
+                                                    user.id,
+                                                    user.name,
+                                                    'تم التنظيف'
+                                                );
+                                                handleCompleteCleaning(task.id);
+                                                success(t('housekeeping.cleaningCompleted') || 'تم إكمال التنظيف');
+                                                logEvent({
+                                                    eventName: 'task_complete_click',
+                                                    category: 'task',
+                                                    branchId: branchId,
+                                                    userId: user.id,
+                                                    metadata: { taskId: task.id, room: task.roomNumber, system: 'unified' }
+                                                });
+                                            } catch (err: any) {
+                                                error(err.message || t('common.error') || 'حدث خطأ');
+                                            }
+                                        }
+                                    }}
+                                    onView={() => {
+                                        // ✅ Open inspection modal for inspection tasks (CONFIRMED) or tasks needing inspection
+                                        if ((task.type === 'inspection' && (task.status === 'CONFIRMED' || task.status === 'NEW')) || task.status === 'NEEDS_INSPECTION') {
+                                            setInspectionTask(task);
+                                        }
+                                    }}
+                                />
+                            );
+                        }
+                        
+                        // ✅ Fallback to old card system
+                        return (
+                            <SwipeableTaskCard
+                                key={task.id}
+                                task={task}
+                                userId={user?.id}
+                                userName={user?.name}
+                                tenantId={tenantId}
+                                statusConfig={STATUS_CONFIG}
+                                cleaningTypeConfig={CLEANING_TYPE_CONFIG}
+                                onStart={() => {
+                                    if (task.status === 'CONFIRMED' || task.status === 'NEW') {
+                                        setStartCleaningTask(task);
+                                        logEvent({
+                                            eventName: 'task_start_click',
+                                            category: 'task',
+                                            branchId: branchId,
+                                            userId: user?.id,
+                                            metadata: { taskId: task.id, room: task.roomNumber, system: 'legacy' }
+                                        });
+                                    }
+                                }}
+                                onComplete={() => {
+                                    if (task.status === 'IN_PROGRESS') {
+                                        handleCompleteCleaning(task.id);
+                                        logEvent({
+                                            eventName: 'task_complete_click',
+                                            category: 'task',
+                                            branchId: branchId,
+                                            userId: user?.id,
+                                            metadata: { taskId: task.id, room: task.roomNumber, system: 'legacy' }
+                                        });
+                                    }
+                                }}
+                                onView={() => {
+                                    if ((task.type === 'inspection' && task.status === 'CONFIRMED') || task.status === 'NEEDS_INSPECTION') {
+                                        setInspectionTask(task);
+                                    }
+                                }}
                             />
-                        ))
+                        );
+                    })
                         )}
                     </div>
                 </div>
@@ -2005,7 +2152,7 @@ export const HousekeepingDashboard: React.FC = () => {
                                 setTeamMembers([{ id: user?.id || '', name: user?.name || t('common.me') }]);
                             }
                         } catch (e) {
-                            console.error('Error reloading team after update:', e);
+                            logger.error('Error reloading team after update:', e, 'HousekeepingDashboard');
                         }
                     };
                     reloadTeam();
@@ -2024,7 +2171,7 @@ export const HousekeepingDashboard: React.FC = () => {
                                 setTeamMembers([{ id: user?.id || '', name: user?.name || t('common.me') }]);
                             }
                         } catch (e) {
-                            console.error('Error reloading team after update:', e);
+                            logger.error('Error reloading team after update:', e, 'HousekeepingDashboard');
                         }
                     };
                     reloadTeam();

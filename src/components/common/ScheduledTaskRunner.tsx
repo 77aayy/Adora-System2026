@@ -5,10 +5,11 @@
  */
 
 import React, { useEffect } from 'react';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { ScheduledTask } from '../../features/admin/ScheduledTasksManager';
+import { logger } from '../../services/loggerService';
 
 export const ScheduledTaskRunner: React.FC = () => {
     const { user, branchId, tenantId } = useAuth(); // ✅ Use branchId and tenantId from context
@@ -37,64 +38,82 @@ export const ScheduledTaskRunner: React.FC = () => {
 
                 const batchPromises = snapshot.docs.map(async (taskDoc) => {
                     const task = { id: taskDoc.id, ...taskDoc.data() } as ScheduledTask;
+                    const taskRef = doc(db!, 'scheduled_tasks', task.id);
 
-                    // 1. Create the actual Request
-                    const requestType = mapDeptToType(task.department);
-                    const initialDepartment = task.department; // ✅ Map department correctly
-                    
-                    await addDoc(collection(db!, 'requests'), {
-                        type: requestType,
-                        status: 'PENDING_RECEPTION', // Start as PENDING_RECEPTION, will be routed to department
-                        priority: 'normal',
-                        source: 'SYSTEM' as any,
-                        title: task.title,
-                        description: task.description, // Mapped to notes or details
-                        notes: task.description,
-                        branch: task.branchId,
-                        tenantId: tenantId, // ✅ SaaS: Add tenantId
-                        roomNumber: task.targetId || 'GENERAL', // Default if no target
-                        guestName: 'System Scheduled',
-                        createdAt: serverTimestamp(),
-                        createdBy: {
-                            id: 'SYSTEM',
-                            name: 'Auto Scheduler',
-                            department: 'admin'
-                        },
-                        // ✅ Request Journey Tracking
-                        currentDepartment: initialDepartment,
-                        originDepartment: initialDepartment,
-                        departmentHistory: [{
-                            department: initialDepartment,
-                            status: 'PENDING_RECEPTION',
-                            enteredAt: serverTimestamp(),
-                            handledBy: {
+                    // 1. Claim task (transaction: only if still active — avoids duplicate from second tab/run)
+                    let claimed = false;
+                    try {
+                        await runTransaction(db!, async (tx) => {
+                            const snap = await tx.get(taskRef);
+                            if (snap.data()?.status !== 'active') return;
+                            tx.update(taskRef, {
+                                status: 'processing',
+                                processingStartedAt: serverTimestamp()
+                            });
+                            claimed = true;
+                        });
+                    } catch (e) {
+                        logger.warn('ScheduledTaskRunner: claim failed for task ' + task.id, e, 'ScheduledTaskRunner');
+                        return;
+                    }
+                    if (!claimed) return;
+
+                    try {
+                        // 2. Create the actual Request
+                        const requestType = mapDeptToType(task.department);
+                        const initialDepartment = task.department;
+                        await addDoc(collection(db!, `tenants/${tenantId}/requests`), {
+                            type: requestType,
+                            status: 'NEW',
+                            priority: 'normal',
+                            source: 'SYSTEM' as any,
+                            title: task.title,
+                            description: task.description,
+                            notes: task.description,
+                            branch: task.branchId,
+                            tenantId: tenantId,
+                            roomNumber: task.targetId || 'GENERAL',
+                            guestName: 'System Scheduled',
+                            createdAt: serverTimestamp(),
+                            createdBy: {
                                 id: 'SYSTEM',
-                                name: 'Auto Scheduler'
+                                name: 'Auto Scheduler',
+                                department: 'admin'
                             },
-                            notes: 'تم إنشاؤه تلقائياً من الجدولة'
-                        }]
-                    });
+                            currentDepartment: initialDepartment,
+                            originDepartment: initialDepartment,
+                            departmentHistory: [{
+                                department: initialDepartment,
+                                status: 'NEW',
+                                enteredAt: serverTimestamp(),
+                                handledBy: { id: 'SYSTEM', name: 'Auto Scheduler' },
+                                notes: 'تم إنشاؤه تلقائياً من الجدولة'
+                            }]
+                        });
 
-                    // 2. Handle Recurring Logic
-                    if (task.frequency === 'once') {
-                        // Mark as completed
-                        await updateDoc(doc(db!, 'scheduled_tasks', task.id), {
-                            status: 'completed'
-                        });
-                    } else {
-                        // Calculate next run
-                        const nextRun = calculateNextRun(task.nextRun, task.frequency);
-                        await updateDoc(doc(db!, 'scheduled_tasks', task.id), {
-                            nextRun: nextRun
-                        });
+                        // 3. Mark task completed or set next run (so it no longer appears in "active" due query)
+                        if (task.frequency === 'once') {
+                            await updateDoc(taskRef, { status: 'completed' });
+                        } else {
+                            const nextRun = calculateNextRun(task.nextRun, task.frequency);
+                            await updateDoc(taskRef, { nextRun, status: 'active' });
+                        }
+                    } catch (err) {
+                        logger.error('ScheduledTaskRunner: create/update failed for task ' + task.id + ', reverting to active', err, 'ScheduledTaskRunner');
+                        try {
+                            await updateDoc(taskRef, { status: 'active' });
+                        } catch (revertErr) {
+                            logger.warn('ScheduledTaskRunner: failed to revert task to active', revertErr, 'ScheduledTaskRunner');
+                        }
+                        throw err;
                     }
                 });
 
                 await Promise.all(batchPromises);
-                console.log('Processed due tasks successfully.');
+                logger.info('Processed due tasks successfully.', undefined, 'ScheduledTaskRunner');
 
             } catch (err) {
-                console.error('Error in ScheduledTaskRunner:', err);
+                logger.error('Error in ScheduledTaskRunner:', err, 'ScheduledTaskRunner');
             }
         };
 

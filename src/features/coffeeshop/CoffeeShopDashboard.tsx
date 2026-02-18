@@ -28,6 +28,7 @@ import {
 import { getPointsConfig, awardPoints } from '../../services/pointsService';
 import { StatCard } from '../../components/common/StatCard';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
+import { logger } from '../../services/loggerService';
 import { useOnboardingTour } from '../../hooks/useOnboardingTour'; // ✅ Onboarding tour
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
 // DeveloperSignature is now in GlobalFooter (App.tsx)
@@ -78,7 +79,7 @@ export const CoffeeShopDashboard: React.FC = () => {
     useEffect(() => {
         const fastUITimeout = setTimeout(() => {
             if (loading) {
-                console.log('⚡ Fast UI: Showing CoffeeShop page now');
+                logger.info('⚡ Fast UI: Showing CoffeeShop page now', undefined, 'CoffeeShopDashboard');
                 setLoading(false);
             }
         }, 2000);
@@ -139,7 +140,11 @@ export const CoffeeShopDashboard: React.FC = () => {
 
         setCompleting(true);
         try {
-            await completeOrder(order.id, user.id, user.name);
+            if (!tenantId) {
+                error('tenantId is required');
+                return;
+            }
+            await completeOrder(tenantId, order.id, user.id, user.name);
             
             // Award points if configured
             if (tenantId) {
@@ -156,23 +161,23 @@ export const CoffeeShopDashboard: React.FC = () => {
                         );
                     }
                 } catch (err) {
-                    console.warn('Failed to award points:', err);
+                    logger.warn('Failed to award points:', err, 'CoffeeShopDashboard');
                 }
 
                 // ✅ Auto-check daily attendance when employee completes an order
                 try {
                     const { checkDailyAttendance } = await import('../../services/challengeService');
                     checkDailyAttendance(tenantId, user.id).catch(err => {
-                        console.warn('Failed to check daily attendance:', err);
+                        logger.warn('Failed to check daily attendance:', err, 'CoffeeShopDashboard');
                     });
                 } catch (err) {
-                    console.warn('Could not load challengeService:', err);
+                    logger.warn('Could not load challengeService:', err, 'CoffeeShopDashboard');
                 }
             }
 
             success(t('coffeeshop.orderCompletedSuccess'));
         } catch (err: any) {
-            console.error('Error completing order:', err);
+            logger.error('Error completing order:', err, 'CoffeeShopDashboard');
             error(t('coffeeshop.orderCompletedFailed', { error: err.message || t('common.error') }));
         } finally {
             setCompleting(false);
@@ -384,7 +389,13 @@ export const CoffeeShopDashboard: React.FC = () => {
                                 {order.status !== 'delivered' && order.status !== 'cancelled' && (
                                     <div className="flex gap-2 pt-2 border-t adora-border">
                                         {(order.status === 'pending' || order.status === 'confirmed') && (
-                                            <button onClick={() => updateOrderStatus(order.id, 'preparing')}
+                                            <button onClick={() => {
+                                                if (!tenantId) {
+                                                    error('tenantId is required');
+                                                    return;
+                                                }
+                                                updateOrderStatus(tenantId, order.id, 'preparing')
+                                            }}
                                                 className="flex-1 py-1.5 px-2 rounded-lg bg-blue-500 text-white text-xs font-bold flex items-center justify-center gap-1">
                                                 <Play className="w-3 h-3" /> {t('coffeeshop.startPreparing')}
                                             </button>

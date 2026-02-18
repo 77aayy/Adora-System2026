@@ -143,7 +143,7 @@ export async function createCoffeeOrder(
         docRef.id
     );
 
-    console.log(`☕ Coffee order created: ${docRef.id} - awaiting reception approval`);
+    logger.info(`☕ Coffee order created: ${docRef.id} - awaiting reception approval`, undefined, 'coffeeShopFlowService');
     return docRef.id;
 }
 
@@ -197,7 +197,7 @@ export async function approveOrder(
         totalAmount: order.totalAmount
     });
 
-    console.log(`✅ Order ${orderId} approved by ${receptionistName}`);
+    logger.info(`✅ Order ${orderId} approved by ${receptionistName}`, undefined, 'coffeeShopFlowService');
 }
 
 /**
@@ -231,7 +231,7 @@ export async function rejectOrder(
         logger.info('Order rejected - notification queued', undefined, 'coffeeShopFlowService');
     }
 
-    console.log(`❌ Order ${orderId} rejected: ${reason}`);
+    logger.info(`❌ Order ${orderId} rejected: ${reason}`, undefined, 'coffeeShopFlowService');
 }
 
 // ============================================================
@@ -258,7 +258,7 @@ export async function startPreparing(
         updatedAt: serverTimestamp()
     });
 
-    console.log(`🍳 Order ${orderId} - preparation started by ${baristaName}`);
+    logger.info(`🍳 Order ${orderId} - preparation started by ${baristaName}`, undefined, 'coffeeShopFlowService');
 }
 
 /**
@@ -292,7 +292,7 @@ export async function markReady(
         orderId
     );
 
-    console.log(`✅ Order ${orderId} ready for delivery`);
+    logger.info(`✅ Order ${orderId} ready for delivery`, undefined, 'coffeeShopFlowService');
 }
 
 // ============================================================
@@ -318,7 +318,7 @@ export async function startDelivery(
         updatedAt: serverTimestamp()
     });
 
-    console.log(`🚶 Order ${orderId} - delivering by ${deliveryPersonName}`);
+    logger.info(`🚶 Order ${orderId} - delivering by ${deliveryPersonName}`, undefined, 'coffeeShopFlowService');
 }
 
 /**
@@ -431,7 +431,7 @@ export async function completeDelivery(
         orderId
     );
 
-    console.log(`✅ Order ${orderId} delivered and charged to Room Card`);
+    logger.info(`✅ Order ${orderId} delivered and charged to Room Card`, undefined, 'coffeeShopFlowService');
 }
 
 // ============================================================

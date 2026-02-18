@@ -19,6 +19,7 @@ import {
     SystemConfigs,
     KeyValidationResult
 } from '../../services/systemConfigsService';
+import { formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -294,7 +295,7 @@ export const ApiKeysSettings: React.FC = () => {
             {configs.lastUpdated && (
                 <div className="p-3 rounded-lg bg-teal-500/10 border border-teal-500/20 text-sm text-teal-300 flex items-center gap-2">
                     <RefreshCw className="w-4 h-4" />
-                    آخر تحديث: {new Date(configs.lastUpdated).toLocaleString('ar-EG')}
+                    آخر تحديث: {formatDateTimeGregorianEn(configs.lastUpdated)}
                 </div>
             )}
 

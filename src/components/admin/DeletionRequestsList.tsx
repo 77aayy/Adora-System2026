@@ -8,9 +8,11 @@ import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useUX } from '../../hooks/useUX';
 import { useTranslation } from 'react-i18next';
+import { useTenant } from '../../context/TenantContext';
 
 export const DeletionRequestsList: React.FC = () => {
     const { requests } = useRequests();
+    const { tenantId } = useTenant();
     const { showSuccess, showError } = useUX();
     const { t } = useTranslation();
 
@@ -22,11 +24,11 @@ export const DeletionRequestsList: React.FC = () => {
     if (deletionRequests.length === 0) return null;
 
     const handleApprove = async (req: Request) => {
+        if (!tenantId) return;
         if (!confirm(t('admin.approveDeleteConfirm') || 'هل أنت متأكد من الموافقة على الحذف؟ (سيتم أرشفة الطلب ولن يظهر في القوائم النشطة)')) return;
         try {
-            // ✅ ARCHITECTURAL FIX: Use Service Layer (Soft Delete) instead of direct Hard Delete
-            // This preserves linkage to Inventory/Points logs.
-            await deleteRequest(req.id);
+            // ✅ Tenant-scoped: Use Service Layer (Soft Delete)
+            await deleteRequest(req.id, tenantId);
             showSuccess(t('admin.archiveSuccess') || 'تمت الأرشفة بنجاح');
         } catch (error) {
             console.error(error);
@@ -35,10 +37,9 @@ export const DeletionRequestsList: React.FC = () => {
     };
 
     const handleReject = async (req: Request) => {
-        if (!db) return;
+        if (!db || !tenantId) return;
         try {
-            // Remove the deletionRequest field to "Reject"
-            await updateDoc(doc(db, 'requests', req.id), {
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, req.id), {
                 deletionRequest: deleteField()
             });
             showSuccess(t('admin.rejectDeleteSuccess') || 'تم رفض طلب الحذف');

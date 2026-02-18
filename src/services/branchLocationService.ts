@@ -6,6 +6,7 @@
 import { getLocationSettings, calculateDistance, getCurrentLocation } from './locationService';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -117,7 +118,7 @@ export const checkBranchLocation = async (
             distance: Math.round(distance)
         };
     } catch (error: any) {
-        console.error('Branch location check error:', error);
+        logger.error('Branch location check error:', error, 'branchLocationService');
         // If location check fails, allow access (fail open)
         return { isAtBranch: true };
     }

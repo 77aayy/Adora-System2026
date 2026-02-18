@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Clock, Bell, X } from 'lucide-react';
+import { AlertTriangle, Bell, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getLicenseNotificationsForOwner, getLicenseNotificationsForManager, type LicenseNotification } from '../../services/licenseNotificationService';
 import { logger } from '../../services/loggerService';
@@ -68,14 +68,18 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
                                     ) as Promise<any>
                                 ]);
                             } catch (indexError: any) {
-                                // ✅ Handle Firestore internal errors gracefully
+                                const isChannelError = indexError?.code === 400 || indexError?.code === 404 ||
+                                    indexError?.message?.includes('400') || indexError?.message?.includes('Listen/channel');
+                                if (isChannelError) {
+                                    logger.debug('License notifications: Listen channel error, using empty list', undefined, 'LicenseNotificationWidget');
+                                    result = [];
+                                    return;
+                                }
                                 if (indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
                                     logger.warn('Firestore internal error in loadNotifications (likely cache issue)', indexError, 'LicenseNotificationWidget');
                                     result = [];
                                     return;
                                 }
-                                
-                                // ✅ Fallback: Get without orderBy if index doesn't exist or timeout
                                 if (indexError.code === 'failed-precondition' || indexError.message === 'Timeout') {
                                     logger.warn('Using fallback query (no orderBy)', indexError, 'LicenseNotificationWidget');
                                     snapshot = await getDocs(
@@ -119,17 +123,18 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
                                 .slice(0, maxNotifications);
                         }
                     } catch (err: any) {
-                        // ✅ Handle Firestore internal errors gracefully
-                        if (err?.message?.includes('INTERNAL ASSERTION FAILED') || err?.message?.includes('Unexpected state')) {
+                        const isChannelError = err?.code === 400 || err?.code === 404 ||
+                            err?.message?.includes('400') || err?.message?.includes('Listen/channel');
+                        if (isChannelError) {
+                            logger.debug('License notifications: channel error, using empty list', undefined, 'LicenseNotificationWidget');
+                        } else if (err?.message?.includes('INTERNAL ASSERTION FAILED') || err?.message?.includes('Unexpected state')) {
                             logger.warn('Firestore internal error in loadNotifications (likely cache issue)', err, 'LicenseNotificationWidget');
                         } else {
-                            // ✅ Handle permission errors gracefully (expected for non-owners)
-                            const isPermissionError = err?.code === 'permission-denied' || 
-                                                      err?.message?.includes('permission') ||
-                                                      err?.message?.includes('Missing or insufficient');
-                            
+                            const isPermissionError = err?.code === 'permission-denied' ||
+                                err?.message?.includes('permission') ||
+                                err?.message?.includes('Missing or insufficient');
                             if (isPermissionError) {
-                                logger.warn('Permission denied for license notifications (expected for non-owners)', undefined, 'LicenseNotificationWidget');
+                                logger.debug('Permission denied for license notifications (expected for non-owners)', undefined, 'LicenseNotificationWidget');
                             } else {
                                 logger.error('Failed to load notifications from Firestore', err, 'LicenseNotificationWidget');
                             }
@@ -163,14 +168,7 @@ export const LicenseNotificationWidget: React.FC<LicenseNotificationWidgetProps>
     };
 
     if (loading) {
-        return (
-            <div className={`p-4 rounded-xl glass ${className}`}>
-                <div className="flex items-center gap-2 text-white/60">
-                    <Clock className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">{t('common.loading')}</span>
-                </div>
-            </div>
-        );
+        return null; /* لا نعرض شريط "جاري التحميل" — الودجت يظهر فقط عند جاهزية البيانات */
     }
 
     const visibleNotifications = notifications.filter((n) => !dismissed.has(`${n.managerId}-${n.daysUntilExpiry}-${n.notificationType}`));

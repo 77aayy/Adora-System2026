@@ -6,6 +6,7 @@
 
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc, orderBy, increment } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -124,7 +125,7 @@ export const createSupportTicket = async (
         
         return docRef.id;
     } catch (error) {
-        console.error('Error creating support ticket:', error);
+        logger.error('Error creating support ticket:', error, 'supportTicketService');
         throw error;
     }
 };
@@ -140,7 +141,7 @@ export const getTicket = async (ticketId: string): Promise<SupportTicket | null>
         }
         return null;
     } catch (error) {
-        console.error('Error getting ticket:', error);
+        logger.error('Error getting ticket:', error, 'supportTicketService');
         return null;
     }
 };
@@ -152,7 +153,7 @@ export const subscribeToAllTickets = (
     callback: (tickets: SupportTicket[]) => void
 ): (() => void) => {
     if (!db) {
-        console.warn('Firebase db not initialized, skipping all tickets subscription');
+        logger.warn('Firebase db not initialized, skipping all tickets subscription', undefined, 'supportTicketService');
         callback([]);
         return () => {};
     }
@@ -172,7 +173,7 @@ export const subscribeToAllTickets = (
             callback(tickets);
         },
         (error) => {
-            console.error('Error subscribing to all tickets:', error);
+            logger.error('Error subscribing to all tickets:', error, 'supportTicketService');
             callback([]);
         }
     );
@@ -186,7 +187,7 @@ export const subscribeToTenantTickets = (
     callback: (tickets: SupportTicket[]) => void
 ): (() => void) => {
     if (!db) {
-        console.warn('Firebase db not initialized, skipping tenant tickets subscription');
+        logger.warn('Firebase db not initialized, skipping tenant tickets subscription', undefined, 'supportTicketService');
         callback([]);
         return () => {};
     }
@@ -207,7 +208,7 @@ export const subscribeToTenantTickets = (
             callback(tickets);
         },
         (error) => {
-            console.error('Error subscribing to tickets:', error);
+            logger.error('Error subscribing to tickets:', error, 'supportTicketService');
             callback([]);
         }
     );
@@ -238,7 +239,7 @@ export const subscribeToUserTickets = (
             callback(tickets);
         },
         (error) => {
-            console.error('Error subscribing to user tickets:', error);
+            logger.error('Error subscribing to user tickets:', error, 'supportTicketService');
             callback([]);
         }
     );
@@ -269,7 +270,7 @@ export const subscribeToBranchTickets = (
             callback(tickets);
         },
         (error) => {
-            console.error('Error subscribing to branch tickets:', error);
+            logger.error('Error subscribing to branch tickets:', error, 'supportTicketService');
             callback([]);
         }
     );
@@ -322,10 +323,10 @@ export const acknowledgeTicket = async (
                 }
             }
         } catch (notifError) {
-            console.warn('Failed to send notification (non-critical):', notifError);
+            logger.warn('Failed to send notification (non-critical):', notifError, 'supportTicketService');
         }
     } catch (error) {
-        console.error('Error acknowledging ticket:', error);
+        logger.error('Error acknowledging ticket:', error, 'supportTicketService');
         throw error;
     }
 };
@@ -345,7 +346,7 @@ export const markTicketInProgress = async (
             updatedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error marking ticket in progress:', error);
+        logger.error('Error marking ticket in progress:', error, 'supportTicketService');
         throw error;
     }
 };
@@ -399,10 +400,10 @@ export const resolveTicket = async (
                 }
             }
         } catch (notifError) {
-            console.warn('Failed to send notification (non-critical):', notifError);
+            logger.warn('Failed to send notification (non-critical):', notifError, 'supportTicketService');
         }
     } catch (error) {
-        console.error('Error resolving ticket:', error);
+        logger.error('Error resolving ticket:', error, 'supportTicketService');
         throw error;
     }
 };
@@ -458,10 +459,10 @@ export const closeTicket = async (
                 }
             }
         } catch (notifError) {
-            console.warn('Failed to send notification (non-critical):', notifError);
+            logger.warn('Failed to send notification (non-critical):', notifError, 'supportTicketService');
         }
     } catch (error) {
-        console.error('Error closing ticket:', error);
+        logger.error('Error closing ticket:', error, 'supportTicketService');
         throw error;
     }
 };
@@ -515,11 +516,11 @@ export const addOwnerResponse = async (
                 }
             }
         } catch (notifError) {
-            console.warn('Failed to send notification (non-critical):', notifError);
+            logger.warn('Failed to send notification (non-critical):', notifError, 'supportTicketService');
             // Don't throw - notification failure shouldn't block response
         }
     } catch (error) {
-        console.error('Error adding owner response:', error);
+        logger.error('Error adding owner response:', error, 'supportTicketService');
         throw error;
     }
 };
@@ -551,7 +552,7 @@ const updateTicketStatusCounter = async (
             });
         }
     } catch (error) {
-        console.error('Error updating ticket status counter:', error);
+        logger.error('Error updating ticket status counter:', error, 'supportTicketService');
     }
 };
 
@@ -572,7 +573,7 @@ export const getTicketStatus = async (tenantId: string): Promise<SupportTicketSt
             lastUpdated: Timestamp.now()
         };
     } catch (error) {
-        console.error('Error getting ticket status:', error);
+        logger.error('Error getting ticket status:', error, 'supportTicketService');
         return null;
     }
 };
@@ -586,7 +587,7 @@ export const subscribeToTicketStatus = (
 ): (() => void) => {
     // ✅ Guard against null db
     if (!db) {
-        console.warn('Firebase db not initialized, skipping ticket status subscription');
+        logger.warn('Firebase db not initialized, skipping ticket status subscription', undefined, 'supportTicketService');
         callback({
             tenantId,
             unreadCount: 0,
@@ -616,7 +617,7 @@ export const subscribeToTicketStatus = (
             (error: any) => {
                 // ✅ Handle Firestore internal errors gracefully
                 if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
-                    console.warn('Firestore internal error in subscribeToTicketStatus (likely cache issue)', error);
+                    logger.warn('Firestore internal error in subscribeToTicketStatus (likely cache issue)', error, 'supportTicketService');
                 } else {
                     // ✅ Handle permission errors gracefully (expected for non-owners)
                     const isPermissionError = error?.code === 'permission-denied' || 
@@ -624,9 +625,9 @@ export const subscribeToTicketStatus = (
                                               error?.message?.includes('Missing or insufficient');
                     
                     if (isPermissionError) {
-                        console.warn('Permission denied for ticket status subscription (expected for non-owners)', error);
+                        logger.debug('Permission denied for ticket status subscription (expected for non-owners)', error, 'supportTicketService');
                     } else {
-                        console.error('Error subscribing to ticket status:', error);
+                        logger.error('Error subscribing to ticket status:', error, 'supportTicketService');
                     }
                 }
                 callback({
@@ -641,7 +642,7 @@ export const subscribeToTicketStatus = (
     } catch (error: any) {
         // ✅ Handle Firestore internal errors gracefully
         if (error?.message?.includes('INTERNAL ASSERTION FAILED') || error?.message?.includes('Unexpected state')) {
-            console.warn('Firestore internal error setting up ticket status subscription (likely cache issue)', error);
+            logger.warn('Firestore internal error setting up ticket status subscription (likely cache issue)', error, 'supportTicketService');
         } else {
             // ✅ Handle permission errors gracefully (expected for non-owners)
             const isPermissionError = error?.code === 'permission-denied' || 
@@ -649,9 +650,9 @@ export const subscribeToTicketStatus = (
                                       error?.message?.includes('Missing or insufficient');
             
             if (isPermissionError) {
-                console.warn('Permission denied for ticket status subscription (expected for non-owners)', error);
+                logger.debug('Permission denied for ticket status subscription (expected for non-owners)', error, 'supportTicketService');
             } else {
-                console.error('Error setting up ticket status subscription:', error);
+                logger.error('Error setting up ticket status subscription:', error, 'supportTicketService');
             }
         }
         callback({
@@ -683,7 +684,7 @@ export const markTicketAsRead = async (ticketId: string, tenantId: string): Prom
             }
         }
     } catch (error) {
-        console.error('Error marking ticket as read:', error);
+        logger.error('Error marking ticket as read:', error, 'supportTicketService');
     }
 };
 
@@ -716,7 +717,7 @@ export const getTicketStatistics = async (tenantId: string): Promise<{
             closed: tickets.filter(t => t.status === 'closed').length
         };
     } catch (error) {
-        console.error('Error getting ticket statistics:', error);
+        logger.error('Error getting ticket statistics:', error, 'supportTicketService');
         return {
             total: 0,
             pending: 0,
@@ -735,7 +736,7 @@ export const getTicketStatistics = async (tenantId: string): Promise<{
 export const getUnrespondedTicketsCount = async (): Promise<number> => {
     try {
         if (!db) {
-            console.warn('Firebase db not initialized, returning 0 for unresponded tickets count');
+            logger.warn('Firebase db not initialized, returning 0 for unresponded tickets count', undefined, 'supportTicketService');
             return 0;
         }
 
@@ -755,17 +756,18 @@ export const getUnrespondedTicketsCount = async (): Promise<number> => {
         
         return unrespondedCount;
     } catch (error: any) {
-        // ✅ Handle permission errors gracefully
-        const isPermissionError = error?.code === 'permission-denied' || 
-                                  error?.message?.includes('permission') ||
-                                  error?.message?.includes('Missing or insufficient');
-        
-        if (isPermissionError) {
-            // Permission denied is expected for non-admins
+        const isPermissionError = error?.code === 'permission-denied' ||
+            error?.message?.includes('permission') ||
+            error?.message?.includes('Missing or insufficient');
+        const isChannelError = error?.code === 400 || error?.code === 404 ||
+            error?.message?.includes('400') || error?.message?.includes('Listen/channel');
+        if (isPermissionError || isChannelError) {
+            if (isChannelError) {
+                logger.debug('Unresponded tickets count: channel error, returning 0', undefined, 'supportTicketService');
+            }
             return 0;
         }
-        
-        console.error('Error getting unresponded tickets count:', error);
+        logger.error('Error getting unresponded tickets count:', error, 'supportTicketService');
         return 0;
     }
 };

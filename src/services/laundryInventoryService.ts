@@ -10,6 +10,8 @@ import {
     query, where, orderBy, onSnapshot, Timestamp, writeBatch, limit, runTransaction
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
+import { formatDateGregorianEn } from '../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -289,7 +291,7 @@ export const updateItemStock = async (
     itemId: string,
     newStock: number
 ): Promise<void> => {
-    console.log(`Stock update requested for item ${itemId}: ${newStock}`);
+    logger.info(`Stock update requested for item ${itemId}: ${newStock}`, undefined, 'laundryInventoryService');
     // Stock is calculated from records, not stored directly
 };
 
@@ -301,7 +303,7 @@ export const toggleItemInCards = async (
     branchId: string,
     itemId: string
 ): Promise<void> => {
-    console.log(`Toggle card visibility for item ${itemId}`);
+    logger.info(`Toggle card visibility for item ${itemId}`, undefined, 'laundryInventoryService');
     // Card visibility is a UI concern, not persisted in current schema
 };
 
@@ -537,7 +539,7 @@ export const submitReceipt = async (
 
         transaction.set(statsRef, { counts: currentStats, updatedAt: serverTimestamp() }, { merge: true });
         
-        console.log(`✅ ATOMIC: Receipt completed for record ${recordId}. Deficit: ${Object.keys(deficit).length} items, Treatment: ${Object.keys(treatmentItems || {}).length} items`);
+        logger.info(`✅ ATOMIC: Receipt completed for record ${recordId}. Deficit: ${Object.keys(deficit).length} items, Treatment: ${Object.keys(treatmentItems || {}).length} items`, undefined, 'laundryInventoryService');
     });
 };
 
@@ -731,7 +733,7 @@ export const reportLostByLaundry = async (
         currentCounts[itemId] = (currentCounts[itemId] || 0) + quantity;
         transaction.set(statsRef, { counts: currentCounts, updatedAt: serverTimestamp() }, { merge: true });
 
-        console.log(`✅ ATOMIC: Reported ${quantity} lost items for ${item.name}. New deficit: ${currentCounts[itemId]}`);
+        logger.info(`✅ ATOMIC: Reported ${quantity} lost items for ${item.name}. New deficit: ${currentCounts[itemId]}`, undefined, 'laundryInventoryService');
     });
 };
 
@@ -791,7 +793,7 @@ export const settleDeficit = async (
             });
             transaction.update(settingsRef, { items: updatedItems });
             
-            console.log(`✅ ATOMIC: Settled ${quantity} items from treatment for ${item.name}`);
+            logger.info(`✅ ATOMIC: Settled ${quantity} items from treatment for ${item.name}`, undefined, 'laundryInventoryService');
         } else {
             // Settle from cumulative deficit (external return)
             const statsSnap = await transaction.get(statsRef);
@@ -822,7 +824,7 @@ export const settleDeficit = async (
             });
             transaction.update(settingsRef, { items: updatedItems });
 
-            console.log(`✅ ATOMIC: Settled ${quantity} items from deficit for ${item.name}. Remaining deficit: ${currentCounts[itemId]}`);
+            logger.info(`✅ ATOMIC: Settled ${quantity} items from deficit for ${item.name}. Remaining deficit: ${currentCounts[itemId]}`, undefined, 'laundryInventoryService');
         }
     });
 };
@@ -931,7 +933,7 @@ export const moveToTreatment = async (
         });
         transaction.update(settingsRef, { items: updatedItems });
 
-        console.log(`✅ ATOMIC: Moved ${quantity} items to treatment for ${item.name}`);
+        logger.info(`✅ ATOMIC: Moved ${quantity} items to treatment for ${item.name}`, undefined, 'laundryInventoryService');
     });
 };
 
@@ -949,8 +951,8 @@ export const generatePrintableReport = async (
     month: number
 ): Promise<string> => {
     const report = await getMonthlyAccountingReport(tenantId, branchId, year, month);
-    const dateStr = new Date().toLocaleDateString('ar-SA');
-    const monthName = new Date(year, month - 1).toLocaleDateString('ar-SA', { month: 'long' });
+    const dateStr = formatDateGregorianEn(new Date());
+    const monthName = new Date(year, month - 1).toLocaleDateString('ar-EG', { month: 'long', calendar: 'gregory', numberingSystem: 'latn' });
 
     return `
     <!DOCTYPE html>

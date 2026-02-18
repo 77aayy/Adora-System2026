@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -45,7 +47,7 @@ export const initPWA = (): void => {
     // Check if already installed
     checkInstallState();
 
-    console.log('✅ PWA service initialized');
+    logger.info('✅ PWA service initialized', undefined, 'pwaService');
 };
 
 /**
@@ -82,7 +84,7 @@ const handleAppInstalled = (): void => {
     // Show celebration
     showInstallCelebration();
 
-    console.log('🎉 App installed successfully');
+    logger.info('🎉 App installed successfully', undefined, 'pwaService');
 };
 
 // ============================================================
@@ -94,7 +96,7 @@ const handleAppInstalled = (): void => {
  */
 export const showInstallPrompt = async (): Promise<boolean> => {
     if (!deferredPrompt) {
-        console.log('Install prompt not available');
+        logger.info('Install prompt not available', undefined, 'pwaService');
         return false;
     }
 
@@ -116,7 +118,7 @@ export const showInstallPrompt = async (): Promise<boolean> => {
             return false;
         }
     } catch (error) {
-        console.error('Install prompt error:', error);
+        logger.error('Install prompt error:', error, 'pwaService');
         return false;
     } finally {
         notifyStatusChange();

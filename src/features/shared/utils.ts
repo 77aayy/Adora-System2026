@@ -9,6 +9,7 @@ import {
     collection, doc, getDoc, getDocs, addDoc, updateDoc,
     query, where, serverTimestamp, Timestamp
 } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TIME UTILITIES
@@ -229,7 +230,7 @@ export const addPointsToEmployee = async (
 
         return true;
     } catch (error) {
-        console.error('Error adding points:', error);
+        logger.error('Error adding points:', error, 'sharedUtils');
         return false;
     }
 };
@@ -248,7 +249,7 @@ export const getEmployeePoints = async (
         const empDoc = await getDoc(doc(db, employeePath));
         return empDoc.data()?.kpi_points || 0;
     } catch (error) {
-        console.error('Error getting points:', error);
+        logger.error('Error getting points:', error, 'sharedUtils');
         return 0;
     }
 };
@@ -281,7 +282,7 @@ export const getPointsHistory = async (
 
         return history.slice(0, maxItems);
     } catch (error) {
-        console.error('Error getting points history:', error);
+        logger.error('Error getting points history:', error, 'sharedUtils');
         return [];
     }
 };

@@ -5,6 +5,7 @@
 
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // SERVICES (15)
@@ -231,7 +232,7 @@ export const activateVoiceAssistant = async (guestId: string): Promise<string> =
 };
 
 export const controlSmartRoom = async (roomNumber: string, command: { device: string; action: string; value?: any }): Promise<boolean> => {
-    console.log(`Smart room control: ${roomNumber} - ${command.device} ${command.action}`);
+    logger.info(`Smart room control: ${roomNumber} - ${command.device} ${command.action}`, undefined, 'guestPortalService');
     return true;
 };
 

@@ -24,6 +24,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { sendPushNotification } from './pushNotificationService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -86,7 +87,7 @@ export const checkOverdueTasks = async (
     thresholds: Partial<DelayThresholds> = {}
 ): Promise<OverdueTask[]> => {
     if (!db) {
-        console.warn('Firebase not initialized');
+        logger.warn('Firebase not initialized', undefined, 'criticalDelayAlertService');
         return [];
     }
 
@@ -160,7 +161,7 @@ export const checkOverdueTasks = async (
 
         return overdueTasks;
     } catch (error) {
-        console.error('Error checking overdue tasks:', error);
+        logger.error('Error checking overdue tasks:', error, 'criticalDelayAlertService');
         return [];
     }
 };
@@ -213,10 +214,10 @@ export const sendDelayAlert = async (
             });
         }
 
-        console.log(`✅ Delay alert sent for task ${task.id}`);
+        logger.info(`✅ Delay alert sent for task ${task.id}`, undefined, 'criticalDelayAlertService');
         return true;
     } catch (error) {
-        console.error('Error sending delay alert:', error);
+        logger.error('Error sending delay alert:', error, 'criticalDelayAlertService');
         return false;
     }
 };
@@ -290,7 +291,7 @@ export const getDelayAlertHistory = async (
             alertedAt: doc.data().alertedAt?.toDate?.() || new Date()
         })) as DelayAlert[];
     } catch (error) {
-        console.error('Error getting alert history:', error);
+        logger.error('Error getting alert history:', error, 'criticalDelayAlertService');
         return [];
     }
 };
@@ -317,7 +318,7 @@ export const acknowledgeAlert = async (
 
         return true;
     } catch (error) {
-        console.error('Error acknowledging alert:', error);
+        logger.error('Error acknowledging alert:', error, 'criticalDelayAlertService');
         return false;
     }
 };

@@ -76,6 +76,7 @@ export const OwnerPanel: React.FC = () => {
     // ✅ فحص/مسح النظام: نافذة كلمة مرور قبل فتح الخيارات (بدون كتابة الباسورد في النافذة)
     const [showScanPasswordModal, setShowScanPasswordModal] = useState(false);
     const [scanPassword, setScanPassword] = useState('');
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     // Manual init not needed - relying on useAuth
     // User role check handles redirection
@@ -551,12 +552,13 @@ export const OwnerPanel: React.FC = () => {
                 <aside id="admin-sidebar" className="h-full">
                     <AdminSidebar
                         isOwner={user?.role === 'owner'}
+                        onCollapseChange={setSidebarCollapsed}
                     />
                 </aside>
             </div>
 
-            {/* Main Content Area - Adjusted for fixed sidebar */}
-            <main className="flex-1 p-3 sm:p-4 pb-24 lg:pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col lg:mr-[280px]">
+            {/* Main Content Area — هامش يمين يتغير مع طي الشريط */}
+            <main className={`flex-1 p-3 sm:p-4 pb-24 lg:pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col transition-[margin-right] duration-300 ease-out ${sidebarCollapsed ? 'lg:mr-[80px]' : 'lg:mr-[280px]'}`}>
                 <div className="flex-1">
                     {/* ✅ Standard Header - Same as other pages */}
                     <div className="flex items-center justify-between mb-6">
@@ -615,7 +617,7 @@ export const OwnerPanel: React.FC = () => {
                                 ? 'bg-red-500/30 text-red-300 border-red-400/50 shadow-lg shadow-red-500/30'
                                 : 'bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/30'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
-                        title={auditProgress || (t('admin.fullSystemScanOrPurge') || 'فحص شامل أو مسح كامل للنظام')}
+                        title={auditProgress || (t('admin.fullSystemScanOrPurge') || 'المسح النووي وإعادة وضع المصنع')}
                     >
                         {/* Pulsing ring animation when loading */}
                         {auditStatus === 'loading' && (
@@ -887,7 +889,7 @@ export const OwnerPanel: React.FC = () => {
                                         value={scanPassword}
                                         onChange={(e) => setScanPassword(e.target.value)}
                                         onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && scanPassword.trim().toLowerCase() === 'adora') {
+                                            if (e.key === 'Enter' && scanPassword.trim() === 'ADORA2026') {
                                                 setShowScanPasswordModal(false);
                                                 setScanPassword('');
                                                 setShowAuditChoiceModal(true);
@@ -898,7 +900,7 @@ export const OwnerPanel: React.FC = () => {
                                         placeholder={t('common.passwordPlaceholder') || '••••••••'}
                                         autoFocus
                                     />
-                                    {scanPassword && scanPassword.trim().toLowerCase() !== 'adora' && (
+                                    {scanPassword && scanPassword.trim() !== 'ADORA2026' && (
                                         <p className="text-xs mt-2 flex items-center gap-1" style={{ color: 'var(--theme-error-500, #ef4444)' }}>
                                             <AlertTriangle className="w-3 h-3" /> كلمة المرور غير صحيحة
                                         </p>
@@ -914,19 +916,19 @@ export const OwnerPanel: React.FC = () => {
                                     </button>
                                     <button
                                         onClick={() => {
-                                            if (scanPassword.trim().toLowerCase() === 'adora') {
+                                            if (scanPassword.trim() === 'ADORA2026') {
                                                 setShowScanPasswordModal(false);
                                                 setScanPassword('');
                                                 setShowAuditChoiceModal(true);
                                             }
                                         }}
-                                        disabled={scanPassword.trim().toLowerCase() !== 'adora'}
+                                        disabled={scanPassword.trim() !== 'ADORA2026'}
                                         className="flex-1 px-6 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                         style={{
-                                            background: scanPassword.trim().toLowerCase() === 'adora' ? 'var(--theme-primary-500)' : 'var(--theme-bg-tertiary)',
-                                            color: scanPassword.trim().toLowerCase() === 'adora' ? 'white' : 'var(--theme-text-disabled)',
-                                            borderColor: scanPassword.trim().toLowerCase() === 'adora' ? 'var(--theme-primary-500)' : 'var(--theme-border-primary)',
-                                            opacity: scanPassword.trim().toLowerCase() === 'adora' ? 1 : 0.5,
+                                            background: scanPassword.trim() === 'ADORA2026' ? 'var(--theme-primary-500)' : 'var(--theme-bg-tertiary)',
+                                            color: scanPassword.trim() === 'ADORA2026' ? 'white' : 'var(--theme-text-disabled)',
+                                            borderColor: scanPassword.trim() === 'ADORA2026' ? 'var(--theme-primary-500)' : 'var(--theme-border-primary)',
+                                            opacity: scanPassword.trim() === 'ADORA2026' ? 1 : 0.5,
                                         }}
                                     >
                                         دخول

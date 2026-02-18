@@ -26,14 +26,19 @@ export interface LogEntry {
 // CONFIGURATION
 // ============================================================
 
+// في التطوير: افتراضيًا نعرض warn و error فقط لتقليل ضجيج الكونسول.
+// لرؤية info/debug: أضف في .env أو شغّل بـ VITE_LOG_LEVEL=verbose (أو info)
+const DEV_LOG_LEVEL = (import.meta.env.VITE_LOG_LEVEL || 'warn').toLowerCase();
+const DEV_LEVELS: LogLevel[] =
+    DEV_LOG_LEVEL === 'verbose' || DEV_LOG_LEVEL === 'debug'
+        ? (['debug', 'info', 'warn', 'error'] as LogLevel[])
+        : DEV_LOG_LEVEL === 'info'
+            ? (['info', 'warn', 'error'] as LogLevel[])
+            : (['warn', 'error'] as LogLevel[]);
+
 const LOG_CONFIG = {
-    // Only log in development
     enabled: import.meta.env.DEV,
-    // Log levels to show (in production, only errors)
-    levels: import.meta.env.DEV 
-        ? ['debug', 'info', 'warn', 'error'] as LogLevel[]
-        : ['error'] as LogLevel[],
-    // Maximum log entries to keep in memory
+    levels: import.meta.env.DEV ? DEV_LEVELS : (['error'] as LogLevel[]),
     maxEntries: 100,
 };
 

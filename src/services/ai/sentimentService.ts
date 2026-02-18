@@ -5,6 +5,7 @@
 
 // Re-verification trigger
 import { generateAIContent } from './geminiService';
+import { logger } from '../loggerService';
 
 export interface SentimentResult {
     sentiment: 'Positive' | 'Neutral' | 'Negative';
@@ -67,7 +68,7 @@ export const analyzeFeedback = async (text: string): Promise<SentimentResult> =>
             suggestedRecovery: result.suggestedRecovery
         };
     } catch (error) {
-        console.error('Sentiment Analysis Failed:', error);
+        logger.error('Sentiment Analysis Failed:', error, 'sentimentService');
         return { sentiment: 'Neutral', severity: 'LOW', score: 0.5 };
     }
 };

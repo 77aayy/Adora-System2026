@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { db } from '../../services/firebase';
 import { Timestamp } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
+import { formatTimeGregorianEn } from '../../utils/dateUtils';
 import {
     ChatMessage,
     QuickOption,
@@ -65,7 +67,7 @@ async function uploadToImgBB(base64Image: string): Promise<string | null> {
         const result = await uploadImageToImgBB(base64Image);
         return result.success ? result.url || null : null;
     } catch (error) {
-        console.error('Error uploading image:', error);
+        logger.error('Error uploading image:', error, 'GuestChatWidget');
         return null;
     }
 }
@@ -81,7 +83,7 @@ interface MessageBubbleProps {
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwn }) => {
     const time = message.createdAt instanceof Timestamp 
-        ? message.createdAt.toDate().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+        ? formatTimeGregorianEn(message.createdAt.toDate(), { showSeconds: false })
         : '';
 
     const getBubbleStyle = () => {
@@ -268,7 +270,7 @@ export const GuestChatWidget: React.FC<GuestChatWidgetProps> = ({
 
             setInitialized(true);
         } catch (error) {
-            console.error('Error initializing chat:', error);
+            logger.error('Error initializing chat:', error, 'GuestChatWidget');
         }
     };
 
@@ -345,7 +347,7 @@ export const GuestChatWidget: React.FC<GuestChatWidgetProps> = ({
             });
             recordRequest(); // ✅ تسجيل الرسالة
         } catch (error) {
-            console.error('Error sending message:', error);
+            logger.error('Error sending message:', error, 'GuestChatWidget');
             setInputText(text); // Restore on error
         } finally {
             setSending(false);
@@ -378,7 +380,7 @@ export const GuestChatWidget: React.FC<GuestChatWidgetProps> = ({
             );
             recordRequest(); // ✅ تسجيل الطلب
         } catch (error: any) {
-            console.error('Error sending quick option:', error);
+            logger.error('Error sending quick option:', error, 'GuestChatWidget');
             
             // ✅ Handle ROOM_NOT_AVAILABLE error gracefully
             if (error?.message === 'ROOM_NOT_AVAILABLE') {
@@ -425,7 +427,7 @@ export const GuestChatWidget: React.FC<GuestChatWidgetProps> = ({
             };
             reader.readAsDataURL(file);
         } catch (error) {
-            console.error('Error uploading image:', error);
+            logger.error('Error uploading image:', error, 'GuestChatWidget');
             setUploading(false);
         }
 

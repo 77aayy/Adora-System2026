@@ -27,6 +27,7 @@ import { useFeatureGate } from '../../hooks/useFeatureGate';
 import { useTenantRooms } from '../../hooks/useTenantData'; // ✅ Added for room data
 import { FloorRoomSelector } from '../../components/shared/FloorRoomSelector'; // ✅ Added Room Selector
 import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn, formatTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -275,7 +276,7 @@ export const ScheduledTasksManager: React.FC = () => {
                             <Clock className="w-4 h-4" />
                             <span>الموعد القادم: </span>
                             <span className="font-bold font-mono">
-                                {task.nextRun?.toDate().toLocaleDateString('ar-SA')} {task.nextRun?.toDate().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
+                                {task.nextRun ? formatDateGregorianEn(task.nextRun.toDate()) + ' ' + formatTimeGregorianEn(task.nextRun.toDate(), { showSeconds: false }) : ''}
                             </span>
                         </div>
                     </div>

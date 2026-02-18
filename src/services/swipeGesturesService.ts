@@ -8,6 +8,8 @@
  * - Swipe left: Delete/Archive action
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -65,7 +67,7 @@ class SwipeGestureManager {
             this.attachToElement(element as HTMLElement, options);
         });
 
-        console.log(`✅ Swipe initialized on ${elements.length} elements`);
+        logger.info(`✅ Swipe initialized on ${elements.length} elements`, undefined, 'swipeGesturesService');
     }
 
     /**

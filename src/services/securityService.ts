@@ -5,6 +5,7 @@
 
 import { collection, query, where, getDocs, addDoc, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // 6. TWO-FACTOR AUTHENTICATION
@@ -24,7 +25,7 @@ export const send2FACode = async (userId: string, method: 'sms' | 'email'): Prom
         used: false,
         createdAt: Timestamp.now()
     });
-    console.log(`2FA code ${code} sent via ${method}`);
+    logger.info(`2FA code ${code} sent via ${method}`, undefined, 'securityService');
     return true;
 };
 
@@ -155,7 +156,7 @@ const getEncryptionKey = (key?: string): string => {
     const envKey = import.meta.env.VITE_ENCRYPTION_KEY;
     if (envKey) return envKey;
     // Fallback to default (should be changed in production)
-    console.warn('⚠️ VITE_ENCRYPTION_KEY not set. Using default key (not secure for production).');
+    logger.warn('⚠️ VITE_ENCRYPTION_KEY not set. Using default key (not secure for production).', undefined, 'securityService');
     return 'adora-default-encryption-key-change-in-production';
 };
 
@@ -196,7 +197,7 @@ export const encryptData = async (data: string, key?: string): Promise<string> =
     try {
         // Check if Web Crypto API is available
         if (!crypto || !crypto.subtle) {
-            console.warn('⚠️ Web Crypto API not available. Falling back to Base64 (not secure).');
+            logger.warn('⚠️ Web Crypto API not available. Falling back to Base64 (not secure).', undefined, 'securityService');
             // Fallback to Base64 for old browsers
             const encoded = btoa(data);
             return `ENC:${encoded}`;
@@ -227,7 +228,7 @@ export const encryptData = async (data: string, key?: string): Promise<string> =
         const encoded = btoa(String.fromCharCode(...combined));
         return `ENC:${encoded}`;
     } catch (error) {
-        console.error('AES encryption failed:', error);
+        logger.error('AES encryption failed:', error, 'securityService');
         // Fallback to Base64 on error (not secure, but maintains compatibility)
         const encoded = btoa(data);
         return `ENC:${encoded}`;
@@ -281,11 +282,11 @@ export const decryptData = async (encryptedData: string, key?: string): Promise<
             return new TextDecoder().decode(decrypted);
         } catch (aesError) {
             // If AES decryption fails, try legacy Base64 (backward compatibility)
-            console.warn('AES decryption failed, trying Base64 fallback:', aesError);
+            logger.warn('AES decryption failed, trying Base64 fallback:', aesError, 'securityService');
             return atob(encoded);
         }
     } catch (error) {
-        console.error('Decryption failed:', error);
+        logger.error('Decryption failed:', error, 'securityService');
         return encryptedData; // Return as-is if decryption fails
     }
 };
@@ -315,7 +316,7 @@ export const exportUserData = async (userId: string): Promise<any> => {
 export const deleteUserData = async (userId: string, confirmation: string): Promise<boolean> => {
     if (confirmation !== 'DELETE_CONFIRMED') return false;
 
-    console.log(`GDPR: Deleting all data for user ${userId}`);
+    logger.info(`GDPR: Deleting all data for user ${userId}`, undefined, 'securityService');
     // Would delete from all collections
     return true;
 };

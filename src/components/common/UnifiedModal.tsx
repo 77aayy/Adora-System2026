@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { haptic } from '../../utils/uxEffects';
@@ -13,7 +14,7 @@ import { haptic } from '../../utils/uxEffects';
 // TYPES
 // ============================================================
 
-export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type ModalSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
 
 export interface UnifiedModalProps {
     isOpen: boolean;
@@ -30,16 +31,19 @@ export interface UnifiedModalProps {
 }
 
 // ============================================================
-// SIZE CONFIG
+// SIZE CONFIG — مضغوط للـ confirmations، متوافق مع الثيم
 // ============================================================
 
 const SIZE_CLASSES: Record<ModalSize, string> = {
-    sm: 'max-w-sm',
+    xs: 'max-w-[320px]',
+    sm: 'max-w-[380px]',
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-xl',
     full: 'max-w-full mx-4',
 };
+
+const COMPACT_SIZES: ModalSize[] = ['xs', 'sm'];
 
 // ============================================================
 // MAIN COMPONENT
@@ -89,61 +93,71 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
 
     if (!isOpen) return null;
 
-    return (
+    const modalContent = (
         <div
-            className="fixed inset-0 z-[100] flex items-start justify-center p-4"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 overflow-x-hidden"
             onClick={handleBackdropClick}
             style={{
-                // ✅ Modal appears in current viewport position (top of viewport)
                 position: 'fixed',
                 top: 0,
                 left: 0,
                 right: 0,
                 bottom: 0,
                 display: 'flex',
-                alignItems: 'flex-start',
+                alignItems: 'center',
                 justifyContent: 'center',
                 overflowY: 'auto',
-                padding: '1rem',
-                paddingTop: 'max(1rem, env(safe-area-inset-top))',
-                // Scroll to top of viewport, not center
-                scrollBehavior: 'auto'
+                overflowX: 'hidden',
+                padding: '0.75rem',
+                paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
+                paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
             }}
         >
-            {/* Backdrop */}
-            <div className="absolute inset-0 animate-fade-in" style={{ backdropFilter: 'none', backgroundColor: 'var(--theme-bg-overlay)' }} />
+            {/* Backdrop — ثيم: زجاجي خفيف */}
+            <div 
+                className="absolute inset-0 animate-fade-in" 
+                style={{ 
+                    backgroundColor: 'var(--theme-bg-overlay, rgba(0,0,0,0.5))',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                }} 
+            />
 
-            {/* Modal */}
+            {/* Modal — نفس نمط glass-card/pro-modal: خلفية صلبة + حدود الثيم (بدون blur على الصندوق) */}
             <div
                 ref={modalRef}
                 className={`
-                    relative w-full ${SIZE_CLASSES[size]}
-                    rounded-3xl shadow-2xl
+                    relative w-full min-w-0 ${SIZE_CLASSES[size]}
+                    rounded-xl
                     animate-modal-in
+                    glass-card
                     ${className}
                 `}
                 style={{ 
-                    background: 'var(--theme-bg-secondary)', 
-                    border: '1px solid var(--theme-border-primary)',
-                    marginTop: 'max(2rem, 5vh)',
-                    maxHeight: 'calc(100vh - max(4rem, 10vh))'
+                    maxHeight: 'calc(100vh - max(1.5rem, 8vh))',
                 }}
             >
-                {/* Header */}
+                {/* Header — مضغوط للـ xs/sm */}
                 {(title || showCloseButton) && (
-                    <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--theme-border-primary)' }}>
-                        <div className="flex items-center gap-3">
+                    <div 
+                        className={`flex items-center justify-between border-b gap-2 min-w-0 ${COMPACT_SIZES.includes(size) ? 'px-3 py-2.5' : 'p-3 sm:p-4'}`}
+                        style={{ borderColor: 'var(--theme-border-primary)' }}
+                    >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                             {icon && (
-                                <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center">
+                                <div 
+                                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                    style={{ background: 'var(--theme-primary-100, rgba(20, 184, 166, 0.12))' }}
+                                >
                                     {icon}
                                 </div>
                             )}
-                            <div>
+                            <div className="min-w-0">
                                 {title && (
-                                    <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>{title}</h2>
+                                    <h2 className="font-semibold truncate" style={{ color: 'var(--theme-text-primary)', fontSize: '0.9375rem' }}>{title}</h2>
                                 )}
                                 {subtitle && (
-                                    <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{subtitle}</p>
+                                    <p className="truncate mt-0.5" style={{ color: 'var(--theme-text-secondary)', fontSize: '0.8125rem' }}>{subtitle}</p>
                                 )}
                             </div>
                         </div>
@@ -153,26 +167,29 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
                                     haptic('light');
                                     onClose();
                                 }}
-                                className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-80"
+                                className="rounded-lg flex items-center justify-center transition-all hover:opacity-80 flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8"
                                 style={{ 
                                     background: 'var(--theme-bg-tertiary)',
-                                    color: 'var(--theme-text-secondary)'
+                                    color: 'var(--theme-text-secondary)',
                                 }}
                             >
-                                <X className="w-5 h-5" />
+                                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                             </button>
                         )}
                     </div>
                 )}
 
-                {/* Body */}
-                <div className="p-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                {/* Body — padding أقل للـ confirmations */}
+                <div className={`max-h-[60vh] overflow-y-auto overflow-x-hidden custom-scrollbar min-w-0 ${COMPACT_SIZES.includes(size) ? 'px-3 py-2.5' : 'p-3 sm:p-4'}`}>
                     {children}
                 </div>
 
                 {/* Footer */}
                 {footer && (
-                    <div className="p-5 border-t" style={{ borderColor: 'var(--theme-border-primary)' }}>
+                    <div 
+                        className={`border-t ${COMPACT_SIZES.includes(size) ? 'px-3 py-2.5' : 'p-3 sm:p-4'}`}
+                        style={{ borderColor: 'var(--theme-border-primary)' }}
+                    >
                         {footer}
                     </div>
                 )}
@@ -217,6 +234,8 @@ export const UnifiedModal: React.FC<UnifiedModalProps> = ({
             `}</style>
         </div>
     );
+
+    return createPortal(modalContent, document.body);
 };
 
 // ============================================================

@@ -34,6 +34,11 @@ export {
     loginWithPin
 } from './auth/loginHandler';
 
+// ✅ User Binding Functions (using Admin SDK - bypasses client Rules)
+export {
+    createUserBinding
+} from './auth/userBinding';
+
 // ✅ System Settings Functions (using Admin SDK)
 export {
     getSystemSettings,
@@ -52,6 +57,19 @@ export {
     checkInGuest, // Legacy - Use processCheckIn instead
     checkOutGuest
 } from './data/roomOperations';
+
+// ✅ Phase 2: Request actions (tenant-isolated, server-side)
+export {
+    requestConfirmCompletion,
+    requestComplete,
+    requestTransferToDepartment
+} from './requests/requestActions';
+
+// ✅ Phase 4: Procurement actions (tenant-isolated, server-side)
+export {
+    procurementApprove,
+    procurementClose
+} from './procurement/procurementActions';
 
 // ✅ Add more functions here as needed
 // export { sendWelcomeEmail } from './email/notifications';

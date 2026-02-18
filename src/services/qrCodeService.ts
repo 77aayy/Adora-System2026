@@ -8,6 +8,7 @@
  */
 
 import { generateSecureAccessToken } from './secureAccessService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -72,7 +73,7 @@ export const generateQRImage = (data: string, options: QROptions = {}): HTMLImag
  * @deprecated Use generateSecureRoomQR instead - this exposes room number in URL (IDOR vulnerability)
  */
 export const generateRoomQR = (qrData: QRData, baseUrl: string = window.location.origin): string => {
-    console.warn('⚠️ DEPRECATED: generateRoomQR is insecure. Use generateSecureRoomQR instead.');
+    logger.warn('⚠️ DEPRECATED: generateRoomQR is insecure. Use generateSecureRoomQR instead.', undefined, 'qrCodeService');
     const params = new URLSearchParams({
         room: qrData.roomNumber,
         branch: qrData.branch,
@@ -108,7 +109,7 @@ export const generateSecureRoomQR = async (
         bgColor: options.bgColor
     });
     
-    console.log(`🔐 Secure QR generated for Room ${data.roomNumber}`);
+    logger.info(`🔐 Secure QR generated for Room ${data.roomNumber}`, undefined, 'qrCodeService');
     
     return { qrUrl, accessUrl: fullUrl, token };
 };
@@ -157,7 +158,7 @@ export const downloadQR = async (data: string, filename: string, options: QROpti
 
         URL.revokeObjectURL(blobUrl);
     } catch (error) {
-        console.error('Failed to download QR:', error);
+        logger.error('Failed to download QR:', error, 'qrCodeService');
 
         // Fallback: open in new tab
         window.open(url, '_blank');
@@ -169,7 +170,7 @@ export const downloadQR = async (data: string, filename: string, options: QROpti
  * @deprecated Use downloadSecureRoomQR instead
  */
 export const downloadRoomQR = (roomNumber: string, branch: string): Promise<void> => {
-    console.warn('⚠️ DEPRECATED: downloadRoomQR is insecure. Use downloadSecureRoomQR instead.');
+    logger.warn('⚠️ DEPRECATED: downloadRoomQR is insecure. Use downloadSecureRoomQR instead.', undefined, 'qrCodeService');
     const qrData: QRData = {
         roomNumber,
         branch,
@@ -203,7 +204,7 @@ export const downloadSecureRoomQR = async (
  * @deprecated Use printSecureRoomQR instead
  */
 export const printRoomQR = (roomNumber: string, floor: string, branch: string): void => {
-    console.warn('⚠️ DEPRECATED: printRoomQR is insecure. Use printSecureRoomQR instead.');
+    logger.warn('⚠️ DEPRECATED: printRoomQR is insecure. Use printSecureRoomQR instead.', undefined, 'qrCodeService');
     const qrUrl = generateRoomQR({ roomNumber, floor, branch, type: 'room' });
 
     const printWindow = window.open('', '_blank');
@@ -383,7 +384,7 @@ export const printSecureRoomQR = async (
  * @deprecated Will be updated to use secure tokens in V3
  */
 export const printMultipleRoomQRs = (rooms: { number: string; floor: string }[], branch: string): void => {
-    console.warn('⚠️ DEPRECATED: printMultipleRoomQRs will be updated to use secure tokens.');
+    logger.warn('⚠️ DEPRECATED: printMultipleRoomQRs will be updated to use secure tokens.', undefined, 'qrCodeService');
     const qrCards = rooms.map(room => {
         const qrUrl = generateRoomQR({ roomNumber: room.number, floor: room.floor, branch, type: 'room' });
         return `

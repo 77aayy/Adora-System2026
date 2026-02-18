@@ -7,6 +7,7 @@
 
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -98,7 +99,7 @@ export const createOwnerAnnouncement = async (
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating owner announcement:', error);
+        logger.error('Error creating owner announcement:', error, 'ownerAnnouncementService');
         throw error;
     }
 };
@@ -119,7 +120,7 @@ export const updateOwnerAnnouncement = async (
             updatedBy: { id: ownerId, name: ownerName }
         });
     } catch (error) {
-        console.error('Error updating owner announcement:', error);
+        logger.error('Error updating owner announcement:', error, 'ownerAnnouncementService');
         throw error;
     }
 };
@@ -134,7 +135,7 @@ export const deactivateOwnerAnnouncement = async (announcementId: string): Promi
             deactivatedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error deactivating owner announcement:', error);
+        logger.error('Error deactivating owner announcement:', error, 'ownerAnnouncementService');
         throw error;
     }
 };
@@ -212,7 +213,7 @@ export const getActiveAnnouncementsForManager = async (
             return bTime.getTime() - aTime.getTime(); // Newest first
         });
     } catch (error) {
-        console.error('Error getting active announcements:', error);
+        logger.error('Error getting active announcements:', error, 'ownerAnnouncementService');
         return [];
     }
 };
@@ -295,7 +296,7 @@ export const subscribeToOwnerAnnouncements = (
             callback(sorted);
         },
         (error) => {
-            console.error('Error subscribing to owner announcements:', error);
+            logger.error('Error subscribing to owner announcements:', error, 'ownerAnnouncementService');
             callback([]);
         }
     );
@@ -353,7 +354,7 @@ export const markAnnouncementAsViewed = async (
             });
         }
     } catch (error) {
-        console.error('Error marking announcement as viewed:', error);
+        logger.error('Error marking announcement as viewed:', error, 'ownerAnnouncementService');
     }
 };
 
@@ -408,7 +409,7 @@ export const dismissAnnouncement = async (
             });
         }
     } catch (error) {
-        console.error('Error dismissing announcement:', error);
+        logger.error('Error dismissing announcement:', error, 'ownerAnnouncementService');
     }
 };
 
@@ -427,7 +428,7 @@ export const getAllOwnerAnnouncements = async (): Promise<OwnerAnnouncement[]> =
             ...doc.data()
         } as OwnerAnnouncement));
     } catch (error) {
-        console.error('Error getting all announcements:', error);
+        logger.error('Error getting all announcements:', error, 'ownerAnnouncementService');
         return [];
     }
 };
@@ -453,7 +454,7 @@ export const subscribeToAllOwnerAnnouncements = (
             callback(announcements);
         },
         (error) => {
-            console.error('Error subscribing to all announcements:', error);
+            logger.error('Error subscribing to all announcements:', error, 'ownerAnnouncementService');
             callback([]);
         }
     );
@@ -490,7 +491,7 @@ export const getAnnouncementStats = async (announcementId: string): Promise<{
             dismissalsByTenant: dismissals
         };
     } catch (error) {
-        console.error('Error getting announcement stats:', error);
+        logger.error('Error getting announcement stats:', error, 'ownerAnnouncementService');
         return {
             totalViews: 0,
             totalDismissals: 0,

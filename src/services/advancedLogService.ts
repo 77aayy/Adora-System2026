@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { logger } from './loggerService';
+import { formatDateGregorianEn, formatTimeGregorianEn, formatDateTimeGregorianEn } from '../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -517,7 +518,7 @@ export const subscribeToLogs = (
     callback: (logs: AdvancedLogEntry[]) => void
 ): Unsubscribe => {
     if (!db || !tenantId) {
-        console.warn('subscribeToLogs: db or tenantId missing');
+        logger.warn('subscribeToLogs: db or tenantId missing', undefined, 'advancedLogService');
         callback([]);
         return () => {}; // Return empty unsubscribe function
     }
@@ -723,8 +724,8 @@ export const exportToCSV = (logs: AdvancedLogEntry[]): string => {
     ];
     
     const rows = logs.map(log => [
-        log.timestamp.toLocaleDateString('ar-SA'),
-        log.timestamp.toLocaleTimeString('ar-SA'),
+        formatDateGregorianEn(log.timestamp?.toDate?.() ?? log.timestamp),
+        formatTimeGregorianEn(log.timestamp?.toDate?.() ?? log.timestamp, { showSeconds: false }),
         CATEGORY_CONFIG[log.category].label,
         log.title,
         log.description,
@@ -861,7 +862,7 @@ export const generatePrintHTML = (
         <h1>${hotelName}</h1>
         <h2>سجل العمليات التفصيلي</h2>
         <p>${dateRange}</p>
-        <p>تم الإنشاء: ${new Date().toLocaleString('ar-SA')}</p>
+        <p>تم الإنشاء: ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}</p>
     </div>
     
     <div class="stats-grid">

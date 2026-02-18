@@ -2,11 +2,14 @@
  * Announcements Service
  * Manages guest announcements and notifications
  * Adora Hotel Management System V2
+ *
+ * SaaS/tenant: Review collection paths; add tenantId and tenant-scoped paths if used in multi-tenant SaaS.
  */
 
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { autoTranslateNewText } from './dynamicTranslationService'; // ✅ Auto-translation
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -78,7 +81,7 @@ export const getAnnouncements = async (branchId: string, tenantId: string): Prom
 
         return announcements.sort((a, b) => (a.order || 0) - (b.order || 0));
     } catch (error) {
-        console.error('Error getting announcements:', error);
+        logger.error('Error getting announcements:', error, 'announcementService');
         return [];
     }
 };
@@ -111,7 +114,7 @@ export const subscribeToAnnouncements = (
             callback(announcements.sort((a, b) => (a.order || 0) - (b.order || 0)));
         },
         (error) => {
-            console.error('Error subscribing to announcements:', error);
+            logger.error('Error subscribing to announcements:', error, 'announcementService');
             callback([]);
         }
     );
@@ -158,13 +161,13 @@ export const createAnnouncement = async (
                 }
             } catch (translationError) {
                 // Don't fail the announcement creation if translation fails
-                console.warn('Auto-translation failed for announcement:', translationError);
+                logger.warn('Auto-translation failed for announcement:', translationError, 'announcementService');
             }
         }
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating announcement:', error);
+        logger.error('Error creating announcement:', error, 'announcementService');
         throw error;
     }
 };
@@ -186,7 +189,7 @@ export const updateAnnouncement = async (
             updatedBy: { id: userId, name: userName }
         });
     } catch (error) {
-        console.error('Error updating announcement:', error);
+        logger.error('Error updating announcement:', error, 'announcementService');
         throw error;
     }
 };
@@ -198,7 +201,7 @@ export const deleteAnnouncement = async (announcementId: string): Promise<void> 
     try {
         await deleteDoc(doc(db, 'announcements', announcementId));
     } catch (error) {
-        console.error('Error deleting announcement:', error);
+        logger.error('Error deleting announcement:', error, 'announcementService');
         throw error;
     }
 };
@@ -236,7 +239,7 @@ export const getAnnouncementReadStatus = async (
 
         return reads;
     } catch (error) {
-        console.error('Error getting announcement read status:', error);
+        logger.error('Error getting announcement read status:', error, 'announcementService');
         return {};
     }
 };
@@ -285,7 +288,7 @@ export const markAnnouncementAsRead = async (
             await addDoc(collection(db, 'announcement_reads'), readData);
         }
     } catch (error) {
-        console.error('Error marking announcement as read:', error);
+        logger.error('Error marking announcement as read:', error, 'announcementService');
     }
 };
 

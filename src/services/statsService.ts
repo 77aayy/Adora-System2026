@@ -38,8 +38,8 @@ export const getDepartmentStats = async (
 
     try {
         const conditions: any[] = [
-            where('branch', '==', branchId),
-            where('tenantId', '==', tenantId)
+            where('branch', '==', branchId)
+            // ✅ CRITICAL SaaS FIX: tenantId already in path, no need for where('tenantId')
         ];
 
         if (period) {
@@ -47,7 +47,8 @@ export const getDepartmentStats = async (
             conditions.push(where('createdAt', '<=', Timestamp.fromDate(period.end)));
         }
 
-        const q = query(collection(db, 'requests'), ...conditions);
+        // ✅ CRITICAL SaaS FIX: Use tenant-scoped collection for data isolation
+        const q = query(collection(db, `tenants/${tenantId}/requests`), ...conditions);
         const snapshot = await getDocs(q);
 
         // Process and aggregate by department
@@ -150,10 +151,10 @@ export const getTimeSeriesData = async (
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
         
+        // ✅ CRITICAL SaaS FIX: Use tenant-scoped collection for data isolation
         const q = query(
-            collection(db, 'requests'),
+            collection(db, `tenants/${tenantId}/requests`),
             where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
             where('createdAt', '>=', Timestamp.fromDate(startDate)),
             orderBy('createdAt', 'asc')
         );

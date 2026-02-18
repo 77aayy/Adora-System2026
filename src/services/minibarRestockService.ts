@@ -73,7 +73,7 @@ export const getMinibarItems = async (branch: string): Promise<MinibarItem[]> =>
         const snapshot = await getDocs(q);
         return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as MinibarItem[];
     } catch (error) {
-        console.error('Failed to get minibar items:', error);
+        logger.error('Failed to get minibar items:', error, 'minibarRestockService');
         return [];
     }
 };

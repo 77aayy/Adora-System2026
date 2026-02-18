@@ -2,11 +2,15 @@
  * Rewards System Service
  * Gamification and employee rewards
  * Adora Hotel Management System V2
+ *
+ * SaaS/tenant: Uses tenants/${tenantId}/employees/${userId}/achievements; some paths may be
+ * tenant-scoped. Unify all achievements/redemptions/streaks under tenant or document any mix.
  */
 
 import { db } from './firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, orderBy, limit, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { awardAchievementPoints, deductPoints } from './pointsService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -143,7 +147,7 @@ export const awardAchievement = async (
             const all = await getAllAchievements(tenantId);
             achievement = all.find(a => a.id === achievementId);
 
-        } catch (e) { console.error(e); }
+        } catch (e) { logger.error('Error getting achievement:', e, 'rewardsSystemService'); }
 
         if (!achievement) return false;
 
@@ -159,7 +163,7 @@ export const awardAchievement = async (
 
         return true;
     } catch (error) {
-        console.error('Failed to award achievement:', error);
+        logger.error('Failed to award achievement:', error, 'rewardsSystemService');
         return false;
     }
 };
@@ -183,7 +187,7 @@ export const checkAchievements = async (
         if (!userDocs.empty) {
             tenantId = userDocs.docs[0].data().tenantId;
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { logger.error('Error getting tenantId:', e, 'rewardsSystemService'); }
 
     if (!tenantId) return [];
 
@@ -232,7 +236,7 @@ export const checkAchievements = async (
 
         // 🎁 Execution: Award the determined number of times
         if (shouldAwardCount > 0) {
-            console.log(`🏆 Awarding ${shouldAwardCount}x ${achievement.name} to ${userId}`);
+            logger.info(`🏆 Awarding ${shouldAwardCount}x ${achievement.name} to ${userId}`, undefined, 'rewardsSystemService');
             for (let i = 0; i < shouldAwardCount; i++) {
                 await awardAchievement(tenantId, userId, achievement.id);
             }
@@ -302,7 +306,7 @@ export const redeemReward = async (
 
         return docRef.id;
     } catch (error) {
-        console.error('Failed to redeem reward:', error);
+        logger.error('Failed to redeem reward:', error, 'rewardsSystemService');
         return null;
     }
 };
@@ -507,7 +511,7 @@ export const useRewards = (userId: string, branch: string, tenantId: string) => 
     const redeem = useCallback(async (reward: Reward) => {
         const userName = ''; // Would get from context
         if (!tenantId) {
-            console.error("Critical: tenantId missing in redeem action");
+            logger.error("Critical: tenantId missing in redeem action", undefined, 'rewardsSystemService');
             return null;
         }
         return redeemReward(tenantId, reward.id, reward.name, userId, userName, reward.pointsCost, branch);

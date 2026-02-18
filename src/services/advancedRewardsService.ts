@@ -19,6 +19,7 @@ import {
 
 import { db } from './firebase';
 import { awardPoints } from './pointsService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -255,11 +256,10 @@ async function getEmployeeStats(
     const stats: Map<string, EmployeeStats> = new Map();
 
     try {
-        const requestsRef = collection(db, 'requests');
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
             where('branch', '==', branchId),
-            where('tenantId', '==', tenantId),
             where('status', '==', 'COMPLETED'),
             where('completedAt', '>=', Timestamp.fromDate(startDate)),
             where('completedAt', '<', Timestamp.fromDate(endDate))
@@ -293,7 +293,7 @@ async function getEmployeeStats(
             stats.set(employeeId, existing);
         });
     } catch (error) {
-        console.error('Error getting employee stats:', error);
+        logger.error('Error getting employee stats:', error, 'advancedRewardsService');
     }
 
     return Array.from(stats.values());
@@ -324,7 +324,7 @@ async function applyRewards(
                 winner.employeeId,
                 winner.bonusPoints,
                 `مكافأة ${period === 'daily' ? 'يومية' : period === 'weekly' ? 'أسبوعية' : 'شهرية'} (${winner.rank})`
-            ).catch(err => console.error('Failed to award points via ledger:', err))
+            ).catch(err => logger.error('Failed to award points via ledger:', err, 'advancedRewardsService'))
         );
 
         // Log the reward
@@ -384,7 +384,7 @@ export async function getRewardsHistory(
             .sort((a, b) => b.awardedAt.getTime() - a.awardedAt.getTime())
             .slice(0, limit);
     } catch (error) {
-        console.error('Error getting rewards history:', error);
+        logger.error('Error getting rewards history:', error, 'advancedRewardsService');
         return [];
     }
 }

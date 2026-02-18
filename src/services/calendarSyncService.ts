@@ -13,6 +13,7 @@ import {
     collection,
     addDoc
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -151,7 +152,7 @@ export const getCalendarSources = async (tenantId: string): Promise<CalendarSett
             autoSync: false
         };
     } catch (error) {
-        console.error('Error getting calendar sources:', error);
+        logger.error('Error getting calendar sources:', error, 'calendarSyncService');
         return {
             sources: DEFAULT_CALENDAR_SOURCES,
             lastSyncAt: null,
@@ -171,7 +172,7 @@ export const saveCalendarSources = async (
         const docRef = doc(db, `tenants/${tenantId}/settings/calendarSources`);
         await setDoc(docRef, settings, { merge: true });
     } catch (error) {
-        console.error('Error saving calendar sources:', error);
+        logger.error('Error saving calendar sources:', error, 'calendarSyncService');
         throw error;
     }
 };
@@ -284,7 +285,7 @@ export const syncSeasonsFromSources = async (
                 }));
             }
         } catch (cloudError) {
-            console.warn('Cloud Function unavailable, using mock data:', cloudError);
+            logger.warn('Cloud Function unavailable, using mock data:', cloudError, 'calendarSyncService');
             usedMock = true;
 
             // Fallback to mock data
@@ -315,7 +316,7 @@ export const syncSeasonsFromSources = async (
         };
 
     } catch (error) {
-        console.error('Error syncing seasons:', error);
+        logger.error('Error syncing seasons:', error, 'calendarSyncService');
         return {
             success: false,
             added: 0,

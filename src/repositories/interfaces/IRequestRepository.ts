@@ -336,30 +336,36 @@ export interface IRequestRepository {
     // ============================================================
 
     /**
-     * Bulk confirms multiple requests
-     * 
+     * Bulk confirms multiple requests (F6: returns counts)
+     *
      * @param requestIds - Array of request IDs
+     * @param tenantId - Tenant ID (required for tenant-scoped path)
      * @param userId - Confirming user's ID
      * @param userName - Confirming user's name
+     * @returns successCount, failedCount, and optional failedIds
      */
     bulkConfirmRequests(
         requestIds: string[],
+        tenantId: string,
         userId: string,
         userName: string
-    ): Promise<void>;
+    ): Promise<{ successCount: number; failedCount: number; failedIds?: string[] }>;
 
     /**
-     * Bulk completes multiple requests
-     * 
+     * Bulk completes multiple requests (F6: returns counts)
+     *
      * @param requestIds - Array of request IDs
+     * @param tenantId - Tenant ID (required for tenant-scoped path)
      * @param userId - Completing user's ID
      * @param userName - Completing user's name
+     * @returns successCount, failedCount, and optional failedIds
      */
     bulkCompleteRequests(
         requestIds: string[],
+        tenantId: string,
         userId: string,
         userName: string
-    ): Promise<void>;
+    ): Promise<{ successCount: number; failedCount: number; failedIds?: string[] }>;
 
     /**
      * Cancels all active requests for a branch

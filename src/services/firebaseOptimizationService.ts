@@ -29,6 +29,7 @@ import {
     QueryConstraint,
     Timestamp
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // 📊 USAGE TRACKER - تتبع الاستهلاك
@@ -80,7 +81,7 @@ export function trackRead(count: number = 1): void {
     
     // Warn if approaching limit
     if (usage.reads > DAILY_LIMITS.targetReads * 0.8) {
-        console.warn(`⚠️ Firebase Reads at ${Math.round(usage.reads / DAILY_LIMITS.targetReads * 100)}% of target`);
+        logger.warn(`⚠️ Firebase Reads at ${Math.round(usage.reads / DAILY_LIMITS.targetReads * 100)}% of target`, undefined, 'firebaseOptimizationService');
     }
 }
 
@@ -93,7 +94,7 @@ export function trackWrite(count: number = 1): void {
     localStorage.setItem(USAGE_KEY, JSON.stringify(usage));
     
     if (usage.writes > DAILY_LIMITS.targetWrites * 0.8) {
-        console.warn(`⚠️ Firebase Writes at ${Math.round(usage.writes / DAILY_LIMITS.targetWrites * 100)}% of target`);
+        logger.warn(`⚠️ Firebase Writes at ${Math.round(usage.writes / DAILY_LIMITS.targetWrites * 100)}% of target`, undefined, 'firebaseOptimizationService');
     }
 }
 
@@ -150,7 +151,7 @@ export function setCache<T>(key: string, data: T, ttl: number = 5 * 60 * 1000): 
         try {
             localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
         } catch {
-            console.warn('Cache storage full');
+            logger.warn('Cache storage full', undefined, 'firebaseOptimizationService');
         }
     }
 }
@@ -230,13 +231,13 @@ export async function smartGetDoc<T>(
     // 1. Try cache first
     const cached = getCache<T>(cacheKey);
     if (cached !== null) {
-        console.log(`📦 Cache hit: ${path}`);
+        logger.info(`📦 Cache hit: ${path}`, undefined, 'firebaseOptimizationService');
         return cached;
     }
     
     // 2. Check throttle
     if (shouldThrottle().reads) {
-        console.warn('⚠️ Read throttled - returning null');
+        logger.warn('⚠️ Read throttled - returning null', undefined, 'firebaseOptimizationService');
         return null;
     }
     
@@ -253,7 +254,7 @@ export async function smartGetDoc<T>(
         }
         return null;
     } catch (error) {
-        console.error(`Error reading ${path}:`, error);
+        logger.error(`Error reading ${path}:`, error, 'firebaseOptimizationService');
         return null;
     }
 }
@@ -272,13 +273,13 @@ export async function smartQuery<T>(
     // 1. Try cache
     const cached = getCache<T[]>(key);
     if (cached !== null) {
-        console.log(`📦 Cache hit: ${collectionPath}`);
+        logger.info(`📦 Cache hit: ${collectionPath}`, undefined, 'firebaseOptimizationService');
         return cached;
     }
     
     // 2. Check throttle
     if (shouldThrottle().reads) {
-        console.warn('⚠️ Query throttled');
+        logger.warn('⚠️ Query throttled', undefined, 'firebaseOptimizationService');
         return [];
     }
     
@@ -297,7 +298,7 @@ export async function smartQuery<T>(
         setCache(key, data, ttl);
         return data;
     } catch (error) {
-        console.error(`Error querying ${collectionPath}:`, error);
+        logger.error(`Error querying ${collectionPath}:`, error, 'firebaseOptimizationService');
         return [];
     }
 }
@@ -311,12 +312,14 @@ interface PendingWrite {
     data: any;
     operation: 'set' | 'update' | 'delete';
     timestamp: number;
+    retries?: number;
 }
 
 let pendingWrites: PendingWrite[] = [];
 let batchTimeout: NodeJS.Timeout | null = null;
 const BATCH_DELAY = 2000; // 2 seconds - جمع الكتابات
 const MAX_BATCH_SIZE = 500; // Firebase limit
+const MAX_WRITE_RETRIES = 2; // avoid blind re-queue → double apply
 
 /**
  * Queue a write operation for batching
@@ -360,7 +363,7 @@ async function processBatch(): Promise<void> {
     
     // Check throttle
     if (shouldThrottle().writes) {
-        console.warn('⚠️ Writes throttled - queueing for later');
+        logger.warn('⚠️ Writes throttled - queueing for later', undefined, 'firebaseOptimizationService');
         // Store for later
         const stored = localStorage.getItem('adora_pending_writes');
         const existing = stored ? JSON.parse(stored) : [];
@@ -389,17 +392,28 @@ async function processBatch(): Promise<void> {
         
         await batch.commit();
         trackWrite(writes.length);
-        console.log(`✅ Batch committed: ${writes.length} operations`);
+        logger.info(`✅ Batch committed: ${writes.length} operations`, undefined, 'firebaseOptimizationService');
         
         // Clear related caches
         writes.forEach(write => {
             clearCache(write.path.split('/')[0]);
         });
         
-    } catch (error) {
-        console.error('Batch write failed:', error);
-        // Re-queue failed writes
-        pendingWrites = [...writes, ...pendingWrites];
+    } catch (error: any) {
+        logger.error('Batch write failed:', error, 'firebaseOptimizationService');
+        const code = error?.code as string | undefined;
+        const nonRetryable = code === 'permission-denied' || code === 'failed-precondition';
+        if (nonRetryable) {
+            logger.warn('Batch failed with non-retryable error; dropping writes', undefined, 'firebaseOptimizationService');
+            return;
+        }
+        const toRequeue = writes
+            .map(w => ({ ...w, retries: (w.retries ?? 0) + 1 }))
+            .filter(w => w.retries <= MAX_WRITE_RETRIES);
+        if (toRequeue.length < writes.length) {
+            logger.warn(`Dropping ${writes.length - toRequeue.length} writes after max retries`, undefined, 'firebaseOptimizationService');
+        }
+        if (toRequeue.length > 0) pendingWrites = [...toRequeue, ...pendingWrites];
     }
 }
 
@@ -562,7 +576,7 @@ export async function archiveOldData(
     await batch.commit();
     trackWrite(snapshot.docs.length * 2); // Set + Delete
     
-    console.log(`📦 Archived ${snapshot.docs.length} documents from ${collectionName}`);
+    logger.info(`📦 Archived ${snapshot.docs.length} documents from ${collectionName}`, undefined, 'firebaseOptimizationService');
     return snapshot.docs.length;
 }
 
@@ -618,7 +632,7 @@ export function initOptimization(): void {
         flushWrites();
     });
     
-    console.log('✅ Firebase Optimization Service initialized');
+    logger.info('✅ Firebase Optimization Service initialized', undefined, 'firebaseOptimizationService');
 }
 
 export default {

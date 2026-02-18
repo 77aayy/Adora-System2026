@@ -13,6 +13,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatTimeGregorianEn } from '../../utils/dateUtils';
 import {
     Receipt,
     Check,
@@ -26,6 +27,7 @@ import {
     CreditCard,
     Home
 } from 'lucide-react';
+import { logger } from '../../services/loggerService';
 import {
     RoomBillSummary,
     FinancialTransaction,
@@ -99,7 +101,7 @@ const TransactionItem: React.FC<TransactionItemProps & { t: (key: string) => str
                 <div className="flex items-center gap-2 mt-0.5">
                     {getStatusBadge()}
                     <span className="text-white/40 text-xs">
-                        {transaction.createdAt?.toDate().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
+                        {formatTimeGregorianEn(transaction.createdAt?.toDate(), { showSeconds: false })}
                     </span>
                 </div>
             </div>
@@ -169,7 +171,7 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
             const summary = await getRoomBillSummary(tenantId, branchId, roomNumber);
             setBillSummary(summary);
         } catch (error) {
-            console.error('Error loading bill summary:', error);
+            logger.error('Error loading bill summary:', error, 'RoomBillCard');
         } finally {
             setLoading(false);
         }
@@ -208,7 +210,7 @@ export const RoomBillCard: React.FC<RoomBillCardProps> = ({
             await loadBillSummary();
             onUpdate?.();
         } catch (error) {
-            console.error('Error cancelling transaction:', error);
+            logger.error('Error cancelling transaction:', error, 'RoomBillCard');
         } finally {
             setProcessing(null);
         }

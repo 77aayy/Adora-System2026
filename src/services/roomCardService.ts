@@ -5,6 +5,7 @@
  * Adora Hotel Management System V2
  */
 
+import { formatDateGregorianEn } from '../utils/dateUtils';
 import {
     collection,
     doc,
@@ -13,6 +14,7 @@ import {
     getDoc,
     query,
     where,
+    limit,
     getDocs,
     onSnapshot,
     Timestamp,
@@ -121,7 +123,7 @@ export const checkRoomAvailability = async (
         }
     } catch (error: any) {
         // ⚠️ Fallback: If Function fails, use client-side check (for backward compatibility)
-        console.warn('Cloud Function checkRoomAvailability failed, falling back to client-side:', error);
+        logger.warn('Cloud Function checkRoomAvailability failed, falling back to client-side:', error, 'roomCardService');
         
         // Fallback to original client-side implementation
         return await checkRoomAvailabilityClientSide(roomNumber, tenantId);
@@ -177,7 +179,7 @@ const checkRoomAvailabilityClientSide = async (
         const existingCard = activeCardSnapshot.docs[0].data();
         throw new Error(
             `الغرفة رقم ${roomNumber} مشغولة بالفعل من قبل: ${existingCard.guestName}\n` +
-            `تاريخ الدخول: ${existingCard.checkInTime?.toDate().toLocaleDateString('ar-SA')}`
+            `تاريخ الدخول: ${existingCard.checkInTime?.toDate() ? formatDateGregorianEn(existingCard.checkInTime.toDate()) : ''}`
         );
     }
 
@@ -307,7 +309,7 @@ export const checkIn = async (data: CheckInData, tenantId: string): Promise<stri
         }
     } catch (error: any) {
         // ⚠️ Fallback: If Function fails, use client-side check-in (for backward compatibility)
-        console.warn('Cloud Function processCheckIn failed, falling back to client-side:', error);
+        logger.warn('Cloud Function processCheckIn failed, falling back to client-side:', error, 'roomCardService');
         
         // Fallback to original client-side implementation
         return await checkInClientSide(data, validatedTenantId);
@@ -397,7 +399,7 @@ const checkInClientSide = async (data: CheckInData, validatedTenantId: string): 
                 qrGeneratedAt: now
             });
             
-            console.log(`🔐 QR token generated automatically for Room ${data.roomNumber} on check-in`);
+            logger.info(`🔐 QR token generated automatically for Room ${data.roomNumber} on check-in`, undefined, 'roomCardService');
         } catch (qrError) {
             // Non-critical: Log warning but don't fail check-in
             logger.warn('Failed to generate QR token on check-in (non-critical)', qrError, 'roomCardService');
@@ -431,7 +433,7 @@ const checkInClientSide = async (data: CheckInData, validatedTenantId: string): 
                     }
                 });
             } catch (err) {
-                console.warn('Could not update employee points:', err);
+                logger.warn('Could not update employee points:', err, 'roomCardService');
                 logger.warn('Failed to award bellman points on check-in', err, 'roomCardService');
             }
         }
@@ -477,7 +479,7 @@ const checkInClientSide = async (data: CheckInData, validatedTenantId: string): 
 
         return docRef.id;
     } catch (error: any) {
-        console.error('Check-in failed:', error);
+        logger.error('Check-in failed:', error, 'roomCardService');
 
         // Return specific error message if available
         if (error.message && error.message.includes('الغرفة')) {
@@ -544,9 +546,9 @@ export const checkOut = async (
             const { deactivateTokenOnCheckout } = await import('./secureAccessService');
             const branchId = cardData?.branch || cardData?.branchId || 'default';
             await deactivateTokenOnCheckout(roomNumber, branchId, validatedTenantId);
-            console.log(`🔐 QR tokens deactivated for Room ${roomNumber} on checkout`);
+            logger.info(`🔐 QR tokens deactivated for Room ${roomNumber} on checkout`, undefined, 'roomCardService');
         } catch (tokenError) {
-            console.warn('⚠️ Failed to deactivate tokens on checkout (non-critical):', tokenError);
+            logger.warn('⚠️ Failed to deactivate tokens on checkout (non-critical):', tokenError, 'roomCardService');
             // Don't fail checkout if token deactivation fails
         }
 
@@ -610,7 +612,7 @@ export const checkOut = async (
                 'Create inspection request'
             );
             inspectionRefId = inspectionRef.id;
-            console.log('✅ Inspection request created:', inspectionRefId);
+            logger.info('✅ Inspection request created:', inspectionRefId, 'roomCardService');
 
             // ✅ Immediately link inspection ID to room card (for recovery if network drops)
             await updateDoc(cardRef, {
@@ -618,7 +620,7 @@ export const checkOut = async (
             });
         } catch (error: any) {
             // ✅ Offline Safety: If network fails, save to localStorage for retry
-            console.error('Failed to create inspection request:', error);
+            logger.error('Failed to create inspection request:', error, 'roomCardService');
 
             // Check if it's a network error
             const isNetworkError = error?.code === 'unavailable' ||
@@ -626,11 +628,11 @@ export const checkOut = async (
                 error?.message?.toLowerCase().includes('offline');
 
             if (isNetworkError) {
-                // Save to offline queue
                 try {
                     const offlineQueue = JSON.parse(localStorage.getItem('offlineQueue') || '[]');
                     offlineQueue.push({
                         type: 'checkout_inspection',
+                        tenantId: validatedTenantId,
                         cardId,
                         roomNumber,
                         employeeId,
@@ -644,7 +646,7 @@ export const checkOut = async (
                     // Return error with recovery message
                     throw new Error('تم حفظ طلب الفحص محلياً. سيتم إرساله تلقائياً عند عودة الاتصال بالإنترنت');
                 } catch (storageError) {
-                    console.error('Failed to save to offline queue:', storageError);
+                    logger.error('Failed to save to offline queue:', storageError, 'roomCardService');
                     throw new Error('فشل إنشاء طلب الفحص. يرجى المحاولة مرة أخرى');
                 }
             } else {
@@ -703,7 +705,7 @@ export const checkOut = async (
                 // No-op here to avoid inconsistent paths; housekeeping will set status via requests
             }
         } catch (err) {
-            console.warn('Could not update room status:', err);
+            logger.warn('Could not update room status:', err, 'roomCardService');
         }
 
         // 4. Create rating invitation (if template exists)
@@ -723,7 +725,7 @@ export const checkOut = async (
             );
         } catch (ratingError) {
             // Don't fail checkout if rating invitation fails
-            console.warn('Could not create rating invitation:', ratingError);
+            logger.warn('Could not create rating invitation:', ratingError, 'roomCardService');
         }
 
         // 5. Award bellman points
@@ -735,7 +737,7 @@ export const checkOut = async (
                     points: increment(points),
                 });
             } catch (err) {
-                console.warn('Could not update employee points:', err);
+                logger.warn('Could not update employee points:', err, 'roomCardService');
             }
         }
         
@@ -743,10 +745,10 @@ export const checkOut = async (
         try {
             const branchId = cardData?.branch || 'default';
             await archiveChatRoom(validatedTenantId, branchId, roomNumber);
-            console.log(`✅ Chat archived for room ${roomNumber}`);
+                logger.info(`✅ Chat archived for room ${roomNumber}`, undefined, 'roomCardService');
         } catch (chatError) {
             // لا نفشل الخروج لو فشلت أرشفة الشات
-            console.warn('Could not archive chat room:', chatError);
+            logger.warn('Could not archive chat room:', chatError, 'roomCardService');
         }
 
         // 7. ✅ تنظيف بيانات Rate Limit للنزيل (خصوصية + توفير مساحة)
@@ -754,17 +756,17 @@ export const checkOut = async (
             const { cleanupGuestRateLimitOnCheckout } = await import('./anonymousAuthService');
             const cleanupResult = await cleanupGuestRateLimitOnCheckout(validatedTenantId, roomNumber);
             if (cleanupResult.deletedCount > 0) {
-                console.log(`🗑️ Guest rate limit cleanup: ${cleanupResult.deletedCount} record(s) deleted`);
+                logger.info(`🗑️ Guest rate limit cleanup: ${cleanupResult.deletedCount} record(s) deleted`, undefined, 'roomCardService');
             }
         } catch (cleanupError) {
             // لا نفشل الخروج لو فشل التنظيف
-            console.warn('Could not cleanup guest rate limits:', cleanupError);
+            logger.warn('Could not cleanup guest rate limits:', cleanupError, 'roomCardService');
         }
 
         // Return inspection request ID (or null if failed and queued offline)
         return inspectionRefId;
     } catch (error) {
-        console.error('Checkout error:', error);
+        logger.error('Checkout error:', error, 'roomCardService');
         return null;
     }
 };
@@ -991,3 +993,58 @@ export const subscribeToTodayRoomCards = (
         callback(cards);
     });
 };
+
+const OFFLINE_QUEUE_KEY = 'offlineQueue';
+const MAX_REPLAY_RETRIES = 3;
+
+/**
+ * Replay queued checkout inspection requests when back online (avoids orphan queue).
+ * Call from app on online event.
+ */
+export async function syncOfflineCheckoutQueue(): Promise<{ synced: number; failed: number }> {
+    if (!db) return { synced: 0, failed: 0 };
+    let synced = 0;
+    let failed = 0;
+    try {
+        const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+        const queue: Array<{ type: string; tenantId?: string; cardId?: string; inspectionRequest?: Record<string, unknown>; retries?: number }> = raw ? JSON.parse(raw) : [];
+        const remaining: typeof queue = [];
+        for (const item of queue) {
+            if (item.type !== 'checkout_inspection' || !item.inspectionRequest || !item.tenantId) {
+                remaining.push(item);
+                continue;
+            }
+            const retries = (item.retries || 0) + 1;
+            if (retries > MAX_REPLAY_RETRIES) {
+                failed++;
+                continue;
+            }
+            try {
+                const requestsRef = collection(db, `tenants/${item.tenantId}/requests`);
+                if (item.cardId) {
+                    const existing = await getDocs(
+                        query(
+                            requestsRef,
+                            where('roomCardId', '==', item.cardId),
+                            where('type', '==', 'inspection'),
+                            limit(1)
+                        )
+                    );
+                    if (!existing.empty) {
+                        continue;
+                    }
+                }
+                await addDoc(requestsRef, { ...item.inspectionRequest });
+                synced++;
+            } catch (e) {
+                logger.warn('syncOfflineCheckoutQueue: item failed', e, 'roomCardService');
+                remaining.push({ ...item, retries });
+                failed++;
+            }
+        }
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
+    } catch (e) {
+        logger.error('syncOfflineCheckoutQueue failed', e, 'roomCardService');
+    }
+    return { synced, failed };
+}

@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Crown, Settings, TrendingUp, Users, Building2, Zap, Building,
@@ -34,13 +35,12 @@ import {
     TenantAnalytics
 } from '../../services/analyticsService';
 import { getAllManagers, createManager, isPinAvailable, suggestUniquePin, toggleLicenseStatus, renewLicense, softDeleteManager, restoreManager, getDeletedManagers, getDemoStats } from '../../services/ownerService';
-import { getAllTrialRequests, markTrialRequestAsContacted, addFollowUpToTrialRequest, type TrialRequest } from '../../services/trialRequestService';
+import { getAllTrialRequests, getDeletedTrialRequests, markTrialRequestAsContacted, addFollowUpToTrialRequest, deleteTrialRequest, type TrialRequest, type DeletedTrialRequest } from '../../services/trialRequestService';
 import type { SystemSettings } from '../../services/systemSettingsService';
 import { PageTransition } from '../../components/common/PageTransition';
 import { FlexibleHeader } from '../../components/common/FlexibleHeader';
 import { UnifiedModal, ModalActions } from '../../components/common/UnifiedModal';
 import { LineChart, BarChart, DoughnutChart } from '../../components/analytics/ChartComponents';
-import { exportToPDF, exportToExcel } from '../../utils/exportUtils';
 import { FileText, AlertCircle, Download, Code2, Palette, Printer } from 'lucide-react';
 import { useAllBranchesForOwner } from '../../hooks/useTenantData'; // ✅ SaaS Integration
 import { clearAllCache as clearRequestCache } from '../../utils/requestCache'; // ✅ For force refresh
@@ -63,7 +63,7 @@ import { db } from '../../services/firebase';
 import { calculateTenantRevenue } from '../../services/billingService';
 import { confirm as customConfirm } from '../../services/customConfirmService';
 import { AdoraLoader, AdoraLoaderInline } from '../../components/common/AdoraLoader';
-import { formatDualDate } from '../../utils/dateUtils';
+import { formatDualDate, formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 import { LicenseNotificationWidget } from '../../components/dashboard/LicenseNotificationWidget';
 import { BillingDashboard } from './BillingDashboard'; // ✅ Import for embedded billing tab
 import {
@@ -82,10 +82,10 @@ import { FirebaseConfig } from '../../services/firebase';
 import { AdminSidebar } from '../../components/admin/AdminSidebar';
 import { CreateManagerHelp } from '../../components/common/ContextualHelp'; // ✅ Contextual Help
 // DeveloperSignature is now in GlobalFooter (App.tsx) - no need to import here
-// ✅ Demo seeding is now handled automatically by demo links (demoLinkService.ts)
-import { Sparkles, Share2 } from 'lucide-react';
-// ✅ Demo Link Manager
-import { DemoLinkManager } from '../../components/owner/DemoLinkManager';
+import { Sparkles } from 'lucide-react';
+import { executeDeepAudit } from '../../services/deepAuditService'; // ✅ Deep Audit & Purge System
+import { logger } from '../../services/loggerService'; // ✅ Logger for audit operations
+import { haptic, playSound } from '../../utils/uxEffects'; // ✅ UX feedback
 // ✅ Onboarding Tour
 import { useOnboardingTour } from '../../hooks/useOnboardingTour';
 import { TourGuide } from '../../components/shared/TourGuide';
@@ -95,7 +95,7 @@ import { MobileMenu } from '../../components/common/MobileMenu';
 // TYPES
 // ============================================================
 
-type TabType = 'overview' | 'tenants' | 'settings' | 'billing' | 'core-config' | 'demo' | 'subscription-requests';
+type TabType = 'overview' | 'tenants' | 'settings' | 'billing' | 'core-config' | 'subscription-requests';
 
 // ============================================================
 // HELPER: Safe Date Conversion (handles Firestore Timestamps)
@@ -133,13 +133,13 @@ const getCachedData = (key: CacheKey): any => {
         if (cached) {
             const { data, timestamp } = JSON.parse(cached);
             if (Date.now() - timestamp < CACHE_DURATION) {
-                console.log(`📦 Cache HIT: ${key} (saved ${Math.round((Date.now() - timestamp) / 1000)}s ago)`);
+                logger.debug(`📦 Cache HIT: ${key} (saved ${Math.round((Date.now() - timestamp) / 1000)}s ago)`, undefined, 'EnhancedOwnerDashboard');
                 return data;
             }
-            console.log(`📦 Cache EXPIRED: ${key}`);
+            logger.debug(`📦 Cache EXPIRED: ${key}`, undefined, 'EnhancedOwnerDashboard');
         }
     } catch (e) {
-        console.warn('Cache read error:', e);
+        logger.warn('Cache read error:', e, 'EnhancedOwnerDashboard');
     }
     return null;
 };
@@ -153,10 +153,59 @@ const setCachedData = (key: CacheKey, data: any): void => {
             data,
             timestamp: Date.now()
         }));
-        console.log(`💾 Cache SAVED: ${key}`);
+        logger.debug(`💾 Cache SAVED: ${key}`, undefined, 'EnhancedOwnerDashboard');
     } catch (e) {
-        console.warn('Cache write error:', e);
+        logger.warn('Cache write error:', e, 'EnhancedOwnerDashboard');
     }
+};
+
+// ============================================================
+// ADD MANAGER DRAFT - Restore wizard after refresh
+// ============================================================
+const ADD_MANAGER_DRAFT_KEY = 'adora_add_manager_draft';
+
+export type AddManagerDraft = {
+    currentStep: number;
+    name: string;
+    phone: string;
+    phoneBackup: string;
+    code: string;
+    hotelName: string;
+    branchCodes: Array<{ code: string; name: string }>;
+    subscriptionDuration: 1 | 2;
+    paymentMethod: string;
+    firebaseConfig: {
+        apiKey: string;
+        authDomain: string;
+        projectId: string;
+        storageBucket: string;
+        messagingSenderId?: string;
+        appId?: string;
+    };
+};
+
+export const getAddManagerDraft = (): AddManagerDraft | null => {
+    try {
+        const raw = sessionStorage.getItem(ADD_MANAGER_DRAFT_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as AddManagerDraft;
+        if (parsed && typeof parsed.currentStep === 'number' && parsed.currentStep >= 1 && parsed.currentStep <= 4) {
+            return parsed;
+        }
+    } catch (_) { /* ignore */ }
+    return null;
+};
+
+export const setAddManagerDraft = (draft: AddManagerDraft): void => {
+    try {
+        sessionStorage.setItem(ADD_MANAGER_DRAFT_KEY, JSON.stringify(draft));
+    } catch (_) { /* ignore */ }
+};
+
+export const clearAddManagerDraft = (): void => {
+    try {
+        sessionStorage.removeItem(ADD_MANAGER_DRAFT_KEY);
+    } catch (_) { /* ignore */ }
 };
 
 /**
@@ -167,7 +216,7 @@ const clearOwnerCache = (): void => {
     keys.forEach(key => {
         localStorage.removeItem(CACHE_KEY_PREFIX + key);
     });
-    console.log('🗑️ Owner cache cleared');
+    logger.info('🗑️ Owner cache cleared', undefined, 'EnhancedOwnerDashboard');
 };
 
 // ============================================================
@@ -175,9 +224,9 @@ const clearOwnerCache = (): void => {
 // ============================================================
 
 export const EnhancedOwnerDashboard: React.FC = () => {
+    const { success, error } = useUX();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
-    const { success, error } = useUX();
     const { t } = useTranslation();
 
     // ✅ SaaS Integration: Get all branches dynamically
@@ -195,6 +244,8 @@ export const EnhancedOwnerDashboard: React.FC = () => {
     
     // ✅ Mobile Menu State
     const [showMobileMenu, setShowMobileMenu] = useState(false);
+    // ✅ Sidebar collapse state — لزامن هامش المحتوى مع عرض الشريط
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     // ✅ Close mobile menu when screen size changes to desktop
     useEffect(() => {
@@ -223,7 +274,6 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         billing: false,      // الفواتير - in sidebar, hide by default
         settings: false,     // الإعدادات - in sidebar, hide by default
         broadcasts: false,   // الرسائل - in sidebar, hide by default
-        demo: true,          // روابط الديمو - not in sidebar, keep visible
         'core-config': false // التأسيس - in sidebar, hide by default
     };
     const [analytics, setAnalytics] = useState<any>(null);
@@ -290,7 +340,9 @@ export const EnhancedOwnerDashboard: React.FC = () => {
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const [showBroadcastModal, setShowBroadcastModal] = useState(false);
     const [showFeatureModal, setShowFeatureModal] = useState(false);
-    const [showAddManagerModal, setShowAddManagerModal] = useState(false);
+    const [showAddManagerModal, setShowAddManagerModal] = useState(() => {
+        return getAddManagerDraft() !== null;
+    });
     const [showManagerDetailsModal, setShowManagerDetailsModal] = useState(false);
     const [selectedManager, setSelectedManager] = useState<TenantAnalytics | null>(null);
 
@@ -302,28 +354,35 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
     const loadDataRef = useRef(false); // ✅ Prevent multiple simultaneous loads
     const loadDataCalledRef = useRef(false); // ✅ Track if loadData was called
+    const [subscriptionTabRefreshKey, setSubscriptionTabRefreshKey] = useState(0); // ✅ Remount SubscriptionRequestsTab on header refresh so list refetches
 
     useEffect(() => {
+        // ✅ CRITICAL FIX: Don't attempt Firestore recovery here
+        // Recovery causes "INTERNAL ASSERTION FAILED" when listeners are active
+        // Errors are handled globally in errorHandlerService.ts (auto-reload)
+        
         // ✅ Only call loadData once on mount
         if (!loadDataCalledRef.current) {
             loadDataCalledRef.current = true;
             loadData();
         }
 
-        // ✅ FAST UI: Force show page after 2 seconds max - rest loads in background
+        // ✅ FAST UI: إظهار الهيكل بعد 0.35 ثانية كحد أقصى — الباقي يحمّل في الخلفية
         const fastUITimeout = setTimeout(() => {
-            if (loading) {
-                console.log('⚡ Fast UI: Showing page now, continuing in background...');
-                setLoading(false);
-                setBackgroundLoading(true);
-            }
-        }, 2000); // ⚡ 2 seconds max wait
+            setLoading((prev) => {
+                if (prev) {
+                    setBackgroundLoading(true);
+                    return false;
+                }
+                return prev;
+            });
+        }, 350);
 
-        // ✅ AUTO-STOP: Force stop background loading after 10 seconds (covers error cases)
+        // ✅ AUTO-STOP: إيقاف شريط الخلفية بعد 8 ثوان (تغطية حالات الخطأ)
         const bgLoadingTimeout = setTimeout(() => {
             setBackgroundLoading(false);
             setLoadingHeavyData(false);
-        }, 10000); // ⚡ 10 seconds max for background loading
+        }, 8000);
 
         return () => {
             clearTimeout(fastUITimeout);
@@ -347,7 +406,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             fetchActivityLogs(false).then(({ logs }) => {
                 setActivityLogs(logs);
             }).catch(err => {
-                console.error('Failed to fetch activity logs:', err);
+                logger.error('Failed to fetch activity logs:', err, 'EnhancedOwnerDashboard');
                 setActivityLogs([]);
             });
 
@@ -363,7 +422,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             const stats = await getDemoStats();
             setDemoStats(stats);
         } catch (err) {
-            console.error('Failed to load demo stats:', err);
+            logger.error('Failed to load demo stats:', err, 'EnhancedOwnerDashboard');
             setDemoStats({ total: 0, nearestExpiry: null, farthestExpiry: null });
         }
     };
@@ -371,16 +430,20 @@ export const EnhancedOwnerDashboard: React.FC = () => {
     const loadData = async (forceRefresh: boolean = false) => {
         // ✅ Prevent multiple simultaneous loads
         if (loadDataRef.current) {
-            console.log('⏸️ loadData already in progress, skipping...');
+            logger.debug('⏸️ loadData already in progress, skipping...', undefined, 'EnhancedOwnerDashboard');
             return;
         }
 
         loadDataRef.current = true;
-        console.log(forceRefresh ? '🔄 Force refresh requested' : '📦 Loading with cache...');
+        logger.debug(forceRefresh ? '🔄 Force refresh requested' : '📦 Loading with cache...', undefined, 'EnhancedOwnerDashboard');
+
+        // ✅ CRITICAL FIX: Don't attempt Firestore recovery here
+        // Recovery causes "INTERNAL ASSERTION FAILED" when listeners are active
+        // Errors are handled globally in errorHandlerService.ts (auto-reload)
 
         // ✅ FIX: Clear ALL caches when force refresh requested
         if (forceRefresh) {
-            console.log('🗑️ Clearing all cached data...');
+            logger.info('🗑️ Clearing all cached data...', undefined, 'EnhancedOwnerDashboard');
             // Clear localStorage cache
             localStorage.removeItem(CACHE_KEY_PREFIX + 'settings');
             localStorage.removeItem(CACHE_KEY_PREFIX + 'analytics');
@@ -390,6 +453,8 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             localStorage.removeItem(CACHE_KEY_PREFIX + 'managerStats');
             // Clear in-memory request cache
             clearRequestCache();
+            // Clear recovery flag to allow retry
+            sessionStorage.removeItem('adora_firestore_recovery_attempted');
         }
 
         // ✅ PHASE 0: Show cached data IMMEDIATELY (instant UI)
@@ -402,9 +467,12 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             const cachedManagerStats = getCachedData('managerStats');
 
             // Apply cached data immediately - user sees page instantly!
+            // ✅ FIX: Only set tenants if cache is NOT empty (prevent empty array from blocking data load)
             if (cachedSettings) setSystemSettings(cachedSettings);
             if (cachedAnalytics) setAnalytics(cachedAnalytics);
-            if (cachedTenants) setTenants(cachedTenants);
+            if (cachedTenants && Array.isArray(cachedTenants) && cachedTenants.length > 0) {
+                setTenants(cachedTenants);
+            }
             if (cachedMultiBranch) setMultiBranchData(cachedMultiBranch);
             if (cachedManagerStats) setManagerStats(cachedManagerStats);
             if (cachedRevenue) {
@@ -414,9 +482,11 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setNearestExpiring(cachedRevenue.nearestExpiring || null);
             }
 
-            // If we have all cached data, stop loading immediately
-            if (cachedSettings && cachedAnalytics && cachedTenants) {
-                console.log('✅ All data from cache - showing page instantly');
+            // ✅ FIX: Only use cache if it's NOT empty (prevent empty cache from blocking data load)
+            // If we have all cached data AND tenants array is not empty, stop loading immediately
+            const hasValidCache = cachedSettings && cachedAnalytics && cachedTenants && Array.isArray(cachedTenants) && cachedTenants.length > 0;
+            if (hasValidCache) {
+                logger.info('✅ All data from cache - showing page instantly', undefined, 'EnhancedOwnerDashboard');
                 setLoading(false);
                 loadDataRef.current = false;
 
@@ -424,6 +494,11 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setBackgroundLoading(true);
                 fetchFreshDataInBackground();
                 return;
+            } else if (cachedTenants && Array.isArray(cachedTenants) && cachedTenants.length === 0) {
+                // ✅ FIX: If cache exists but is empty, clear it and load fresh data
+                logger.warn('⚠️ Cache exists but is empty - clearing and loading fresh data', undefined, 'EnhancedOwnerDashboard');
+                localStorage.removeItem(CACHE_KEY_PREFIX + 'tenants');
+                // Continue to load fresh data below
             }
         }
 
@@ -467,7 +542,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             });
 
         } catch (err: any) {
-            console.error('Error loading data:', err);
+            logger.error('Error loading data:', err, 'EnhancedOwnerDashboard');
         } finally {
             setLoading(false);
             loadDataRef.current = false;
@@ -478,11 +553,19 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setDataJustUpdated(true);
                 setTimeout(() => setDataJustUpdated(false), 3000);
             }
+            // ✅ When user clicks header "تحديث", remount SubscriptionRequestsTab so it refetches trial requests (one refresh for whole page)
+            if (forceRefresh) {
+                setSubscriptionTabRefreshKey((k) => k + 1);
+            }
         }
 
         // ✅ PHASE 3: Load heavy data in background
+        logger.debug('🔍 [loadData] PHASE 3: Checking if should load heavy data...', { loadingHeavyData }, 'EnhancedOwnerDashboard');
         if (!loadingHeavyData) {
+            logger.debug('✅ [loadData] PHASE 3: Calling loadHeavyDataInBackground...', undefined, 'EnhancedOwnerDashboard');
             loadHeavyDataInBackground();
+        } else {
+            logger.debug('⏸️ [loadData] PHASE 3: Skipping - already loading heavy data', undefined, 'EnhancedOwnerDashboard');
         }
     };
 
@@ -524,7 +607,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             await loadHeavyDataInBackground();
 
         } catch (err) {
-            console.warn('Background refresh error:', err);
+            logger.warn('Background refresh error:', err, 'EnhancedOwnerDashboard');
         } finally {
             setBackgroundLoading(false);
             setDataJustUpdated(true);
@@ -543,8 +626,8 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             let expired = 0;
             
             // ✅ DEBUG: Log manager details for troubleshooting
-            console.log('📊 [ManagerStats] Total managers found:', managers.length);
-            console.log('📊 [ManagerStats] Deleted managers:', deletedManagers.length);
+            logger.debug('📊 [ManagerStats] Total managers found:', managers.length, 'EnhancedOwnerDashboard');
+            logger.debug('📊 [ManagerStats] Deleted managers:', deletedManagers.length, 'EnhancedOwnerDashboard');
             
             const managerDetails: any[] = [];
             
@@ -565,7 +648,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 });
 
                 if (isDeleted) {
-                    console.warn(`⚠️ [ManagerStats] Manager ${m.name} (${m.code}) is marked as deleted but still in main list. Consider running softDeleteManager().`);
+                    logger.warn(`⚠️ [ManagerStats] Manager ${m.name} (${m.code}) is marked as deleted but still in main list. Consider running softDeleteManager().`, undefined, 'EnhancedOwnerDashboard');
                     return; // Skip soft-deleted in main list
                 }
 
@@ -575,14 +658,14 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             });
             
             // ✅ DEBUG: Log manager breakdown
-            console.log('📊 [ManagerStats] Breakdown:', {
+            logger.debug('📊 [ManagerStats] Breakdown:', {
                 active,
                 suspended,
                 expired,
                 deleted: deletedManagers.length,
                 totalInMainList: managers.length
             });
-            console.log('📊 [ManagerStats] Manager details:', managerDetails);
+            logger.debug('📊 [ManagerStats] Manager details:', managerDetails, 'EnhancedOwnerDashboard');
 
             // ✅ FIX: Include deleted billing documents (invoices + vouchers) in deleted count
             const deletedBilling = await getDeletedBillingCount().catch(() => 0);
@@ -600,28 +683,49 @@ export const EnhancedOwnerDashboard: React.FC = () => {
             setDeletedBillingCount(deletedBilling);
             setCachedData('managerStats', stats); // ✅ Cache locally
         } catch (err) {
-            console.warn('Error loading manager stats:', err);
+            logger.warn('Error loading manager stats:', err, 'EnhancedOwnerDashboard');
         }
     };
 
     // ✅ Load heavy data in background (non-blocking) - WITH CACHING
     const loadHeavyDataInBackground = async () => {
+        logger.debug('🚀 [loadHeavyDataInBackground] Starting...', undefined, 'EnhancedOwnerDashboard');
         // ✅ PERFORMANCE: Check cache first
         const cachedTenants = getCachedData('tenants');
         const cachedMultiBranch = getCachedData('multiBranch');
+        const cachedTenantsLength = Array.isArray(cachedTenants) ? cachedTenants.length : (cachedTenants ? 'not array' : 'null/undefined');
+        logger.debug('🔍 [loadHeavyDataInBackground] Cache check:', 
+            'hasCachedTenants:', !!cachedTenants, 
+            'cachedTenantsLength:', cachedTenantsLength,
+            'hasCachedMultiBranch:', !!cachedMultiBranch
+        );
 
-        if (cachedTenants && cachedMultiBranch) {
+        // ✅ FIX: Only use cache if it's NOT empty (prevent empty cache from blocking data load)
+        const hasValidTenantsCache = cachedTenants && Array.isArray(cachedTenants) && cachedTenants.length > 0;
+        logger.debug('🔍 [loadHeavyDataInBackground] hasValidTenantsCache:', { hasValidTenantsCache, cachedMultiBranch: !!cachedMultiBranch }, 'EnhancedOwnerDashboard');
+        if (hasValidTenantsCache && cachedMultiBranch) {
+            logger.info('✅ [loadHeavyDataInBackground] Using cached data - skipping Firebase', undefined, 'EnhancedOwnerDashboard');
             setTenants(cachedTenants);
             setMultiBranchData(cachedMultiBranch);
             loadManagerStats(); // ✅ Still load manager stats for accurate counts
             return; // Use cached data, skip Firebase
+        } else if (cachedTenants && Array.isArray(cachedTenants) && cachedTenants.length === 0) {
+            // ✅ FIX: If cache exists but is empty, clear it and load fresh data
+            logger.warn('⚠️ [loadHeavyDataInBackground] Cache exists but is empty - clearing and loading fresh data', undefined, 'EnhancedOwnerDashboard');
+            localStorage.removeItem(CACHE_KEY_PREFIX + 'tenants');
+        } else {
+            logger.debug('🔄 [loadHeavyDataInBackground] No valid cache - will load from Firebase', undefined, 'EnhancedOwnerDashboard');
         }
 
         setLoadingHeavyData(true);
         try {
+            // ✅ FIX: Always load fresh data if cache is empty or invalid
+            const hasValidTenantsCache = cachedTenants && Array.isArray(cachedTenants) && cachedTenants.length > 0;
+            
             // Load tenant analytics, multi-branch data, and manager stats in parallel - with error handling
             const [tenantAnalytics] = await Promise.all([
-                !cachedTenants ? getTenantAnalytics().catch((err: any) => {
+                !hasValidTenantsCache ? getTenantAnalytics().catch((err: any) => {
+                    logger.error('❌ [loadHeavyDataInBackground] Error loading tenant analytics:', err, 'EnhancedOwnerDashboard');
                     if (err?.code === 'resource-exhausted') return [];
                     return [];
                 }) : Promise.resolve(cachedTenants),
@@ -629,9 +733,17 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 loadManagerStats() // ✅ Load manager statistics
             ]);
 
-            if (tenantAnalytics && tenantAnalytics.length > 0) {
-                setTenants(tenantAnalytics);
-                setCachedData('tenants', tenantAnalytics);
+            // ✅ FIX: Always update state if we got data (even if from cache, to ensure state is set)
+            if (tenantAnalytics && Array.isArray(tenantAnalytics)) {
+                if (tenantAnalytics.length > 0) {
+                    setTenants(tenantAnalytics);
+                    setCachedData('tenants', tenantAnalytics);
+                    logger.info(`✅ [loadHeavyDataInBackground] Loaded ${tenantAnalytics.length} tenants`, undefined, 'EnhancedOwnerDashboard');
+                } else {
+                    logger.warn('⚠️ [loadHeavyDataInBackground] No tenants found - array is empty', undefined, 'EnhancedOwnerDashboard');
+                    // Don't cache empty arrays - clear cache instead
+                    localStorage.removeItem(CACHE_KEY_PREFIX + 'tenants');
+                }
             }
         } catch (err: any) {
             // Silent fail for background loading
@@ -707,9 +819,10 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         if (!db) {
                             return { users: 0, requests: 0, rooms: 0, revenue: 0 };
                         }
+                        // ✅ FIX: Use tenant-scoped collections
                         const [usersCount, requestsCount] = await Promise.all([
                             getCountFromServer(query(collection(db, 'users'), where('tenantId', '==', tenantId))).catch(() => ({ data: () => ({ count: 0 }) })),
-                            getCountFromServer(query(collection(db, 'requests'), where('tenantId', '==', tenantId))).catch(() => ({ data: () => ({ count: 0 }) }))
+                            getCountFromServer(query(collection(db, `tenants/${tenantId}/requests`))).catch(() => ({ data: () => ({ count: 0 }) }))
                         ]);
 
                         return {
@@ -754,7 +867,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setSystemSettings({
                     ...systemSettings,
                     features: {
-                        ...systemSettings.features,
+                        ...(systemSettings.features ?? {}),
                         [featureKey]: enabled
                     }
                 });
@@ -765,9 +878,9 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 try {
                     const { cleanupFeatureForAllTenants } = await import('../../services/featureCleanupService');
                     await cleanupFeatureForAllTenants(featureKey);
-                    console.log(`✅ Cleaned up data for disabled feature: ${featureKey}`);
+                    logger.info(`✅ Cleaned up data for disabled feature: ${featureKey}`, undefined, 'EnhancedOwnerDashboard');
                 } catch (cleanupError) {
-                    console.warn(`⚠️ Cleanup failed for ${featureKey}:`, cleanupError);
+                    logger.warn(`⚠️ Cleanup failed for ${featureKey}:`, cleanupError, 'EnhancedOwnerDashboard');
                     // Don't block the toggle if cleanup fails
                 }
             }
@@ -777,7 +890,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 const { invalidateCache } = await import('../../utils/requestCache');
                 invalidateCache('settings:system');
             } catch (err) {
-                console.warn('Could not invalidate cache:', err);
+                logger.warn('Could not invalidate cache:', err, 'EnhancedOwnerDashboard');
             }
 
             // ✅ FIX: Dispatch event to notify all components using useFeatureGate
@@ -798,7 +911,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 setSystemSettings({
                     ...systemSettings,
                     features: {
-                        ...systemSettings.features,
+                        ...(systemSettings.features ?? {}),
                         [featureKey]: !enabled
                     }
                 });
@@ -852,31 +965,11 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         }
     };
 
-    if (loading) {
-        return (
-            <div
-                className="min-h-screen flex items-center justify-center transition-colors duration-300"
-                style={{ background: 'var(--theme-gradient-page)' }}
-            >
-                <div className="text-center">
-                    <AdoraLoader
-                        size="xl"
-                        message={t('admin.loadingBasicData')}
-                        showMessage={true}
-                    />
-                    {loadingHeavyData && (
-                        <p className="text-sm mt-4 animate-pulse" style={{ color: 'var(--theme-text-tertiary)' }}>
-                            {t('admin.loadingAdditionalData')}
-                        </p>
-                    )}
-                </div>
-            </div>
-        );
-    }
+    /* ✅ No full-screen loading bar: dashboard shows immediately, status dot indicates loading */
 
-    // ✅ Handle Core Config Access
+    // ✅ Handle Core Config Access — كلمة المرور: ADORA2026
     const handleCoreConfigAccess = () => {
-        if (coreConfigPassword.trim().toLowerCase() === 'adora') {
+        if (coreConfigPassword.trim() === 'ADORA2026') {
             setCoreConfigAccessGranted(true);
             setShowCoreConfigModal(false);
             setCoreConfigPassword('');
@@ -888,11 +981,27 @@ export const EnhancedOwnerDashboard: React.FC = () => {
     };
 
     // ✅ Use default settings if not loaded yet (Progressive Loading)
+    const defaultFeatures = {
+        qrCodeGuestPortal: true,
+        pointsSystem: true,
+        gamification: true,
+        shiftNotes: true,
+        scheduledTasks: true,
+        aiAssistant: true,
+        calendarSync: true,
+        inventoryManagement: true,
+        procurementSystem: true,
+        laundryManagement: true,
+        whatsappIntegration: true,
+        emailNotifications: true,
+        smsNotifications: false,
+        experimentalFeatures: {} as Record<string, boolean>,
+    };
     const effectiveSettings = (systemSettings || {
         systemVersion: '2.0.0',
         maintenanceMode: false,
         maintenanceMessage: '',
-        enabledFeatures: {},
+        features: defaultFeatures,
         defaultLanguage: 'ar',
         availableLanguages: ['ar', 'en'],
         defaultTheme: 'light',
@@ -902,6 +1011,8 @@ export const EnhancedOwnerDashboard: React.FC = () => {
         trialPeriodDays: 14,
         broadcastMessages: [],
     }) as SystemSettings;
+    // ✅ Ensure features is never undefined (defensive for partial loads)
+    const safeFeatures = effectiveSettings.features ?? defaultFeatures;
 
     return (
         <PageTransition>
@@ -919,7 +1030,8 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 <div className="hidden lg:block desktop-sidebar-container flex-shrink-0 fixed top-0 right-0 h-screen z-30">
                     <aside id="admin-sidebar" className="h-full">
                         <AdminSidebar 
-                            isOwner={user?.role === 'owner'} 
+                            isOwner={user?.role === 'owner'}
+                            onCollapseChange={setSidebarCollapsed}
                         />
                     </aside>
                 </div>
@@ -966,13 +1078,10 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     </div>
                 )}
 
-                {/* Main Content Area - Responsive margin for sidebar (NO margin on mobile) */}
+                {/* Main Content Area — هامش يمين يتغير مع طي/توسيع الشريط */}
                 <main 
-                    className="flex-1 p-3 sm:p-4 pb-24 lg:pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col w-full transition-all duration-300 lg:mr-[280px] mr-0" 
-                    style={{ 
-                        minHeight: '100vh',
-                        paddingBottom: '6rem'
-                    }}
+                    className={`flex-1 p-3 sm:p-4 pb-24 lg:pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col w-full mr-0 transition-[margin-right] duration-300 ease-out ${sidebarCollapsed ? 'lg:mr-[80px]' : 'lg:mr-[280px]'}`}
+                    style={{ minHeight: '100vh', paddingBottom: '6rem' }}
                 >
                     <div className="flex-1 w-full min-h-full">
                         {/* ✅ Header - Mobile Responsive */}
@@ -997,6 +1106,30 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                                    {/* Status dot + optional 360° success ring (no full bar) */}
+                                    <div
+                                        className="relative flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7"
+                                        title={dataJustUpdated ? t('common.success') : (loadingHeavyData || backgroundLoading) ? (t('admin.fetchingData') || 'Loading...') : (t('common.ready') || 'Ready')}
+                                        role={dataJustUpdated ? 'button' : undefined}
+                                        onClick={dataJustUpdated ? () => setDataJustUpdated(false) : undefined}
+                                        aria-label={dataJustUpdated ? t('common.success') : (loadingHeavyData || backgroundLoading) ? 'Loading' : 'Ready'}
+                                    >
+                                        {dataJustUpdated && !loadingHeavyData && !backgroundLoading && (
+                                            <span
+                                                className="absolute inset-0 rounded-full border-2 animate-success-ring-360 pointer-events-none"
+                                                style={{ borderColor: 'var(--theme-success-500, #22c55e)' }}
+                                                aria-hidden
+                                            />
+                                        )}
+                                        <span
+                                            className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0 relative z-10 ${(loadingHeavyData || backgroundLoading) ? 'animate-status-dot-loading' : ''}`}
+                                            style={{
+                                                backgroundColor: (loadingHeavyData || backgroundLoading) ? 'var(--theme-error-500, #ef4444)' : 'var(--theme-success-500, #22c55e)',
+                                                boxShadow: (loadingHeavyData || backgroundLoading) ? '0 0 0 2px rgba(239,68,68,0.35)' : '0 0 0 2px rgba(34,197,94,0.25)',
+                                                transition: 'background-color 0.7s ease-in-out, box-shadow 0.7s ease-in-out'
+                                            }}
+                                        />
+                                    </div>
                                     <button
                                         onClick={() => loadData(true)}
                                         className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 border border-teal-500/30 hover:border-teal-500/50 transition-all"
@@ -1035,7 +1168,6 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                         { id: 'tenants', label: t('admin.createManager'), icon: Users, key: 'tenants' },
                                         { id: 'billing', label: t('admin.billing'), icon: CreditCard, key: 'billing' },
                                         { id: 'settings', label: t('admin.systemSettings'), icon: Settings, key: 'settings' },
-                                        { id: 'demo', label: t('admin.demoLinks'), icon: Share2, key: 'demo' },
                                         { id: 'core-config', label: t('admin.coreSetup'), icon: Shield, key: 'core-config' },
                                     ]
                                     .filter(tab => {
@@ -1066,7 +1198,6 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                         { id: 'billing' as TabType, label: t('admin.billing'), icon: CreditCard, key: 'billing' },
                                         { id: 'settings' as TabType, label: t('admin.systemSettings'), icon: Settings, key: 'settings' },
                                         { id: 'subscription-requests' as TabType, label: t('admin.subscriptionRequests'), icon: MessageSquare, key: 'subscription-requests' },
-                                        { id: 'demo' as TabType, label: t('admin.demoLinks'), icon: Share2, key: 'demo' },
                                         { id: 'core-config' as TabType, label: t('admin.coreSetup'), icon: Shield, hidden: true, key: 'core-config' },
                                         // ✅ REMOVED: broadcasts (not owner's responsibility)
                                     ]
@@ -1119,45 +1250,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* ✅ Background Loading Indicator - Subtle, non-blocking */}
-                    {(loadingHeavyData || backgroundLoading) && (
-                        <div
-                            className="solid-modal rounded-xl p-2 sm:p-3 flex items-center gap-2 sm:gap-3 animate-pulse"
-                            style={{
-                                border: '1px solid var(--theme-primary-500)',
-                                background: 'var(--theme-bg-secondary)'
-                            }}
-                        >
-                            <AdoraLoader size="sm" showMessage={false} />
-                            <span className="text-xs sm:text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
-                                ⏳ {t('admin.fetchingData')}
-                            </span>
-                        </div>
-                    )}
-
-                    {/* ✅ Data Updated Toast - Shows when background loading completes */}
-                    {dataJustUpdated && !loadingHeavyData && !backgroundLoading && (
-                        <div
-                            className="solid-modal rounded-xl p-2 sm:p-3 flex items-center justify-between gap-2 sm:gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
-                            style={{
-                                border: '1px solid var(--theme-success-500, #22c55e)',
-                                background: 'var(--theme-bg-secondary)'
-                            }}
-                        >
-                            <div className="flex items-center gap-2">
-                                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
-                                <span className="text-xs sm:text-sm font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                                    ✅ {t('common.success')}
-                                </span>
-                            </div>
-                            <button
-                                onClick={() => setDataJustUpdated(false)}
-                                className="p-1 rounded-full hover:bg-white/10 transition-colors"
-                            >
-                                <X className="w-3 h-3 sm:w-4 sm:h-4" style={{ color: 'var(--theme-text-tertiary)' }} />
-                            </button>
-                        </div>
-                    )}
+                    {/* ✅ Success state: 360° ring around status dot only (bar removed) */}
 
                     {/* ✅ TABS MOVED TO NAVBAR - More space for content */}
 
@@ -1191,11 +1284,11 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 onRefresh={() => loadData(true)}  // ✅ FIX: Force refresh to clear cache
                                 onAddManager={() => setShowAddManagerModal(true)}
                                 onViewDetails={(tenant) => {
-                                    console.log('👁️ View Details clicked:', tenant.tenantName, tenant.tenantId);
-                                    console.log('👁️ Setting showManagerDetailsModal to true');
+                                    logger.debug('👁️ View Details clicked:', { tenantName: tenant.tenantName, tenantId: tenant.tenantId }, 'EnhancedOwnerDashboard');
+                                    logger.debug('👁️ Setting showManagerDetailsModal to true', undefined, 'EnhancedOwnerDashboard');
                                     setSelectedManager(tenant);
                                     setShowManagerDetailsModal(true);
-                                    console.log('👁️ States should be set now');
+                                    logger.debug('👁️ States should be set now', undefined, 'EnhancedOwnerDashboard');
                                 }}
                             />
                         )}
@@ -1205,7 +1298,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 systemSettings={effectiveSettings}
                                 onSave={handleSaveSettings}
                                 saving={saving}
-                                features={effectiveSettings.features}
+                                features={safeFeatures}
                                 onToggleFeature={handleToggleFeature}
                             />
                         )}
@@ -1214,15 +1307,6 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
                         {activeTab === 'billing' && (
                             <BillingDashboard embedded />
-                        )}
-
-                        {/* 🎯 Demo Links Management */}
-                        {activeTab === 'demo' && (
-                            <DemoLinkManager
-                                tenantId={user?.tenantId || ''}
-                                ownerId={user?.id || ''}
-                                ownerName={user?.name || ''}
-                            />
                         )}
 
                         {/* 🔐 Hidden Core Config Tab - Only for Super Admin */}
@@ -1242,7 +1326,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
                         {/* 📋 Subscription Requests Tab */}
                         {activeTab === 'subscription-requests' && (
-                            <SubscriptionRequestsTab />
+                            <SubscriptionRequestsTab key={`subscription-requests-${subscriptionTabRefreshKey}`} />
                         )}
                     </div>
                     </div>
@@ -1274,8 +1358,8 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                 )}
             </div>
 
-            {/* ✅ Core Config Password Modal - Theme Compatible */}
-            {showCoreConfigModal && (
+            {/* ✅ Core Config Password Modal - Rendered in portal so close/cancel buttons work (no stacking-context trap) */}
+            {showCoreConfigModal && createPortal(
                 <div
                     className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
                     style={{
@@ -1288,7 +1372,6 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         backdropFilter: 'blur(8px)',
                     }}
                     onClick={(e) => {
-                        // Close only if clicking backdrop, not modal content
                         if (e.target === e.currentTarget) {
                             setShowCoreConfigModal(false);
                             setCoreConfigPassword('');
@@ -1296,7 +1379,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                     }}
                 >
 
-                    {/* Modal Content */}
+                    {/* Modal Content - pointer-events-auto so buttons receive clicks */}
                     <div
                         className="relative w-full max-w-md rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 shadow-2xl glass-card mx-2 sm:mx-0"
                         style={{
@@ -1305,6 +1388,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                             zIndex: 100000,
                             position: 'relative',
                             boxShadow: 'var(--theme-shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.3))',
+                            pointerEvents: 'auto',
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -1337,6 +1421,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 </p>
                             </div>
                             <button
+                                type="button"
                                 onClick={() => {
                                     setShowCoreConfigModal(false);
                                     setCoreConfigPassword('');
@@ -1344,8 +1429,10 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 className="p-2 rounded-lg transition-colors hover:opacity-70"
                                 style={{ 
                                     background: 'var(--theme-bg-tertiary)',
-                                    color: 'var(--theme-text-secondary)'
+                                    color: 'var(--theme-text-secondary)',
+                                    pointerEvents: 'auto',
                                 }}
+                                aria-label={t('common.close') || 'إغلاق'}
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -1360,11 +1447,13 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 {t('admin.enterPassword')}
                             </label>
                             <input
+                                id="core-config-password"
+                                name="coreConfigPassword"
                                 type="password"
                                 value={coreConfigPassword}
                                 onChange={(e) => setCoreConfigPassword(e.target.value)}
                                 onKeyPress={(e) => {
-                                    if (e.key === 'Enter' && coreConfigPassword.trim().toLowerCase() === 'adora') {
+                                    if (e.key === 'Enter' && coreConfigPassword.trim() === 'ADORA2026') {
                                         handleCoreConfigAccess();
                                     }
                                 }}
@@ -1377,7 +1466,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                 placeholder="••••••••"
                                 autoFocus
                             />
-                            {coreConfigPassword && coreConfigPassword.trim().toLowerCase() !== 'adora' && (
+                            {coreConfigPassword && coreConfigPassword.trim() !== 'ADORA2026' && (
                                 <p 
                                     className="text-xs mt-2 flex items-center gap-1"
                                     style={{ color: 'var(--theme-error-500, #ef4444)' }}
@@ -1391,6 +1480,7 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                         {/* Footer */}
                         <div className="flex gap-3">
                             <button
+                                type="button"
                                 onClick={() => {
                                     setShowCoreConfigModal(false);
                                     setCoreConfigPassword('');
@@ -1400,47 +1490,52 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                     background: 'var(--theme-bg-tertiary)',
                                     borderColor: 'var(--theme-border-primary)',
                                     color: 'var(--theme-text-primary)',
+                                    pointerEvents: 'auto',
                                 }}
                             >
                                 {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleCoreConfigAccess}
-                                disabled={coreConfigPassword.trim().toLowerCase() !== 'adora'}
+                                disabled={coreConfigPassword.trim() !== 'ADORA2026'}
                                 className="flex-1 px-6 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 style={{
-                                    background: coreConfigPassword.trim().toLowerCase() === 'adora' 
+                                    background: coreConfigPassword.trim() === 'ADORA2026' 
                                         ? 'var(--theme-primary-500)' 
                                         : 'var(--theme-bg-tertiary)',
-                                    color: coreConfigPassword.trim().toLowerCase() === 'adora' 
+                                    color: coreConfigPassword.trim() === 'ADORA2026' 
                                         ? 'white' 
                                         : 'var(--theme-text-disabled)',
-                                    borderColor: coreConfigPassword.trim().toLowerCase() === 'adora' 
+                                    borderColor: coreConfigPassword.trim() === 'ADORA2026' 
                                         ? 'var(--theme-primary-500)' 
                                         : 'var(--theme-border-primary)',
-                                    boxShadow: coreConfigPassword.trim().toLowerCase() === 'adora' 
+                                    boxShadow: coreConfigPassword.trim() === 'ADORA2026' 
                                         ? '0 10px 25px var(--theme-primary-500)' 
                                         : 'none',
-                                    opacity: coreConfigPassword.trim().toLowerCase() === 'adora' ? 1 : 0.5,
+                                    opacity: coreConfigPassword.trim() === 'ADORA2026' ? 1 : 0.5,
                                 }}
                             >
                                 {t('admin.enter')}
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ✅ Add Manager Modal - Rendered OUTSIDE main container */}
             {showAddManagerModal && (
                 <AddManagerModal
                     systemSettings={effectiveSettings}
-                    onClose={() => setShowAddManagerModal(false)}
+                    onClose={() => {
+                        clearAddManagerDraft();
+                        setShowAddManagerModal(false);
+                    }}
                     onSuccess={async () => {
+                        clearAddManagerDraft();
                         setShowAddManagerModal(false);
                         await loadData(true); // Force refresh after adding manager
                         success(t('admin.managerAdded'));
-                        // ✅ {t('admin.autoNavigateToBilling')}
                         setSearchParams({ tab: 'billing' });
                     }}
                 />
@@ -1448,13 +1543,13 @@ export const EnhancedOwnerDashboard: React.FC = () => {
 
             {/* ✅ Manager Details Modal - Enhanced for Light Mode + Print */}
             {showManagerDetailsModal && selectedManager && (
-                <div className="fixed inset-0 z-[100] bg-black/40 dark:bg-black/80 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)' }}>
-                    <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-white/10">
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/20 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-transparent dark:to-transparent">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                                {t('admin.managerDetails')}
+                <div className="fixed inset-0 z-[100] bg-black/40 dark:bg-black/80 flex items-center justify-center p-2 sm:p-4" style={{ backdropFilter: 'blur(4px)' }}>
+                    <div className="bg-white dark:bg-slate-800/90 dark:backdrop-blur-sm rounded-xl w-full max-w-md sm:max-w-lg shadow-2xl border border-slate-200 dark:border-slate-700/50 max-h-[90vh] flex flex-col">
+                        {/* Header - مضموم */}
+                        <div className="flex items-center justify-between px-3 py-2 sm:py-2.5 border-b border-slate-200 dark:border-slate-700/50 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-slate-800/80 dark:to-slate-800/80 flex-shrink-0">
+                            <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                                <Users className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                <span className="truncate">{t('admin.managerDetails')}</span>
                             </h3>
                             <div className="flex items-center gap-2">
                                 {/* Print Button */}
@@ -1492,14 +1587,14 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                                     <h1>${t('admin.adoraSubscriptionReport')}</h1>
                                                     <p><strong>${selectedManager.tenantName}</strong></p>
                                                     <p>${t('admin.managerCode')}: ${selectedManager.managerCode || t('admin.notSpecified')}</p>
-                                                    <p>${t('admin.reportDate')}: ${new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                                    <p>${t('admin.reportDate')}: ${formatDateGregorianEn(new Date(), 'long')}</p>
                                                 </div>
                                                 
                                                 <div class="section">
                                                     <h3>${t('admin.subscriberInfo')}</h3>
                                                     <div class="grid">
                                                         <div class="stat">
-                                                            <div class="stat-label">${t('admin.hotelName')}</div>
+                                                            <div class="stat-label">${t('admin.brandName')}</div>
                                                             <div class="stat-value">${selectedManager.tenantName}</div>
                                                         </div>
                                                         <div class="stat">
@@ -1509,10 +1604,6 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                                         <div class="stat">
                                                             <div class="stat-label">${t('admin.managerCodeLabel')}</div>
                                                             <div class="stat-value">${selectedManager.managerCode || t('admin.notSpecified')}</div>
-                                                        </div>
-                                                        <div class="stat">
-                                                            <div class="stat-label">${t('admin.plan')}</div>
-                                                            <div class="stat-value">${selectedManager.plan}</div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1544,11 +1635,11 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                                     <div class="grid">
                                                         <div class="stat">
                                                             <div class="stat-label">${t('admin.startDate')}</div>
-                                                            <div class="stat-value">${toSafeDate(selectedManager.subscriptionStartDate).toLocaleDateString('ar-EG')}</div>
+                                                            <div class="stat-value">${formatDateGregorianEn(toSafeDate(selectedManager.subscriptionStartDate))}</div>
                                                         </div>
                                                         <div class="stat">
                                                             <div class="stat-label">${t('admin.endDate')}</div>
-                                                            <div class="stat-value">${toSafeDate(selectedManager.licenseExpiryDate).toLocaleDateString('ar-EG')}</div>
+                                                            <div class="stat-value">${formatDateGregorianEn(toSafeDate(selectedManager.licenseExpiryDate))}</div>
                                                         </div>
                                                         <div class="stat">
                                                             <div class="stat-label">${t('admin.remainingDays')}</div>
@@ -1579,11 +1670,11 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                         printWindow.document.close();
                                         printWindow.print();
                                     }}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-500/30 transition-colors border border-teal-300 dark:border-teal-500/30"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-500/30 transition-colors border border-teal-300 dark:border-teal-500/30"
                                     title={t('admin.printSubscriptionReport')}
                                 >
-                                    <Printer className="w-5 h-5" />
-                                    <span className="hidden sm:inline">{t('admin.print')}</span>
+                                    <Printer className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline text-xs">{t('admin.print')}</span>
                                 </button>
                                 {/* Close Button */}
                                 <button
@@ -1591,158 +1682,165 @@ export const EnhancedOwnerDashboard: React.FC = () => {
                                         setShowManagerDetailsModal(false);
                                         setSelectedManager(null);
                                     }}
-                                    className="p-2 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 transition-colors"
+                                    className="p-1 rounded-lg bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 transition-colors"
                                 >
-                                    <X className="w-5 h-5 text-slate-600 dark:text-white" />
+                                    <X className="w-3.5 h-3.5 text-slate-600 dark:text-white" />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Content */}
-                        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-5 lg:space-y-6 bg-slate-50 dark:bg-transparent">
-                            {/* Basic Info */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.hotelName')}</p>
-                                    <p className="text-lg font-bold text-slate-800 dark:text-white">{selectedManager.tenantName}</p>
+                        {/* Content - مضموم + سكرول لو طال */}
+                        <div className="px-2.5 py-2 sm:px-3 sm:py-2.5 space-y-2 bg-slate-50 dark:bg-slate-900/50 overflow-y-auto flex-1 min-h-0">
+                            {/* Basic Info - صف واحد مضغوط */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                <div className="bg-white dark:bg-slate-800/60 rounded-md p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                    <p className="text-[9px] text-slate-500 dark:text-slate-400 mb-0.5 font-medium">{t('admin.brandName')}</p>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{selectedManager.tenantName}</p>
                                 </div>
-                                <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.managerName')}</p>
-                                    <p className="text-lg font-bold text-slate-800 dark:text-white">{selectedManager.managerName || t('admin.notSpecified')}</p>
+                                <div className="bg-white dark:bg-slate-800/60 rounded-md p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                    <p className="text-[9px] text-slate-500 dark:text-slate-400 mb-0.5 font-medium">{t('admin.managerName')}</p>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{selectedManager.managerName || t('admin.notSpecified')}</p>
                                 </div>
-                                <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.managerCodeLabel')}</p>
-                                    <p className="text-lg font-bold text-teal-600 dark:text-teal-400">{selectedManager.managerCode || t('admin.notSpecified')}</p>
+                                <div className="bg-white dark:bg-slate-800/60 rounded-md p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                    <p className="text-[9px] text-slate-500 dark:text-slate-400 mb-0.5 font-medium">{t('admin.managerCodeLabel')}</p>
+                                    <p className="text-xs font-bold text-teal-600 dark:text-teal-400 font-mono">{selectedManager.managerCode || t('admin.notSpecified')}</p>
                                 </div>
-                                <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                    <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.plan')}</p>
-                                    <p className="text-lg font-bold text-slate-800 dark:text-white capitalize">{selectedManager.plan}</p>
-                                </div>
-                            </div>
-
-                            {/* Status */}
-                            <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                <p className="text-sm text-slate-500 dark:text-white/60 mb-2">{t('admin.status')}</p>
-                                <div className="flex items-center gap-2">
-                                    {selectedManager.status === 'active' && (
-                                        <span className="px-3 py-1 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-full text-sm border border-green-300 dark:border-green-500/30 flex items-center gap-1">
-                                            <CheckCircle className="w-4 h-4" />
-                                            {t('admin.activeStatus')}
-                                        </span>
-                                    )}
-                                    {selectedManager.status === 'suspended' && (
-                                        <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 rounded-full text-sm border border-yellow-300 dark:border-yellow-500/30 flex items-center gap-1">
-                                            <Pause className="w-4 h-4" />
-                                            {t('admin.suspendedStatus')}
-                                        </span>
-                                    )}
-                                    {selectedManager.status === 'expired' && (
-                                        <span className="px-3 py-1 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-full text-sm border border-red-300 dark:border-red-500/30 flex items-center gap-1">
-                                            <X className="w-4 h-4" />
-                                            {t('admin.expiredLicense')}
-                                        </span>
-                                    )}
+                                <div className="bg-white dark:bg-slate-800/60 rounded-md p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                    <p className="text-[9px] text-slate-500 dark:text-slate-400 mb-0.5 font-medium">{t('admin.totalBranches')}</p>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">{selectedManager.totalBranches || 0}</p>
                                 </div>
                             </div>
 
-                            {/* Statistics */}
-                            <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                <p className="text-sm text-slate-500 dark:text-white/60 mb-3">{t('admin.statistics')}</p>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="bg-blue-50 dark:bg-white/5 rounded-xl p-4 text-center border border-blue-200 dark:border-transparent">
-                                        <Users className="w-6 h-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
-                                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalEmployees}</p>
-                                        <p className="text-xs text-slate-500 dark:text-white/60">{t('common.employee')}</p>
-                                    </div>
-                                    <div className="bg-purple-50 dark:bg-white/5 rounded-xl p-4 text-center border border-purple-200 dark:border-transparent">
-                                        <Building2 className="w-6 h-6 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
-                                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalBranches}</p>
-                                        <p className="text-xs text-slate-500 dark:text-white/60">{t('sidebar.branch')}</p>
-                                    </div>
-                                    <div className="bg-teal-50 dark:bg-white/5 rounded-xl p-4 text-center border border-teal-200 dark:border-transparent">
-                                        <DoorOpen className="w-6 h-6 text-teal-600 dark:text-teal-400 mx-auto mb-2" />
-                                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalRooms}</p>
-                                        <p className="text-xs text-slate-500 dark:text-white/60">{t('common.room')}</p>
-                                    </div>
-                                    <div className="bg-green-50 dark:bg-white/5 rounded-xl p-4 text-center border border-green-200 dark:border-transparent">
-                                        <Activity className="w-6 h-6 text-green-600 dark:text-green-400 mx-auto mb-2" />
-                                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{selectedManager.totalRequests}</p>
-                                        <p className="text-xs text-slate-500 dark:text-white/60">{t('common.request')}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* License Info */}
-                            <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                <p className="text-sm text-slate-500 dark:text-white/60 mb-3">{t('admin.licenseInfo')}</p>
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-                                        <span className="text-slate-700 dark:text-white/80">{t('admin.startDate')}</span>
-                                        <span className="text-slate-800 dark:text-white font-medium">
-                                            {toSafeDate(selectedManager.subscriptionStartDate).toLocaleDateString('ar-EG')}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-                                        <span className="text-slate-700 dark:text-white/80">{t('admin.endDate')}</span>
-                                        <span className="text-slate-800 dark:text-white font-medium">
-                                            {toSafeDate(selectedManager.licenseExpiryDate).toLocaleDateString('ar-EG')}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-                                        <span className="text-slate-700 dark:text-white/80">{t('admin.remainingDays')}</span>
-                                        <span className={`font-bold ${selectedManager.daysUntilExpiry <= 7
-                                                ? 'text-red-600 dark:text-red-400'
-                                                : selectedManager.daysUntilExpiry <= 30
-                                                    ? 'text-yellow-600 dark:text-yellow-400'
-                                                    : 'text-green-600 dark:text-green-400'
-                                            }`}>
-                                            {selectedManager.daysUntilExpiry} {t('admin.days')}
-                                        </span>
+                            {/* Branch Codes + Status في صف واحد */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                {(() => {
+                                    const branchList = selectedManager.branches && selectedManager.branches.length > 0
+                                        ? selectedManager.branches
+                                        : ((selectedManager as any).branchCodes || []).map((code: string) => ({
+                                            id: `branch-${code}`,
+                                            name: `فرع ${code}`,
+                                            code: code
+                                        }));
+                                    return branchList.length > 0 ? (
+                                        <div className="bg-white dark:bg-slate-800/60 rounded-md p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                            <p className="text-[9px] text-slate-500 dark:text-slate-400 mb-1 font-medium flex items-center gap-1">
+                                                <Building2 className="w-3 h-3 text-teal-600 dark:text-teal-400" />
+                                                أكواد الفروع ({branchList.length})
+                                            </p>
+                                            <div className="flex flex-wrap gap-1">
+                                                {branchList.map((branch: any) => (
+                                                    <span
+                                                        key={branch.id || branch.code}
+                                                        className="px-1.5 py-0.5 bg-teal-50 dark:bg-slate-700/60 text-teal-700 dark:text-teal-400 rounded border border-teal-200 dark:border-teal-500/30 text-[10px] font-medium inline-flex items-center gap-1"
+                                                    >
+                                                        {branch.name || `فرع ${branch.code}`}
+                                                        {branch.code && <span className="font-mono font-bold">{branch.code}</span>}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : null;
+                                })()}
+                                {/* Status */}
+                                <div className="bg-white dark:bg-slate-800/60 rounded-md p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                    <p className="text-[9px] text-slate-500 dark:text-slate-400 mb-1 font-medium">{t('admin.status')}</p>
+                                    <div className="flex items-center gap-1.5">
+                                        {selectedManager.status === 'active' && (
+                                            <span className="px-1.5 py-0.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded text-[10px] border border-green-300 dark:border-green-500/30 font-semibold inline-flex items-center gap-1">
+                                                <CheckCircle className="w-3 h-3" />{t('admin.activeStatus')}
+                                            </span>
+                                        )}
+                                        {selectedManager.status === 'suspended' && (
+                                            <span className="px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 rounded text-[10px] border border-yellow-300 dark:border-yellow-500/30 font-semibold inline-flex items-center gap-1">
+                                                <Pause className="w-3 h-3" />{t('admin.suspendedStatus')}
+                                            </span>
+                                        )}
+                                        {selectedManager.status === 'expired' && (
+                                            <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded text-[10px] border border-red-300 dark:border-red-500/30 font-semibold inline-flex items-center gap-1">
+                                                <X className="w-3 h-3" />{t('admin.expiredLicense')}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Last Activity - ✅ Human-readable format */}
-                            <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-transparent shadow-sm">
-                                <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.lastActivity')}</p>
-                                <p className="text-slate-800 dark:text-white">
-                                    {(() => {
-                                        const lastDate = selectedManager.lastActivity instanceof Date
-                                            ? selectedManager.lastActivity
-                                            : new Date(selectedManager.lastActivity);
-                                        const now = new Date();
-                                        const diffMs = now.getTime() - lastDate.getTime();
-                                        const diffMins = Math.floor(diffMs / (1000 * 60));
-                                        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                                        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                            {/* Statistics - صف واحد 4 خانات مضمومة */}
+                            <div className="bg-white dark:bg-slate-800/60 rounded-md p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                <p className="text-[9px] text-slate-500 dark:text-slate-400 mb-1 font-medium">{t('admin.statistics')}</p>
+                                <div className="grid grid-cols-4 gap-1">
+                                    <div className="bg-blue-50 dark:bg-slate-800/70 rounded p-1.5 text-center border border-blue-200 dark:border-blue-500/30">
+                                        <Users className="w-3 h-3 text-blue-600 dark:text-blue-400 mx-auto mb-0.5" />
+                                        <p className="text-sm font-bold text-blue-700 dark:text-blue-300">{selectedManager.totalEmployees || 0}</p>
+                                        <p className="text-[9px] text-slate-600 dark:text-slate-300">{t('common.employee')}</p>
+                                    </div>
+                                    <div className="bg-purple-50 dark:bg-slate-800/70 rounded p-1.5 text-center border border-purple-200 dark:border-purple-500/30">
+                                        <Building2 className="w-3 h-3 text-purple-600 dark:text-purple-400 mx-auto mb-0.5" />
+                                        <p className="text-sm font-bold text-purple-700 dark:text-purple-300">{selectedManager.totalBranches || 0}</p>
+                                        <p className="text-[9px] text-slate-600 dark:text-slate-300">{t('sidebar.branch')}</p>
+                                    </div>
+                                    <div className="bg-teal-50 dark:bg-slate-800/70 rounded p-1.5 text-center border border-teal-200 dark:border-teal-500/30">
+                                        <DoorOpen className="w-3 h-3 text-teal-600 dark:text-teal-400 mx-auto mb-0.5" />
+                                        <p className="text-sm font-bold text-teal-700 dark:text-teal-300">{selectedManager.totalRooms || 0}</p>
+                                        <p className="text-[9px] text-slate-600 dark:text-slate-300">{t('common.room')}</p>
+                                    </div>
+                                    <div className="bg-green-50 dark:bg-slate-800/70 rounded p-1.5 text-center border border-green-200 dark:border-green-500/30">
+                                        <Activity className="w-3 h-3 text-green-600 dark:text-green-400 mx-auto mb-0.5" />
+                                        <p className="text-sm font-bold text-green-700 dark:text-green-300">{selectedManager.totalRequests || 0}</p>
+                                        <p className="text-[9px] text-slate-600 dark:text-slate-300">{t('common.request')}</p>
+                                    </div>
+                                </div>
+                            </div>
 
-                                        if (diffMins < 1) return t('admin.now');
-                                        if (diffMins < 60) return t('admin.minutesAgo', { minutes: diffMins });
-                                        if (diffHours < 24) return t('admin.hoursAgo', { hours: diffHours });
-                                        if (diffDays === 1) return t('admin.yesterday');
-                                        if (diffDays < 7) return t('admin.daysAgo', { days: diffDays });
-                                        if (diffDays < 30) return t('admin.weeksAgo', { weeks: Math.floor(diffDays / 7) });
-
-                                        return lastDate.toLocaleDateString('ar-SA', {
-                                            year: 'numeric',
-                                            month: 'long',
-                                            day: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        });
-                                    })()}
-                                </p>
+                            {/* License + Last Activity في صف واحد */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                <div className="bg-white dark:bg-slate-800/60 rounded-md p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                    <p className="text-[9px] text-slate-500 dark:text-slate-400 mb-1 font-medium">{t('admin.licenseInfo')}</p>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/80 rounded p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                            <span className="text-[10px] text-slate-600 dark:text-slate-300 font-medium">{t('admin.endDate')}</span>
+                                            <span className="text-[10px] text-slate-900 dark:text-white font-bold">{formatDateGregorianEn(toSafeDate(selectedManager.licenseExpiryDate), 'medium')}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/80 rounded p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                            <span className="text-[10px] text-slate-600 dark:text-slate-300 font-medium">{t('admin.remainingDays')}</span>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${selectedManager.daysUntilExpiry <= 7 ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-slate-800/60' : selectedManager.daysUntilExpiry <= 30 ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-slate-800/60' : 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-slate-800/60'}`}>
+                                                {selectedManager.daysUntilExpiry} {t('admin.days')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {selectedManager.lastActivity && (
+                                    <div className="bg-white dark:bg-slate-800/60 rounded-md p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                        <p className="text-[9px] text-slate-500 dark:text-slate-400 mb-1 font-medium flex items-center gap-1"><Clock className="w-3 h-3 text-teal-600 dark:text-teal-400" />{t('admin.lastActivity')}</p>
+                                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/80 rounded p-1.5 border border-slate-200 dark:border-slate-700/50">
+                                            <span className="text-[10px] text-slate-600 dark:text-slate-300 font-medium">{t('admin.lastRequest')}</span>
+                                            <span className="text-[10px] text-slate-900 dark:text-white font-bold">
+                                                {(() => {
+                                                    const lastActivity = toSafeDate(selectedManager.lastActivity);
+                                                    const now = new Date();
+                                                    const diffMs = now.getTime() - lastActivity.getTime();
+                                                    const diffMins = Math.floor(diffMs / (1000 * 60));
+                                                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                                                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                                    if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
+                                                    if (diffHours < 24) return `منذ ${diffHours} ساعة`;
+                                                    if (diffDays < 7) return `منذ ${diffDays} يوم`;
+                                                    return formatDateGregorianEn(lastActivity, 'medium');
+                                                })()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-end gap-2 sm:gap-3 p-3 sm:p-4 lg:p-6 border-t border-slate-200 dark:border-white/10">
+                        <div className="flex items-center justify-end gap-2 px-2 py-1.5 border-t border-slate-200 dark:border-white/10 flex-shrink-0">
                             <button
                                 onClick={() => {
                                     setShowManagerDetailsModal(false);
                                     setSelectedManager(null);
                                 }}
-                                className="px-6 py-2 rounded-lg bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white transition-colors"
+                                className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-slate-700 dark:text-white transition-colors text-xs"
                             >
                                 {t('common.close')}
                             </button>
@@ -1825,78 +1923,12 @@ const OverviewTab: React.FC<{
                 onActivityRefresh?.(logs);
                 setLastRefreshTime(new Date());
             } catch (error) {
-                console.error('Failed to refresh activity:', error);
+                logger.error('Failed to refresh activity:', error, 'EnhancedOwnerDashboard');
             }
             setRefreshingActivity(false);
         };
         return (
             <div className="space-y-4 sm:space-y-6">
-                {/* ✅ Export Buttons - Compact Design */}
-                <div className="flex gap-2 justify-end">
-                    <button
-                        onClick={() => {
-                            if (!analytics || Object.keys(analytics).length === 0) {
-                                alert(t('common.noData'));
-                                return;
-                            }
-                            try {
-                                // ✅ Prepare comprehensive export data
-                                const exportData = {
-                                    ...analytics,
-                                    totalTenants: analytics.totalTenants || 0,
-                                    activeTenants: analytics.activeTenants || 0,
-                                    totalUsers: analytics.totalUsers || 0,
-                                    totalBranches: analytics.totalBranches || 0,
-                                    totalRooms: analytics.totalRooms || 0,
-                                    totalRequests: analytics.totalRequests || 0,
-                                    exportDate: new Date().toISOString()
-                                };
-                                exportToPDF(exportData, 'adora-dashboard-report.pdf');
-                            } catch (err) {
-                                console.error('PDF export failed:', err);
-                                alert(t('admin.exportPdfFailed'));
-                            }
-                        }}
-                        disabled={!analytics}
-                        className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={analytics ? t('admin.exportPdf') : t('admin.waitForData')}
-                    >
-                        <FileText className="w-4 h-4" />
-                        <span className="hidden sm:inline text-xs">PDF</span>
-                    </button>
-                    <button
-                        onClick={() => {
-                            if (!analytics || Object.keys(analytics).length === 0) {
-                                alert(t('common.noData'));
-                                return;
-                            }
-                            try {
-                                // ✅ Prepare comprehensive export data
-                                const exportData = {
-                                    ...analytics,
-                                    totalTenants: analytics.totalTenants || 0,
-                                    activeTenants: analytics.activeTenants || 0,
-                                    totalUsers: analytics.totalUsers || 0,
-                                    totalBranches: analytics.totalBranches || 0,
-                                    totalRooms: analytics.totalRooms || 0,
-                                    totalRequests: analytics.totalRequests || 0,
-                                    exportDate: new Date().toISOString()
-                                };
-                                exportToExcel(exportData, 'adora-dashboard-report.xlsx');
-                            } catch (err) {
-                                console.error('Excel export failed:', err);
-                                alert(t('admin.exportExcelFailed'));
-                            }
-                        }}
-                        disabled={!analytics}
-                        className={`px-2 py-1.5 dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs ${!analytics ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={analytics ? t('admin.exportExcel') : t('admin.waitForData')}
-                    >
-                        <Download className="w-4 h-4" />
-                        <span className="hidden sm:inline text-xs">Excel</span>
-                    </button>
-                </div>
-
                 {/* Critical Alerts - Mobile First */}
                 {systemSettings.maintenanceMode && (
                     <div className="glass rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-yellow-500/30 bg-yellow-500/10">
@@ -1932,7 +1964,7 @@ const OverviewTab: React.FC<{
                             <div className="min-w-0 flex-1">
                                 <h3 className="text-sm sm:text-base font-bold text-white mb-0.5 sm:mb-1">الإحصائيات السريعة</h3>
                                 <p className="text-xs sm:text-sm text-white/50 hidden sm:block">
-                                    إجمالي الفروع، المستخدمين، الطلبات، والغرف
+                                    {t('admin.quickStatsDescription')}
                                 </p>
                             </div>
                         </div>
@@ -1942,7 +1974,7 @@ const OverviewTab: React.FC<{
                     </div>
 
                     {/* Collapsible Content */}
-                    <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isStatsExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+                    <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-slate-50 dark:bg-slate-800/60 ${isStatsExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
                         <div className="p-3 sm:p-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4" data-tour="owner-overview-stats">
                                 <StatCard
@@ -1992,13 +2024,13 @@ const OverviewTab: React.FC<{
                                     {demoStats.nearestExpiry && (
                                         <div className="flex items-center gap-2">
                                             <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                                            <span>{t('admin.nearestExpiry')}: {demoStats.nearestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                            <span>{t('admin.nearestExpiry')}: {formatDateGregorianEn(demoStats.nearestExpiry, 'long')}</span>
                                         </div>
                                     )}
                                     {demoStats.farthestExpiry && demoStats.farthestExpiry.getTime() !== demoStats.nearestExpiry?.getTime() && (
                                         <div className="flex items-center gap-2">
                                             <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                                            <span>{t('admin.farthestExpiry')}: {demoStats.farthestExpiry.toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                            <span>{t('admin.farthestExpiry')}: {formatDateGregorianEn(demoStats.farthestExpiry, 'long')}</span>
                                         </div>
                                     )}
                                 </div>
@@ -2191,10 +2223,7 @@ const OverviewTab: React.FC<{
                                     <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">جميع الفروع ({allBranches.length})</h3>
-                                    <p className="text-xs sm:text-sm text-white/50 hidden sm:block">
-                                        عرض جميع فروع جميع المشتركين في النظام
-                                    </p>
+                                    <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">{t('admin.allBranches')} ({allBranches.length})</h3>
                                 </div>
                             </div>
                             <div className={`p-2 rounded-lg bg-white/5 transition-transform duration-300 flex-shrink-0 ${isBranchesExpanded ? '' : 'rotate-180'}`}>
@@ -2203,7 +2232,7 @@ const OverviewTab: React.FC<{
                         </div>
 
                         {/* Collapsible Content */}
-                        <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isBranchesExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+                        <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-slate-50 dark:bg-slate-800/60 ${isBranchesExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
                             <div className="p-3 sm:p-4 lg:p-6">
                                 <div className="space-y-2">
                                     {allBranches.slice(0, isBranchesExpanded ? allBranches.length : 5).map((branch: any) => (
@@ -2256,7 +2285,7 @@ const OverviewTab: React.FC<{
                 <DataHealthReportCard
                     tenantId={user?.role === 'owner' ? (user?.tenantId || 'system-owner' || 'owner') : (user?.id || '')}
                     onViewDetails={(report) => {
-                        console.log('View report details:', report.id);
+                        logger.debug('View report details:', report.id, 'EnhancedOwnerDashboard');
                         // Could open a detailed modal here
                     }}
                 />
@@ -2318,30 +2347,30 @@ const OverviewTab: React.FC<{
                                     </p>
                                 </div>
                             ) : (
-                                <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar">
+                                <div className="space-y-1.5 max-h-[400px] overflow-y-auto custom-scrollbar">
                                     {(activityLogs || []).map((log, index) => (
                                         <div
                                             key={log.id || index}
-                                            className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:bg-white/5"
+                                            className="flex items-start gap-2 p-2 rounded-md transition-colors hover:bg-white/5"
                                             style={{
                                                 background: 'var(--theme-bg-secondary)',
                                                 border: '1px solid var(--theme-border-primary)',
                                             }}
                                         >
                                             {/* Icon */}
-                                            <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-lg"
+                                            <div className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-sm"
                                                 style={{ background: 'var(--theme-bg-tertiary)' }}>
                                                 {getActionIcon(log.action)}
                                             </div>
 
                                             {/* Content */}
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className={`font-medium text-sm ${getActionColor(log.action)}`}>
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className={`font-medium text-xs ${getActionColor(log.action)}`}>
                                                         {getActionLabel(log.action)}
                                                     </span>
                                                     {log.targetName && (
-                                                        <span className="text-xs px-2 py-0.5 rounded-full"
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full"
                                                             style={{
                                                                 background: 'var(--theme-bg-tertiary)',
                                                                 color: 'var(--theme-text-secondary)',
@@ -2350,19 +2379,19 @@ const OverviewTab: React.FC<{
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <span className="text-[10px]" style={{ color: 'var(--theme-text-secondary)' }}>
                                                         👤 {log.userName || t('admin.system')}
                                                     </span>
                                                     {log.department && log.department !== 'system' && (
-                                                        <span className="text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                                        <span className="text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>
                                                             • {log.department}
                                                         </span>
                                                     )}
                                                 </div>
                                                 {/* Details if available */}
                                                 {log.details && Object.keys(log.details).length > 0 && (
-                                                    <div className="mt-1 text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                                    <div className="mt-0.5 text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>
                                                         {log.details.message && <span>{String(log.details.message)}</span>}
                                                         {log.details.oldValue !== undefined && log.details.newValue !== undefined && (
                                                             <span>
@@ -2374,7 +2403,7 @@ const OverviewTab: React.FC<{
                                             </div>
 
                                             {/* Time */}
-                                            <div className="flex-shrink-0 text-xs" style={{ color: 'var(--theme-text-tertiary)' }}>
+                                            <div className="flex-shrink-0 text-[10px]" style={{ color: 'var(--theme-text-tertiary)' }}>
                                                 {formatTimeAgo(log.timestamp)}
                                             </div>
                                         </div>
@@ -2425,6 +2454,16 @@ const TenantsTab: React.FC<{
     const { success, error } = useUX();
     const { t } = useTranslation();
     const { user } = useAuth();
+    
+    // ✅ Deep Audit & Purge System State
+    const [auditLoading, setAuditLoading] = useState(false);
+    const [auditStatus, setAuditStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const [auditProgress, setAuditProgress] = useState<string>('');
+    const [showAuditChoiceModal, setShowAuditChoiceModal] = useState(false);
+    const [showPurgeConfirmModal, setShowPurgeConfirmModal] = useState(false);
+    const [resetCode, setResetCode] = useState('');
+    const [showScanPasswordModal, setShowScanPasswordModal] = useState(false);
+    const [scanPassword, setScanPassword] = useState('');
 
     // Load deleted managers on mount
     useEffect(() => {
@@ -2522,7 +2561,7 @@ const TenantsTab: React.FC<{
 
                     // Check if date is valid
                     if (isNaN(expiry.getTime())) {
-                        console.warn('Invalid expiry date for tenant:', t.tenantId, t.licenseExpiryDate);
+                        logger.warn('Invalid expiry date for tenant:', { tenantId: t.tenantId, expiryDate: t.licenseExpiryDate }, 'EnhancedOwnerDashboard');
                         return t.status === 'expired';
                     }
 
@@ -2531,7 +2570,7 @@ const TenantsTab: React.FC<{
                     expiry.setHours(0, 0, 0, 0);
                     return expiry < now || t.status === 'expired';
                 } catch (error) {
-                    console.warn('Error filtering expired tenant:', t.tenantId, error);
+                    logger.warn('Error filtering expired tenant:', { tenantId: t.tenantId, error }, 'EnhancedOwnerDashboard');
                     return t.status === 'expired';
                 }
             });
@@ -2656,10 +2695,10 @@ const TenantsTab: React.FC<{
                     );
                     const employeesCount = await getCountFromServer(employeesQuery);
 
+                    // ✅ FIX: Use tenant-scoped collection
                     // Get requests by department
                     const requestsQuery = query(
-                        collection(db, 'requests'),
-                        where('tenantId', '==', tenant.tenantId),
+                        collection(db, `tenants/${tenant.tenantId}/requests`),
                         where('branch', '==', branch.id)
                     );
                     const requestsSnapshot = await getDocs(requestsQuery);
@@ -2681,7 +2720,7 @@ const TenantsTab: React.FC<{
 
                     // Get system settings for enabled features
                     const systemSettings = await getSystemSettings();
-                    const enabledFeatures = Object.entries(systemSettings.features)
+                    const enabledFeatures = Object.entries(systemSettings?.features ?? {})
                         .filter(([_, enabled]) => enabled)
                         .map(([key, _]) => key);
 
@@ -2704,10 +2743,121 @@ const TenantsTab: React.FC<{
             });
             setSelectedTenant(tenant);
         } catch (err: any) {
-            console.error('Error loading manager details:', err);
+            logger.error('Error loading manager details:', err, 'EnhancedOwnerDashboard');
             error(t('admin.errorLoadingManager'));
         } finally {
             setLoadingDetails(false);
+        }
+    };
+
+    // ✅ Deep Audit & Purge System Handlers (must be before return — used in modals below)
+    const handleScanPasswordConfirm = async () => {
+        if (scanPassword.trim() !== 'ADORA2026') {
+            error(t('admin.wrongPassword') || 'كلمة المرور غير صحيحة');
+            return;
+        }
+        setShowScanPasswordModal(false);
+        setScanPassword('');
+        setShowAuditChoiceModal(true);
+    };
+
+    const handleDeepAudit = async () => {
+        logger.info('Deep Audit button clicked', null, 'TenantsTab');
+        if (!user || user.role !== 'owner' || !user.id) {
+            error('⚠️ خطأ: هذه العملية متاحة للمالك فقط.');
+            return;
+        }
+        const confirm1 = await customConfirm({
+            type: 'warning',
+            title: t('admin.deepAuditProtocol') || '🔍 Deep Audit Protocol',
+            message: t('admin.deepAuditMessage') || 'سيتم فحص النظام بالكامل (Firestore, Auth, Storage) وحذف أي بيانات تجريبية.\n\nهل أنت متأكد؟',
+            confirmText: t('common.confirm'),
+            cancelText: t('common.cancel')
+        });
+        if (!confirm1) {
+            setShowAuditChoiceModal(false);
+            return;
+        }
+        setShowAuditChoiceModal(false);
+        setAuditLoading(true);
+        setAuditStatus('loading');
+        setAuditProgress(t('admin.scanningFirestore') || '🔍 جاري فحص Firestore...');
+        try {
+            logger.info('Starting Deep Audit Protocol', null, 'TenantsTab');
+            setAuditProgress(t('admin.scanningFirestore') || '📊 جاري فحص Firestore...');
+            const report = await executeDeepAudit();
+            setAuditProgress(t('admin.auditCompleted') || '✅ اكتمل الفحص بنجاح!');
+            if (report.summary.status === 'STERILE') {
+                setAuditStatus('success');
+                success(`✅ تم الفحص بنجاح!\n\n📊 الحالة: النظام نظيف 100%\n🗑️ تم حذف: ${report.summary.totalDeleted} عنصر`);
+            } else if (report.summary.status === 'CONTAMINATED') {
+                setAuditStatus('error');
+                error(`⚠️ اكتمل الفحص مع تحذيرات\n\nتم حذف ${report.summary.totalDeleted} عنصر، لكن لا يزال هناك بيانات في النظام`);
+            } else {
+                setAuditStatus('error');
+                error(t('admin.deepAuditFailed') || '❌ فشل الفحص');
+            }
+            await onRefresh();
+            const deleted = await getDeletedManagers();
+            setDeletedManagers(deleted); // ✅ تحديث قائمة المحذوفين بعد الفحص (تم مسح الأرشيف)
+        } catch (err: any) {
+            logger.error('Deep Audit error', err, 'TenantsTab');
+            setAuditStatus('error');
+            setAuditProgress(t('common.operationFailed') || '❌ فشل العملية');
+            error(err.message || t('admin.deepAuditFailed'));
+        } finally {
+            setAuditLoading(false);
+            setTimeout(() => {
+                setAuditStatus('idle');
+                setAuditProgress('');
+            }, 3000);
+        }
+    };
+
+    const handleConfirmPurge = async () => {
+        if (resetCode.trim() !== 'RESET') {
+            error(t('system.wrongResetCode'));
+            return;
+        }
+        if (!user || user.role !== 'owner' || !user.id) {
+            error('⚠️ خطأ: هذه العملية متاحة للمالك فقط.');
+            return;
+        }
+        setShowPurgeConfirmModal(false);
+        setResetCode('');
+        setAuditLoading(true);
+        setAuditStatus('loading');
+        setAuditProgress(`☢️ ${t('system.purging')}`);
+        try {
+            logger.info('Initializing Nuclear Purge via Deep Audit', null, 'TenantsTab');
+            setAuditProgress(`🔥 ${t('system.deletingAllData')}`);
+            const report = await executeDeepAudit({ nuclearMode: true, ownerId: user.id });
+            setAuditProgress(`✅ ${t('system.purgeCompleted')}`);
+            setAuditStatus('success');
+            haptic('success');
+            playSound('success');
+            await onRefresh();
+            const deletedNow = await getDeletedManagers();
+            setDeletedManagers(deletedNow); // ✅ عرض الحالة الفعلية بعد المسح (إن فشل حذف الأرشيف يبقى الظهور حتى تنشر القواعد)
+            const hasArchiveError = report.firestore?.errors?.some((e: string) => e.includes('deleted_managers') || e.includes('صلاحيات'));
+            if (hasArchiveError) {
+                error(t('admin.deletedManagersPurgeFailed') || 'تم المسح لكن أرشيف المحذوفين لم يُمسح (صلاحيات). انشر القواعد: firebase deploy --only firestore:rules');
+            }
+            success(`${t('system.purgeSuccess')}\n\n${t('system.purgeSuccessDetails', { count: report.summary.totalDeleted })}`);
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } catch (err: any) {
+            logger.error('Purge System error', err, 'TenantsTab');
+            setAuditStatus('error');
+            setAuditProgress(`❌ ${t('system.purgeFailed')}`);
+            error(`${t('system.purgeFailed')}\n\n${err.message || 'خطأ غير معروف'}`);
+            setTimeout(() => {
+                setAuditStatus('idle');
+                setAuditProgress('');
+            }, 5000);
+        } finally {
+            setAuditLoading(false);
         }
     };
 
@@ -2716,14 +2866,17 @@ const TenantsTab: React.FC<{
             {/* 📍 Contextual Help for Owner */}
             <CreateManagerHelp />
 
-            <div className="glass rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 mb-3 sm:mb-4 lg:mb-6">
-                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{t('admin.tenantList')}</h3>
-                    <button
-                        onClick={onAddManager}
-                        className="group relative w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2.5 text-sm sm:text-base font-semibold overflow-hidden"
+            <div className="w-full space-y-4 sm:space-y-6">
+                {/* Header Section */}
+                <div className="glass rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 mb-3 sm:mb-4 lg:mb-6">
+                        <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{t('admin.tenantList')}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                onClick={onAddManager}
+                                className="group relative w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2.5 text-sm sm:text-base font-semibold overflow-hidden"
                         style={{
-                            background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.95) 0%, rgba(14, 165, 233, 0.95) 100%)',
+                            background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.95) 69%, rgba(14, 165, 233, 0.95) 100%)',
                             border: '2px solid rgba(20, 184, 166, 0.4)',
                             color: '#ffffff',
                             boxShadow: '0 4px 16px rgba(20, 184, 166, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15)',
@@ -2735,23 +2888,68 @@ const TenantsTab: React.FC<{
                             e.currentTarget.style.transform = 'translateY(-2px)';
                         }}
                         onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(20, 184, 166, 0.95) 0%, rgba(14, 165, 233, 0.95) 100%)';
+                            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(20, 184, 166, 0.95) 69%, rgba(14, 165, 233, 0.95) 100%)';
                             e.currentTarget.style.borderColor = 'rgba(20, 184, 166, 0.4)';
                             e.currentTarget.style.boxShadow = '0 4px 16px rgba(20, 184, 166, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15)';
                             e.currentTarget.style.transform = 'translateY(0)';
                         }}
-                    >
+                        >
                         {/* Shine effect */}
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
                         <Plus className="w-5 h-5 sm:w-5 sm:h-5 flex-shrink-0 relative z-10" style={{ filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))' }} />
                         <span className="relative z-10">{t('admin.addNewManager')}</span>
-                    </button>
-                </div>
+                            </button>
+                            
+                            {/* ✅ Deep Audit & Purge System Buttons - نفس حجم زر إضافة مدير */}
+                            <button
+                                onClick={() => setShowScanPasswordModal(true)}
+                                disabled={auditLoading}
+                                className={`flex items-center justify-center gap-2 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl border transition-all relative overflow-hidden text-sm sm:text-base font-semibold ${
+                                    auditStatus === 'loading' 
+                                        ? 'bg-blue-500/30 text-blue-300 border-blue-400/50 animate-pulse shadow-lg shadow-blue-500/30' 
+                                        : auditStatus === 'success'
+                                        ? 'bg-green-500/30 text-green-300 border-green-400/50 shadow-lg shadow-green-500/30'
+                                        : auditStatus === 'error'
+                                        ? 'bg-red-500/30 text-red-300 border-red-400/50 shadow-lg shadow-red-500/30'
+                                        : 'bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/30'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                title={auditProgress || (t('admin.fullSystemScanOrPurge') || 'المسح النووي وإعادة وضع المصنع')}
+                            >
+                                {auditStatus === 'loading' && (
+                                    <span className="absolute inset-0 rounded-xl sm:rounded-2xl animate-ping bg-blue-500/20"></span>
+                                )}
+                                <div className="relative flex items-center gap-2">
+                                    {auditLoading ? (
+                                        <div className="flex items-center gap-2">
+                                            <AdoraLoaderInline size={18} />
+                                            <span className="text-sm sm:text-base font-semibold animate-pulse">{auditProgress || 'جاري المعالجة...'}</span>
+                                        </div>
+                                    ) : auditStatus === 'success' ? (
+                                        <>
+                                            <CheckCircle className="w-5 h-5 animate-bounce" />
+                                            <span className="text-sm sm:text-base font-semibold">✅ اكتمل</span>
+                                        </>
+                                    ) : auditStatus === 'error' ? (
+                                        <>
+                                            <AlertTriangle className="w-5 h-5 animate-shake" />
+                                            <span className="text-sm sm:text-base font-semibold">❌ فشل</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Shield className="w-5 h-5 flex-shrink-0" />
+                                            <span className="hidden sm:inline">{t('admin.scanOrPurge') || 'المسح النووي وإعادة وضع المصنع'}</span>
+                                            <span className="sm:hidden">🔍</span>
+                                        </>
+                                    )}
+                                </div>
+                            </button>
+                        </div>
+                    </div>
 
-                {/* Filters - Mobile First */}
-                <div className="mb-4 space-y-3">
-                    {/* Filter Buttons */}
-                    <div className="flex flex-wrap gap-1.5 sm:gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
+                    {/* ✅ Filters - Mobile First, Full Width, Above Cards */}
+                    <div className="w-full space-y-3">
+                    {/* Filter Buttons - Responsive Grid for Mobile */}
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-2 overflow-x-auto pb-2 scrollbar-hide">
                         {[
                             { id: 'all' as FilterType, label: t('common.all'), icon: Activity },
                             { id: 'active' as FilterType, label: t('admin.active'), icon: CheckCircle },
@@ -2810,46 +3008,21 @@ const TenantsTab: React.FC<{
                                 <button
                                     key={filter.id}
                                     onClick={() => setActiveFilter(filter.id)}
-                                    className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm flex-shrink-0"
-                                    style={isActive
-                                        ? {
-                                            background: 'rgba(20, 184, 166, 0.2)',
-                                            color: 'rgba(20, 184, 166, 1)',
-                                            border: '1px solid rgba(20, 184, 166, 0.4)',
-                                            boxShadow: '0 4px 12px rgba(20, 184, 166, 0.15)',
-                                        }
-                                        : {
-                                            background: 'rgba(30, 41, 59, 0.6)',
-                                            color: 'rgba(255, 255, 255, 0.7)',
-                                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                                        }}
-                                    onMouseEnter={(e) => {
-                                        if (!isActive) {
-                                            e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)';
-                                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!isActive) {
-                                            e.currentTarget.style.background = 'rgba(30, 41, 59, 0.6)';
-                                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                                        }
-                                    }}
+                                    className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg sm:rounded-xl transition-all whitespace-nowrap text-xs sm:text-sm w-full sm:w-auto flex-shrink-0 ${
+                                        isActive
+                                            ? 'bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/40 dark:border-teal-500/30 shadow-sm'
+                                            : 'bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-800/80'
+                                    }`}
                                 >
                                     <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                                     <span>{filter.label}</span>
                                     {count > 0 && (
                                         <span 
-                                            className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
-                                            style={isActive
-                                                ? {
-                                                    background: 'rgba(20, 184, 166, 0.3)',
-                                                    color: 'rgba(20, 184, 166, 1)',
-                                                }
-                                                : {
-                                                    background: 'rgba(255, 255, 255, 0.1)',
-                                                    color: 'rgba(255, 255, 255, 0.8)',
-                                                }}
+                                            className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                                isActive
+                                                    ? 'bg-teal-500/30 text-teal-700 dark:text-teal-400'
+                                                    : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-white/80'
+                                            }`}
                                         >
                                             {count}
                                         </span>
@@ -2859,46 +3032,40 @@ const TenantsTab: React.FC<{
                         })}
                     </div>
 
-                    {/* Search by Name/Code - Mobile First */}
-                    <div className="relative">
+                    {/* Search by Name/Code - Mobile First, Full Width */}
+                    <div className="relative w-full">
                         <Search 
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5" 
-                            style={{ color: 'rgba(255, 255, 255, 0.5)' }}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 z-10 text-slate-400 dark:text-slate-500" 
                         />
                         <input
+                            id="tenant-search-input"
+                            name="tenantSearch"
                             type="text"
                             placeholder={t('admin.searchByNameOrCode')}
                             value={searchCode}
                             onChange={(e) => setSearchCode(e.target.value)}
-                            className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base shadow-sm transition-all"
-                            style={{
-                                background: 'rgba(30, 41, 59, 0.8)',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                color: 'rgba(255, 255, 255, 0.95)',
-                                placeholder: 'rgba(255, 255, 255, 0.4)',
-                            }}
-                            onFocus={(e) => {
-                                e.currentTarget.style.borderColor = 'rgba(32, 178, 170, 0.5)';
-                                e.currentTarget.style.background = 'rgba(30, 41, 59, 1)';
-                            }}
-                            onBlur={(e) => {
-                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                                e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)';
-                            }}
+                            className="w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base shadow-sm transition-all bg-slate-100 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/50 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:focus:ring-primary-500/30 focus:bg-white dark:focus:bg-slate-800/80"
                         />
                     </div>
                 </div>
+                </div>
 
-                <div className="space-y-2 sm:space-y-3">
-                    {filteredTenants.length === 0 ? (
+                {/* ✅ Empty State - Below Filters */}
+                {filteredTenants.length === 0 && (
+                    <div className="w-full flex items-center justify-center min-h-[200px]">
                         <p className="text-center text-slate-500 dark:text-white/40 py-6 sm:py-8 text-sm sm:text-base">
                             {searchCode || activeFilter !== 'all'
                                 ? t('admin.noResults')
                                 : t('admin.noTenants')}
                         </p>
-                    ) : (
-                        filteredTenants.map((tenant: TenantAnalytics & { isDeleted?: boolean }) => {
-                            // ✅ Check if this is a deleted manager
+                    </div>
+                )}
+
+                {/* ✅ Ultra-Compact Cards Container - Mobile First */}
+                {filteredTenants.length > 0 && (
+                    <div className="w-full space-y-2 sm:space-y-3">
+                    {filteredTenants.map((tenant: TenantAnalytics & { isDeleted?: boolean }, index: number) => {
+                        // ✅ Check if this is a deleted manager
                             const isDeletedManager = (tenant as any).isDeleted === true ||
                                 tenant.status === 'deleted' ||
                                 activeFilter === 'deleted';
@@ -2921,97 +3088,78 @@ const TenantsTab: React.FC<{
                                             ? 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500'
                                             : 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-500';
 
-                            // ✅ Special card styling for deleted managers
+                            // ✅ Ultra-Compact Professional Row Design - 2026 Best Practices
                             const cardClasses = isDeletedManager
-                                ? 'bg-gradient-to-r from-red-100 via-gray-100 to-red-100 dark:from-red-950/30 dark:via-gray-900/40 dark:to-red-950/30 rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all border-2 border-dashed border-red-400 dark:border-red-500/40 relative overflow-hidden opacity-80 hover:opacity-100'
-                                : 'bg-white dark:bg-white/5 rounded-xl sm:rounded-2xl p-4 sm:p-5 hover:bg-white dark:hover:bg-white/10 transition-all duration-300 border border-slate-200/80 dark:border-transparent shadow-[0_8px_30px_rgba(0,0,0,0.15),0_4px_10px_rgba(0,0,0,0.1)] hover:shadow-[0_15px_50px_rgba(0,0,0,0.2),0_8px_20px_rgba(0,0,0,0.15)] hover:border-teal-400 dark:hover:border-teal-500/30 hover:-translate-y-1';
+                                ? 'bg-gradient-to-r from-red-50/30 via-gray-50/20 to-red-50/30 dark:from-slate-900/60 dark:via-slate-800/50 dark:to-slate-900/60 rounded-xl p-3 transition-all border border-dashed border-red-300/40 dark:border-red-500/20 relative overflow-hidden opacity-90 hover:opacity-100 shadow-sm hover:shadow-md dark:shadow-slate-900/30'
+                                : 'bg-white dark:bg-slate-800/60 rounded-xl p-3 transition-all duration-200 border border-slate-200/80 dark:border-slate-700/50 shadow-sm hover:shadow-md hover:border-teal-400/50 dark:hover:border-teal-500/30 dark:shadow-slate-900/20';
 
                             return (
                                 <div
-                                    key={tenant.tenantId}
+                                    key={`${tenant.tenantId}-${index}-${isDeletedManager ? 'deleted' : 'active'}`}
                                     className={cardClasses}
                                 >
-                                    {/* ✅ Deleted indicator stripe */}
                                     {isDeletedManager && (
-                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-400 via-red-500 to-red-400" />
+                                        <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-red-400 via-red-500 to-red-400" />
                                     )}
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-                                        <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-1">
-                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 min-w-0">
-                                                <h4 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate w-full sm:w-auto">
-                                                    {tenant.tenantName}
-                                                </h4>
-                                                {tenant.managerName && (
-                                                    <span className="text-xs text-slate-600 dark:text-white/70 bg-slate-200 dark:bg-white/10 border border-slate-300 dark:border-white/15 rounded-full px-2 py-0.5 truncate self-start sm:self-auto flex items-center gap-1.5">
-                                                        <span>المدير: {tenant.managerName}</span>
-                                                        {tenant.managerCode && (
-                                                            <span className="text-slate-500 dark:text-white/50 font-mono">({tenant.managerCode})</span>
-                                                        )}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-wrap text-xs sm:text-sm text-slate-600 dark:text-white/60">
-                                                <span className="flex flex-wrap gap-1.5">
-                                                    <span>{tenant.totalBranches} فروع</span>
-                                                    <span className="hidden sm:inline">•</span>
-                                                    <span>{tenant.totalEmployees} موظف</span>
-                                                    <span className="hidden sm:inline">•</span>
-                                                    <span>{tenant.plan}</span>
-                                                </span>
-                                                <span
-                                                    className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full border ${statusClasses} self-start sm:self-auto flex items-center gap-1`}
-                                                >
-                                                    {isDeletedManager && <Trash2 className="w-3 h-3" />}
-                                                    {statusLabel}
-                                                </span>
-                                            </div>
-                                            {/* ✅ Branches with codes */}
-                                            {(() => {
-                                                // Use branches if available, otherwise fallback to branchCodes
-                                                const branchList = tenant.branches && tenant.branches.length > 0
-                                                    ? tenant.branches
-                                                    : ((tenant as any).branchCodes || []).map((code: string) => ({
-                                                        id: `branch-${code}`,
-                                                        name: `فرع ${code}`,
-                                                        code: code
-                                                    }));
-                                                return branchList.length > 0 ? (
-                                                    <div className="flex flex-wrap gap-1.5 mt-2">
-                                                        {branchList.map((branch: any) => (
-                                                            <span
-                                                                key={branch.id}
-                                                                className="text-[10px] bg-teal-100 dark:bg-primary-500/15 text-teal-700 dark:text-primary-300 border border-teal-400 dark:border-primary-500/30 rounded-lg px-2 py-0.5 flex items-center gap-1"
-                                                            >
-                                                                <Building2 className="w-3 h-3" />
-                                                                <span>{branch.name}</span>
-                                                                <span className="text-teal-600 dark:text-primary-400/70 font-mono">({branch.code})</span>
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : null;
-                                            })()}
-                                            <p className="text-[10px] sm:text-xs text-slate-500 dark:text-white/40 mt-1 leading-relaxed">
-                                                انتهاء الترخيص:{' '}
-                                                <span className="block sm:inline">
-                                                    {new Date(tenant.licenseExpiryDate).toLocaleDateString('ar-SA-u-ca-islamic', {
-                                                        year: 'numeric',
-                                                        month: 'long',
-                                                        day: 'numeric'
-                                                    })}
-                                                    {' - '}
-                                                    {new Date(tenant.licenseExpiryDate).toLocaleDateString('ar-EG', {
-                                                        year: 'numeric',
-                                                        month: 'short',
-                                                        day: 'numeric'
-                                                    })}م
-                                                </span>
-                                                <span className="hidden sm:inline"> • </span>
-                                                <span className="block sm:inline">
-                                                    ({tenant.daysUntilExpiry} يوم)
-                                                </span>
-                                            </p>
+                                    {/* صف منسق: شبكة على الشاشات المتوسطة+ */}
+                                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.2fr)_auto_1fr_auto_auto_auto] md:items-center gap-y-3 md:gap-x-4 md:gap-y-0">
+                                        {/* عمود 1: الاسم + الحالة */}
+                                        <div className="min-w-0 flex flex-wrap items-center gap-2">
+                                            <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                                {tenant.tenantName}
+                                            </h4>
+                                            <span
+                                                className={`text-[10px] px-2 py-0.5 rounded-md border ${statusClasses} flex items-center gap-1 font-semibold shrink-0`}
+                                            >
+                                                {isDeletedManager && <Trash2 className="w-3 h-3" />}
+                                                {statusLabel}
+                                            </span>
                                         </div>
-                                        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+                                        {/* عمود 2: المدير + الكود */}
+                                        <div className="min-w-0 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                            <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                            <span className="truncate">{tenant.managerName || '—'}</span>
+                                            {tenant.managerCode && (
+                                                <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 rounded font-mono text-[10px] font-bold border border-slate-200 dark:border-slate-600 shrink-0">
+                                                    {tenant.managerCode}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {/* عمود 3: الإحصائيات (فروع · موظفين · غرف · طلبات) */}
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400" title={t('admin.totalBranches') || 'فروع'}>
+                                                <Building2 className="w-3 h-3 text-blue-500" />
+                                                <b className="text-slate-900 dark:text-white tabular-nums">{tenant.totalBranches}</b>
+                                            </span>
+                                            <span className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400" title={t('admin.totalEmployees') || 'موظفين'}>
+                                                <Users className="w-3 h-3 text-purple-500" />
+                                                <b className="text-slate-900 dark:text-white tabular-nums">{tenant.totalEmployees}</b>
+                                            </span>
+                                            <span className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400" title={t('admin.rooms') || 'غرف'}>
+                                                <DoorOpen className="w-3 h-3 text-teal-500" />
+                                                <b className="text-slate-900 dark:text-white tabular-nums">{tenant.totalRooms ?? 0}</b>
+                                            </span>
+                                            <span className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400" title={t('admin.requests') || 'طلبات'}>
+                                                <Activity className="w-3 h-3 text-green-500" />
+                                                <b className="text-slate-900 dark:text-white tabular-nums">{tenant.totalRequests ?? 0}</b>
+                                            </span>
+                                        </div>
+                                        {/* عمود 4: الخطة */}
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <CreditCard className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+                                            <span className="font-semibold text-slate-900 dark:text-white capitalize">
+                                                {tenant.plan === 'enterprise' ? 'Enterprise' : tenant.plan === 'pro' ? 'Pro' : 'Basic'}
+                                            </span>
+                                        </div>
+                                        {/* عمود 5: المتبقي */}
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <Calendar className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                                            <span className={`font-semibold tabular-nums ${tenant.daysUntilExpiry <= 7 ? 'text-red-600 dark:text-red-400' : tenant.daysUntilExpiry <= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}>
+                                                {tenant.daysUntilExpiry} يوم
+                                            </span>
+                                        </div>
+                                        {/* عمود 6: الإجراءات */}
+                                        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                                             {isDeletedManager ? (
                                                 // Restore button for deleted managers (in any filter)
                                                 <button
@@ -3047,25 +3195,25 @@ const TenantsTab: React.FC<{
                                                         }
                                                     }}
                                                     disabled={processing === tenant.tenantId}
-                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                    className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 hover:border-green-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-xs sm:text-sm font-medium min-w-[32px] sm:min-w-[auto]"
                                                     title={t('admin.restoreManager')}
                                                 >
                                                     {processing === tenant.tenantId ? (
-                                                        <AdoraLoaderInline size={16} />
+                                                        <AdoraLoaderInline size={12} />
                                                     ) : (
-                                                        <Upload className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                        <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                     )}
-                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">{t('admin.restore')}</span>
+                                                    <span className="text-sm font-medium">{t('admin.restore')}</span>
                                                 </button>
                                             ) : (
                                                 <>
                                                     <button
                                                         onClick={() => onViewDetails?.(tenant)}
-                                                        className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group"
+                                                        className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 border border-teal-500/30 hover:border-teal-500/50 transition-all duration-200 shadow-sm hover:shadow-md text-xs sm:text-sm font-medium min-w-[32px] sm:min-w-[auto]"
                                                         title={t('common.viewFullDetails') || 'عرض التفاصيل الكاملة'}
                                                     >
-                                                        <Eye className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                                        <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">{t('common.view') || 'عرض'}</span>
+                                                        <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                                        <span className="hidden sm:inline text-sm font-medium">{t('common.view') || 'عرض'}</span>
                                                     </button>
                                                     {/* ✅ Check if manager is deleted before showing action buttons */}
                                                     {(() => {
@@ -3109,15 +3257,15 @@ const TenantsTab: React.FC<{
                                                                         }
                                                                     }}
                                                                     disabled={processing === tenant.tenantId}
-                                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                                    className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 hover:border-green-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-xs sm:text-sm font-medium min-w-[32px] sm:min-w-[auto]"
                                                                     title={t('admin.restoreManager')}
                                                                 >
                                                                     {processing === tenant.tenantId ? (
-                                                                        <AdoraLoaderInline size={16} />
+                                                                        <AdoraLoaderInline size={14} />
                                                                     ) : (
-                                                                        <Upload className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                                        <Upload className="w-4 h-4" />
                                                                     )}
-                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">{t('admin.restore')}</span>
+                                                                    <span className="hidden sm:inline text-sm font-medium">{t('admin.restore')}</span>
                                                                 </button>
                                                             );
                                                         }
@@ -3137,7 +3285,6 @@ const TenantsTab: React.FC<{
                                                                         try {
                                                                             await toggleLicenseStatus(manager.id, tenant.tenantId, tenant.status === 'active');
                                                                             success(tenant.status === 'active' ? t('admin.managerSuspended') : t('admin.managerActivated'));
-                                                                            // Refresh data to update statistics and cards
                                                                             await onRefresh();
                                                                         } catch (err: any) {
                                                                             error(err.message || t('admin.addError'));
@@ -3146,15 +3293,21 @@ const TenantsTab: React.FC<{
                                                                         }
                                                                     }}
                                                                     disabled={processing === tenant.tenantId}
-                                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                                    className={`flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-xs sm:text-sm font-medium min-w-[32px] sm:min-w-[auto] ${
+                                                                        tenant.status === 'active'
+                                                                            ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/50'
+                                                                            : 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 hover:border-green-500/50'
+                                                                    }`}
                                                                     title={tenant.status === 'active' ? t('owner.suspend') : t('owner.activate')}
                                                                 >
-                                                                    {tenant.status === 'active' ? (
-                                                                        <Pause className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                                    {processing === tenant.tenantId ? (
+                                                                        <AdoraLoaderInline size={12} />
+                                                                    ) : tenant.status === 'active' ? (
+                                                                        <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                                     ) : (
-                                                                        <Play className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                                        <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                                     )}
-                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">
+                                                                    <span className="hidden sm:inline text-sm font-medium">
                                                                         {tenant.status === 'active' ? t('owner.suspend') : t('owner.activate')}
                                                                     </span>
                                                                 </button>
@@ -3170,15 +3323,9 @@ const TenantsTab: React.FC<{
                                                                         try {
                                                                             const systemSettings = await getSystemSettings();
                                                                             const defaultPrice = systemSettings.defaultSubscriptionPrice || 0;
-
-                                                                            // Get current subscription price
                                                                             const subscription = await getSubscription(tenant.tenantId);
                                                                             const currentPrice = subscription?.pricePerMonth || 0;
-
-                                                                            // Renew license and check for price warning
                                                                             const result = await renewLicense(manager.id, tenant.tenantId, 1, currentPrice, defaultPrice);
-
-                                                                            // Show warning if price is below default
                                                                             if (result.warning) {
                                                                                 await customConfirm({
                                                                                     title: t('common.warning'),
@@ -3188,14 +3335,8 @@ const TenantsTab: React.FC<{
                                                                                     type: 'warning'
                                                                                 });
                                                                             }
-
-                                                                            // Use default price if set, otherwise use current price
                                                                             const renewalPrice = defaultPrice > 0 ? defaultPrice : currentPrice;
-
-                                                                            // Renew subscription with price
                                                                             await renewSubscription(tenant.tenantId, 'yearly', renewalPrice);
-
-                                                                            // Create invoice and payment if price > 0
                                                                             if (renewalPrice > 0 && subscription) {
                                                                                 const invoiceId = await createInvoice({
                                                                                     tenantId: tenant.tenantId,
@@ -3237,15 +3378,15 @@ const TenantsTab: React.FC<{
                                                                         }
                                                                     }}
                                                                     disabled={processing === tenant.tenantId}
-                                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                                    className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-400 border border-teal-500/30 hover:border-teal-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-xs sm:text-sm font-medium min-w-[32px] sm:min-w-[auto]"
                                                                     title={t('admin.renewSubscriptionYear') || 'تجديد الاشتراك (سنة)'}
                                                                 >
                                                                     {processing === tenant.tenantId ? (
-                                                                        <AdoraLoaderInline size={16} />
+                                                                        <AdoraLoaderInline size={12} />
                                                                     ) : (
-                                                                        <RefreshCw className="w-4 h-4 transition-transform group-hover:scale-110" />
+                                                                        <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                                     )}
-                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">تجديد</span>
+                                                                    <span className="hidden sm:inline text-sm font-medium">تجديد</span>
                                                                 </button>
                                                                 <button
                                                                     onClick={async () => {
@@ -3280,11 +3421,15 @@ const TenantsTab: React.FC<{
                                                                         }
                                                                     }}
                                                                     disabled={processing === tenant.tenantId}
-                                                                    className="flex flex-col items-center gap-1 p-2.5 rounded-xl dark:bg-white/10 bg-slate-200/80 dark:text-white text-slate-700 dark:hover:bg-white/20 hover:bg-slate-300/90 border border-slate-300/50 dark:border-white/10 shadow-sm dark:shadow-white/5 hover:shadow-md transition-all duration-200 hover:scale-105 active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                                                                    className="flex items-center justify-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 hover:border-red-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-xs sm:text-sm font-medium min-w-[32px] sm:min-w-[auto]"
                                                                     title={t('admin.deletePermanent')}
                                                                 >
-                                                                    <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
-                                                                    <span className="text-[10px] font-medium opacity-80 group-hover:opacity-100">{t('admin.delete')}</span>
+                                                                    {processing === tenant.tenantId ? (
+                                                                        <AdoraLoaderInline size={12} />
+                                                                    ) : (
+                                                                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                                                    )}
+                                                                    <span className="hidden sm:inline text-sm font-medium">{t('admin.delete')}</span>
                                                                 </button>
                                                             </>
                                                         );
@@ -3295,11 +3440,10 @@ const TenantsTab: React.FC<{
                                     </div>
                                 </div>
                             );
-                        })
-                    )}
+                        })}
                 </div>
+            )}
             </div>
-
 
             {/* Manager Details Modal */}
             {selectedTenant && managerDetails && (
@@ -3313,6 +3457,151 @@ const TenantsTab: React.FC<{
                     }}
                 />
             )}
+
+            {/* ✅ Deep Audit & Purge System Modals */}
+            {/* Scan Password Modal */}
+            <UnifiedModal
+                isOpen={showScanPasswordModal}
+                onClose={() => {
+                    if (!auditLoading) {
+                        setShowScanPasswordModal(false);
+                        setScanPassword('');
+                    }
+                }}
+                title={t('admin.scanPasswordTitle') || '🔐 كلمة المرور'}
+                subtitle={t('admin.scanPasswordSubtitle') || 'أدخل كلمة المرور للوصول إلى خيارات الفحص والمسح'}
+                icon={<Shield className="w-6 h-6 text-blue-400" />}
+                size="md"
+                showCloseButton={!auditLoading}
+                closeOnBackdrop={!auditLoading}
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">
+                            {t('admin.password') || 'كلمة المرور'}
+                        </label>
+                        <input
+                            type="password"
+                            value={scanPassword}
+                            onChange={(e) => setScanPassword(e.target.value)}
+                            placeholder={t('admin.enterPassword') || 'أدخل كلمة المرور'}
+                            className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                            dir="ltr"
+                            disabled={auditLoading}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && scanPassword.trim()) {
+                                    handleScanPasswordConfirm();
+                                }
+                            }}
+                        />
+                    </div>
+                    <ModalActions
+                        onCancel={() => {
+                            if (!auditLoading) {
+                                setShowScanPasswordModal(false);
+                                setScanPassword('');
+                            }
+                        }}
+                        onConfirm={handleScanPasswordConfirm}
+                        cancelText={t('common.cancel')}
+                        confirmText={t('common.confirm')}
+                        confirmVariant="primary"
+                        loading={auditLoading}
+                        disabled={!scanPassword.trim() || auditLoading}
+                    />
+                </div>
+            </UnifiedModal>
+
+            {/* Audit Choice Modal */}
+            <UnifiedModal
+                isOpen={showAuditChoiceModal}
+                onClose={() => {
+                    if (!auditLoading) {
+                        setShowAuditChoiceModal(false);
+                    }
+                }}
+                title={t('admin.auditChoiceTitle') || 'اختر العملية'}
+                subtitle={t('admin.auditChoiceSubtitle') || 'اختر بين فحص النظام أو مسح كامل'}
+                icon={<Shield className="w-6 h-6 text-blue-400" />}
+                size="md"
+                showCloseButton={!auditLoading}
+                closeOnBackdrop={!auditLoading}
+            >
+                <div className="space-y-3">
+                    <button
+                        onClick={handleDeepAudit}
+                        disabled={auditLoading}
+                        className="w-full px-4 py-3 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 hover:border-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        <Shield className="w-5 h-5" />
+                        <span className="font-medium">{t('admin.deepAudit') || '🔍 فحص النظام'}</span>
+                    </button>
+                    <button
+                        onClick={() => {
+                            setShowAuditChoiceModal(false);
+                            setShowPurgeConfirmModal(true);
+                        }}
+                        disabled={auditLoading}
+                        className="w-full px-4 py-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 hover:border-red-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        <AlertTriangle className="w-5 h-5" />
+                        <span className="font-medium">{t('admin.purgeSystem') || '☢️ مسح النظام'}</span>
+                    </button>
+                </div>
+            </UnifiedModal>
+
+            {/* Purge Confirm Modal */}
+            <UnifiedModal
+                isOpen={showPurgeConfirmModal}
+                onClose={() => {
+                    if (!auditLoading) {
+                        setShowPurgeConfirmModal(false);
+                        setResetCode('');
+                    }
+                }}
+                title={t('admin.purgeConfirmTitle') || '☢️ تأكيد المسح الكامل'}
+                subtitle={t('admin.purgeConfirmSubtitle') || 'هذه العملية ستحذف جميع البيانات نهائياً. اكتب RESET للتأكيد.'}
+                icon={<AlertTriangle className="w-6 h-6 text-red-400" />}
+                size="md"
+                showCloseButton={!auditLoading}
+                closeOnBackdrop={!auditLoading}
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-white/80 mb-2">
+                            {t('admin.resetCode') || 'كود التأكيد: RESET'}
+                        </label>
+                        <input
+                            type="text"
+                            value={resetCode}
+                            onChange={(e) => setResetCode(e.target.value)}
+                            placeholder="RESET"
+                            className="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all font-mono"
+                            dir="ltr"
+                            disabled={auditLoading}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && resetCode.trim() === 'RESET') {
+                                    handleConfirmPurge();
+                                }
+                            }}
+                        />
+                    </div>
+                    <ModalActions
+                        onCancel={() => {
+                            if (!auditLoading) {
+                                setShowPurgeConfirmModal(false);
+                                setResetCode('');
+                            }
+                        }}
+                        onConfirm={handleConfirmPurge}
+                        cancelText={t('common.cancel')}
+                        confirmText={t('admin.confirmPurge') || 'تأكيد المسح'}
+                        confirmVariant="danger"
+                        loading={auditLoading}
+                        disabled={resetCode.trim() !== 'RESET' || auditLoading}
+                    />
+                </div>
+            </UnifiedModal>
         </>
     );
 };
@@ -3327,26 +3616,6 @@ const SettingsTab: React.FC<{
     const { t } = useTranslation();
     const [isFeaturesCollapsed, setIsFeaturesCollapsed] = useState(true);
     const [isCompanyInfoCollapsed, setIsCompanyInfoCollapsed] = useState(true);
-    const [isTabsConfigCollapsed, setIsTabsConfigCollapsed] = useState(true);
-    
-    // ✅ Visible Tabs Configuration
-    const visibleTabs = systemSettings.visibleTabs || {
-        overview: true,
-        tenants: false,
-        billing: false,
-        settings: false,
-        broadcasts: false,
-        demo: true,
-        'core-config': false
-    };
-    
-    const handleToggleTab = (tabKey: keyof typeof visibleTabs) => {
-        const updated = {
-            ...visibleTabs,
-            [tabKey]: !visibleTabs[tabKey]
-        };
-        onSave({ visibleTabs: updated });
-    };
 
     // ✅ FIXED: Initialize from localStorage first, then systemSettings
     const [localPrice, setLocalPrice] = useState<number>(() => {
@@ -3422,6 +3691,25 @@ const SettingsTab: React.FC<{
     const [localContactEmail, setLocalContactEmail] = useState(systemSettings.contactEmail ?? '');
     const [localContactWebsite, setLocalContactWebsite] = useState(systemSettings.contactWebsite ?? '');
 
+    // ✅ Sync company info from systemSettings when it loads/updates (e.g. from Firebase after mount)
+    useEffect(() => {
+        setLocalCompanyName(systemSettings.companyName ?? '');
+        setLocalCompanyTaxNumber(systemSettings.companyTaxNumber ?? '');
+        setLocalCompanyAddress(systemSettings.companyAddress ?? '');
+        setLocalCommercialRegistration(systemSettings.commercialRegistrationNumber ?? '');
+        setLocalContactPhone(systemSettings.contactPhone ?? '');
+        setLocalContactEmail(systemSettings.contactEmail ?? '');
+        setLocalContactWebsite(systemSettings.contactWebsite ?? '');
+    }, [
+        systemSettings.companyName,
+        systemSettings.companyTaxNumber,
+        systemSettings.companyAddress,
+        systemSettings.commercialRegistrationNumber,
+        systemSettings.contactPhone,
+        systemSettings.contactEmail,
+        systemSettings.contactWebsite
+    ]);
+
     // Feature Labels
     const featureLabels: Record<string, string> = {
         qrCodeGuestPortal: 'بوابة النزيل (QR)',
@@ -3493,6 +3781,8 @@ const SettingsTab: React.FC<{
                                         سعر الاشتراك (ر.س)
                                     </label>
                                     <input
+                                        id="subscription-price"
+                                        name="subscriptionPrice"
                                         type="number"
                                         min="0"
                                         value={displayPrice}
@@ -3505,7 +3795,8 @@ const SettingsTab: React.FC<{
                                             const newPrice = parseFloat((e.target as HTMLInputElement).value) || 0;
                                             setLocalPrice(newPrice);
                                         }}
-                                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                         placeholder={t('common.examplePrice') || 'مثال: 1000'}
                                     />
                                 </div>
@@ -3523,7 +3814,8 @@ const SettingsTab: React.FC<{
                                             const newTax = parseFloat(e.target.value);
                                             setLocalTax(isNaN(newTax) ? 0 : newTax);
                                         }}
-                                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                         placeholder={t('admin.discountPlaceholder') || '15'}
                                     />
                                 </div>
@@ -3533,6 +3825,8 @@ const SettingsTab: React.FC<{
                                         خصم السنتين (%)
                                     </label>
                                     <input
+                                        id="subscription-discount"
+                                        name="subscriptionDiscount"
                                         type="number"
                                         min="0"
                                         max="100"
@@ -3541,7 +3835,8 @@ const SettingsTab: React.FC<{
                                             const newDiscount = parseFloat(e.target.value);
                                             setLocalTwoYearDiscount(isNaN(newDiscount) ? 0 : newDiscount);
                                         }}
-                                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                         placeholder={t('admin.discountPlaceholder2') || '5'}
                                     />
                                 </div>
@@ -3673,7 +3968,7 @@ const SettingsTab: React.FC<{
                 </div>
 
                 {/* Collapsible Content */}
-                <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isCompanyInfoCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
+                <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-slate-50 dark:bg-slate-800/60 ${isCompanyInfoCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
                         <div className="p-3 sm:p-4 lg:p-6">
                         <div className="space-y-3 sm:space-y-4">
                             {/* Company Name */}
@@ -3682,10 +3977,13 @@ const SettingsTab: React.FC<{
                                     اسم الشركة *
                                 </label>
                                 <input
+                                    id="company-name"
+                                    name="companyName"
                                     type="text"
                                     value={localCompanyName}
                                     onChange={(e) => setLocalCompanyName(e.target.value)}
-                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                     placeholder={t('common.exampleCompanyName') || 'مثال: شركة أدورا لإدارة الفنادق'}
                                 />
                             </div>
@@ -3696,10 +3994,13 @@ const SettingsTab: React.FC<{
                                     الرقم الضريبي *
                                 </label>
                                 <input
+                                    id="company-tax-number"
+                                    name="companyTaxNumber"
                                     type="text"
                                     value={localCompanyTaxNumber}
                                     onChange={(e) => setLocalCompanyTaxNumber(e.target.value)}
-                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                     placeholder={t('common.exampleTaxNumber') || 'مثال: 302003322600003'}
                                 />
                             </div>
@@ -3710,10 +4011,13 @@ const SettingsTab: React.FC<{
                                     {t('admin.commercialRegisterNumber')} *
                                 </label>
                                 <input
+                                    id="commercial-registration"
+                                    name="commercialRegistration"
                                     type="text"
                                     value={localCommercialRegistration}
                                     onChange={(e) => setLocalCommercialRegistration(e.target.value)}
-                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                     placeholder={t('owner.exampleCommercialRegistration') || 'مثال: 4030284941'}
                                 />
                             </div>
@@ -3724,10 +4028,13 @@ const SettingsTab: React.FC<{
                                     عنوان الشركة *
                                 </label>
                                 <textarea
+                                    id="company-address"
+                                    name="companyAddress"
                                     value={localCompanyAddress}
                                     onChange={(e) => setLocalCompanyAddress(e.target.value)}
                                     rows={2}
-                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base resize-none"
+                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base resize-none"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                     placeholder={t('owner.exampleCompanyAddress') || 'مثال: جدة - الرويس، شارع الجزيرة بجوار الأطباء المتحدون'}
                                 />
                             </div>
@@ -3738,10 +4045,13 @@ const SettingsTab: React.FC<{
                                     أرقام التواصل (هاتف) *
                                 </label>
                                 <input
+                                    id="contact-phone"
+                                    name="contactPhone"
                                     type="text"
                                     value={localContactPhone}
                                     onChange={(e) => setLocalContactPhone(e.target.value)}
-                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                     placeholder={t('owner.exampleContactPhone') || 'مثال: +966 12 6076060، +966 570707121'}
                                 />
                             </div>
@@ -3752,10 +4062,13 @@ const SettingsTab: React.FC<{
                                     البريد الإلكتروني
                                 </label>
                                 <input
+                                    id="contact-email"
+                                    name="contactEmail"
                                     type="email"
                                     value={localContactEmail}
                                     onChange={(e) => setLocalContactEmail(e.target.value)}
-                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                     placeholder={t('owner.exampleContactEmail') || 'مثال: info@adora.com'}
                                 />
                             </div>
@@ -3766,10 +4079,13 @@ const SettingsTab: React.FC<{
                                     الموقع الإلكتروني
                                 </label>
                                 <input
+                                    id="contact-website"
+                                    name="contactWebsite"
                                     type="url"
                                     value={localContactWebsite}
                                     onChange={(e) => setLocalContactWebsite(e.target.value)}
-                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-blue-400 transition-colors text-sm sm:text-base"
+                                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                     placeholder={t('owner.exampleWebsite') || 'مثال: https://www.adora.com'}
                                 />
                             </div>
@@ -3827,12 +4143,13 @@ const SettingsTab: React.FC<{
                 </div>
 
                 {/* Collapsible Content */}
-                <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isFeaturesCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
+                <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-slate-50 dark:bg-slate-800/60 ${isFeaturesCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
                         <div className="p-3 sm:p-4 lg:p-6">
                         <div className="space-y-3 sm:space-y-4">
                             {featureOrder.map((key) => {
                                 if (key === 'experimentalFeatures') return null;
-                                const enabled = features[key] as boolean;
+                                const safeFeatures = features ?? {};
+                                const enabled = safeFeatures[key] as boolean;
                                 const description = featureDescriptions[key] || 'ميزة متاحة في النظام';
                                 return (
                                     <div
@@ -3870,94 +4187,16 @@ const SettingsTab: React.FC<{
                 </div>
             </div>
 
-            {/* ✅ Visible Tabs Configuration Section */}
-            <div className="glass rounded-xl sm:rounded-2xl overflow-hidden border border-white/10">
-                <div
-                    onClick={() => setIsTabsConfigCollapsed(!isTabsConfigCollapsed)}
-                    className="flex items-center justify-between p-4 sm:p-6 cursor-pointer hover:bg-white/5 transition-colors"
-                >
-                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-500/20 flex items-center justify-center shadow-lg shadow-purple-500/10 flex-shrink-0">
-                            <LayoutDashboard className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h3 className="text-base sm:text-xl font-bold text-white mb-0.5 sm:mb-1">{t('admin.horizontalTabsSettings')}</h3>
-                            <p className="text-xs sm:text-sm text-white/50 leading-relaxed hidden sm:block">
-                                {t('admin.selectTabsToShow')}
-                            </p>
-                        </div>
-                    </div>
-                    <div className={`p-2 rounded-lg bg-white/5 transition-transform duration-300 flex-shrink-0 ${isTabsConfigCollapsed ? '' : 'rotate-180'}`}>
-                        <ChevronDown className="w-4 h-4 text-white/60" />
-                    </div>
-                </div>
-
-                {/* Collapsible Content */}
-                <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isTabsConfigCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
-                        <div className="p-3 sm:p-4 lg:p-6">
-                        <div className="space-y-3 sm:space-y-4">
-                            {[
-                                { key: 'overview' as const, label: t('admin.overview') || 'Overview', description: t('admin.mainDashboardAlwaysVisible') || 'Main Dashboard (always visible)', alwaysVisible: true },
-                                { key: 'tenants' as const, label: t('admin.createManager') || 'Create Manager', description: t('admin.tabDescriptions.tenants') || 'Create and manage managers (subscribers)', alwaysVisible: false },
-                                { key: 'billing' as const, label: t('admin.billing') || 'Billing', description: t('admin.tabDescriptions.billing') || 'Manage invoices and subscriptions', alwaysVisible: false },
-                                { key: 'settings' as const, label: t('admin.systemSettings') || 'System Settings', description: t('admin.tabDescriptions.settings') || 'Complete project settings', alwaysVisible: false },
-                                { key: 'demo' as const, label: t('admin.demoLinks') || 'Demo Links', description: t('admin.tabDescriptions.demo') || 'Create and manage demo links', alwaysVisible: false },
-                                { key: 'core-config' as const, label: t('admin.coreSetup') || '🔐 Core Setup', description: t('admin.tabDescriptions.coreConfig') || 'Advanced core settings (hidden by default)', alwaysVisible: false },
-                            ].map(tab => {
-                                const isEnabled = visibleTabs[tab.key] !== false;
-                                const isDisabled = tab.alwaysVisible;
-                                
-                                return (
-                                    <div
-                                        key={tab.key}
-                                        className="flex items-start justify-between p-3 sm:p-4 bg-white/5 rounded-lg sm:rounded-xl hover:bg-white/10 transition-all gap-3 sm:gap-4"
-                                    >
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-1">
-                                                <h4 className="font-medium text-white text-sm sm:text-base">
-                                                    {tab.label}
-                                                </h4>
-                                                {isDisabled && (
-                                                    <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                                                        دائماً مرئي
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="text-xs sm:text-sm text-white/50 leading-relaxed">
-                                                {tab.description}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                            <button
-                                                onClick={() => !isDisabled && handleToggleTab(tab.key)}
-                                                disabled={isDisabled || saving}
-                                                className={`relative w-12 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${
-                                                    isEnabled
-                                                        ? 'bg-teal-500'
-                                                        : 'bg-white/20'
-                                                } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                                title={isDisabled ? 'هذا التبويب دائماً مرئي' : isEnabled ? 'إخفاء التبويب' : 'إظهار التبويب'}
-                                            >
-                                                <span
-                                                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${
-                                                        isEnabled ? 'translate-x-6' : 'translate-x-0'
-                                                    }`}
-                                                />
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* ✅ إخفاء: إعدادات التبويبات الأفقية — غير مستخدم */}
 
             {/* ✅ Dynamic Platform Branding Section - Logo & Theme */}
             <DynamicBrandingSection />
 
             {/* ✅ Developer Branding Section - For Forgot Code & Support Links */}
-            <DeveloperBrandingSection />
+                            <DeveloperBrandingSection onSettingsUpdate={(settings) => {
+                                // Update parent SettingsTab's systemSettings via onSave
+                                onSave(settings);
+                            }} />
         </div>
     );
 };
@@ -3987,9 +4226,14 @@ const DynamicBrandingSection: React.FC = () => {
         localStorage.setItem('adora_primary_color', primaryColor);
         localStorage.setItem('adora_secondary_color', secondaryColor);
 
-        // Apply theme immediately via CSS variables
-        document.documentElement.style.setProperty('--color-primary', primaryColor);
-        document.documentElement.style.setProperty('--color-secondary', secondaryColor);
+        // Apply theme immediately via CSS variables used by theme-system/adora-components
+        const root = document.documentElement.style;
+        root.setProperty('--color-primary', primaryColor);
+        root.setProperty('--color-secondary', secondaryColor);
+        root.setProperty('--theme-primary-500', primaryColor);
+        root.setProperty('--theme-primary-400', secondaryColor);
+        root.setProperty('--theme-primary-600', primaryColor);
+        root.setProperty('--theme-gradient-primary', `linear-gradient(135deg, ${secondaryColor} 0%, ${primaryColor} 100%)`);
 
         setTimeout(() => {
             setSaving(false);
@@ -4022,7 +4266,7 @@ const DynamicBrandingSection: React.FC = () => {
             </div>
 
             {/* Collapsible Content */}
-            <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
+            <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-slate-50 dark:bg-slate-800/60 ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
                 <div className="p-4 sm:p-6 space-y-4">
                     <p className="text-xs text-white/60 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/10">
                         {t('admin.theseSettingsChangePlatform')}
@@ -4034,15 +4278,18 @@ const DynamicBrandingSection: React.FC = () => {
                             رابط اللوجو (Logo URL)
                         </label>
                         <input
+                            id="logo-url"
+                            name="logoUrl"
                             type="url"
                             value={logoUrl}
                             onChange={(e) => setLogoUrl(e.target.value)}
-                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-purple-400 transition-colors text-sm sm:text-base"
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                            style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                             placeholder={t('owner.exampleLogoUrl') || 'https://example.com/logo.png'}
                             dir="ltr"
                         />
                         {logoUrl && (
-                            <div className="mt-2 p-3 bg-slate-800/50 rounded-xl flex items-center justify-center">
+                            <div className="mt-2 p-3 bg-slate-100 dark:bg-slate-800/50 rounded-xl flex items-center justify-center border border-slate-200 dark:border-slate-700/50">
                                 <img
                                     src={logoUrl}
                                     alt="معاينة اللوجو"
@@ -4088,12 +4335,16 @@ const DynamicBrandingSection: React.FC = () => {
                                 <label className="block text-xs text-white/50 mb-1">اللون الأساسي</label>
                                 <div className="flex items-center gap-2">
                                     <input
+                                        id="primary-color-picker"
+                                        name="primaryColorPicker"
                                         type="color"
                                         value={primaryColor}
                                         onChange={(e) => setPrimaryColor(e.target.value)}
                                         className="w-10 h-10 rounded-lg cursor-pointer border-0"
                                     />
                                     <input
+                                        id="primary-color-text"
+                                        name="primaryColorText"
                                         type="text"
                                         value={primaryColor}
                                         onChange={(e) => setPrimaryColor(e.target.value)}
@@ -4106,12 +4357,16 @@ const DynamicBrandingSection: React.FC = () => {
                                 <label className="block text-xs text-white/50 mb-1">اللون الثانوي</label>
                                 <div className="flex items-center gap-2">
                                     <input
+                                        id="secondary-color-picker"
+                                        name="secondaryColorPicker"
                                         type="color"
                                         value={secondaryColor}
                                         onChange={(e) => setSecondaryColor(e.target.value)}
                                         className="w-10 h-10 rounded-lg cursor-pointer border-0"
                                     />
                                     <input
+                                        id="secondary-color-text"
+                                        name="secondaryColorText"
                                         type="text"
                                         value={secondaryColor}
                                         onChange={(e) => setSecondaryColor(e.target.value)}
@@ -4132,7 +4387,7 @@ const DynamicBrandingSection: React.FC = () => {
                                     className="px-4 py-2 rounded-lg text-white text-sm font-medium shadow-lg transition-transform hover:scale-105"
                                     style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
                                 >
-                                    زرار رئيسي
+                                    زر رئيسي
                                 </button>
                                 <button
                                     className="px-4 py-2 rounded-lg text-sm font-medium"
@@ -4142,7 +4397,7 @@ const DynamicBrandingSection: React.FC = () => {
                                         border: `1px solid ${primaryColor}40`
                                     }}
                                 >
-                                    زرار ثانوي
+                                    زر ثانوي
                                 </button>
                             </div>
                         </div>
@@ -4176,7 +4431,7 @@ const DynamicBrandingSection: React.FC = () => {
 };
 
 // ✅ Developer Branding Section Component
-const DeveloperBrandingSection: React.FC = () => {
+const DeveloperBrandingSection: React.FC<{ onSettingsUpdate?: (settings: any) => void }> = ({ onSettingsUpdate }) => {
     const { t } = useTranslation();
     const { user } = useAuth();
     const { success, error } = useUX();
@@ -4189,57 +4444,80 @@ const DeveloperBrandingSection: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [loading, setLoading] = useState(true);
+    const justSavedRef = useRef(false); // ✅ Prevent reload after save
 
     // ✅ Load from Firebase on mount (with localStorage as fallback)
     // ✅ CRITICAL: Only load on mount, never reload after save
     useEffect(() => {
+        // ✅ CRITICAL: Skip reload if we just saved (prevent overwriting user changes)
+        if (justSavedRef.current) {
+            logger.debug('⏸️ Skipping reload - data was just saved', undefined, 'EnhancedOwnerDashboard');
+            justSavedRef.current = false;
+            setLoading(false);
+            return;
+        }
+
         const loadDeveloperSettings = async () => {
             try {
-                // ✅ CRITICAL: Force refresh to get latest data from Firebase
-                const settings = await getSystemSettings(true); // forceRefresh = true
-                if (settings?.developerBranding) {
-                    const branding = settings.developerBranding;
-                    // ✅ Always update state, even if value is empty (to clear old values)
-                    setDevPhoneSA(branding.devPhoneSA || '');
-                    setDevPhoneEG(branding.devPhoneEG || '');
-                    setDevEmail(branding.devEmail || '');
-                    setDevName(branding.devName || '');
-                    setDevSignature(branding.devSignature || '');
-                    
-                    // ✅ CRITICAL: Sync to localStorage for backward compatibility (always, even if empty)
-                    localStorage.setItem('adora_dev_phone_sa', branding.devPhoneSA || '');
-                    localStorage.setItem('adora_dev_phone_eg', branding.devPhoneEG || '');
-                    localStorage.setItem('adora_dev_email', branding.devEmail || '');
-                    localStorage.setItem('adora_dev_name', branding.devName || '');
-                    localStorage.setItem('adora_dev_signature', branding.devSignature || '');
-                } else {
-                    // ✅ If no Firebase data, use localStorage as fallback
-                    const localName = localStorage.getItem('adora_dev_name');
-                    const localPhoneSA = localStorage.getItem('adora_dev_phone_sa');
-                    const localPhoneEG = localStorage.getItem('adora_dev_phone_eg');
-                    const localEmail = localStorage.getItem('adora_dev_email');
-                    const localSignature = localStorage.getItem('adora_dev_signature');
-                    
-                    if (localName) setDevName(localName);
-                    if (localPhoneSA) setDevPhoneSA(localPhoneSA);
-                    if (localPhoneEG) setDevPhoneEG(localPhoneEG);
-                    if (localEmail) setDevEmail(localEmail);
-                    if (localSignature) setDevSignature(localSignature);
+                // ✅ CRITICAL: Read from localStorage FIRST (it's the source of truth since Firebase write is blocked)
+                const localKey = 'adora_system_settings';
+                const localData = localStorage.getItem(localKey);
+                if (localData) {
+                    try {
+                        const parsed = JSON.parse(localData);
+                        if (parsed.developerBranding) {
+                            const { devPhoneSA, devPhoneEG, devEmail, devName, devSignature } = parsed.developerBranding;
+                            // ✅ Always update state, even if value is empty (to clear old values)
+                            setDevPhoneSA(devPhoneSA || '');
+                            setDevPhoneEG(devPhoneEG || '');
+                            setDevEmail(devEmail || '');
+                            setDevName(devName || '');
+                            setDevSignature(devSignature || '');
+                            
+                            // ✅ CRITICAL: Sync to individual localStorage keys for backward compatibility
+                            if (devPhoneSA) localStorage.setItem('adora_dev_phone_sa', devPhoneSA);
+                            if (devPhoneEG) localStorage.setItem('adora_dev_phone_eg', devPhoneEG);
+                            if (devEmail) localStorage.setItem('adora_dev_email', devEmail);
+                            if (devName) localStorage.setItem('adora_dev_name', devName);
+                            if (devSignature) localStorage.setItem('adora_dev_signature', devSignature);
+                            
+                            setLoading(false);
+                            return; // ✅ Use localStorage data, don't check Firebase
+                        }
+                    } catch (e) {
+                        logger.warn('Failed to parse localStorage system_settings:', e, 'EnhancedOwnerDashboard');
+                    }
                 }
-            } catch (err) {
-                console.warn('Failed to load developer settings from Firebase, using localStorage:', err);
-                // ✅ Fallback to localStorage
+                
+                // ✅ Fallback: Check individual localStorage keys (for backward compatibility)
                 const localName = localStorage.getItem('adora_dev_name');
                 const localPhoneSA = localStorage.getItem('adora_dev_phone_sa');
                 const localPhoneEG = localStorage.getItem('adora_dev_phone_eg');
                 const localEmail = localStorage.getItem('adora_dev_email');
                 const localSignature = localStorage.getItem('adora_dev_signature');
                 
-                if (localName) setDevName(localName);
-                if (localPhoneSA) setDevPhoneSA(localPhoneSA);
-                if (localPhoneEG) setDevPhoneEG(localPhoneEG);
-                if (localEmail) setDevEmail(localEmail);
-                if (localSignature) setDevSignature(localSignature);
+                if (localName || localPhoneSA || localPhoneEG || localEmail || localSignature) {
+                    if (localName) setDevName(localName);
+                    if (localPhoneSA) setDevPhoneSA(localPhoneSA);
+                    if (localPhoneEG) setDevPhoneEG(localPhoneEG);
+                    if (localEmail) setDevEmail(localEmail);
+                    if (localSignature) setDevSignature(localSignature);
+                    setLoading(false);
+                    return; // ✅ Use localStorage data
+                }
+                
+                // ✅ Last resort: Try Firebase (but it will likely fail due to Rules)
+                const settings = await getSystemSettings(false); // Don't force refresh
+                if (settings?.developerBranding) {
+                    const branding = settings.developerBranding;
+                    setDevPhoneSA(branding.devPhoneSA || '');
+                    setDevPhoneEG(branding.devPhoneEG || '');
+                    setDevEmail(branding.devEmail || '');
+                    setDevName(branding.devName || '');
+                    setDevSignature(branding.devSignature || '');
+                }
+            } catch (err) {
+                logger.warn('Failed to load developer settings:', err, 'EnhancedOwnerDashboard');
             } finally {
                 setLoading(false);
             }
@@ -4251,33 +4529,14 @@ const DeveloperBrandingSection: React.FC = () => {
     const handleSave = async () => {
         setSaving(true);
         try {
-            // ✅ Save to localStorage (for backward compatibility)
+            // ✅ 1. Save to localStorage first (source of truth for this session)
             localStorage.setItem('adora_dev_phone_sa', devPhoneSA);
             localStorage.setItem('adora_dev_phone_eg', devPhoneEG);
             localStorage.setItem('adora_dev_email', devEmail);
             localStorage.setItem('adora_dev_name', devName);
             localStorage.setItem('adora_dev_signature', devSignature);
-            
-            // ✅ CRITICAL: Save to Firebase for persistence across devices/browsers
-            await updateSystemSettings({
-                developerBranding: {
-                    devPhoneSA,
-                    devPhoneEG,
-                    devEmail,
-                    devName,
-                    devSignature
-                }
-            }, user?.id || 'system');
-            
-            // ✅ CRITICAL: Invalidate cache to force refresh on next load
-            try {
-                const { invalidateCache } = await import('../../utils/requestCache');
-                invalidateCache('settings:system');
-            } catch (err) {
-                console.warn('Could not invalidate cache:', err);
-            }
-            
-            // ✅ CRITICAL: Also update localStorage system_settings to ensure consistency
+
+            // ✅ 2. Update adora_system_settings in localStorage for consistency
             try {
                 const localKey = 'adora_system_settings';
                 const existing = localStorage.getItem(localKey);
@@ -4296,17 +4555,12 @@ const DeveloperBrandingSection: React.FC = () => {
                 };
                 localStorage.setItem(localKey, JSON.stringify(updated));
             } catch (err) {
-                console.warn('Could not update localStorage system_settings:', err);
+                logger.warn('Could not update localStorage system_settings:', err, 'EnhancedOwnerDashboard');
             }
-            
-            // ✅ CRITICAL: Update individual localStorage keys for backward compatibility
-            localStorage.setItem('adora_dev_name', devName);
-            localStorage.setItem('adora_dev_phone_sa', devPhoneSA);
-            localStorage.setItem('adora_dev_phone_eg', devPhoneEG);
-            localStorage.setItem('adora_dev_email', devEmail);
-            localStorage.setItem('adora_dev_signature', devSignature);
-            
-            // ✅ CRITICAL: Dispatch event to update all components immediately (LoginScreen, DeveloperSignature, DeveloperFooter, etc.)
+
+            justSavedRef.current = true;
+
+            // ✅ 3. Dispatch event IMMEDIATELY so DeveloperFooter (and LoginScreen, DeveloperSignature) update even if Firebase fails
             const configData = {
                 devName,
                 phoneSA: devPhoneSA,
@@ -4314,20 +4568,56 @@ const DeveloperBrandingSection: React.FC = () => {
                 email: devEmail,
                 signature: devSignature
             };
-            
-            // Dispatch custom event for real-time updates
             window.dispatchEvent(new CustomEvent('adora_dev_settings_updated', { detail: configData }));
-            
+
             setSaved(true);
             success(t('admin.saveSuccess') || 'تم حفظ الإعدادات بنجاح');
-            
-            // ✅ CRITICAL: Don't reload from Firebase immediately - use saved values
-            // Firebase write may have delay, so we keep the current state values
-            // The state is already updated with the saved values, no need to reload
-            
-            setTimeout(() => setSaved(false), 2000);
-        } catch (err: any) {
-            console.error('Error saving developer settings:', err);
+
+            // ✅ 4. Persist to Firebase (cross-device); footer already updated from step 3
+            try {
+                await updateSystemSettings({
+                    developerBranding: {
+                        devPhoneSA,
+                        devPhoneEG,
+                        devEmail,
+                        devName,
+                        devSignature
+                    }
+                }, user?.id || 'system');
+
+                if (onSettingsUpdate) {
+                    const currentSettings = await getSystemSettings(true);
+                    if (currentSettings) {
+                        onSettingsUpdate({
+                            developerBranding: {
+                                devPhoneSA,
+                                devPhoneEG,
+                                devEmail,
+                                devName,
+                                devSignature
+                            }
+                        });
+                    }
+                }
+
+                try {
+                    const { invalidateCache } = await import('../../utils/requestCache');
+                    invalidateCache('settings:system');
+                } catch (err) {
+                    logger.warn('Could not invalidate cache:', err, 'EnhancedOwnerDashboard');
+                }
+            } catch (firebaseErr: unknown) {
+                logger.error('Error saving developer settings to Firebase:', firebaseErr, 'EnhancedOwnerDashboard');
+                error(t('admin.errorSavingSettings') || 'خطأ في حفظ الإعدادات');
+                // Footer and localStorage already updated; only Firebase sync failed
+            }
+
+            setTimeout(() => {
+                justSavedRef.current = false;
+                setSaved(false);
+            }, 5000);
+        } catch (err: unknown) {
+            logger.error('Error saving developer settings:', err, 'EnhancedOwnerDashboard');
             error(t('admin.errorSavingSettings') || 'خطأ في حفظ الإعدادات');
         } finally {
             setSaving(false);
@@ -4358,88 +4648,103 @@ const DeveloperBrandingSection: React.FC = () => {
             </div>
 
             {/* Collapsible Content */}
-            <div className={`transition-all duration-300 ease-in-out border-t border-white/5 bg-black/20 ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
+            <div className={`transition-all duration-300 ease-in-out border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-800/60 ${isCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[2000px] opacity-100'}`}>
                 <div className="p-4 sm:p-6 space-y-4">
-                    <p className="text-xs text-white/60 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/10">
+                    <p className="text-xs text-slate-600 dark:text-white/60 leading-relaxed bg-white dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm">
                         💡 هذه البيانات تُستخدم في رابط "نسيت الكود" وتوقيع حقوق الملكية في أسفل الصفحات.
                         يمكنك تغييرها في أي وقت.
                     </p>
 
                     {/* Developer Phone - Saudi */}
                     <div>
-                        <label className="block text-xs font-medium text-white/70 mb-1.5">
+                        <label className="block text-xs font-medium text-slate-700 dark:text-white/70 mb-1.5">
                             📱 رقم واتساب السعودية (+966)
                         </label>
                         <input
+                            id="dev-phone-sa"
+                            name="devPhoneSA"
                             type="tel"
                             value={devPhoneSA}
                             onChange={(e) => setDevPhoneSA(e.target.value.replace(/[^0-9]/g, ''))}
-                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white dark:bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                            style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                             placeholder={t('owner.examplePhoneSA') || '966570707121'}
                             dir="ltr"
                         />
-                        <p className="text-xs text-white/40 mt-1">{t('owner.enterPhoneWithCountryCode') || 'ادخل الرقم بالمفتاح الدولي بدون + (مثال: 966570707121)'}</p>
+                        <p className="text-xs text-slate-500 dark:text-white/40 mt-1">{t('owner.enterPhoneWithCountryCode') || 'ادخل الرقم بالمفتاح الدولي بدون + (مثال: 966570707121)'}</p>
                     </div>
 
                     {/* Developer Phone - Egypt */}
                     <div>
-                        <label className="block text-xs font-medium text-white/70 mb-1.5">
+                        <label className="block text-xs font-medium text-slate-700 dark:text-white/70 mb-1.5">
                             📱 رقم واتساب مصر (+20)
                         </label>
                         <input
+                            id="dev-phone-eg"
+                            name="devPhoneEG"
                             type="tel"
                             value={devPhoneEG}
                             onChange={(e) => setDevPhoneEG(e.target.value.replace(/[^0-9]/g, ''))}
-                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white dark:bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                            style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                             placeholder={t('owner.examplePhoneEG') || '201500000162'}
                             dir="ltr"
                         />
-                        <p className="text-xs text-white/40 mt-1">ادخل الرقم بالمفتاح الدولي بدون + (مثال: 201500000162)</p>
+                        <p className="text-xs text-slate-500 dark:text-white/40 mt-1">ادخل الرقم بالمفتاح الدولي بدون + (مثال: 201500000162)</p>
                     </div>
 
                     {/* Developer Email */}
                     <div>
-                        <label className="block text-xs font-medium text-white/70 mb-1.5">
+                        <label className="block text-xs font-medium text-slate-700 dark:text-white/70 mb-1.5">
                             البريد الإلكتروني للمطور
                         </label>
                         <input
+                            id="dev-email"
+                            name="devEmail"
                             type="email"
                             value={devEmail}
                             onChange={(e) => setDevEmail(e.target.value)}
-                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white dark:bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                            style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                             placeholder={t('owner.exampleEmail') || '77aayy@gmail.com'}
                             dir="ltr"
                         />
-                        <p className="text-xs text-white/40 mt-1">{t('owner.appearsInDeveloperSignature') || 'يظهر في توقيع المطور أسفل الصفحات'}</p>
+                        <p className="text-xs text-slate-500 dark:text-white/40 mt-1">{t('owner.appearsInDeveloperSignature') || 'يظهر في توقيع المطور أسفل الصفحات'}</p>
                     </div>
 
                     {/* Developer Name */}
                     <div>
-                        <label className="block text-xs font-medium text-white/70 mb-1.5">
+                        <label className="block text-xs font-medium text-slate-700 dark:text-white/70 mb-1.5">
                             اسم المطور / الشركة
                         </label>
                         <input
+                            id="dev-name"
+                            name="devName"
                             type="text"
                             value={devName}
                             onChange={(e) => setDevName(e.target.value)}
-                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white dark:bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                            style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                             placeholder={t('owner.exampleDeveloperName') || 'Ayman Abu Warda'}
                         />
                     </div>
 
                     {/* Developer Signature */}
                     <div>
-                        <label className="block text-xs font-medium text-white/70 mb-1.5">
+                        <label className="block text-xs font-medium text-slate-700 dark:text-white/70 mb-1.5">
                             توقيع المطور (Copyright)
                         </label>
                         <input
+                            id="dev-signature"
+                            name="devSignature"
                             type="text"
                             value={devSignature}
                             onChange={(e) => setDevSignature(e.target.value)}
-                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 border border-white/10 rounded-lg sm:rounded-xl text-white focus:outline-none focus:border-amber-400 transition-colors text-sm sm:text-base"
+                            className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white dark:bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-lg sm:rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-colors text-sm sm:text-base"
+                            style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                             placeholder={t('owner.exampleCraftedBy') || 'Crafted by Ayman Abu Warda'}
                         />
-                        <p className="text-xs text-white/40 mt-1">يظهر في أسفل صفحات النظام</p>
+                        <p className="text-xs text-slate-500 dark:text-white/40 mt-1">يظهر في أسفل صفحات النظام</p>
                     </div>
 
                     {/* Save Button */}
@@ -4516,7 +4821,7 @@ const UpdatesTab: React.FC<{
             setBroadcastSent(true);
             setTimeout(() => setBroadcastSent(false), 5000);
         } catch (error) {
-            console.error('Error broadcasting update:', error);
+            logger.error('Error broadcasting update:', error, 'EnhancedOwnerDashboard');
             await customConfirm({
                 title: t('admin.error'),
                 message: t('admin.errorBroadcastingUpdate'),
@@ -4606,7 +4911,7 @@ const UpdatesTab: React.FC<{
                                     </div>
                                     <p className="text-xs sm:text-sm text-white/60 leading-relaxed">{update.changelog}</p>
                                     <p className="text-[10px] sm:text-xs text-white/40 mt-1.5 sm:mt-1">
-                                        {new Date(update.releaseDate).toLocaleDateString('ar-SA')}
+                                        {formatDateGregorianEn(new Date(update.releaseDate))}
                                     </p>
                                 </div>
                             </div>
@@ -4663,7 +4968,7 @@ const BroadcastsTab: React.FC<{
                             <h4 className="font-bold text-white text-sm sm:text-base">{broadcast.title}</h4>
                             <p className="text-xs sm:text-sm text-white/60 mt-1 leading-relaxed">{broadcast.message}</p>
                             <p className="text-[10px] sm:text-xs text-white/40 mt-2">
-                                {new Date(broadcast.startDate).toLocaleDateString('ar-SA')} - {new Date(broadcast.endDate).toLocaleDateString('ar-SA')}
+                                {formatDateGregorianEn(new Date(broadcast.startDate))} - {formatDateGregorianEn(new Date(broadcast.endDate))}
                             </p>
                         </div>
                     ))
@@ -4770,23 +5075,30 @@ const UpdateModal: React.FC<{
                 <h3 className="text-xl font-bold text-white mb-6">{t('admin.addNewUpdate')}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
+                        id="version-input"
+                        name="version"
                         type="text"
                         placeholder={t('admin.versionPlaceholder') || 'رقم الإصدار (مثال: 3.1.0)'}
                         value={version}
                         onChange={(e) => setVersion(e.target.value)}
                         required
-                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-yellow-400"
+                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/50 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:focus:ring-primary-500/30"
                     />
                     <textarea
+                        id="changelog-textarea"
+                        name="changelog"
                         placeholder={t('admin.changelogPlaceholder') || 'سجل التغييرات'}
                         value={changelog}
                         onChange={(e) => setChangelog(e.target.value)}
                         required
                         rows={4}
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400 resize-none"
+                        className="w-full px-4 py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 resize-none"
+                        style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                     />
                     <label className="flex items-center gap-3 text-white/60">
                         <input
+                            id="critical-checkbox"
+                            name="critical"
                             type="checkbox"
                             checked={critical}
                             onChange={(e) => setCritical(e.target.checked)}
@@ -4796,6 +5108,8 @@ const UpdateModal: React.FC<{
                     </label>
                     <label className="flex items-center gap-3 text-white/60">
                         <input
+                            id="required-checkbox"
+                            name="required"
                             type="checkbox"
                             checked={required}
                             onChange={(e) => setRequired(e.target.checked)}
@@ -4854,7 +5168,8 @@ const TenantMultiSelect: React.FC<{
                 <button
                     type="button"
                     onClick={() => setIsOpen(!isOpen)}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white/80 hover:bg-white/10 focus:outline-none focus:border-yellow-400 transition-all flex items-center justify-between"
+                    className="w-full px-4 py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-xl text-white/80 hover:bg-white/10 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-all flex items-center justify-between"
+                    style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                 >
                     <span className="text-sm">
                         {loading ? t('admin.loading') :
@@ -4879,6 +5194,8 @@ const TenantMultiSelect: React.FC<{
                                         className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
                                     >
                                         <input
+                                            id={`tenant-checkbox-${tenant.id}`}
+                                            name={`tenant-${tenant.id}`}
                                             type="checkbox"
                                             checked={selectedTenants.includes(tenant.id)}
                                             onChange={() => onToggle(tenant.id)}
@@ -4939,7 +5256,7 @@ const BroadcastModal: React.FC<{
                     }));
                 setTenants(tenantList);
             } catch (error) {
-                console.error('Error loading tenants:', error);
+                logger.error('Error loading tenants:', error, 'EnhancedOwnerDashboard');
             } finally {
                 setLoadingTenants(false);
             }
@@ -5004,29 +5321,37 @@ const BroadcastModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
                 <h3 className="text-xl font-bold text-white mb-6">{t('admin.addGeneralMessage')}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input
+                        id="broadcast-title"
+                        name="broadcastTitle"
                         type="text"
                         placeholder={t('owner.title')}
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         required
-                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-yellow-400"
+                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/50 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:focus:ring-primary-500/30"
                     />
                     <textarea
+                        id="broadcast-message"
+                        name="broadcastMessage"
                         placeholder={t('owner.message')}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         required
                         rows={4}
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400 resize-none"
+                        className="w-full px-4 py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 resize-none"
+                        style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                     />
                     <select
+                        id="broadcast-type"
+                        name="broadcastType"
                         value={type}
                         onChange={(e) => setType(e.target.value as any)}
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all appearance-none cursor-pointer hover:bg-white/10 hover:border-white/20 [&>option]:bg-[#0f172a] [&>option]:text-white"
+                        className="w-full px-4 py-3 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-xl text-white text-sm focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-all appearance-none cursor-pointer hover:bg-white/10 hover:border-primary-500/50 [&>option]:bg-[#0f172a] [&>option]:text-white"
+                        style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                     >
                         <option value="info">معلومات</option>
                         <option value="warning">تحذير</option>
@@ -5034,26 +5359,32 @@ const BroadcastModal: React.FC<{
                         <option value="error">خطأ</option>
                     </select>
                     <input
+                        id="broadcast-start-date"
+                        name="broadcastStartDate"
                         type="datetime-local"
                         placeholder={t('common.startDate') || 'تاريخ البدء'}
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
                         required
-                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-yellow-400"
+                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/50 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:focus:ring-primary-500/30"
                     />
                     <input
+                        id="broadcast-end-date"
+                        name="broadcastEndDate"
                         type="datetime-local"
                         placeholder={t('common.endDate') || 'تاريخ الانتهاء'}
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
                         required
-                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-yellow-400"
+                                    className="w-full px-4 py-3 bg-slate-100 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/50 rounded-xl text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/40 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:focus:ring-primary-500/30"
                     />
 
                     {/* Scheduled Message Option */}
                     <div className="space-y-3">
                         <label className="flex items-center gap-3 cursor-pointer">
                             <input
+                                id="broadcast-is-scheduled"
+                                name="broadcastIsScheduled"
                                 type="checkbox"
                                 checked={isScheduled}
                                 onChange={(e) => setIsScheduled(e.target.checked)}
@@ -5067,12 +5398,15 @@ const BroadcastModal: React.FC<{
                                 <div>
                                     <label className="text-sm text-white/80 mb-2 block">عدد الأيام قبل انتهاء الترخيص</label>
                                     <input
+                                        id="days-before-expiry"
+                                        name="daysBeforeExpiry"
                                         type="number"
                                         min="1"
                                         max="365"
                                         value={daysBeforeExpiry}
                                         onChange={(e) => setDaysBeforeExpiry(parseInt(e.target.value) || 7)}
-                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-yellow-400"
+                                        className="w-full px-4 py-2 bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 rounded-xl text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40"
+                                        style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                                     />
                                 </div>
 
@@ -5082,6 +5416,8 @@ const BroadcastModal: React.FC<{
                                         {(['manager', 'employee', 'staff'] as const).map(role => (
                                             <label key={role} className="flex items-center gap-2 cursor-pointer">
                                                 <input
+                                                    id={`role-checkbox-${role}`}
+                                                    name={`targetRole-${role}`}
                                                     type="checkbox"
                                                     checked={targetRoles.includes(role)}
                                                     onChange={() => handleRoleToggle(role)}
@@ -5166,39 +5502,39 @@ const AddManagerModal: React.FC<{
     onSuccess: () => void;
 }> = ({ systemSettings, onClose, onSuccess }) => {
     const { t } = useTranslation();
-    // ✅ Wizard Step State
-    const [currentStep, setCurrentStep] = useState(1);
-    const TOTAL_STEPS = 4;
-
-    // ✅ Step 1: Basic Info
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
-    const [phoneBackup, setPhoneBackup] = useState(''); // ✅ رقم الهاتف الاحتياطي
-    const [code, setCode] = useState('');
-    const [hotelName, setHotelName] = useState('');
-
-    // ✅ Step 2: Branches
-    const [branchCodes, setBranchCodes] = useState<Array<{ code: string; name: string }>>([]);
-    const [currentBranchCode, setCurrentBranchCode] = useState('');
-    const [currentBranchName, setCurrentBranchName] = useState('');
-
-    // ✅ Step 3: Subscription & Payment
-    const [subscriptionDuration, setSubscriptionDuration] = useState<1 | 2>(1);
-    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'bank_transfer' | 'deferred'>('cash');
-
-    // ✅ Firebase Config for Isolated Tenant Database (SaaS)
-    const [firebaseConfig, setFirebaseConfig] = useState<FirebaseConfig>({
+    const defaultFirebaseConfig: FirebaseConfig = {
         apiKey: '',
         authDomain: '',
         projectId: '',
         storageBucket: '',
         messagingSenderId: '',
         appId: ''
-    });
+    };
+
+    // ✅ Restore from draft (after refresh)
+    const draft = getAddManagerDraft();
+    const [currentStep, setCurrentStep] = useState(draft?.currentStep ?? 1);
+    const TOTAL_STEPS = 4;
+
+    const [name, setName] = useState(draft?.name ?? '');
+    const [phone, setPhone] = useState(draft?.phone ?? '');
+    const [phoneBackup, setPhoneBackup] = useState(draft?.phoneBackup ?? '');
+    const [code, setCode] = useState(draft?.code ?? '');
+    const [hotelName, setHotelName] = useState(draft?.hotelName ?? '');
+
+    const [branchCodes, setBranchCodes] = useState<Array<{ code: string; name: string }>>(draft?.branchCodes ?? []);
+    const [currentBranchCode, setCurrentBranchCode] = useState('');
+    const [currentBranchName, setCurrentBranchName] = useState('');
+
+    const [subscriptionDuration, setSubscriptionDuration] = useState<1 | 2>(draft?.subscriptionDuration ?? 1);
+    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit' | 'bank_transfer' | 'deferred'>(
+        (draft?.paymentMethod as 'cash' | 'credit' | 'bank_transfer' | 'deferred') ?? 'cash'
+    );
+
+    const [firebaseConfig, setFirebaseConfig] = useState<FirebaseConfig>(draft?.firebaseConfig ? { ...defaultFirebaseConfig, ...draft.firebaseConfig } : defaultFirebaseConfig);
     const [firebaseTestPassed, setFirebaseTestPassed] = useState(false);
     const [showFirebaseConfig, setShowFirebaseConfig] = useState(false);
 
-    // ✅ General State
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const { user, authReady } = useAuth();
@@ -5206,6 +5542,30 @@ const AddManagerModal: React.FC<{
     const [conflictingCodes, setConflictingCodes] = useState<Set<string>>(new Set());
     const [checkingCodes, setCheckingCodes] = useState(false);
     const [generatingCode, setGeneratingCode] = useState(false);
+
+    // ✅ Persist draft to sessionStorage when form/step changes (so refresh restores)
+    useEffect(() => {
+        if (loading) return;
+        setAddManagerDraft({
+            currentStep,
+            name,
+            phone,
+            phoneBackup,
+            code,
+            hotelName,
+            branchCodes,
+            subscriptionDuration,
+            paymentMethod,
+            firebaseConfig: {
+                apiKey: firebaseConfig.apiKey ?? '',
+                authDomain: firebaseConfig.authDomain ?? '',
+                projectId: firebaseConfig.projectId ?? '',
+                storageBucket: firebaseConfig.storageBucket ?? '',
+                messagingSenderId: firebaseConfig.messagingSenderId ?? '',
+                appId: firebaseConfig.appId ?? ''
+            }
+        });
+    }, [loading, currentStep, name, phone, phoneBackup, code, hotelName, branchCodes, subscriptionDuration, paymentMethod, firebaseConfig]);
 
     // ✅ Wizard Navigation
     const canGoNext = () => {
@@ -5267,7 +5627,7 @@ const AddManagerModal: React.FC<{
                     });
                 }
             } catch (err) {
-                console.warn('Silent PIN check failed:', err);
+                logger.warn('Silent PIN check failed:', err, 'EnhancedOwnerDashboard');
             } finally {
                 setCheckingCodes(false);
             }
@@ -5289,10 +5649,10 @@ const AddManagerModal: React.FC<{
     };
 
     const handleAddBranch = async () => {
-        console.log('🔵 handleAddBranch called', { currentBranchCode, currentBranchName, authReady, user: user?.email });
+        logger.debug('🔵 handleAddBranch called', { currentBranchCode, currentBranchName, authReady, user: user?.email }, 'EnhancedOwnerDashboard');
 
         if (!currentBranchCode.trim() || !currentBranchName.trim()) {
-            console.log('🔴 Empty branch code or name');
+            logger.warn('🔴 Empty branch code or name', undefined, 'EnhancedOwnerDashboard');
             return;
         }
         const bCode = currentBranchCode.trim();
@@ -5302,27 +5662,27 @@ const AddManagerModal: React.FC<{
         // 2. من 1 إلى 4 أرقام
         // 3. لا يبدأ بـ 0
         if (!/^[1-9]\d{0,3}$/.test(bCode)) {
-            console.log('🔴 Invalid branch code format:', bCode);
+            logger.warn('🔴 Invalid branch code format:', bCode, 'EnhancedOwnerDashboard');
             setError('كود الفرع يجب أن يكون من 1 إلى 4 أرقام، بدون حروف، ولا يبدأ بصفر');
             return;
         }
         if (branchCodes.some(b => b.code === bCode)) {
-            console.log('🔴 Branch code already exists in list');
+            logger.warn('🔴 Branch code already exists in list', undefined, 'EnhancedOwnerDashboard');
             setError('كود الفرع موجود بالفعل في قائمتك');
             return;
         }
         if (bCode === code) {
-            console.log('🔴 Branch code same as manager code');
+            logger.warn('🔴 Branch code same as manager code', undefined, 'EnhancedOwnerDashboard');
             setError('كود الفرع يجب أن يختلف عن كود المدير الرئيسي');
             return;
         }
 
-        console.log('🟢 Validation passed, checking PIN availability...');
+        logger.debug('🟢 Validation passed, checking PIN availability...', undefined, 'EnhancedOwnerDashboard');
         setLoading(true);
         setCheckingCodes(true);
         try {
             const available = await isPinAvailable(bCode, { authReady, user: user as any });
-            console.log('🟢 PIN availability result:', available);
+            logger.debug('🟢 PIN availability result:', available, 'EnhancedOwnerDashboard');
             if (!available) {
                 setError(`تحذير: كود الفرع ${bCode} مستخدم بالفعل في مؤسسة أخرى.`);
                 setConflictingCodes(prev => new Set(prev).add(bCode));
@@ -5330,7 +5690,7 @@ const AddManagerModal: React.FC<{
                 setCheckingCodes(false);
                 return;
             }
-            console.log('✅ Adding branch to list...');
+            logger.info('✅ Adding branch to list...', undefined, 'EnhancedOwnerDashboard');
             setBranchCodes([...branchCodes, { code: bCode, name: currentBranchName.trim() }]);
             setCurrentBranchCode('');
             setCurrentBranchName('');
@@ -5340,9 +5700,9 @@ const AddManagerModal: React.FC<{
                 next.delete(bCode);
                 return next;
             });
-            console.log('✅ Branch added successfully!');
+            logger.info('✅ Branch added successfully!', undefined, 'EnhancedOwnerDashboard');
         } catch (err: any) {
-            console.error('🔴 Branch PIN check error:', err);
+            logger.error('🔴 Branch PIN check error:', err, 'EnhancedOwnerDashboard');
             setError('حدث خطأ أثناء التحقق من كود الفرع. حاول مرة أخرى.');
         } finally {
             setLoading(false);
@@ -5464,7 +5824,7 @@ const AddManagerModal: React.FC<{
                 }
             } catch (functionError: any) {
                 // ✅ Fallback: Use client-side createManager (if Functions not available)
-                console.warn('Cloud Function failed, using fallback:', functionError);
+                logger.warn('Cloud Function failed, using fallback:', functionError, 'EnhancedOwnerDashboard');
                 showError(`⚠️ Cloud Function غير متاحة - استخدام طريقة بديلة...`);
                 
                 const fallbackResult = await createManager({
@@ -5521,11 +5881,11 @@ const AddManagerModal: React.FC<{
                         showSuccess('✅ تم إعداد Firebase تلقائياً بنجاح! (Authentication, Firestore Rules, Storage)');
                     } else {
                         const errorMsg = result?.message || 'خطأ غير معروف';
-                        console.warn('Firebase auto-setup partial failure:', errorMsg);
+                        logger.warn('Firebase auto-setup partial failure:', errorMsg, 'EnhancedOwnerDashboard');
                         showError(`⚠️ تم إنشاء المدير بنجاح، لكن فشل الإعداد التلقائي: ${errorMsg}. يمكنك إعداد Firebase يدوياً من Firebase Console.`);
                     }
                 } catch (setupError: any) {
-                    console.error('Firebase auto-setup error:', setupError);
+                    logger.error('Firebase auto-setup error:', setupError, 'EnhancedOwnerDashboard');
                     const errorMessage = setupError.message || setupError.code || 'خطأ غير معروف';
                     // Don't fail manager creation - it's already created successfully
                     showError(`⚠️ تم إنشاء المدير بنجاح، لكن فشل الإعداد التلقائي لـ Firebase: ${errorMessage}. يمكنك إعداد Firebase يدوياً من Firebase Console.`);
@@ -5537,6 +5897,10 @@ const AddManagerModal: React.FC<{
 
             // ✅ Financial documents are created automatically in createManager (Single Source of Truth)
             showSuccess(t('admin.addManagerSuccess'));
+
+            // ✅ Dispatch event to refresh billing data in BillingDashboard
+            window.dispatchEvent(new CustomEvent('manager-created'));
+            window.dispatchEvent(new CustomEvent('billing-data-refresh'));
 
             onSuccess();
         } catch (err: any) {
@@ -5594,13 +5958,13 @@ const AddManagerModal: React.FC<{
                                     <label className="flex items-center gap-1.5 text-xs mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
                                         <Users className="w-3.5 h-3.5 text-teal-500" />اسم المشترك <span className="text-red-500">*</span>
                                     </label>
-                                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="input py-2 text-sm" placeholder={t('owner.exampleName') || 'أيمن أبو ورده'} required />
+                                    <input id="manager-name" name="managerName" type="text" value={name} onChange={e => setName(e.target.value)} className="input py-2 text-sm" placeholder={t('owner.exampleName') || 'أيمن أبو ورده'} required />
                                 </div>
                                 <div>
                                     <label className="flex items-center gap-1.5 text-xs mb-1" style={{ color: 'var(--theme-text-secondary)' }}>
                                         <Building className="w-3.5 h-3.5 text-purple-500" />اسم الفندق/البراند
                                     </label>
-                                    <input type="text" value={hotelName} onChange={e => setHotelName(e.target.value)} className="input py-2 text-sm" placeholder="سلسلة فنادق الأهرام" />
+                                    <input id="hotel-name" name="hotelName" type="text" value={hotelName} onChange={e => setHotelName(e.target.value)} className="input py-2 text-sm" placeholder="سلسلة فنادق الأهرام" />
                                 </div>
                             </div>
 
@@ -5612,8 +5976,8 @@ const AddManagerModal: React.FC<{
                                         <MessageSquare className="w-3.5 h-3.5 text-green-500" />رقم الهاتف <span className="text-red-500">*</span>
                                     </label>
                                     <div className="relative">
-                                        <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9+]/g, ''))} className="input py-2 text-sm text-left" placeholder="05xxxxxxxx" dir="ltr" required />
-                                        {phone.length >= 9 && <div className="absolute left-2 top-1/2 -translate-y-1/2"><CheckCircle className="w-4 h-4 text-green-500" /></div>}
+                                        <input id="manager-phone" name="managerPhone" type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/[^0-9+]/g, ''))} className="input py-2 text-sm text-left pl-9" placeholder="05xxxxxxxx" dir="ltr" required />
+                                        {phone.length >= 9 && <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none"><CheckCircle className="w-4 h-4 text-green-500" /></div>}
                                     </div>
                                 </div>
                                 {/* Backup Phone */}
@@ -5622,8 +5986,8 @@ const AddManagerModal: React.FC<{
                                         <MessageSquare className="w-3.5 h-3.5 text-blue-400" />هاتف احتياطي <span className="text-[10px] opacity-70">(اختياري)</span>
                                     </label>
                                     <div className="relative">
-                                        <input type="tel" value={phoneBackup} onChange={e => setPhoneBackup(e.target.value.replace(/[^0-9+]/g, ''))} className="input py-2 text-sm text-left" placeholder="05xxxxxxxx" dir="ltr" />
-                                        {phoneBackup.length >= 9 && <div className="absolute left-2 top-1/2 -translate-y-1/2"><CheckCircle className="w-4 h-4 text-blue-400" /></div>}
+                                        <input id="manager-phone-backup" name="managerPhoneBackup" type="tel" value={phoneBackup} onChange={e => setPhoneBackup(e.target.value.replace(/[^0-9+]/g, ''))} className="input py-2 text-sm text-left pl-9" placeholder="05xxxxxxxx" dir="ltr" />
+                                        {phoneBackup.length >= 9 && <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none"><CheckCircle className="w-4 h-4 text-blue-400" /></div>}
                                     </div>
                                 </div>
                             </div>
@@ -5636,15 +6000,17 @@ const AddManagerModal: React.FC<{
                                 <div className="flex gap-2">
                                     <div className="relative flex-1">
                                         <input
+                                            id="manager-code"
+                                            name="managerCode"
                                             type="text"
                                             value={code}
                                             onChange={e => handleCodeChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                            className={`input py-2 text-center text-xl font-mono tracking-[0.3em] ${conflictingCodes.has(code) ? '!border-red-500 !bg-red-500/10' : code.length === 4 ? '!border-green-500 !bg-green-500/10' : ''}`}
+                                            className={`input py-2 text-center text-xl font-mono tracking-[0.3em] pl-9 ${conflictingCodes.has(code) ? '!border-red-500 !bg-red-500/10' : code.length === 4 ? '!border-green-500 !bg-green-500/10' : ''}`}
                                             placeholder="• • • •"
                                             maxLength={4}
                                         />
-                                        {checkingCodes && <div className="absolute left-2 top-1/2 -translate-y-1/2"><AdoraLoaderInline size={16} /></div>}
-                                        {!checkingCodes && code.length === 4 && !conflictingCodes.has(code) && <div className="absolute left-2 top-1/2 -translate-y-1/2"><CheckCircle className="w-4 h-4 text-green-500" /></div>}
+                                        {checkingCodes && <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none"><AdoraLoaderInline size={16} /></div>}
+                                        {!checkingCodes && code.length === 4 && !conflictingCodes.has(code) && <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none"><CheckCircle className="w-4 h-4 text-green-500" /></div>}
                                     </div>
                                     <button
                                         type="button"
@@ -5682,8 +6048,8 @@ const AddManagerModal: React.FC<{
                             <div className="glass rounded-xl p-3">
                                 <label className="flex items-center gap-1.5 text-xs mb-2" style={{ color: 'var(--theme-text-secondary)' }}><Plus className="w-3.5 h-3.5 text-teal-500" />{t('admin.addUpdate')} فرع</label>
                                 <div className="flex gap-2">
-                                    <input type="text" value={currentBranchCode} onChange={e => { let v=e.target.value.replace(/\D/g,''); if(v.startsWith('0'))v=v.slice(1); setCurrentBranchCode(v.slice(0,4)); }} maxLength={4} className={`input py-2 w-16 text-center font-mono text-sm ${conflictingCodes.has(currentBranchCode)?'!border-red-500':''}`} placeholder="كود" />
-                                    <input type="text" value={currentBranchName} onChange={e=>setCurrentBranchName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleAddBranch()} className="input py-2 flex-1 text-sm" placeholder="اسم الفرع" />
+                                    <input id="branch-code" name="branchCode" type="text" value={currentBranchCode} onChange={e => { let v=e.target.value.replace(/\D/g,''); if(v.startsWith('0'))v=v.slice(1); setCurrentBranchCode(v.slice(0,4)); }} maxLength={4} className={`input py-2 w-16 text-center font-mono text-sm ${conflictingCodes.has(currentBranchCode)?'!border-red-500':''}`} placeholder="كود" />
+                                    <input id="branch-name" name="branchName" type="text" value={currentBranchName} onChange={e=>setCurrentBranchName(e.target.value)} onKeyPress={e=>e.key==='Enter'&&handleAddBranch()} className="input py-2 flex-1 text-sm" placeholder="اسم الفرع" />
                                     <button type="button" onClick={handleAddBranch} disabled={loading||!currentBranchCode.trim()||!currentBranchName.trim()} className="px-4 py-2 rounded-xl text-white text-sm font-bold disabled:opacity-40 bg-teal-500 hover:bg-teal-600 flex items-center gap-1.5"><Plus className="w-4 h-4" />إضافة</button>
                                 </div>
                                 {error && (error.includes('كود الفرع')||error.includes('مستخدم')||error.includes('الفرع')) && <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{error}</p>}
@@ -6082,15 +6448,15 @@ const ManagerDetailsModal: React.FC<{
                     <h1>🏨 تقرير اشتراك Adora</h1>
                     <p><strong>${tenant.tenantName}</strong></p>
                     <p>كود المدير: ${managerDetails.manager.code || 'غير متوفر'} • ${managerDetails.branches.length} فرع</p>
-                    <p>تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <p>تاريخ التقرير: ${formatDateGregorianEn(new Date(), 'long')}</p>
                 </div>
                 
                 <div class="section">
                     <h3>📋 معلومات الاشتراك</h3>
                     <div class="grid">
                         <div class="stat">
-                            <div class="stat-label">تاريخ إنشاء الحساب</div>
-                            <div class="stat-value">${createdAt.toLocaleDateString('ar-SA')}</div>
+                            <div class="stat-label">${t('admin.accountCreationDate')}</div>
+                            <div class="stat-value">${formatDateGregorianEn(createdAt)}</div>
                         </div>
                         <div class="stat">
                             <div class="stat-label">مدة الاشتراك</div>
@@ -6116,11 +6482,11 @@ const ManagerDetailsModal: React.FC<{
                         <h3>🏢 فرع: ${branch.name || branch.id}</h3>
                         <div class="grid">
                             <div class="stat">
-                                <div class="stat-label">عدد الموظفين</div>
+                                <div class="stat-label">${t('admin.employeesCount')}</div>
                                 <div class="stat-value">${branch.employeesCount || 0}</div>
                             </div>
                             <div class="stat">
-                                <div class="stat-label">إجمالي الطلبات</div>
+                                <div class="stat-label">${t('admin.totalRequests')}</div>
                                 <div class="stat-value">${branch.totalRequests || 0}</div>
                             </div>
                         </div>
@@ -6148,18 +6514,17 @@ const ManagerDetailsModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center z-50 p-4" style={{ backdropFilter: 'blur(4px)' }}>
-            <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-3xl overflow-hidden max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 dark:border-white/10">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-2xl overflow-hidden max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-white/10">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/10 flex-shrink-0 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-transparent dark:to-transparent">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
-                            <Users className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-white/10 flex-shrink-0 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-transparent dark:to-transparent">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                            <Users className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white">{tenant.tenantName}</h3>
-                            <p className="text-sm text-slate-600 dark:text-white/60">
-                                كود المدير: {managerDetails.manager.code || 'غير متوفر'} •
-                                {managerDetails.branches.length} فرع
+                            <h3 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-white truncate max-w-[200px] sm:max-w-none">{tenant.tenantName}</h3>
+                            <p className="text-xs sm:text-sm text-slate-600 dark:text-white/60">
+                                كود المدير: <span className="font-mono font-bold">{managerDetails.manager.code || 'غير متوفر'}</span> • {managerDetails.branches.length} فرع
                             </p>
                         </div>
                     </div>
@@ -6184,7 +6549,7 @@ const ManagerDetailsModal: React.FC<{
                 </div>
 
                 {/* Content */}
-                <div id="subscription-report-content" className="p-6 overflow-y-auto flex-1 bg-slate-50 dark:bg-transparent">
+                <div id="subscription-report-content" className="p-4 sm:p-5 lg:p-6 overflow-y-auto flex-1 bg-slate-50 dark:bg-transparent">
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
                             <AdoraLoader size="md" showMessage={false} />
@@ -6192,35 +6557,29 @@ const ManagerDetailsModal: React.FC<{
                     ) : (
                         <div className="space-y-6">
                             {/* Manager Lifecycle */}
-                            <div className="bg-white dark:bg-white/5 rounded-2xl p-6 border border-slate-200 dark:border-white/10 shadow-sm">
+                            <div className="bg-white dark:bg-slate-800/60 rounded-2xl p-6 border border-slate-200 dark:border-slate-700/50 shadow-sm">
                                 <h4 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
                                     <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
-                                    دورة حياة المدير
+                                    {t('admin.managerLifecycle')}
                                 </h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 lg:gap-4">
-                                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
-                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">تاريخ إنشاء الحساب</p>
+                                    <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3">
+                                        <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.accountCreationDate')}</p>
                                         <p className="text-slate-800 dark:text-white font-medium">
-                                            {createdAt.toLocaleDateString('ar-SA', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
+                                            {formatDateTimeGregorianEn(createdAt, { dateStyle: 'long', showSeconds: false })}
                                         </p>
                                     </div>
-                                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
+                                    <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3">
                                         <p className="text-sm text-slate-500 dark:text-white/60 mb-1">مدة الاشتراك</p>
                                         <p className="text-slate-800 dark:text-white font-medium">
                                             {Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))} يوم
                                         </p>
                                     </div>
-                                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
+                                    <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3">
                                         <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.plan')}</p>
                                         <p className="text-slate-800 dark:text-white font-medium capitalize">{tenant.plan}</p>
                                     </div>
-                                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-3">
+                                    <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3">
                                         <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.licenseStatus')}</p>
                                         <p className={`font-medium ${tenant.daysUntilExpiry > 30 ? 'text-green-600 dark:text-green-400' : tenant.daysUntilExpiry > 7 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
                                             {tenant.daysUntilExpiry > 0 ? t('admin.daysRemaining', { days: tenant.daysUntilExpiry }) : t('admin.expired')}
@@ -6231,7 +6590,7 @@ const ManagerDetailsModal: React.FC<{
 
                             {/* Branches Tabs */}
                             {managerDetails.branches.length > 1 ? (
-                                <div className="bg-white dark:bg-white/5 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-slate-200 dark:border-white/10 shadow-sm">
+                                <div className="bg-white dark:bg-slate-800/60 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-slate-200 dark:border-slate-700/50 shadow-sm">
                                     <h4 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
                                         <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
                                         الفروع ({managerDetails.branches.length})
@@ -6243,7 +6602,7 @@ const ManagerDetailsModal: React.FC<{
                                                 onClick={() => setActiveBranchTab(branch.id)}
                                                 className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap ${activeBranchTab === branch.id
                                                         ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-500/30'
-                                                        : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-white/10'
+                                                        : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-white/60 hover:bg-slate-200 dark:hover:bg-slate-700/50'
                                                     }`}
                                             >
                                                 {branch.name || branch.id}
@@ -6256,7 +6615,7 @@ const ManagerDetailsModal: React.FC<{
                             {/* Active Branch Details */}
                             {activeBranch && (
                                 <div className="space-y-4">
-                                    <div className="bg-white dark:bg-white/5 rounded-2xl p-6 border border-slate-200 dark:border-white/10 shadow-sm">
+                                    <div className="bg-white dark:bg-slate-800/60 rounded-2xl p-6 border border-slate-200 dark:border-slate-700/50 shadow-sm">
                                         <h4 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
                                             <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
                                             {activeBranch.name || activeBranch.id}
@@ -6264,16 +6623,16 @@ const ManagerDetailsModal: React.FC<{
 
                                         {/* Branch Stats */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-5 lg:mb-6">
-                                            <div className="bg-blue-50 dark:bg-white/5 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-blue-200 dark:border-transparent">
-                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-white/60 mb-1">عدد الموظفين</p>
+                                            <div className="bg-blue-50 dark:bg-slate-800/60 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-blue-200 dark:border-blue-500/30">
+                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.employeesCount')}</p>
                                                 <p className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">{activeBranch.employeesCount || 0}</p>
                                             </div>
-                                            <div className="bg-teal-50 dark:bg-white/5 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-teal-200 dark:border-transparent">
-                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-white/60 mb-1">إجمالي الطلبات</p>
+                                            <div className="bg-teal-50 dark:bg-slate-800/60 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-teal-200 dark:border-teal-500/30">
+                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.totalRequests')}</p>
                                                 <p className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">{activeBranch.totalRequests || 0}</p>
                                             </div>
-                                            <div className="bg-purple-50 dark:bg-white/5 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-purple-200 dark:border-transparent">
-                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-white/60 mb-1">أكثر الأقسام طلباً</p>
+                                            <div className="bg-purple-50 dark:bg-slate-800/60 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-purple-200 dark:border-purple-500/30">
+                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.topDepartment')}</p>
                                                 <p className="text-base sm:text-lg font-bold text-slate-800 dark:text-white">{activeBranch.topDepartment}</p>
                                             </div>
                                         </div>
@@ -6286,7 +6645,7 @@ const ManagerDetailsModal: React.FC<{
                                                     {Object.entries(activeBranch.departmentCounts)
                                                         .sort(([, a], [, b]) => (b as number) - (a as number))
                                                         .map(([dept, count]) => (
-                                                            <div key={dept} className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3 border border-slate-200 dark:border-transparent">
+                                                            <div key={dept} className="flex items-center justify-between bg-slate-100 dark:bg-slate-800/60 rounded-lg p-3 border border-slate-200 dark:border-slate-700/50">
                                                                 <span className="text-slate-700 dark:text-white/80">{dept}</span>
                                                                 <span className="text-blue-600 dark:text-blue-400 font-bold">{count as number}</span>
                                                             </div>
@@ -6317,7 +6676,7 @@ const ManagerDetailsModal: React.FC<{
 
                             {/* Single Branch View */}
                             {managerDetails.branches.length === 1 && activeBranch && (
-                                <div className="bg-white dark:bg-white/5 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-slate-200 dark:border-white/10 shadow-sm">
+                                <div className="bg-white dark:bg-slate-800/60 rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-slate-200 dark:border-slate-700/50 shadow-sm">
                                     <h4 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
                                         <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                                         {activeBranch.name || activeBranch.id}
@@ -6325,16 +6684,16 @@ const ManagerDetailsModal: React.FC<{
 
                                     {/* Same content as above */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                        <div className="bg-blue-50 dark:bg-white/5 rounded-xl p-4 border border-blue-200 dark:border-transparent">
-                                            <p className="text-sm text-slate-500 dark:text-white/60 mb-1">عدد الموظفين</p>
+                                        <div className="bg-blue-50 dark:bg-slate-800/60 rounded-xl p-4 border border-blue-200 dark:border-blue-500/30">
+                                            <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.employeesCount')}</p>
                                             <p className="text-2xl font-bold text-slate-800 dark:text-white">{activeBranch.employeesCount || 0}</p>
                                         </div>
-                                        <div className="bg-teal-50 dark:bg-white/5 rounded-xl p-4 border border-teal-200 dark:border-transparent">
-                                            <p className="text-sm text-slate-500 dark:text-white/60 mb-1">إجمالي الطلبات</p>
+                                        <div className="bg-teal-50 dark:bg-slate-800/60 rounded-xl p-4 border border-teal-200 dark:border-teal-500/30">
+                                            <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.totalRequests')}</p>
                                             <p className="text-2xl font-bold text-slate-800 dark:text-white">{activeBranch.totalRequests || 0}</p>
                                         </div>
-                                        <div className="bg-purple-50 dark:bg-white/5 rounded-xl p-4 border border-purple-200 dark:border-transparent">
-                                            <p className="text-sm text-slate-500 dark:text-white/60 mb-1">أكثر الأقسام طلباً</p>
+                                        <div className="bg-purple-50 dark:bg-slate-800/60 rounded-xl p-4 border border-purple-200 dark:border-purple-500/30">
+                                            <p className="text-sm text-slate-500 dark:text-white/60 mb-1">{t('admin.topDepartment')}</p>
                                             <p className="text-lg font-bold text-slate-800 dark:text-white">{activeBranch.topDepartment}</p>
                                         </div>
                                     </div>
@@ -6346,7 +6705,7 @@ const ManagerDetailsModal: React.FC<{
                                                 {Object.entries(activeBranch.departmentCounts)
                                                     .sort(([, a], [, b]) => (b as number) - (a as number))
                                                     .map(([dept, count]) => (
-                                                        <div key={dept} className="flex items-center justify-between bg-slate-100 dark:bg-white/5 rounded-lg p-3 border border-slate-200 dark:border-transparent">
+                                                        <div key={dept} className="flex items-center justify-between bg-slate-100 dark:bg-slate-800/60 rounded-lg p-3 border border-slate-200 dark:border-slate-700/50">
                                                             <span className="text-slate-700 dark:text-white/80">{dept}</span>
                                                             <span className="text-blue-600 dark:text-blue-400 font-bold">{count as number}</span>
                                                         </div>
@@ -6388,8 +6747,10 @@ const SubscriptionRequestsTab: React.FC = () => {
     const { success, error } = useUX();
     const { t } = useTranslation();
     const [requests, setRequests] = useState<TrialRequest[]>([]);
+    const [deletedRequests, setDeletedRequests] = useState<DeletedTrialRequest[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'contacted' | 'not-contacted'>('all');
+    const [loadingDeleted, setLoadingDeleted] = useState(false);
+    const [filter, setFilter] = useState<'all' | 'contacted' | 'not-contacted' | 'deleted'>('all');
     const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'branches-high' | 'branches-low'>('newest');
     const [showContactModal, setShowContactModal] = useState(false);
     const [showNotesModal, setShowNotesModal] = useState(false);
@@ -6400,38 +6761,35 @@ const SubscriptionRequestsTab: React.FC = () => {
     const [contactNotes, setContactNotes] = useState('');
     const [followUpNote, setFollowUpNote] = useState('');
 
-    // Fetch requests
+    // Fetch requests + deleted count (for stats card)
     useEffect(() => {
         const fetchRequests = async () => {
             setLoading(true);
             try {
-                const result = await getAllTrialRequests();
-                if (result.success && result.data) {
-                    setRequests(result.data);
+                const [reqResult, deletedResult] = await Promise.all([
+                    getAllTrialRequests(),
+                    getDeletedTrialRequests(),
+                ]);
+                if (reqResult.success && reqResult.data) {
+                    setRequests(reqResult.data);
                 } else {
-                    // ✅ Better error message for permission errors
-                    const errorMsg = result.error || t('common.error');
+                    const errorMsg = reqResult.error || t('common.error');
                     const isPermissionError = errorMsg.toLowerCase().includes('permission') || 
                                              errorMsg.toLowerCase().includes('missing or insufficient') ||
                                              errorMsg.toLowerCase().includes('unauthorized');
-                    
-                    if (isPermissionError) {
-                        error(t('admin.permissionError'));
-                    } else {
-                        error(errorMsg);
-                    }
+                    if (isPermissionError) error(t('admin.permissionError'));
+                    else error(errorMsg);
+                }
+                if (deletedResult.success && deletedResult.data) {
+                    setDeletedRequests(deletedResult.data);
                 }
             } catch (err: any) {
                 const errorMsg = err.message || 'حدث خطأ أثناء جلب الطلبات';
                 const isPermissionError = errorMsg.toLowerCase().includes('permission') || 
                                          errorMsg.toLowerCase().includes('missing or insufficient') ||
                                          errorMsg.toLowerCase().includes('unauthorized');
-                
-                if (isPermissionError) {
-                        error(t('admin.permissionErrorGeneral'));
-                } else {
-                    error(errorMsg);
-                }
+                if (isPermissionError) error(t('admin.permissionErrorGeneral'));
+                else error(errorMsg);
             } finally {
                 setLoading(false);
             }
@@ -6440,6 +6798,24 @@ const SubscriptionRequestsTab: React.FC = () => {
         fetchRequests();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // ✅ Only run once on mount - t and error are stable functions
+
+    // Fetch deleted when user switches to "المحذوفة" tab
+    useEffect(() => {
+        if (filter !== 'deleted') return;
+        const fetchDeleted = async () => {
+            setLoadingDeleted(true);
+            try {
+                const result = await getDeletedTrialRequests();
+                if (result.success && result.data) setDeletedRequests(result.data);
+                else if (result.error) error(result.error);
+            } catch (err: any) {
+                error(err?.message || 'فشل جلب سجل المحذوفات');
+            } finally {
+                setLoadingDeleted(false);
+            }
+        };
+        fetchDeleted();
+    }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Filter and sort requests
     const filteredRequests = useMemo(() => {
@@ -6482,26 +6858,32 @@ const SubscriptionRequestsTab: React.FC = () => {
         return result;
     }, [requests, filter, sortBy]);
 
-    // Format date with Gregorian + Hijri
-    // ✅ Use useCallback to ensure formatDate is stable and has access to t
+    // ميلادي فقط، أرقام إنجليزي
     const formatDate = useCallback((dateValue: any): string => {
         if (!dateValue) return t('admin.undefined');
         try {
-            let date: Date;
-            if (dateValue instanceof Timestamp) {
-                date = dateValue.toDate();
-            } else if (typeof dateValue?.toDate === 'function') {
-                date = dateValue.toDate();
-            } else if (dateValue instanceof Date) {
-                date = dateValue;
-            } else {
-                date = new Date(dateValue);
-            }
-            return formatDualDate(date, { showGregorian: true, showHijri: true, dateStyle: 'long' });
+            return formatDateGregorianEn(dateValue, 'long');
         } catch {
             return t('admin.undefined');
         }
     }, [t]);
+
+    const [requestIdToDelete, setRequestIdToDelete] = useState<string | null>(null);
+    const handleConfirmDelete = async (requestId: string) => {
+        const result = await deleteTrialRequest(requestId);
+        if (result.success) {
+            success('تم حذف الطلب');
+            setRequestIdToDelete(null);
+            const [refreshResult, deletedResult] = await Promise.all([
+                getAllTrialRequests(),
+                getDeletedTrialRequests(),
+            ]);
+            if (refreshResult.success && refreshResult.data) setRequests(refreshResult.data);
+            if (deletedResult.success && deletedResult.data) setDeletedRequests(deletedResult.data);
+        } else {
+            error(result.error || 'فشل الحذف');
+        }
+    };
 
     // Handle mark as contacted - Open modal first
     const handleMarkAsContacted = (requestId: string) => {
@@ -6554,11 +6936,9 @@ const SubscriptionRequestsTab: React.FC = () => {
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
 
-        // ✅ FIX: Format dates before template string to avoid closure issues
         const requestCreatedDate = formatDate(request.createdAt);
         const requestContactedDate = request.contactedAt ? formatDate(request.contactedAt) : '';
-        // ✅ FIX: Format print date before template string
-        const printDate = formatDualDate(new Date(), { showGregorian: true, showHijri: true, dateStyle: 'long' });
+        const printDate = formatDateGregorianEn(new Date(), 'long');
 
         const contactResultText = {
             'demo': 'طلب ديمو',
@@ -6576,7 +6956,7 @@ const SubscriptionRequestsTab: React.FC = () => {
                         ? followUp.createdAt 
                         : new Date(followUp.createdAt || Date.now());
                 // ✅ Format date before template string
-                const formattedFollowUpDate = formatDualDate(followUpDate, { showGregorian: true, showHijri: true, dateStyle: 'long' });
+                const formattedFollowUpDate = formatDateGregorianEn(followUpDate, 'long');
                 return `
                     <tr>
                         <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${index + 1}</td>
@@ -6802,34 +7182,16 @@ const SubscriptionRequestsTab: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
+            {/* Header - تحديث القائمة يتم من زر "تحديث" في أعلى الصفحة (لا تكرار) */}
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-white mb-2">{t('admin.subscriptionRequests')}</h2>
                     <p className="text-white/60">{t('admin.allTrialAndSubscriptionRequests')}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => {
-                            setLoading(true);
-                            getAllTrialRequests().then(result => {
-                                if (result.success && result.data) {
-                                    setRequests(result.data);
-                                    success(t('admin.updateRequests'));
-                                }
-                                setLoading(false);
-                            });
-                        }}
-                        className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-all flex items-center gap-2"
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                        {t('admin.refresh')}
-                    </button>
-                </div>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
                 <div className="bg-white/5 rounded-xl p-4 border border-white/10">
                     <div className="text-white/60 text-sm mb-1">{t('common.total')}</div>
                     <div className="text-2xl font-bold text-white">{requests?.length || 0}</div>
@@ -6846,6 +7208,10 @@ const SubscriptionRequestsTab: React.FC = () => {
                         {requests?.filter(r => r.contactedAt).length || 0}
                     </div>
                 </div>
+                <div className="bg-amber-500/10 rounded-xl p-4 border border-amber-500/20">
+                    <div className="text-amber-400/80 text-sm mb-1">الطلبات المحذوفة</div>
+                    <div className="text-2xl font-bold text-amber-400">{deletedRequests?.length ?? 0}</div>
+                </div>
             </div>
 
             {/* Filters & Sort */}
@@ -6855,14 +7221,17 @@ const SubscriptionRequestsTab: React.FC = () => {
                     {([
                         { key: 'all', label: t('common.all') },
                         { key: 'not-contacted', label: t('admin.notContacted') },
-                        { key: 'contacted', label: t('admin.contacted') }
+                        { key: 'contacted', label: t('admin.contacted') },
+                        { key: 'deleted', label: 'المحذوفة' }
                     ] as const).map((filterOption) => (
                         <button
                             key={filterOption.key}
                             onClick={() => setFilter(filterOption.key as any)}
                             className={`px-4 py-2 rounded-lg transition-all ${
                                 filter === filterOption.key
-                                    ? 'bg-teal-500 text-white'
+                                    ? filterOption.key === 'deleted'
+                                        ? 'bg-amber-500/80 text-white'
+                                        : 'bg-teal-500 text-white'
                                     : 'bg-white/5 text-white/60 hover:bg-white/10'
                             }`}
                         >
@@ -6871,24 +7240,80 @@ const SubscriptionRequestsTab: React.FC = () => {
                     ))}
                 </div>
 
-                {/* Sort Dropdown */}
-                <div className="flex items-center gap-2">
-                    <label className="text-white/60 text-sm whitespace-nowrap">ترتيب حسب:</label>
-                    <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as any)}
-                        className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
-                    >
-                        <option value="newest">أحدث طلب</option>
-                        <option value="oldest">أقدم طلب</option>
-                        <option value="branches-high">عدد الفروع (أكثر ← أقل)</option>
-                        <option value="branches-low">عدد الفروع (أقل ← أكثر)</option>
-                    </select>
-                </div>
+                {/* Sort Dropdown - hidden in "المحذوفة" tab */}
+                {filter !== 'deleted' && (
+                    <div className="flex items-center gap-2">
+                        <label className="text-white/60 text-sm whitespace-nowrap">ترتيب حسب:</label>
+                        <select
+                            id="sort-by-select"
+                            name="sortBy"
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as any)}
+                            className="px-4 py-2 rounded-lg bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-all"
+                            style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
+                        >
+                            <option value="newest">أحدث طلب</option>
+                            <option value="oldest">أقدم طلب</option>
+                            <option value="branches-high">{t('admin.totalBranches')} ({t('common.highToLow')})</option>
+                            <option value="branches-low">{t('admin.totalBranches')} ({t('common.lowToHigh')})</option>
+                        </select>
+                    </div>
+                )}
             </div>
 
-            {/* Requests List */}
-            <div className="space-y-4">
+            {/* سجل المحذوفات */}
+            {filter === 'deleted' && (
+                <div className="space-y-2">
+                    {loadingDeleted ? (
+                        <div className="text-center py-12 bg-white/5 rounded-xl border border-white/10">
+                            <p className="text-white/60">جاري تحميل سجل المحذوفات...</p>
+                        </div>
+                    ) : !deletedRequests || deletedRequests.length === 0 ? (
+                        <div className="text-center py-12 bg-white/5 rounded-xl border border-white/10">
+                            <Trash2 className="w-16 h-16 text-white/20 mx-auto mb-4" />
+                            <p className="text-white/60">لا توجد طلبات محذوفة</p>
+                        </div>
+                    ) : (
+                        deletedRequests.map((request) => (
+                            <div
+                                key={request.id}
+                                className="bg-amber-500/5 rounded-xl p-3 border border-amber-500/20"
+                            >
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                        <Trash2 className="w-4 h-4 text-amber-400" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="text-base font-semibold text-white truncate">{request.name}</h3>
+                                        <p className="text-white/60 text-xs">{request.phone}</p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/50">
+                                    <span>تاريخ الطلب: {formatDate(request.createdAt)}</span>
+                                    <span>•</span>
+                                    <span className="text-amber-400/90">تاريخ الحذف: {formatDate(request.deletedAt)}</span>
+                                    {request.source && (
+                                        <>
+                                            <span>•</span>
+                                            <span>{request.source === 'about_us_page' ? 'صفحة About Us' : request.source}</span>
+                                        </>
+                                    )}
+                                    {request.requiredBranches != null && (
+                                        <>
+                                            <span>•</span>
+                                            <span className="text-teal-400">{request.requiredBranches} ترخيص</span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {/* Requests List - compact rows (when not "المحذوفة") */}
+            {filter !== 'deleted' && (
+            <div className="space-y-2">
                 {!filteredRequests || filteredRequests.length === 0 ? (
                     <div className="text-center py-12 bg-white/5 rounded-xl border border-white/10">
                         <MessageSquare className="w-16 h-16 text-white/20 mx-auto mb-4" />
@@ -6902,98 +7327,99 @@ const SubscriptionRequestsTab: React.FC = () => {
                     filteredRequests.map((request) => (
                         <div
                             key={request.id}
-                            className="bg-white/5 rounded-xl p-6 border border-white/10 hover:border-teal-500/30 transition-all"
+                            className="bg-white/5 rounded-xl p-3 border border-white/10 hover:border-teal-500/30 transition-all"
                         >
-                            <div className="flex items-start justify-between flex-wrap gap-4">
+                            <div className="flex items-start justify-between flex-wrap gap-2">
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="w-12 h-12 rounded-full bg-teal-500/20 flex items-center justify-center">
-                                            <Users className="w-6 h-6 text-teal-400" />
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-9 h-9 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                                            <Users className="w-4 h-4 text-teal-400" />
                                         </div>
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-white">{request.name}</h3>
-                                            <p className="text-white/60 text-sm">{request.phone}</p>
+                                        <div className="min-w-0">
+                                            <h3 className="text-base font-semibold text-white truncate">{request.name}</h3>
+                                            <p className="text-white/60 text-xs">{request.phone}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4 flex-wrap text-sm">
-                                        <div className="flex items-center gap-2 text-white/60">
-                                            <Calendar className="w-4 h-4" />
-                                            {formatDate(request.createdAt)}
-                                        </div>
-                                        <div className="flex items-center gap-2 text-white/60">
-                                            <Globe className="w-4 h-4" />
-                                            {request.source === 'about_us_page' ? 'صفحة About Us' : request.source}
-                                        </div>
-                                        {request.requiredBranches && (
-                                            <div className="flex items-center gap-2 text-teal-400">
-                                                <Building2 className="w-4 h-4" />
-                                                <span className="font-semibold">{request.requiredBranches} ترخيص</span>
-                                                <span className="text-white/40">({request.requiredBranches} فرع)</span>
-                                            </div>
+                                    <div className="flex items-center gap-3 flex-wrap text-xs">
+                                        <span className="text-white/50">
+                                            تاريخ الطلب: {formatDate(request.createdAt)}
+                                        </span>
+                                        <span className="text-white/40">•</span>
+                                        <span className="text-white/50">{request.source === 'about_us_page' ? 'صفحة About Us' : request.source}</span>
+                                        {request.requiredBranches != null && (
+                                            <>
+                                                <span className="text-white/40">•</span>
+                                                <span className="text-teal-400">{request.requiredBranches} ترخيص ({request.requiredBranches} فرع)</span>
+                                            </>
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 flex-col sm:flex-row">
+                                <div className="flex items-center gap-2 flex-col sm:flex-row">
                                     {request.contactedAt ? (
-                                        <div className="flex flex-col items-end gap-3 w-full sm:w-auto">
-                                            <div className="flex items-center gap-2">
-                                                <span className="px-3 py-1 rounded-lg text-xs font-semibold border bg-green-500/20 text-green-400 border-green-500/30">
+                                        <div className="flex flex-col items-end gap-1.5 w-full sm:w-auto">
+                                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                                <span className="px-2 py-0.5 rounded text-xs font-semibold border bg-green-500/20 text-green-400 border-green-500/30">
                                                     تم التواصل معه
                                                 </span>
+                                                <span className="text-xs text-white/40">تاريخ الاتصال: {formatDate(request.contactedAt)}</span>
+                                                {request.contactResult && (
+                                                    <span className="text-xs text-white/50">
+                                                        {request.contactResult === 'demo' && 'طلب ديمو'}
+                                                        {request.contactResult === 'thinking' && 'طلب مهلة تفكير'}
+                                                        {request.contactResult === 'wrong' && 'طلب خاطئ'}
+                                                        {request.contactResult === 'other' && 'طلب آخر'}
+                                                    </span>
+                                                )}
                                                 <button
                                                     onClick={() => handleViewNotes(request)}
-                                                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-teal-500/30 transition-all"
+                                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
                                                     title={t('admin.viewNotes') || 'عرض الملاحظات'}
                                                 >
-                                                    <Eye className="w-4 h-4 text-white/60 hover:text-teal-400" />
+                                                    <Eye className="w-3.5 h-3.5 text-white/60 hover:text-teal-400" />
                                                 </button>
                                                 <button
                                                     onClick={() => handlePrintRequest(request)}
-                                                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-teal-500/30 transition-all"
+                                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
                                                     title={t('admin.printDetails') || 'طباعة التفاصيل'}
                                                 >
-                                                    <Printer className="w-4 h-4 text-white/60 hover:text-teal-400" />
+                                                    <Printer className="w-3.5 h-3.5 text-white/60 hover:text-teal-400" />
+                                                </button>
+                                                <button
+                                                    onClick={() => setRequestIdToDelete(request.id!)}
+                                                    className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20"
+                                                    title="حذف الطلب"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
                                                 </button>
                                             </div>
-                                            <span className="text-xs text-white/40">{formatDate(request.contactedAt)}</span>
-                                            {request.contactResult && (
-                                                <span className="text-xs text-white/60">
-                                                    {request.contactResult === 'demo' && 'طلب ديمو'}
-                                                    {request.contactResult === 'thinking' && 'طلب مهلة تفكير'}
-                                                    {request.contactResult === 'wrong' && 'طلب خاطئ'}
-                                                    {request.contactResult === 'other' && 'طلب آخر'}
-                                                </span>
-                                            )}
-                                            {/* Follow-up Section */}
-                                            <div className="w-full mt-2 pt-3 border-t border-white/10">
+                                            <div className="w-full mt-1 pt-2 border-t border-white/10">
                                                 <button
-                                                    onClick={() => {
-                                                        setSelectedRequestId(request.id!);
-                                                        setShowFollowUpModal(true);
-                                                    }}
-                                                    className="w-full px-4 py-2 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/30 hover:border-teal-500/50 text-teal-400 text-sm font-medium transition-all flex items-center justify-center gap-2"
+                                                    onClick={() => { setSelectedRequestId(request.id!); setShowFollowUpModal(true); }}
+                                                    className="w-full px-3 py-1.5 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/30 text-teal-400 text-xs font-medium flex items-center justify-center gap-1"
                                                 >
-                                                    <MessageSquare className="w-4 h-4" />
-                                                    متابعة
+                                                    <MessageSquare className="w-3 h-3" />
+                                                    متابعة {request.followUps?.length ? `(${request.followUps.length})` : ''}
                                                 </button>
-                                                {request.followUps && request.followUps.length > 0 && (
-                                                    <div className="mt-2 text-xs text-white/40">
-                                                        ({request.followUps.length} متابعة)
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col items-end gap-2">
-                                            <span className="px-3 py-1 rounded-lg text-xs font-semibold border bg-red-500/20 text-red-400 border-red-500/30">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="px-2 py-0.5 rounded text-xs font-semibold border bg-red-500/20 text-red-400 border-red-500/30">
                                                 لم يتم التواصل معه
                                             </span>
                                             <button
                                                 onClick={() => handleMarkAsContacted(request.id!)}
-                                                className="px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-600 text-white text-sm font-medium transition-all flex items-center gap-2"
+                                                className="px-3 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-600 text-white text-xs font-medium flex items-center gap-1"
                                             >
-                                                <CheckCircle className="w-4 h-4" />
+                                                <CheckCircle className="w-3.5 h-3.5" />
                                                 تم التواصل
+                                            </button>
+                                            <button
+                                                onClick={() => setRequestIdToDelete(request.id!)}
+                                                className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20"
+                                                title="حذف الطلب"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
                                             </button>
                                         </div>
                                     )}
@@ -7003,6 +7429,28 @@ const SubscriptionRequestsTab: React.FC = () => {
                     ))
                 )}
             </div>
+            )}
+
+            {/* Delete confirmation modal — مضغوط ومتوافق مع الثيم */}
+            <UnifiedModal
+                isOpen={!!requestIdToDelete}
+                onClose={() => setRequestIdToDelete(null)}
+                title="تأكيد الحذف"
+                subtitle="هل أنت متأكد من حذف هذا الطلب؟ لا يمكن التراجع."
+                icon={<Trash2 className="w-4 h-4" style={{ color: 'var(--theme-accent-red-dark, #dc2626)' }} />}
+                size="xs"
+                footer={
+                    <ModalActions
+                        onCancel={() => setRequestIdToDelete(null)}
+                        onConfirm={() => requestIdToDelete && handleConfirmDelete(requestIdToDelete)}
+                        cancelText="إلغاء"
+                        confirmText="تأكيد الحذف"
+                        confirmVariant="danger"
+                    />
+                }
+            >
+                <span />
+            </UnifiedModal>
 
             {/* Contact Result Modal */}
             <UnifiedModal
@@ -7054,10 +7502,13 @@ const SubscriptionRequestsTab: React.FC = () => {
                             الملاحظات <span className="text-red-400">*</span>
                         </label>
                         <textarea
+                            id="contact-notes"
+                            name="contactNotes"
                             value={contactNotes}
                             onChange={(e) => setContactNotes(e.target.value)}
                             placeholder="اكتب ملاحظاتك عن الاتصال... (مثال: المشترك يريد تجربة لمدة أسبوع، أو لديه أسئلة عن الأسعار)"
-                            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all resize-none"
+                            className="w-full px-4 py-3 rounded-xl bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 text-white placeholder-white/40 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-all resize-none"
+                            style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                             rows={4}
                             dir="rtl"
                             required
@@ -7185,7 +7636,8 @@ const SubscriptionRequestsTab: React.FC = () => {
                             value={followUpNote}
                             onChange={(e) => setFollowUpNote(e.target.value)}
                             placeholder="اكتب ملاحظة المتابعة... (مثال: سيتم الاتصال به مرة أخرى الأسبوع القادم)"
-                            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all resize-none"
+                            className="w-full px-4 py-3 rounded-xl bg-white/5 border-2 border-primary-500/40 dark:border-primary-500/30 text-white placeholder-white/40 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:focus:ring-primary-500/40 transition-all resize-none"
+                            style={{ boxShadow: '0 2px 8px rgba(20, 184, 166, 0.15), 0 0 0 1px rgba(20, 184, 166, 0.1)' }}
                             rows={4}
                             dir="rtl"
                             required

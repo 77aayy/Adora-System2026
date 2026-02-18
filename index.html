@@ -13,19 +13,7 @@
     <!-- CSP violation for infird.com is EXPECTED and SAFE - it's blocked intentionally -->
     <!-- Development CSP (more permissive for hot reload) -->
     <!-- Note: frame-ancestors is ignored in <meta> tag - use HTTP headers instead (vercel.json) -->
-    <meta http-equiv="Content-Security-Policy" content="
-        default-src 'self';
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://www.gstatic.com https://*.firebaseio.com https://*.googleapis.com https://www.googletagmanager.com;
-        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-        font-src 'self' https://fonts.gstatic.com;
-        img-src 'self' data: https: blob:;
-        connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.cloudfunctions.net wss://*.firebaseio.com https://i.ibb.co https://imgbb.com https://api.imgbb.com https://www.google-analytics.com https://analytics.google.com;
-        frame-src 'self' https://*.firebaseapp.com;
-        object-src 'none';
-        base-uri 'self';
-        form-action 'self';
-        upgrade-insecure-requests;
-    " />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://www.gstatic.com https://*.firebaseio.com https://*.googleapis.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.cloudfunctions.net wss://*.firebaseio.com https://i.ibb.co https://imgbb.com https://api.imgbb.com https://www.google-analytics.com https://analytics.google.com; frame-src 'self' https://*.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;" />
 
     <!-- PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -48,6 +36,22 @@
         rel="stylesheet" />
 
     <title>Adora | نظام إدارة الفنادق</title>
+    
+    <!-- تمرير الصفحة: html حاوية التمرير الوحيدة — شريط التمرير يظهر من index.css (ثيم) -->
+    <style>
+        html {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            min-height: 100% !important;
+            height: 100% !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        body {
+            min-height: 100% !important;
+            overflow: visible !important;
+            overflow-x: hidden !important;
+        }
+    </style>
     
     <!-- ✅ CRITICAL: Remove Black Frame from Toast Notifications -->
     <style>
@@ -73,6 +77,7 @@
         div[class*="pointer-events-auto"][class*="rounded-xl"] {
             margin: 0 !important;
             outline: none !important;
+            -o-border-image: none !important;
             border-image: none !important;
         }
         
@@ -89,66 +94,7 @@
 </head>
 
 <body class="font-cairo antialiased">
-    <!-- 🎨 شاشة التحميل الأولية - تظهر قبل React -->
-    <div id="root">
-        <div id="initial-loader" style="
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #020617 100%);
-        ">
-            <img 
-                src="/adora-logo.png" 
-                alt="Adora" 
-                style="
-                    width: 120px;
-                    height: 120px;
-                    object-fit: contain;
-                    margin-bottom: 24px;
-                    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-                    filter: drop-shadow(0 0 20px rgba(45, 212, 191, 0.4));
-                "
-            />
-            <div style="display: flex; gap: 6px;">
-                <div style="
-                    width: 12px;
-                    height: 12px;
-                    border-radius: 50%;
-                    background: #14b8a6;
-                    animation: bounce 1s infinite;
-                    animation-delay: 0ms;
-                "></div>
-                <div style="
-                    width: 12px;
-                    height: 12px;
-                    border-radius: 50%;
-                    background: #14b8a6;
-                    animation: bounce 1s infinite;
-                    animation-delay: 150ms;
-                "></div>
-                <div style="
-                    width: 12px;
-                    height: 12px;
-                    border-radius: 50%;
-                    background: #14b8a6;
-                    animation: bounce 1s infinite;
-                    animation-delay: 300ms;
-                "></div>
-            </div>
-        </div>
-        <style>
-            @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.5; }
-            }
-            @keyframes bounce {
-                0%, 100% { transform: translateY(0); }
-                50% { transform: translateY(-10px); }
-            }
-        </style>
-    </div>
+    <div id="root"></div>
 
     <!-- 📋 زر نسخ الأخطاء - Adora Theme -->
     <script>

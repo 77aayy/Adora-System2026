@@ -12,6 +12,8 @@ import { useUX } from '../context/UXContext';
 import { useAI } from '../context/AIContext';
 import { db, analytics, logEvent } from '../services/firebase';
 import { writeBatch, doc, addDoc, collection, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { completeRequest } from '../services/requestService';
+import { updateRoomStatus } from '../services/roomService';
 import { synthesizeSpeech, playAudioUrl, isGoogleTTSAvailable } from '../services/googleTTSService';
 import {
     smartDetectLanguage,
@@ -492,26 +494,34 @@ export const useSmartAgent = ({ context, schema, data, onSuccess }: SmartAgentOp
                     return;
                 }
 
-                // ⚡ ATOMIC EXECUTION (Adora Logic)
+                // ⚡ Server-side completion (tenant path + callable) — no direct root write
                 if (result.action === 'UPDATE_STATUS') {
                     try {
-                        const batch = writeBatch(db);
                         const { requestId, roomId, needsInspection } = result.params;
+                        const tenantId = userTenantId;
+                        const branchId = (user as any)?.branch || (user as any)?.branchId || 'default';
+                        const userId = (user as any)?.id || 'voice';
+                        const userName = (user as any)?.name || 'Adora Voice';
 
-                        if (requestId) {
-                            const requestRef = doc(db, 'requests', requestId);
-                            batch.update(requestRef, { status: 'COMPLETED' });
+                        if (requestId && tenantId) {
+                            await completeRequest(requestId, tenantId, userId, userName);
                         }
 
-                        if (roomId && !needsInspection) {
-                            const roomRef = doc(db, 'rooms', roomId);
-                            batch.update(roomRef, { status: 'ready' });
+                        if (roomId && !needsInspection && tenantId) {
+                            const roomIdStr = String(roomId);
+                            const lastUnderscore = roomIdStr.lastIndexOf('_');
+                            const roomNumber = lastUnderscore > 0 ? roomIdStr.slice(lastUnderscore + 1) : roomIdStr;
+                            const roomBranchId = lastUnderscore > 0 ? roomIdStr.slice(0, lastUnderscore) : branchId;
+                            await updateRoomStatus(tenantId, roomBranchId, roomNumber, 'ready' as any);
                         }
 
-                        await batch.commit();
-                        console.log('✅ Atomic Status Update Committed');
+                        console.log('✅ Status update committed via callable/tenant path');
+                        onSuccess(result.action, result.params);
+                        playSound('success');
+                        haptic('medium');
+                        setStatus('idle');
                     } catch (err) {
-                        console.error('❌ Atomic Update Failed:', err);
+                        console.error('❌ Status update failed:', err);
                         speak('حدث خطأ في تحديث البيانات');
                         setStatus('idle');
                     }
@@ -606,7 +616,12 @@ export const useSmartAgent = ({ context, schema, data, onSuccess }: SmartAgentOp
                             }
                         };
 
-                        await addDoc(collection(db, 'requests'), {
+                        // ✅ FIX: Use tenant-scoped collection
+                        if (!userTenantId) {
+                            throw new Error('tenantId is required');
+                        }
+                        const requestsRef = collection(db, `tenants/${userTenantId}/requests`);
+                        await addDoc(requestsRef, {
                             type,
                             serviceType: type,
                             roomNumber: String(roomNumber),

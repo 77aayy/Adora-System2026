@@ -6,6 +6,7 @@
 import { getLocationSettings, calculateDistance, getCurrentLocation } from './locationService';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -43,6 +44,7 @@ export const createGeofenceMonitor = (
     let lastKnownBranch: string | null = currentBranchId;
     const enterCallbacks: Array<(event: GeofenceEvent) => void> = [];
     const exitCallbacks: Array<(event: GeofenceEvent) => void> = [];
+    let locationErrorLogged = false; // Log geolocation failure only once to avoid console spam
 
     const checkLocation = async () => {
         try {
@@ -140,15 +142,20 @@ export const createGeofenceMonitor = (
                 }
             }
         } catch (error: any) {
-            // ✅ Silent fail for expected errors (timeout, permission denied, etc.)
-            // Only log unexpected errors
-            if (error?.code === 3 || error?.code === 'TIMEOUT') {
-                // Geolocation timeout - expected in some scenarios (indoor, poor GPS signal)
-                // Fail silently
+            // ✅ Silent fail for expected errors: timeout (3), position unavailable (2), permission denied (1)
+            const code = error?.code ?? error?.message?.match(/code[:\s]*(\d+)/)?.[1];
+            if (code === 3 || code === 2 || code === 1 || error?.code === 'TIMEOUT' ||
+                error?.message?.includes('query location') || error?.message?.includes('position unavailable')) {
+                if (!locationErrorLogged) {
+                    locationErrorLogged = true;
+                    logger.debug('Geolocation unavailable for geofence (will not retry log)', undefined, 'autoSwitchBranchService');
+                }
                 return;
             }
-            // Log only unexpected errors
-            console.error('Error checking geofence:', error);
+            if (!locationErrorLogged) {
+                locationErrorLogged = true;
+                logger.error('Error checking geofence:', error, 'autoSwitchBranchService');
+            }
         }
     };
 

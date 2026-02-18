@@ -40,13 +40,13 @@ import { useFeatureGate } from './hooks/useFeatureGate';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { ToastContainer } from './components/common/EnhancedToast';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { SplashScreen } from './components/common/SplashScreen';
 import SimulationCanvas from './components/SimulationCanvas';
 import { MaintenanceMode } from './components/system/MaintenanceMode';
 import { BroadcastMessages } from './components/system/BroadcastMessages';
 import { UpdateNotifications } from './components/system/UpdateNotifications';
 import { PremiumHeader } from './components/layout/PremiumHeader';
 import { useTranslation } from 'react-i18next';
+import { logger } from './services/loggerService';
 import './index.css';
 
 // ============================================================
@@ -149,14 +149,14 @@ const NavigationBar: React.FC<{
 
             try {
                 if ((user as any).tenantId) {
-                    // Load from tenant branches
                     const { doc, getDoc } = await import('firebase/firestore');
-                    const { db } = await import('./services/firebase');
-                    if (!db) {
+                    const { getSafeFirestore } = await import('./services/firebase');
+                    const safeDb = await getSafeFirestore();
+                    if (!safeDb) {
                         setBranchName(branchId);
                         return;
                     }
-                    const branchRef = doc(db, `tenants/${(user as any).tenantId}/branches`, branchId);
+                    const branchRef = doc(safeDb, 'tenants', (user as any).tenantId, 'branches', branchId);
                     const branchDoc = await getDoc(branchRef);
                     if (branchDoc.exists()) {
                         setBranchName(branchDoc.data().name || branchId);
@@ -167,7 +167,12 @@ const NavigationBar: React.FC<{
                     // Legacy: Use branchId as name
                     setBranchName(branchId);
                 }
-            } catch (error) {
+            } catch (error: any) {
+                const isPerm = error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient');
+                if (isPerm) {
+                    setBranchName(branchId || '');
+                    return;
+                }
                 console.error('Error loading branch name:', error);
                 setBranchName(branchId || '');
             }
@@ -186,7 +191,13 @@ const NavigationBar: React.FC<{
                 const branches = await loadAvailableBranches(user as any);
                 setAvailableBranches(branches);
                 setShowBranchTabs(branches.length > 1);
-            } catch (error) {
+            } catch (error: any) {
+                const isPerm = error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient');
+                if (isPerm) {
+                    setAvailableBranches((user as any).branches || []);
+                    setShowBranchTabs(((user as any).branches?.length || 0) > 1);
+                    return;
+                }
                 console.error('Error loading available branches:', error);
             }
         };
@@ -502,20 +513,21 @@ const NavigationBar: React.FC<{
 
 // Developer Signature Footer - International Professional Style
 const DeveloperFooter: React.FC = () => {
-    const location = useLocation();
     const { t } = useTranslation(); // ✅ Add i18n for WhatsApp messages
     const [isDark, setIsDark] = useState(
         document.documentElement.getAttribute('data-theme') === 'dark'
     );
 
-    // ✅ Get config from localStorage (set by owner in settings) - MUST be before conditional return
+    // ✅ مصدر واحد للتوقيع: localStorage + حدث adora_dev_settings_updated
+    // ✅ استخدم ?? فقط: القيمة الفارغة '' تُحفظ (لا نستبدلها بالافتراضي)
     const getConfig = () => {
         try {
             return {
-                devName: localStorage.getItem('adora_dev_name') || 'Ayman Abo Warda',
-                phoneSA: localStorage.getItem('adora_dev_phone_sa') || '966570707121',
-                phoneEG: localStorage.getItem('adora_dev_phone_eg') || '201500000162',
-                email: localStorage.getItem('adora_dev_email') || '77aayy@gmail.com',
+                devName: localStorage.getItem('adora_dev_name') ?? 'Ayman Abo Warda',
+                phoneSA: localStorage.getItem('adora_dev_phone_sa') ?? '966570707121',
+                phoneEG: localStorage.getItem('adora_dev_phone_eg') ?? '201500000162',
+                email: localStorage.getItem('adora_dev_email') ?? '77aayy@gmail.com',
+                signature: localStorage.getItem('adora_dev_signature') ?? 'Crafted by Ayman Abo Warda',
             };
         } catch {
             return {
@@ -523,6 +535,7 @@ const DeveloperFooter: React.FC = () => {
                 phoneSA: '966570707121',
                 phoneEG: '201500000162',
                 email: '77aayy@gmail.com',
+                signature: 'Crafted by Ayman Abo Warda',
             };
         }
     };
@@ -539,7 +552,6 @@ const DeveloperFooter: React.FC = () => {
                     try {
                         const { auth } = await import('./services/firebase');
                         if (auth?.currentUser) {
-                            console.log('✅ Auth confirmed before loading systemSettings');
                             return true;
                         }
                         await new Promise(resolve => setTimeout(resolve, 100));
@@ -547,7 +559,12 @@ const DeveloperFooter: React.FC = () => {
                         // Continue waiting
                     }
                 }
-                console.warn('⚠️ Auth not ready after waiting, proceeding anyway');
+                // ✅ FIX: Only warn if we're actually trying to use auth-dependent features
+                // For owner dashboard, auth is required, but for other pages it's optional
+                const currentPath = window.location.pathname;
+                if (currentPath.includes('owner-dashboard')) {
+                    console.warn('⚠️ Auth not ready after waiting, proceeding anyway (owner dashboard may have limited functionality)');
+                }
                 return false;
             };
             
@@ -558,22 +575,21 @@ const DeveloperFooter: React.FC = () => {
                 const settings = await getSystemSettings();
                 if (settings?.developerBranding) {
                     const branding = settings.developerBranding;
+                    // ✅ استخدم ?? فقط: إذا المستخدم مسح الحقل ('') نبقيه فارغاً ولا نعيد الافتراضي
                     const newConfig = {
-                        devName: branding.devName || devConfig.devName,
-                        phoneSA: branding.devPhoneSA || devConfig.phoneSA,
-                        phoneEG: branding.devPhoneEG || devConfig.phoneEG,
-                        email: branding.devEmail || devConfig.email,
+                        devName: branding.devName ?? devConfig.devName,
+                        phoneSA: branding.devPhoneSA ?? devConfig.phoneSA,
+                        phoneEG: branding.devPhoneEG ?? devConfig.phoneEG,
+                        email: branding.devEmail ?? devConfig.email,
+                        signature: branding.devSignature ?? devConfig.signature,
                     };
-                    
-                    // Update state
                     setDevConfig(newConfig);
-                    
-                    // Sync to localStorage for backward compatibility
-                    if (branding.devName) localStorage.setItem('adora_dev_name', branding.devName);
-                    if (branding.devPhoneSA) localStorage.setItem('adora_dev_phone_sa', branding.devPhoneSA);
-                    if (branding.devPhoneEG) localStorage.setItem('adora_dev_phone_eg', branding.devPhoneEG);
-                    if (branding.devEmail) localStorage.setItem('adora_dev_email', branding.devEmail);
-                    if (branding.devSignature) localStorage.setItem('adora_dev_signature', branding.devSignature);
+                    // ✅ اكتب دائماً (بما فيها '') لمسح localStorage عند حذف القيمة
+                    localStorage.setItem('adora_dev_name', newConfig.devName ?? '');
+                    localStorage.setItem('adora_dev_phone_sa', newConfig.phoneSA ?? '');
+                    localStorage.setItem('adora_dev_phone_eg', newConfig.phoneEG ?? '');
+                    localStorage.setItem('adora_dev_email', newConfig.email ?? '');
+                    localStorage.setItem('adora_dev_signature', newConfig.signature ?? '');
                 }
             } catch (err) {
                 console.warn('Failed to load developer settings from Firebase, using localStorage:', err);
@@ -583,25 +599,28 @@ const DeveloperFooter: React.FC = () => {
         loadDeveloperSettings();
     }, []);
     
-    // ✅ FIX: Listen for settings updates from owner dashboard
+    // ✅ FIX: Listen for settings updates from owner dashboard (مصدر واحد للتوقيع)
     useEffect(() => {
         const handleSettingsUpdate = (event: CustomEvent) => {
-            const newConfig = event.detail;
-            // Update state
-            setDevConfig(newConfig);
-            // Also update localStorage to ensure persistence
-            if (newConfig.devName) localStorage.setItem('adora_dev_name', newConfig.devName);
-            if (newConfig.phoneSA) localStorage.setItem('adora_dev_phone_sa', newConfig.phoneSA);
-            if (newConfig.phoneEG) localStorage.setItem('adora_dev_phone_eg', newConfig.phoneEG);
-            if (newConfig.email) localStorage.setItem('adora_dev_email', newConfig.email);
-            if (newConfig.signature) localStorage.setItem('adora_dev_signature', newConfig.signature);
+            const d = event.detail || {};
+            setDevConfig((prev) => {
+                const next = {
+                    devName: d.devName ?? prev.devName,
+                    phoneSA: d.phoneSA ?? prev.phoneSA,
+                    phoneEG: d.phoneEG ?? prev.phoneEG,
+                    email: d.email ?? prev.email,
+                    signature: d.signature !== undefined ? d.signature : prev.signature,
+                };
+                if (next.devName != null) localStorage.setItem('adora_dev_name', next.devName);
+                if (next.phoneSA != null) localStorage.setItem('adora_dev_phone_sa', next.phoneSA);
+                if (next.phoneEG != null) localStorage.setItem('adora_dev_phone_eg', next.phoneEG);
+                if (next.email != null) localStorage.setItem('adora_dev_email', next.email);
+                if (next.signature != null) localStorage.setItem('adora_dev_signature', next.signature);
+                return next;
+            });
         };
-        
         window.addEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
-        
-        return () => {
-            window.removeEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
-        };
+        return () => window.removeEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
     }, []);
 
     // Listen for theme changes - MUST be before any conditional return!
@@ -708,24 +727,7 @@ const DeveloperFooter: React.FC = () => {
         };
     }, []);
     
-    // ✅ FIX: Listen for settings updates from owner dashboard - MUST be before conditional return
-    useEffect(() => {
-        const handleSettingsUpdate = (event: CustomEvent) => {
-            setDevConfig(event.detail);
-        };
-        
-        window.addEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
-        
-        return () => {
-            window.removeEventListener('adora_dev_settings_updated', handleSettingsUpdate as EventListener);
-        };
-    }, []);
-    
-    // ✅ Hide footer on login page and guest page (they have their own footers) - AFTER all hooks
-    const isLoginPage = location.pathname === '/login';
-    const isGuestPage = location.pathname === '/guest' || location.pathname.startsWith('/guest');
-    if (isLoginPage || isGuestPage) return null;
-
+    // ✅ مصدر واحد للتوقيع في كل المشروع: DeveloperFooter يظهر في كل الصفحات (login, guest, about, dashboards)
     const config = devConfig;
     const currentYear = new Date().getFullYear();
 
@@ -734,89 +736,84 @@ const DeveloperFooter: React.FC = () => {
         return hour >= 5 && hour < 12 ? t('whatsapp.morning') : t('whatsapp.evening');
     };
 
-    // ⚠️ EXACT FORMAT FROM LoginScreen.tsx - DO NOT CHANGE
-    // Format: © السنة • الاسم • +رقم سعودي • +رقم مصري • الإيميل
+    const sep = <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>;
+    const hasPhoneSA = Boolean(config.phoneSA?.trim());
+    const hasPhoneEG = Boolean(config.phoneEG?.trim());
+    const hasEmail = Boolean(config.email?.trim());
+
+    // Format: © السنة • التوقيع • +رقم سعودي؟ • +رقم مصري؟ • الإيميل؟ • About Us
     return (
         <footer 
-            className="fixed bottom-0 left-0 right-0 z-50 py-2 text-center pointer-events-auto transition-all duration-300"
+            className="w-full py-2 text-center pointer-events-auto transition-all duration-300"
             dir="ltr"
             style={{
                 background: isDark 
-                    ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 1) 100%)' 
-                    : 'linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 1) 100%)',
+                    ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(15, 23, 42, 1) 100%)' 
+                    : 'linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 1) 100%)',
                 borderTop: '1px solid',
                 borderColor: isDark ? 'rgba(51, 65, 85, 0.5)' : 'rgba(226, 232, 240, 0.8)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
             }}
         >
             <p 
                 className="text-[8px] sm:text-[9px] tracking-wide transition-all duration-300 flex items-center justify-center gap-1.5 flex-wrap px-4"
                 style={{ fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif" }}
             >
-                {/* Copyright */}
-                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-                    © {currentYear}
-                </span>
-                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                
-                {/* Developer Name */}
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>© {currentYear}</span>
+                {sep}
                 <span className={`font-semibold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
-                    {config.devName}
+                    {config.signature || config.devName}
                 </span>
-                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                
-                {/* Saudi Phone */}
-                <a 
-                    href={`https://wa.me/${config.phoneSA}?text=${encodeURIComponent(getWhatsAppMessage())}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`hover:underline transition-colors ${
-                        isDark 
-                            ? 'text-slate-300 hover:text-teal-400' 
-                            : 'text-slate-600 hover:text-teal-600'
-                    }`}
-                >
-                    +{config.phoneSA}
-                </a>
-                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                
-                {/* Egypt Phone */}
-                <a 
-                    href={`https://wa.me/${config.phoneEG}?text=${encodeURIComponent(getWhatsAppMessage())}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`hover:underline transition-colors ${
-                        isDark 
-                            ? 'text-slate-300 hover:text-teal-400' 
-                            : 'text-slate-600 hover:text-teal-600'
-                    }`}
-                >
-                    +{config.phoneEG}
-                </a>
-                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                
-                {/* Developer Email */}
-                <a 
-                    href={`mailto:${config.email}`}
-                    className={`hover:underline transition-colors ${
-                        isDark 
-                            ? 'text-slate-300 hover:text-teal-400' 
-                            : 'text-slate-600 hover:text-teal-600'
-                    }`}
-                >
-                    {config.email}
-                </a>
-                <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>•</span>
-                
-                {/* About Us Link */}
+                {hasPhoneSA && (
+                    <>
+                        {sep}
+                        <a
+                            href={`https://wa.me/${config.phoneSA!.trim()}?text=${encodeURIComponent(getWhatsAppMessage())}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`hover:underline transition-colors ${isDark ? 'text-slate-300 hover:text-teal-400' : 'text-slate-600 hover:text-teal-600'}`}
+                        >
+                            +{config.phoneSA!.trim()}
+                        </a>
+                    </>
+                )}
+                {hasPhoneEG ? (
+                    <>
+                        {sep}
+                        <a
+                            href={`https://wa.me/${config.phoneEG!.trim()}?text=${encodeURIComponent(getWhatsAppMessage())}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`hover:underline transition-colors ${isDark ? 'text-slate-300 hover:text-teal-400' : 'text-slate-600 hover:text-teal-600'}`}
+                        >
+                            +{config.phoneEG!.trim()}
+                        </a>
+                    </>
+                ) : (
+                    <>
+                        {sep}
+                        <span className="inline-block min-w-[3ch]" aria-hidden> </span>
+                    </>
+                )}
+                {hasEmail ? (
+                    <>
+                        {sep}
+                        <a
+                            href={`mailto:${config.email!.trim()}`}
+                            className={`hover:underline transition-colors ${isDark ? 'text-slate-300 hover:text-teal-400' : 'text-slate-600 hover:text-teal-600'}`}
+                        >
+                            {config.email!.trim()}
+                        </a>
+                    </>
+                ) : (
+                    <>
+                        {sep}
+                        <span className="inline-block min-w-[3ch]" aria-hidden> </span>
+                    </>
+                )}
+                {sep}
                 <Link
                     to="/about"
-                    className={`hover:underline transition-colors ${
-                        isDark 
-                            ? 'text-slate-300 hover:text-teal-400' 
-                            : 'text-slate-600 hover:text-teal-600'
-                    }`}
+                    className={`hover:underline transition-colors ${isDark ? 'text-slate-300 hover:text-teal-400' : 'text-slate-600 hover:text-teal-600'}`}
                 >
                     About Us
                 </Link>
@@ -829,8 +826,11 @@ const DeveloperFooter: React.FC = () => {
 const AppContent: React.FC = () => {
     const location = useLocation();
     const { voiceEnabled, toggleVoice, success } = useUX();
-    const { user, branchId, setBranch } = useAuth();
+    const { user, branchId, setBranch, authReady } = useAuth();
     const { i18n, t } = useTranslation(); // ✅ Add i18n for language listener
+    
+    // ✅ Gate geolocation until user gesture (avoids "[Violation] Only request geolocation in response to a user gesture")
+    const [userHasGestured, setUserHasGestured] = React.useState(false);
     
     // ✅ Enable global keyboard shortcuts (Alt+1-8 navigation)
     useGlobalKeyboardShortcuts();
@@ -865,8 +865,20 @@ const AppContent: React.FC = () => {
         preloadAdjacentRoutes(location.pathname);
     }, [location.pathname]);
 
-    // ✅ Auto-Switch Branch: Monitor location and switch branch automatically
+    // ✅ One-time: mark that user has interacted (allows geolocation without violation)
     useEffect(() => {
+        const onGesture = () => setUserHasGestured(true);
+        document.addEventListener('click', onGesture, { once: true, passive: true });
+        document.addEventListener('touchstart', onGesture, { once: true, passive: true });
+        return () => {
+            document.removeEventListener('click', onGesture);
+            document.removeEventListener('touchstart', onGesture);
+        };
+    }, []);
+
+    // ✅ Auto-Switch Branch: Monitor location and switch branch automatically (only after user gesture)
+    useEffect(() => {
+        if (!userHasGestured) return;
         if (!user?.tenantId || !user?.branches || user.branches.length <= 1) return;
         if (!branchId) return;
         
@@ -915,7 +927,7 @@ const AppContent: React.FC = () => {
         return () => {
             cleanup.then(cleanupFn => cleanupFn?.()).catch(console.error);
         };
-    }, [user?.tenantId, user?.branches, branchId, setBranch, success, location.pathname, t]);
+    }, [userHasGestured, user?.tenantId, user?.branches, branchId, setBranch, success, location.pathname, t]);
 
     // ✅ Determine which header to show
     const isManager = user?.role === 'manager';
@@ -927,16 +939,17 @@ const AppContent: React.FC = () => {
     const isOnManagerPage = managerPaths.some(path => location.pathname.startsWith(path));
     
     // Show unified header for managers on manager pages
-    const showUnifiedHeader = isManager && isOnManagerPage && !isOnLoginOrGuest;
+    const showUnifiedHeader = authReady && isManager && isOnManagerPage && !isOnLoginOrGuest;
     
     // Show regular nav for non-managers or when unified header is not shown
     // ✅ Hide navigation on About Us page
+    // ✅ Avoid header tremor: don't show either header until auth ready (no switch from NavBar → PremiumHeader)
     const isOnAboutPage = location.pathname === '/about';
-    const showRegularNav = !isOnLoginOrGuest && !showUnifiedHeader && !isOwner && !isOnAboutPage;
+    const showRegularNav = authReady && !isOnLoginOrGuest && !showUnifiedHeader && !isOwner && !isOnAboutPage;
 
     return (
         <div 
-            className={`min-h-screen overflow-x-hidden ${isOnLoginOrGuest ? '' : 'pb-12 sm:pb-16 md:pb-20'}`} 
+            className="min-h-screen overflow-x-hidden"
             style={{ background: isOnLoginOrGuest ? 'transparent' : 'var(--theme-bg-primary)' }}
         >
             {/* ✅ Premium Header - Two-Tier Architecture with Turquoise DNA */}
@@ -945,7 +958,7 @@ const AppContent: React.FC = () => {
             {/* ✅ Regular Navigation Bar for employees */}
             {showRegularNav && <NavigationBar isVoiceEnabled={voiceEnabled} onToggleVoice={toggleVoice} />}
             
-            <main className={`overflow-x-hidden w-full ${showRegularNav ? 'pt-16 sm:pt-20 md:pt-24' : showUnifiedHeader ? 'pt-0' : ''}`}>
+            <main className={`overflow-x-hidden w-full ${showRegularNav ? 'pt-16 sm:pt-20 md:pt-24' : showUnifiedHeader ? 'pt-0' : !authReady ? 'pt-0' : ''}`}>
                 <ErrorBoundary key={location.pathname}>
                     <AppRoutes />
                 </ErrorBoundary>
@@ -968,25 +981,8 @@ const App: React.FC = () => {
         return <SimulationCanvas />;
     }
 
-    const [showSplash, setShowSplash] = useState(() => {
-        // ✅ Only show splash on FIRST visit (not on refresh)
-        // Check if user is already logged in - if yes, skip splash completely
-        const isLoggedIn = localStorage.getItem('adora_user');
-        
-        // If user is logged in, skip splash (they're refreshing, not first visit)
-        if (isLoggedIn) {
-            return false;
-        }
-        
-        // Only show splash on first visit
-        const hasShownSplash = localStorage.getItem('adora_splash_shown');
-        return !hasShownSplash;
-    });
-
-    const handleSplashComplete = () => {
-        localStorage.setItem('adora_splash_shown', 'true');
-        setShowSplash(false);
-    };
+    // ✅ إلغاء شاشة Splash وشاشة اللوجو الأولية للاستجابة الأسرع
+    const [showSplash] = useState(false);
 
     // 🧠 GENIUS DEBUG TOOLS & GLOBAL ERROR HANDLING
     useEffect(() => {
@@ -1002,7 +998,7 @@ const App: React.FC = () => {
                 // 🏥 First: Check database integrity and auto-seed missing collections
                 const healthResult = await performHealthCheck();
                 if (healthResult.seeded) {
-                    console.log('🌱 Database seeded:', healthResult.seedingResult?.collectionsCreated);
+                    logger.debug('Database seeded', healthResult.seedingResult?.collectionsCreated, 'App');
                 }
                 
                 // Then: Run regular diagnostics if user is logged in
@@ -1011,7 +1007,8 @@ const App: React.FC = () => {
                     const user = JSON.parse(userData);
                     if (user.tenantId && (user.branch || (user.branches && user.branches[0]))) {
                         const branch = user.branch || user.branches[0];
-                        runDataDoctor(user.tenantId, branch);
+                        const branchId = typeof branch === 'object' && branch?.id ? branch.id : (branch?.code ?? String(branch ?? ''));
+                        if (branchId) runDataDoctor(user.tenantId, branchId);
                     }
                 }
             } catch (doctorErr) {
@@ -1038,7 +1035,6 @@ const App: React.FC = () => {
                 db: firebase.db,
                 firestore
             };
-            console.log('🧠 GENIUS DEBUG TOOLS LOADED: window.debugGenius');
         
         // ✅ Firebase Config Debug Helper
         (window as any).checkFirebaseConfig = () => {
@@ -1063,8 +1059,6 @@ const App: React.FC = () => {
                 return null;
             }
         };
-        
-        console.log('🔧 Firebase Config Helper: window.checkFirebaseConfig()');
         };
         loadGeniusTools();
     }, []);
@@ -1089,7 +1083,6 @@ const App: React.FC = () => {
 
     return (
         <>
-            {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <ProviderComposer providers={providers}>
                     <AppContent />

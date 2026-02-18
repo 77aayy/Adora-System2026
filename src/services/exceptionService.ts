@@ -14,6 +14,7 @@ import { db } from './firebase';
 import {
     collection, getDocs, query, where, orderBy, limit, Timestamp
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -117,9 +118,17 @@ class ExceptionDetector {
     private alerts: ExceptionAlert[] = [];
     private thresholds: ThresholdConfig;
     private branchId: string = '';
+    private tenantId: string = '';
 
     constructor(thresholds: Partial<ThresholdConfig> = {}) {
         this.thresholds = { ...DEFAULT_THRESHOLDS, ...thresholds };
+    }
+
+    /**
+     * Set tenant ID for tenant-scoped requests path (required for SaaS isolation)
+     */
+    setTenantId(tenantId: string): void {
+        this.tenantId = tenantId;
     }
 
     /**
@@ -141,6 +150,10 @@ class ExceptionDetector {
      */
     async detectAll(): Promise<ExceptionAlert[]> {
         this.alerts = [];
+        if (!this.tenantId) {
+            logger.warn('ExceptionDetector.detectAll called without tenantId', undefined, 'exceptionService');
+            return [];
+        }
 
         await Promise.all([
             this.detectDNAPatterns(),
@@ -156,7 +169,7 @@ class ExceptionDetector {
             return order[a.severity] - order[b.severity];
         });
 
-        console.log(`🔍 Found ${this.alerts.length} exceptions`);
+        logger.info(`🔍 Found ${this.alerts.length} exceptions`, undefined, 'exceptionService');
         return this.alerts;
     }
 
@@ -176,10 +189,8 @@ class ExceptionDetector {
                 constraints.push(where('branch', '==', this.branchId));
             }
 
-            const requestsQuery = query(
-                collection(db, 'requests'),
-                ...constraints
-            );
+            const requestsRef = collection(db, `tenants/${this.tenantId}/requests`);
+            const requestsQuery = query(requestsRef, ...constraints);
 
             const snapshot = await getDocs(requestsQuery);
             const patterns = new Map<string, Array<{ room: string; type: string; date: Date }>>();
@@ -220,7 +231,7 @@ class ExceptionDetector {
                 }
             });
         } catch (error) {
-            console.error('DNA detection error:', error);
+            logger.error('DNA detection error:', error, 'exceptionService');
         }
     }
 
@@ -239,10 +250,8 @@ class ExceptionDetector {
                 constraints.push(where('branch', '==', this.branchId));
             }
 
-            const pendingQuery = query(
-                collection(db, 'requests'),
-                ...constraints
-            );
+            const requestsRef = collection(db, `tenants/${this.tenantId}/requests`);
+            const pendingQuery = query(requestsRef, ...constraints);
 
             const snapshot = await getDocs(pendingQuery);
             const now = new Date();
@@ -277,7 +286,7 @@ class ExceptionDetector {
                 }
             });
         } catch (error) {
-            console.error('Watchdog detection error:', error);
+            logger.error('Watchdog detection error:', error, 'exceptionService');
         }
     }
 
@@ -298,10 +307,8 @@ class ExceptionDetector {
                 constraints.push(where('branch', '==', this.branchId));
             }
 
-            const completedQuery = query(
-                collection(db, 'requests'),
-                ...constraints
-            );
+            const requestsRef = collection(db, `tenants/${this.tenantId}/requests`);
+            const completedQuery = query(requestsRef, ...constraints);
 
             const snapshot = await getDocs(completedQuery);
             const staffPerformance = new Map<string, { durations: number[]; name: string }>();
@@ -362,7 +369,7 @@ class ExceptionDetector {
                 }
             });
         } catch (error) {
-            console.error('Performance detection error:', error);
+            logger.error('Performance detection error:', error, 'exceptionService');
         }
     }
 
@@ -379,10 +386,8 @@ class ExceptionDetector {
                 constraints.push(where('branch', '==', this.branchId));
             }
 
-            const pendingQuery = query(
-                collection(db, 'requests'),
-                ...constraints
-            );
+            const requestsRef = collection(db, `tenants/${this.tenantId}/requests`);
+            const pendingQuery = query(requestsRef, ...constraints);
 
             const snapshot = await getDocs(pendingQuery);
             const now = new Date();
@@ -427,7 +432,7 @@ class ExceptionDetector {
                 }
             });
         } catch (error) {
-            console.error('SLA detection error:', error);
+            logger.error('SLA detection error:', error, 'exceptionService');
         }
     }
 
@@ -444,11 +449,8 @@ class ExceptionDetector {
                 constraints.push(where('branch', '==', this.branchId));
             }
 
-            const pendingQuery = query(
-                collection(db, 'requests'),
-                ...constraints,
-                limit(50)
-            );
+            const requestsRef = collection(db, `tenants/${this.tenantId}/requests`);
+            const pendingQuery = query(requestsRef, ...constraints, limit(50));
 
             const snapshot = await getDocs(pendingQuery);
             const now = new Date();
@@ -477,7 +479,7 @@ class ExceptionDetector {
                 }
             });
         } catch (error) {
-            console.error('Overdue detection error:', error);
+            logger.error('Overdue detection error:', error, 'exceptionService');
         }
     }
 
@@ -488,8 +490,9 @@ class ExceptionDetector {
         const avgTimes = new Map<string, number>();
 
         try {
+            const requestsRef = collection(db, `tenants/${this.tenantId}/requests`);
             const completedQuery = query(
-                collection(db, 'requests'),
+                requestsRef,
                 where('status', '==', 'COMPLETED'),
                 limit(500)
             );
@@ -519,7 +522,7 @@ class ExceptionDetector {
                 avgTimes.set(type, avg);
             });
         } catch (error) {
-            console.error('Calculate avg times error:', error);
+            logger.error('Calculate avg times error:', error, 'exceptionService');
         }
 
         return avgTimes;
@@ -604,6 +607,7 @@ interface UseExceptionsReturn {
 }
 
 export const useExceptions = (
+    tenantId: string,
     branchId: string,
     autoRefreshMs?: number
 ): UseExceptionsReturn => {
@@ -612,12 +616,13 @@ export const useExceptions = (
     const [error, setError] = useState<string | null>(null);
 
     const refresh = useCallback(async () => {
-        if (!branchId) return;
+        if (!tenantId || !branchId) return;
 
         setLoading(true);
         setError(null);
 
         try {
+            exceptionDetector.setTenantId(tenantId);
             exceptionDetector.setBranch(branchId);
             const detected = await exceptionDetector.detectAll();
             setAlerts(detected);
@@ -626,7 +631,7 @@ export const useExceptions = (
         } finally {
             setLoading(false);
         }
-    }, [branchId]);
+    }, [tenantId, branchId]);
 
     useEffect(() => {
         refresh();

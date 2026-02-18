@@ -24,6 +24,7 @@ import {
     resumeWakeWordListening,
     isWakeWordListening,
 } from '../../services/wakeWordService';
+import { logger } from '../../services/loggerService';
 import {
     smartDetectLanguage,
     getLanguageOptions,
@@ -261,7 +262,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         if (wakeWordEnabled && wakeWordSupported && onResult && !isListening && !isProcessing) {
             const started = startWakeWordListening({
                 onWakeWordDetected: (followUpCommand) => {
-                    console.log('✨ Wake word detected! Follow-up:', followUpCommand);
+                    logger.info('✨ Wake word detected! Follow-up:', followUpCommand, 'VoiceInputButton');
                     setWakeWordActive(false);
 
                     if (followUpCommand) {
@@ -272,7 +273,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
                     }
                 },
                 onError: (error) => {
-                    console.warn('👂 Wake word error:', error);
+                    logger.warn('👂 Wake word error:', error, 'VoiceInputButton');
                     if (error === 'not-allowed') {
                         setWakeWordActive(false);
                     }
@@ -322,7 +323,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
             'hi-IN': '🇮🇳 हिन्दी',
             'bn-IN': '🇧🇩 বাংলা'
         };
-        console.log(`🌐 Language switched to: ${langNames[nextLang]}`);
+        logger.info(`🌐 Language switched to: ${langNames[nextLang]}`, undefined, 'VoiceInputButton');
     }, [currentLang]);
 
     // 🌐 Toggle auto-detect
@@ -330,7 +331,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         const newState = !autoDetectLang;
         setAutoDetectLang(newState);
         localStorage.setItem('adora_auto_detect_lang', String(newState));
-        console.log(`🌐 Auto-detect: ${newState ? 'ON' : 'OFF'}`);
+        logger.info(`🌐 Auto-detect: ${newState ? 'ON' : 'OFF'}`, undefined, 'VoiceInputButton');
     }, [autoDetectLang]);
 
     // Auto-sync language with App Language on mount
@@ -385,7 +386,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
 
     const handleStart = useCallback(() => {
         if (!supported) {
-            console.warn('⚠️ Voice input not supported');
+            logger.warn('⚠️ Voice input not supported', undefined, 'VoiceInputButton');
             playSound?.('error');
             return;
         }
@@ -399,12 +400,12 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         const initSuccess = initVoiceInput({
             language: currentLang,
             onStart: () => {
-                console.log("🎤 Mic started successfully");
+                logger.info("🎤 Mic started successfully", undefined, 'VoiceInputButton');
                 playSound?.('click');
                 haptic?.('light');
             },
             onEnd: () => {
-                console.log("🎤 Mic stopped (Auto-Logic)");
+                logger.info("🎤 Mic stopped (Auto-Logic)", undefined, 'VoiceInputButton');
                 setIsListening(false);
                 // 🧠 Auto-Send using REF to get latest text
                 if (transcriptRef.current.trim().length > 1) {
@@ -412,7 +413,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
                 }
             },
             onError: (error) => {
-                console.error("🔴 Voice Error:", error);
+                logger.error("🔴 Voice Error:", error, 'VoiceInputButton');
                 setIsListening(false);
                 playSound?.('error');
                 haptic?.('heavy');
@@ -434,7 +435,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         });
 
         if (!initSuccess) {
-            console.error("❌ Failed to initialize voice input");
+            logger.error("❌ Failed to initialize voice input", undefined, 'VoiceInputButton');
             setIsListening(false);
             setTranscript('⚠️ فشل تشغيل الميكروفون');
             setTimeout(() => setTranscript(''), 3000);
@@ -452,7 +453,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         });
         
         if (!startSuccess) {
-            console.error("❌ Failed to start listening");
+            logger.error("❌ Failed to start listening", undefined, 'VoiceInputButton');
             setIsListening(false);
             setTranscript('⚠️ فشل بدء الاستماع، حاول مرة أخرى');
             setTimeout(() => setTranscript(''), 3000);
@@ -471,7 +472,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
             // Start listening for wake word
             const started = startWakeWordListening({
                 onWakeWordDetected: (followUpCommand) => {
-                    console.log('✨ Wake word detected! Follow-up:', followUpCommand);
+                    logger.info('✨ Wake word detected! Follow-up:', followUpCommand, 'VoiceInputButton');
                     setWakeWordActive(false);
 
                     // 🔊 AUDIO REACTION
@@ -488,7 +489,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
                     }
                 },
                 onError: (error) => {
-                    console.warn('👂 Wake word error:', error);
+                    logger.warn('👂 Wake word error:', error, 'VoiceInputButton');
                     if (error === 'not-allowed') {
                         setWakeWordActive(false);
                     }
@@ -508,7 +509,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         if (wakeWordEnabled && wakeWordSupported && onResult && !isListening && !isProcessing) {
             const started = startWakeWordListening({
                 onWakeWordDetected: (followUpCommand) => {
-                    console.log('✨ Wake word detected! Follow-up:', followUpCommand);
+                    logger.info('✨ Wake word detected! Follow-up:', followUpCommand, 'VoiceInputButton');
                     setWakeWordActive(false);
 
                     if (followUpCommand) {
@@ -519,7 +520,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
                     }
                 },
                 onError: (error) => {
-                    console.warn('👂 Wake word error:', error);
+                    logger.warn('👂 Wake word error:', error, 'VoiceInputButton');
                     // If denied, don't keep trying
                     if (error === 'not-allowed') {
                         setWakeWordActive(false);

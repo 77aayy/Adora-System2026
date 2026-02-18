@@ -10,6 +10,8 @@ import {
     query, where, orderBy, limit, onSnapshot,
     serverTimestamp, Timestamp
 } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -92,13 +94,20 @@ export const getPriorityLabel = (priority: string): string => PRIORITY_LABELS[pr
 
 /**
  * Subscribe to procurement requests
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const subscribeToProcurementRequests = (
+    tenantId: string,
     branchId: string,
     callback: (pending: ProcurementRequest[], purchased: ProcurementRequest[], completed: ProcurementRequest[]) => void
 ): (() => void) => {
+    if (!tenantId) {
+        logger.error('subscribeToProcurementRequests: tenantId is required', undefined, 'procurementAdvancedFeatures');
+        callback([], [], []);
+        return () => {};
+    }
     const procurementQuery = query(
-        collection(db, 'requests'),
+        collection(db, `tenants/${tenantId}/requests`),
         where('branch', '==', branchId),
         where('serviceType', '==', 'procurement')
     );
@@ -241,8 +250,10 @@ export const getTimeRemaining = (
 
 /**
  * Purchase single item
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const purchaseItem = async (
+    tenantId: string,
     requestId: string,
     quantity: number,
     cost: number,
@@ -250,8 +261,11 @@ export const purchaseItem = async (
     employeeId: string,
     employeeName: string
 ): Promise<boolean> => {
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     try {
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
         await updateDoc(requestRef, {
             status: 'PURCHASED',
             purchasedQuantity: quantity,
@@ -262,15 +276,17 @@ export const purchaseItem = async (
         });
         return true;
     } catch (error) {
-        console.error('Error purchasing item:', error);
+        logger.error('Error purchasing item:', error, 'procurementAdvancedFeatures');
         return false;
     }
 };
 
 /**
  * Purchase multiple items (batch)
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const purchaseItems = async (
+    tenantId: string,
     items: { id: string; quantity: number }[],
     employeeId: string,
     employeeName: string
@@ -279,7 +295,7 @@ export const purchaseItems = async (
         const batch = writeBatch(db);
 
         items.forEach(item => {
-            const ref = doc(db, 'requests', item.id);
+            const ref = doc(db, 'tenants', tenantId, 'requests', item.id);
             batch.update(ref, {
                 status: 'PURCHASED',
                 purchasedQuantity: item.quantity,
@@ -291,7 +307,7 @@ export const purchaseItems = async (
         await batch.commit();
         return true;
     } catch (error) {
-        console.error('Error purchasing items:', error);
+        logger.error('Error purchasing items:', error, 'procurementAdvancedFeatures');
         return false;
     }
 };
@@ -301,9 +317,10 @@ export const purchaseItems = async (
 // ============================================================
 
 /**
- * Receive single item
+ * Receive single item (tenant-scoped)
  */
 export const receiveItem = async (
+    tenantId: string,
     requestId: string,
     receivedQuantity: number,
     notes: string,
@@ -313,11 +330,12 @@ export const receiveItem = async (
     originalRequest: ProcurementRequest
 ): Promise<{ success: boolean; shortageCreated: boolean }> => {
     try {
+        if (!tenantId) throw new Error('tenantId is required');
         const batch = writeBatch(db);
         const requestedQuantity = originalRequest.quantity || 1;
 
-        // Update original request
-        const requestRef = doc(db, 'requests', requestId);
+        // Update original request (tenant path)
+        const requestRef = doc(db, 'tenants', tenantId, 'requests', requestId);
         batch.update(requestRef, {
             status: 'COMPLETED',
             receivedQuantity,
@@ -326,11 +344,12 @@ export const receiveItem = async (
             'timeline.completed': serverTimestamp()
         });
 
-        // Create shortage request if needed
+        // Create shortage request if needed (tenant-scoped)
         let shortageCreated = false;
         if (receivedQuantity < requestedQuantity) {
             const shortage = requestedQuantity - receivedQuantity;
-            const shortageRef = doc(collection(db, 'requests'));
+            const requestsRef = collection(db, 'tenants', tenantId, 'requests');
+            const shortageRef = doc(requestsRef);
             batch.set(shortageRef, {
                 branch: branchId,
                 serviceType: 'procurement',
@@ -340,6 +359,7 @@ export const receiveItem = async (
                 description: `عجز من الطلب السابق - كان المطلوب ${requestedQuantity} والمستلم ${receivedQuantity}`,
                 status: 'CONFIRMED',
                 parentRequestId: requestId,
+                tenantId: tenantId, // ✅ Add tenantId
                 createdBy: { id: employeeId, name: employeeName },
                 createdAt: serverTimestamp(),
                 timeline: { created: serverTimestamp() }
@@ -350,24 +370,26 @@ export const receiveItem = async (
         await batch.commit();
         return { success: true, shortageCreated };
     } catch (error) {
-        console.error('Error receiving item:', error);
+        logger.error('Error receiving item:', error, 'procurementAdvancedFeatures');
         return { success: false, shortageCreated: false };
     }
 };
 
 /**
- * Receive multiple items (batch)
+ * Receive multiple items (batch, tenant-scoped)
  */
 export const receiveItems = async (
+    tenantId: string,
     items: { id: string; receivedQty: number }[],
     employeeId: string,
     employeeName: string
 ): Promise<boolean> => {
     try {
+        if (!tenantId) throw new Error('tenantId is required');
         const batch = writeBatch(db);
 
         items.forEach(item => {
-            const ref = doc(db, 'requests', item.id);
+            const ref = doc(db, 'tenants', tenantId, 'requests', item.id);
             batch.update(ref, {
                 status: 'COMPLETED',
                 receivedQuantity: item.receivedQty,
@@ -379,7 +401,7 @@ export const receiveItems = async (
         await batch.commit();
         return true;
     } catch (error) {
-        console.error('Error receiving items:', error);
+        logger.error('Error receiving items:', error, 'procurementAdvancedFeatures');
         return false;
     }
 };
@@ -416,7 +438,7 @@ export const createNotification = async (
         });
         return true;
     } catch (error) {
-        console.error('Error creating notification:', error);
+        logger.error('Error creating notification:', error, 'procurementAdvancedFeatures');
         return false;
     }
 };
@@ -453,7 +475,7 @@ export const markNotificationRead = async (notificationId: string): Promise<bool
         });
         return true;
     } catch (error) {
-        console.error('Error marking notification read:', error);
+        logger.error('Error marking notification read:', error, 'procurementAdvancedFeatures');
         return false;
     }
 };
@@ -510,15 +532,21 @@ const getDateRange = (
 
 /**
  * Load procurement history
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const loadProcurementHistory = async (
+    tenantId: string,
     branchId: string,
     employeeId: string,
     filter: HistoryFilter
 ): Promise<any[]> => {
+    if (!tenantId) {
+        logger.error('loadProcurementHistory: tenantId is required', undefined, 'procurementAdvancedFeatures');
+        return [];
+    }
     try {
         const requestsQuery = query(
-            collection(db, 'requests'),
+            collection(db, `tenants/${tenantId}/requests`),
             where('branch', '==', branchId),
             where('serviceType', '==', 'procurement')
         );
@@ -557,7 +585,7 @@ export const loadProcurementHistory = async (
         results.sort((a, b) => b.workDate.getTime() - a.workDate.getTime());
         return results;
     } catch (error) {
-        console.error('Error loading procurement history:', error);
+        logger.error('Error loading procurement history:', error, 'procurementAdvancedFeatures');
         return [];
     }
 };
@@ -687,7 +715,7 @@ export const printProcurementHistory = (
         <html dir="rtl" lang="ar">
         <head>
             <meta charset="UTF-8">
-            <title>سجل المشتريات - ${new Date().toLocaleDateString('ar-SA')}</title>
+            <title>سجل المشتريات - ${formatDateGregorianEn(new Date())}</title>
             <style>
                 body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 20px; }
                 h1 { text-align: center; margin-bottom: 20px; color: #1a1a2e; }
@@ -704,7 +732,7 @@ export const printProcurementHistory = (
         <body>
             <h1>سجل المشتريات</h1>
             <div class="info">
-                <p><strong>التاريخ:</strong> ${new Date().toLocaleDateString('ar-SA')}</p>
+                <p><strong>التاريخ:</strong> ${formatDateGregorianEn(new Date())}</p>
                 <p><strong>الموظف:</strong> ${employeeName || '--'}</p>
                 <p><strong>الفرع:</strong> ${branchName || '--'}</p>
             </div>
@@ -719,13 +747,7 @@ export const printProcurementHistory = (
                 </thead>
                 <tbody>
                     ${items.map(item => {
-        const date = item.workDate.toLocaleString('ar-SA', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const date = formatDateTimeGregorianEn(item.workDate, { dateStyle: 'medium', showSeconds: false });
         const status = item.status === 'COMPLETED' ? 'مستلم' : 'مشترى';
         const statusClass = item.status === 'COMPLETED' ? 'receive' : 'purchase';
 
@@ -741,7 +763,7 @@ export const printProcurementHistory = (
                 </tbody>
             </table>
             <div class="footer">
-                تم الطباعة بواسطة نظام أدورا - ${new Date().toLocaleString('ar-SA')}
+                تم الطباعة بواسطة نظام أدورا - ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}
             </div>
         </body>
         </html>

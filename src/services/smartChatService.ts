@@ -30,6 +30,7 @@ import {
     Timestamp,
     writeBatch
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -397,8 +398,8 @@ export async function sendQuickOptionMessage(
 ): Promise<string> {
     // 🎮 Demo mode: Skip room verification
     if (!isDemoMode) {
-        // ✅ SECURITY CHECK: Verify room card is active and QR is enabled
-        const roomCardsRef = collection(db, 'roomCards');
+        // ✅ SECURITY CHECK: Verify room card is active and QR is enabled (tenant-scoped)
+        const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
         const roomQuery = query(
             roomCardsRef,
             where('roomNumber', '==', roomNumber),
@@ -413,7 +414,7 @@ export async function sendQuickOptionMessage(
             throw new Error('ROOM_NOT_AVAILABLE');
         }
     } else {
-        console.log('🎮 Demo Mode: Bypassing room card verification for quick option');
+        logger.info('🎮 Demo Mode: Bypassing room card verification for quick option', undefined, 'smartChatService');
     }
     
     // Send guest message

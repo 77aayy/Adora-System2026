@@ -6,6 +6,7 @@
 import { getLocationSettings, calculateDistance, getCurrentLocation } from './locationService';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -89,7 +90,7 @@ export const detectClosestBranch = async (
         // Return closest match
         return validMatches[0];
     } catch (error) {
-        console.error('Error detecting closest branch:', error);
+        logger.error('Error detecting closest branch:', error, 'smartBranchService');
         return null;
     }
 };

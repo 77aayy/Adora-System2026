@@ -19,33 +19,21 @@ export enum RequestType {
     OTHER = 'other'
 }
 
+/**
+ * Request Status — unified + legacy (single source for all status strings).
+ * Use NEW/IN_PROGRESS/COMPLETED/CANCELLED for new flows; legacy values for DB/compat.
+ */
 export enum RequestStatus {
-    // Reception statuses
-    PENDING_RECEPTION = 'PENDING_RECEPTION',
-    CONFIRMED = 'CONFIRMED',
-
-    // Department statuses
+    NEW = 'NEW',
     IN_PROGRESS = 'IN_PROGRESS',
-    WAITING_INSPECTION = 'WAITING_INSPECTION',
-    WAITING_MAINTENANCE = 'WAITING_MAINTENANCE',
-
-    // Maintenance specific
-    MAINTENANCE_PENDING = 'MAINTENANCE_PENDING',
-    MAINTENANCE_IN_PROGRESS = 'MAINTENANCE_IN_PROGRESS',
-    PENDING_MAINTENANCE = 'PENDING_MAINTENANCE',
-
-    // Housekeeping specific
-    PENDING_HOUSEKEEPING = 'PENDING_HOUSEKEEPING',
-    CLEANING_IN_PROGRESS = 'CLEANING_IN_PROGRESS',
-
-    // Final statuses
     COMPLETED = 'COMPLETED',
     CANCELLED = 'CANCELLED',
+    // Legacy (DB / department-specific labels)
+    PENDING_RECEPTION = 'PENDING_RECEPTION',
+    CONFIRMED = 'CONFIRMED',
+    PENDING_HOUSEKEEPING = 'PENDING_HOUSEKEEPING',
+    PENDING_MAINTENANCE = 'PENDING_MAINTENANCE',
     WAITING_PARTS = 'WAITING_PARTS',
-
-    // Transfer statuses
-    TRANSFERRED_TO_CLEANING = 'TRANSFERRED_TO_CLEANING',
-    TRANSFERRED_TO_MAINTENANCE = 'TRANSFERRED_TO_MAINTENANCE'
 }
 
 export enum RequestPriority {
@@ -189,6 +177,20 @@ export interface Request {
         notes?: string; // ملاحظات
         nextDepartment?: string; // القسم التالي (إذا انتقل)
     }>;
+    
+    // ✅ Unified State Machine (Phase 1: State Transition Service)
+    involvedDepartments?: string[]; // جميع الأقسام التي شاركت في الكارت
+    isActionRequiredByReception?: boolean; // هل يحتاج الاستقبال للعمل؟
+    stateHistory?: Array<{
+        fromStatus: 'NEW' | 'IN_PROGRESS' | 'COMPLETED';
+        toStatus: 'NEW' | 'IN_PROGRESS' | 'COMPLETED';
+        fromDepartment: string;
+        toDepartment: string;
+        userId: string;
+        userName: string;
+        timestamp: Timestamp;
+        notes?: string;
+    }>;
 }
 
 export interface CreateRequestInput {
@@ -203,6 +205,8 @@ export interface CreateRequestInput {
     targetCompletionTime?: Date; // ✅ Added
     photos?: string[];
     tenantId: string; // ✅ Multi-tenancy support (Strict)
+    /** F2: Optional idempotency key; if duplicate within window, returns existing request id */
+    idempotencyKey?: string;
 }
 
 export interface UpdateRequestInput {

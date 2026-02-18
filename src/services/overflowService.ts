@@ -137,10 +137,9 @@ export async function countActiveTasks(
         // Count active requests (pending, confirmed, in_progress)
         const activeStatuses = ['PENDING_RECEPTION', 'CONFIRMED', 'IN_PROGRESS', 'PENDING_HOUSEKEEPING', 'PENDING_MAINTENANCE'];
 
-        const requestsRef = collection(db, 'requests');
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const q = query(
             requestsRef,
-            where('tenantId', '==', tenantId),
             where('branch', '==', branchId),
             where('type', 'in', types),
             where('status', 'in', activeStatuses)
@@ -300,11 +299,9 @@ export function subscribeToOverflowAlerts(
         return () => {};
     }
 
-    // Subscribe to requests collection for this branch
-    const requestsRef = collection(db, 'requests');
+    const requestsRef = collection(db, `tenants/${tenantId}/requests`);
     const q = query(
         requestsRef,
-        where('tenantId', '==', tenantId),
         where('branch', '==', branchId),
         where('status', 'in', ['PENDING_RECEPTION', 'CONFIRMED', 'IN_PROGRESS', 'PENDING_HOUSEKEEPING', 'PENDING_MAINTENANCE'])
     );
@@ -342,11 +339,9 @@ export async function canAcceptMaintenanceRequest(
             return { canAccept: true };
         }
 
-        // Check if there are active emergency maintenance requests
-        const requestsRef = collection(db, 'requests');
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const emergencyQuery = query(
             requestsRef,
-            where('tenantId', '==', tenantId),
             where('branch', '==', branchId),
             where('type', '==', 'maintenance'),
             where('priority', 'in', ['emergency', 'urgent']),

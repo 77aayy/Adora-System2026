@@ -10,6 +10,8 @@ import {
     query, where, orderBy, limit, onSnapshot,
     serverTimestamp, Timestamp
 } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn, formatDateTimeGregorianEn, formatTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -163,7 +165,7 @@ export const loadBranchSettings = async (
         }
         return null;
     } catch (error) {
-        console.error('Error loading branch settings:', error);
+        logger.error('Error loading branch settings:', error, 'dashboardAdvancedFeatures');
         return null;
     }
 };
@@ -185,7 +187,7 @@ export const saveBranchSettings = async (
         });
         return true;
     } catch (error) {
-        console.error('Error saving branch settings:', error);
+        logger.error('Error saving branch settings:', error, 'dashboardAdvancedFeatures');
         return false;
     }
 };
@@ -218,7 +220,7 @@ export const loadEmployees = async (
 
         return employees;
     } catch (error) {
-        console.error('Error loading employees:', error);
+        logger.error('Error loading employees:', error, 'dashboardAdvancedFeatures');
         return [];
     }
 };
@@ -266,7 +268,7 @@ export const addEmployee = async (
         });
         return docRef.id;
     } catch (error) {
-        console.error('Error adding employee:', error);
+        logger.error('Error adding employee:', error, 'dashboardAdvancedFeatures');
         return null;
     }
 };
@@ -289,7 +291,7 @@ export const updateEmployee = async (
         });
         return true;
     } catch (error) {
-        console.error('Error updating employee:', error);
+        logger.error('Error updating employee:', error, 'dashboardAdvancedFeatures');
         return false;
     }
 };
@@ -308,7 +310,7 @@ export const deleteEmployee = async (
         await deleteDoc(employeeRef);
         return true;
     } catch (error) {
-        console.error('Error deleting employee:', error);
+        logger.error('Error deleting employee:', error, 'dashboardAdvancedFeatures');
         return false;
     }
 };
@@ -331,7 +333,7 @@ export const toggleEmployeeStatus = async (
         });
         return true;
     } catch (error) {
-        console.error('Error toggling employee status:', error);
+        logger.error('Error toggling employee status:', error, 'dashboardAdvancedFeatures');
         return false;
     }
 };
@@ -360,16 +362,23 @@ export const generateEmployeeCode = (): string => {
 
 /**
  * Subscribe to today's requests
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const subscribeToTodayRequests = (
+    tenantId: string,
     branchId: string,
     callback: (requests: Request[]) => void
 ): (() => void) => {
+    if (!tenantId) {
+        logger.error('subscribeToTodayRequests: tenantId is required', undefined, 'dashboardAdvancedFeatures');
+        callback([]);
+        return () => {};
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const requestsQuery = query(
-        collection(db, 'requests'),
+        collection(db, `tenants/${tenantId}/requests`),
         where('branch', '==', branchId),
         where('createdAt', '>=', Timestamp.fromDate(today))
     );
@@ -470,13 +479,20 @@ export const getMedal = (rank: number): string => {
 
 /**
  * Subscribe to pending procurement requests
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const subscribeToPendingProcurement = (
+    tenantId: string,
     branchId: string,
     callback: (requests: Request[]) => void
 ): (() => void) => {
+    if (!tenantId) {
+        logger.error('subscribeToPendingProcurement: tenantId is required', undefined, 'dashboardAdvancedFeatures');
+        callback([]);
+        return () => {};
+    }
     const procurementQuery = query(
-        collection(db, 'requests'),
+        collection(db, `tenants/${tenantId}/requests`),
         where('branch', '==', branchId),
         where('serviceType', '==', 'procurement'),
         where('status', '==', 'PENDING_APPROVAL')
@@ -500,15 +516,17 @@ export const subscribeToPendingProcurement = (
 };
 
 /**
- * Approve procurement request
+ * Approve procurement request (tenant-scoped)
  */
 export const approveProcurement = async (
     requestId: string,
     managerId: string,
-    managerName: string
+    managerName: string,
+    tenantId: string
 ): Promise<boolean> => {
     try {
-        const requestRef = doc(db, 'requests', requestId);
+        if (!tenantId) return false;
+        const requestRef = doc(db, 'tenants', tenantId, 'requests', requestId);
         await updateDoc(requestRef, {
             status: 'PROCUREMENT_PENDING',
             approvedBy: { id: managerId, name: managerName },
@@ -517,22 +535,24 @@ export const approveProcurement = async (
         });
         return true;
     } catch (error) {
-        console.error('Error approving procurement:', error);
+        logger.error('Error approving procurement:', error, 'dashboardAdvancedFeatures');
         return false;
     }
 };
 
 /**
- * Reject procurement request
+ * Reject procurement request (tenant-scoped)
  */
 export const rejectProcurement = async (
     requestId: string,
     managerId: string,
     managerName: string,
-    reason: string
+    reason: string,
+    tenantId: string
 ): Promise<boolean> => {
     try {
-        const requestRef = doc(db, 'requests', requestId);
+        if (!tenantId) return false;
+        const requestRef = doc(db, 'tenants', tenantId, 'requests', requestId);
         await updateDoc(requestRef, {
             status: 'REJECTED',
             rejectedBy: { id: managerId, name: managerName },
@@ -542,7 +562,7 @@ export const rejectProcurement = async (
         });
         return true;
     } catch (error) {
-        console.error('Error rejecting procurement:', error);
+        logger.error('Error rejecting procurement:', error, 'dashboardAdvancedFeatures');
         return false;
     }
 };
@@ -631,14 +651,14 @@ export const exportToCSV = (requests: Request[]): void => {
         getServiceName(r.serviceType),
         getStatusName(r.status),
         r.completedBy || r.confirmedBy || '',
-        r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString('ar-SA') : ''
+        r.createdAt?.toDate ? formatDateTimeGregorianEn(r.createdAt.toDate(), { showSeconds: false }) : ''
     ]);
 
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `تقرير_${new Date().toLocaleDateString('ar-SA')}.csv`;
+    link.download = `تقرير_${formatDateGregorianEn(new Date(), 'short')}.csv`;
     link.click();
 };
 
@@ -657,7 +677,7 @@ export const printLogs = (): void => {
  * Format time
  */
 export const formatTime = (date: Date): string => {
-    return date.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+    return formatTimeGregorianEn(date, { showSeconds: false });
 };
 
 /**

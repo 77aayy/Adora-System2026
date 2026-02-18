@@ -111,7 +111,7 @@ export const subscribeToLostFound = (
 ) => {
     // 🔐 SECURITY: tenantId is required for SaaS isolation
     if (!tenantId) {
-        console.warn('⚠️ [LostFound] subscribeToLostFound called without tenantId - returning empty');
+        logger.warn('⚠️ [LostFound] subscribeToLostFound called without tenantId - returning empty', undefined, 'lostFoundService');
         callback([]);
         return () => { };
     }
@@ -126,8 +126,9 @@ export const subscribeToLostFound = (
         constraints.push(where('status', '==', status));
     }
 
+    // ✅ CRITICAL FIX: Use tenant-scoped collection (lostFoundRef) instead of root collection
     const q = query(
-        collection(db, 'lost_found'),
+        lostFoundRef,
         ...constraints
     );
 
@@ -152,7 +153,7 @@ export const subscribeToLostFound = (
 export const getLostFoundItem = async (itemId: string, tenantId: string): Promise<LostFoundItem | null> => {
     // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
     if (!tenantId) {
-        console.warn('⚠️ [LostFound] getLostFoundItem called without tenantId');
+        logger.warn('⚠️ [LostFound] getLostFoundItem called without tenantId', undefined, 'lostFoundService');
         return null;
     }
     const docRef = doc(db, `tenants/${tenantId}/lost_found`, itemId);
@@ -177,7 +178,7 @@ const getLastCheckedOutGuest = async (
     try {
         // ✅ FIX: Use tenant-scoped collection for proper SaaS isolation
         if (!tenantId) {
-            console.warn('⚠️ [Lost & Found] getLastCheckedOutGuest called without tenantId');
+            logger.warn('⚠️ [Lost & Found] getLastCheckedOutGuest called without tenantId', undefined, 'lostFoundService');
             return null;
         }
         const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
@@ -203,7 +204,7 @@ const getLastCheckedOutGuest = async (
         const snapshot = await getDocs(q);
         
         if (snapshot.empty) {
-            console.warn(`⚠️ [Lost & Found] No checked-out guest found for Room ${roomNumber}`);
+            logger.warn(`⚠️ [Lost & Found] No checked-out guest found for Room ${roomNumber}`, undefined, 'lostFoundService');
             return null;
         }
         
@@ -213,7 +214,7 @@ const getLastCheckedOutGuest = async (
             phone: cardData.guestPhone || cardData.guest_phone || cardData.phone
         };
     } catch (error) {
-        console.error('Error fetching last checked-out guest:', error);
+        logger.error('Error fetching last checked-out guest:', error, 'lostFoundService');
         return null;
     }
 };
@@ -294,11 +295,11 @@ export const addLostFoundItem = async (
                 
                 logger.info(`WhatsApp notification sent for Room ${item.roomNumber}`, undefined, 'lostFoundService');
             } else {
-                console.warn(`⚠️ [Lost & Found] Could not find phone number for last guest in Room ${item.roomNumber}`);
+                logger.warn(`⚠️ [Lost & Found] Could not find phone number for last guest in Room ${item.roomNumber}`, undefined, 'lostFoundService');
             }
         } catch (whatsappError: any) {
             // Don't fail item creation if WhatsApp fails
-            console.warn('⚠️ WhatsApp notification failed (non-critical):', whatsappError.message);
+            logger.warn('⚠️ WhatsApp notification failed (non-critical):', whatsappError.message, 'lostFoundService');
         }
     }
 
@@ -376,10 +377,10 @@ export const claimItem = async (
                 updatedAt: serverTimestamp(),
             });
             
-            console.log(`✅ ATOMIC: Item ${itemId} claimed by ${claimedBy.name} with identity verification`);
+            logger.info(`✅ ATOMIC: Item ${itemId} claimed by ${claimedBy.name} with identity verification`, undefined, 'lostFoundService');
         });
     } catch (error: any) {
-        console.error('❌ ATOMIC TRANSACTION FAILED (claimItem):', error);
+        logger.error('❌ ATOMIC TRANSACTION FAILED (claimItem):', error, 'lostFoundService');
         throw new Error(`فشل المطالبة بالعنصر: ${error.message || 'خطأ غير معروف'}`);
     }
 };
@@ -441,10 +442,10 @@ export const returnItem = async (
                 updatedAt: serverTimestamp(),
             });
             
-            console.log(`✅ ATOMIC: Item ${itemId} returned by ${returnedBy.name} with proof of delivery`);
+            logger.info(`✅ ATOMIC: Item ${itemId} returned by ${returnedBy.name} with proof of delivery`, undefined, 'lostFoundService');
         });
     } catch (error: any) {
-        console.error('❌ ATOMIC TRANSACTION FAILED (returnItem):', error);
+        logger.error('❌ ATOMIC TRANSACTION FAILED (returnItem):', error, 'lostFoundService');
         throw new Error(`فشل إرجاع العنصر: ${error.message || 'خطأ غير معروف'}`);
     }
 };
@@ -488,10 +489,10 @@ export const donateItem = async (
                 notes: notes || currentData.notes || null,
             });
             
-            console.log(`✅ ATOMIC: Item ${itemId} donated by ${donatedBy.name}`);
+            logger.info(`✅ ATOMIC: Item ${itemId} donated by ${donatedBy.name}`, undefined, 'lostFoundService');
         });
     } catch (error: any) {
-        console.error('❌ ATOMIC TRANSACTION FAILED (donateItem):', error);
+        logger.error('❌ ATOMIC TRANSACTION FAILED (donateItem):', error, 'lostFoundService');
         throw new Error(`فشل التبرع بالعنصر: ${error.message || 'خطأ غير معروف'}`);
     }
 };
@@ -521,7 +522,7 @@ export const disposeItem = async (
 export const getLostFoundStats = async (branchId: string, tenantId?: string) => {
     // 🔐 SECURITY: tenantId is required for SaaS isolation
     if (!tenantId) {
-        console.warn('⚠️ [LostFound] getLostFoundStats called without tenantId');
+        logger.warn('⚠️ [LostFound] getLostFoundStats called without tenantId', undefined, 'lostFoundService');
         return {
             total: 0,
             found: 0,

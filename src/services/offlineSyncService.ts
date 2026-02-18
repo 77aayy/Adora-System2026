@@ -4,8 +4,10 @@
  * Adora Hotel Management System V2
  */
 
-import { db } from './firebase';
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { db, getSafeFirestore } from './firebase';
+import type { Firestore } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -17,6 +19,8 @@ export interface OfflineOperation {
     id: string;
     collection: string;
     docId?: string;
+    /** When set, operation runs on tenants/{tenantId}/{collection} (tenant-scoped) */
+    tenantId?: string;
     action: OfflineAction;
     data: Record<string, any>;
     timestamp: number;
@@ -53,7 +57,6 @@ export function initOfflineSync(): void {
         syncOfflineQueue();
     }
 
-    console.log(`📶 Offline sync initialized. Status: ${isOnline ? 'Online' : 'Offline'}`);
 }
 
 /**
@@ -69,7 +72,7 @@ export function cleanupOfflineSync(): void {
 // ============================================================
 
 function handleOnline(): void {
-    console.log('🌐 Back online!');
+    logger.info('🌐 Back online!', undefined, 'offlineSyncService');
     isOnline = true;
 
     // Notify callbacks
@@ -83,7 +86,7 @@ function handleOnline(): void {
 }
 
 function handleOffline(): void {
-    console.log('📴 Gone offline!');
+    logger.info('📴 Gone offline!', undefined, 'offlineSyncService');
     isOnline = false;
 
     // Notify callbacks
@@ -116,19 +119,28 @@ function saveQueue(queue: OfflineOperation[]): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
 }
 
+/** Collections that must never be replayed from queue (source of truth = server/callables) */
+const NO_OFFLINE_REPLAY_COLLECTIONS = ['requests', 'rooms'];
+
 /**
- * Add operation to offline queue
+ * Add operation to offline queue.
+ * @param tenantId - If set, replay writes to tenants/{tenantId}/{collectionName}
  */
 export function queueOperation(
     collectionName: string,
     action: OfflineAction,
     data: Record<string, any>,
-    docId?: string
+    docId?: string,
+    tenantId?: string
 ): string {
+    if (NO_OFFLINE_REPLAY_COLLECTIONS.includes(collectionName)) {
+        throw new Error(`Offline queue not allowed for "${collectionName}". Use online flow (callables).`);
+    }
     const operation: OfflineOperation = {
         id: `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         collection: collectionName,
         docId,
+        tenantId,
         action,
         data,
         timestamp: Date.now(),
@@ -139,7 +151,7 @@ export function queueOperation(
     queue.push(operation);
     saveQueue(queue);
 
-    console.log(`📦 Queued offline operation: ${action} on ${collectionName}`);
+    logger.info(`📦 Queued offline operation: ${action} on ${collectionName}`, undefined, 'offlineSyncService');
 
     // Try to sync immediately if online
     if (isOnline) {
@@ -170,22 +182,25 @@ export async function syncOfflineQueue(): Promise<void> {
     const queue = getQueue();
     if (queue.length === 0) return;
 
+    const safeDb = await getSafeFirestore();
+    if (!safeDb) return;
+
     syncInProgress = true;
-    console.log(`🔄 Syncing ${queue.length} offline operations...`);
+    logger.info(`🔄 Syncing ${queue.length} offline operations...`, undefined, 'offlineSyncService');
 
     for (const operation of queue) {
         try {
-            await executeOperation(operation);
+            await executeOperation(operation, safeDb);
             removeFromQueue(operation.id);
-            console.log(`✅ Synced: ${operation.action} on ${operation.collection}`);
+            logger.info(`✅ Synced: ${operation.action} on ${operation.collection}`, undefined, 'offlineSyncService');
         } catch (error) {
-            console.error(`❌ Failed to sync operation:`, error);
+            logger.error(`❌ Failed to sync operation:`, error, 'offlineSyncService');
 
             // Update retry count
             operation.retries++;
             if (operation.retries >= 3) {
                 removeFromQueue(operation.id);
-                console.warn(`🗑️ Removed after 3 retries: ${operation.id}`);
+                logger.warn(`🗑️ Removed after 3 retries: ${operation.id}`, undefined, 'offlineSyncService');
             }
         }
     }
@@ -194,21 +209,45 @@ export async function syncOfflineQueue(): Promise<void> {
 
     const remaining = getQueue().length;
     if (remaining > 0) {
-        console.log(`📦 ${remaining} operations still pending`);
+        logger.info(`📦 ${remaining} operations still pending`, undefined, 'offlineSyncService');
     } else {
-        console.log(`✅ All operations synced!`);
+        logger.info(`✅ All operations synced!`, undefined, 'offlineSyncService');
     }
 }
 
 /**
- * Execute a single operation
+ * Execute a single operation (supports tenant-scoped path when operation.tenantId is set)
  */
-async function executeOperation(operation: OfflineOperation): Promise<void> {
-    const { collection: collectionName, action, data, docId } = operation;
+async function executeOperation(operation: OfflineOperation, dbInstance?: Firestore | null): Promise<void> {
+    const firestore = dbInstance ?? db;
+    if (!firestore) return;
+
+    const { collection: collectionName, action, data, docId, tenantId } = operation;
+
+    const collectionRef = tenantId
+        ? collection(firestore, 'tenants', tenantId, collectionName)
+        : collection(firestore, collectionName);
+    const docRefForId = (id: string) =>
+        tenantId ? doc(firestore, 'tenants', tenantId, collectionName, id) : doc(firestore, collectionName, id);
+
+    // F1: For requests update, read-before-write to avoid overwriting terminal state with stale data
+    if (collectionName === 'requests' && action === 'update' && docId) {
+        const ref = docRefForId(docId);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+            const serverStatus = (snap.data()?.status ?? '').toString().toUpperCase();
+            if (serverStatus === 'COMPLETED' || serverStatus === 'CANCELLED') {
+                logger.info(`F1: Skipping offline update for request ${docId} (server status: ${serverStatus})`, undefined, 'offlineSyncService');
+                return;
+            }
+        }
+    } else if (NO_OFFLINE_REPLAY_COLLECTIONS.includes(collectionName)) {
+        throw new Error(`Replay blocked for "${collectionName}" to prevent stale overwrite.`);
+    }
 
     switch (action) {
         case 'create':
-            await addDoc(collection(db, collectionName), {
+            await addDoc(collectionRef, {
                 ...data,
                 createdAt: serverTimestamp(),
                 _syncedAt: serverTimestamp(),
@@ -217,7 +256,7 @@ async function executeOperation(operation: OfflineOperation): Promise<void> {
 
         case 'update':
             if (!docId) throw new Error('docId required for update');
-            await updateDoc(doc(db, collectionName, docId), {
+            await updateDoc(docRefForId(docId), {
                 ...data,
                 updatedAt: serverTimestamp(),
                 _syncedAt: serverTimestamp(),
@@ -226,7 +265,7 @@ async function executeOperation(operation: OfflineOperation): Promise<void> {
 
         case 'delete':
             if (!docId) throw new Error('docId required for delete');
-            await updateDoc(doc(db, collectionName, docId), {
+            await updateDoc(docRefForId(docId), {
                 _deleted: true,
                 _deletedAt: serverTimestamp(),
             });
@@ -239,39 +278,48 @@ async function executeOperation(operation: OfflineOperation): Promise<void> {
 // ============================================================
 
 /**
- * Smart save - works online and offline
+ * Smart save - works online and offline.
+ * @param tenantId - If set, writes to tenants/{tenantId}/{collectionName} (and queue replays there)
  */
 export async function smartSave(
     collectionName: string,
     data: Record<string, any>,
-    docId?: string
+    docId?: string,
+    tenantId?: string
 ): Promise<string | null> {
     const action: OfflineAction = docId ? 'update' : 'create';
 
     if (isOnline) {
+        const safeDb = await getSafeFirestore();
+        if (!safeDb) {
+            queueOperation(collectionName, action, data, docId, tenantId);
+            return null;
+        }
+        const collRef = tenantId ? collection(safeDb, 'tenants', tenantId, collectionName) : collection(safeDb, collectionName);
+        const docRef = (id: string) => tenantId ? doc(safeDb, 'tenants', tenantId, collectionName, id) : doc(safeDb, collectionName, id);
         try {
             if (action === 'create') {
-                const docRef = await addDoc(collection(db, collectionName), {
+                const docRefCreated = await addDoc(collRef, {
                     ...data,
                     createdAt: serverTimestamp(),
                 });
-                return docRef.id;
+                return docRefCreated.id;
             } else {
-                await updateDoc(doc(db, collectionName, docId!), {
+                await updateDoc(docRef(docId!), {
                     ...data,
                     updatedAt: serverTimestamp(),
                 });
                 return docId!;
             }
         } catch (error) {
-            console.warn('Online save failed, queuing...', error);
-            queueOperation(collectionName, action, data, docId);
+            logger.warn('Online save failed, queuing...', error, 'offlineSyncService');
+            queueOperation(collectionName, action, data, docId, tenantId);
             return null;
         }
-    } else {
-        queueOperation(collectionName, action, data, docId);
-        return null;
     }
+
+    queueOperation(collectionName, action, data, docId, tenantId);
+    return null;
 }
 
 // ============================================================

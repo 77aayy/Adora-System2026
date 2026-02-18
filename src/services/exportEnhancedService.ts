@@ -6,6 +6,7 @@
 
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
+import { formatDateGregorianEn } from '../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -67,7 +68,7 @@ export const exportToPDF = async (options: ExportOptions): Promise<void> => {
 
     // Add date
     doc.setFontSize(10);
-    doc.text(`التاريخ: ${new Date().toLocaleDateString('ar-SA')}`, 20, yPos);
+    doc.text(`التاريخ: ${formatDateGregorianEn(new Date())}`, 20, yPos);
     yPos += 15;
 
     // Table settings

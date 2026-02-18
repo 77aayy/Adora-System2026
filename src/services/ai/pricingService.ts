@@ -4,6 +4,7 @@
  */
 
 import { generateAIContent } from './geminiService';
+import { logger } from '../loggerService';
 
 export interface PricingRecommendation {
     suggestedPrice: number;
@@ -73,7 +74,7 @@ export const getPricingRecommendation = async (data: PricingInput): Promise<Pric
             strategy: result.strategy || 'STANDARD'
         };
     } catch (error) {
-        console.error('Pricing AI Failed:', error);
+        logger.error('Pricing AI Failed:', error, 'pricingService');
         // Fallback to base price
         return {
             suggestedPrice: basePrice,

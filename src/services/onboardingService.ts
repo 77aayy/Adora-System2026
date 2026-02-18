@@ -6,6 +6,7 @@
 
 import { db } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -58,9 +59,15 @@ export const hasCompletedTour = async (
 
         const data = docSnap.data() as OnboardingStatus;
         return !!data.completedTours?.[department];
-    } catch (error) {
-        console.error('Error checking tour status:', error);
-        // Fallback to localStorage if Firestore fails
+    } catch (error: any) {
+        const isPermissionError = error?.code === 'permission-denied' ||
+            error?.message?.includes('permission') ||
+            error?.message?.includes('Missing or insufficient');
+        if (isPermissionError) {
+            logger.debug('Tour status check skipped (permission denied, using fallback)', undefined, 'onboardingService');
+        } else {
+            logger.error('Error checking tour status:', error, 'onboardingService');
+        }
         const localKey = `adora_tour_${department}_${userId}`;
         return localStorage.getItem(localKey) === 'true';
     }
@@ -99,7 +106,7 @@ export const markTourCompleted = async (
         const localKey = `adora_tour_${department}_${userId}`;
         localStorage.setItem(localKey, 'true');
     } catch (error) {
-        console.error('Error marking tour completed:', error);
+        logger.error('Error marking tour completed:', error, 'onboardingService');
         // Fallback to localStorage
         const localKey = `adora_tour_${department}_${userId}`;
         localStorage.setItem(localKey, 'true');
@@ -128,7 +135,7 @@ export const resetAllTours = async (userId: string): Promise<void> => {
             localStorage.removeItem(`adora_tour_${dept}_${userId}`);
         });
     } catch (error) {
-        console.error('Error resetting tours:', error);
+        logger.error('Error resetting tours:', error, 'onboardingService');
     }
 };
 
@@ -157,7 +164,7 @@ export const getCompletedTours = async (
 
         return result;
     } catch (error) {
-        console.error('Error getting completed tours:', error);
+        logger.error('Error getting completed tours:', error, 'onboardingService');
         return {};
     }
 };

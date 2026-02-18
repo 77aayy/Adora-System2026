@@ -53,13 +53,11 @@ export const getCached = <T>(key: string): T | null => {
     
     // Check if data is fresh
     if (now < entry.expiresAt) {
-        console.log(`⚡ Cache HIT (fresh): ${key}`);
         return entry.data;
     }
     
     // Check if data is stale but usable
     if (now < entry.timestamp + STALE_TTL) {
-        console.log(`⚡ Cache HIT (stale): ${key}`);
         return entry.data;
     }
     
@@ -78,7 +76,6 @@ export const setCache = <T>(key: string, data: T, ttl: number = DEFAULT_TTL): vo
         timestamp: now,
         expiresAt: now + ttl
     });
-    console.log(`💾 Cache SET: ${key} (TTL: ${ttl / 1000}s)`);
 };
 
 /**
@@ -94,7 +91,6 @@ const getInFlightRequest = <T>(key: string): Promise<T> | null => {
         return null;
     }
     
-    console.log(`🔄 Request DEDUPLICATED: ${key}`);
     return inFlight.promise;
 };
 

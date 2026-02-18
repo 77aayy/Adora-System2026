@@ -8,6 +8,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Tenant, TenantInfo } from '../types/tenant';
+import { logger } from '../services/loggerService';
 
 interface TenantContextType {
     tenantId: string | null;
@@ -127,7 +128,7 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
             const authPromise = auth.currentUser 
                 ? Promise.resolve() 
                 : signInAnonymously(auth).catch((authError: any) => {
-                    console.warn('Anonymous auth failed during tenant load (non-critical):', authError?.message);
+                    logger.warn('Anonymous auth failed during tenant load (non-critical):', authError?.message, 'TenantContext');
                 });
 
             // Wait for auth, then fetch tenant doc
@@ -146,11 +147,11 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
                     localStorage.setItem('adora_org_name', info.name);
                 }
             } else {
-                console.error('Tenant not found:', id);
+                logger.error('Tenant not found:', id, 'TenantContext');
                 clearTenant();
             }
         } catch (error) {
-            console.error('Error loading tenant:', error);
+            logger.error('Error loading tenant:', error, 'TenantContext');
             // ✅ Don't clear tenant on permission errors - might be temporary
             // Only clear if tenant truly doesn't exist
             if ((error as any)?.code !== 'permission-denied') {

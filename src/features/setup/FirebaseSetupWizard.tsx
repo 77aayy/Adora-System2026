@@ -38,6 +38,7 @@ import {
     type FirebaseConfig,
 } from '../../services/firebase';
 import { AdoraLoaderInline } from '../../components/common/AdoraLoader';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -174,11 +175,6 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
     
-    // 📱 Demo links
-    match /demoLinks/{linkId} {
-      allow read, write: if request.auth != null;
-    }
-    
     // 📜 License notifications
     match /licenseNotifications/{notificationId} {
       allow read, write: if request.auth != null;
@@ -258,7 +254,7 @@ export const FirebaseSetupWizard: React.FC = () => {
     // This prevents unauthorized access to setup page
     useEffect(() => {
         if (isFirebaseConfigured()) {
-            console.log('🔒 Firebase already configured - redirecting to login');
+            logger.info('🔒 Firebase already configured - redirecting to login', undefined, 'FirebaseSetupWizard');
             navigate('/login', { replace: true });
         }
     }, [navigate]);

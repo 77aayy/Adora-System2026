@@ -15,6 +15,7 @@ import { FloorRoomSelector } from './FloorRoomSelector';
 import { UnifiedRoomInput } from './UnifiedRoomInput';
 import { useTenantRooms } from '../../hooks/useTenantData';
 import { useTranslation } from 'react-i18next';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -122,7 +123,7 @@ export const ShiftNotes: React.FC<ShiftNotesProps> = ({ isOpen, onClose, roomNum
                 setNotes(archivedNotes);
             }
         } catch (error) {
-            console.error('Failed to load notes:', error);
+            logger.error('Failed to load notes:', error, 'ShiftNotes');
         } finally {
             setLoading(false);
         }
@@ -187,7 +188,7 @@ export const ShiftNotes: React.FC<ShiftNotesProps> = ({ isOpen, onClose, roomNum
         try {
             await ShiftNotesService.markNoteAsRead(session, noteId, user.id || '');
         } catch (error) {
-            console.error('Failed to mark as read:', error);
+            logger.error('Failed to mark as read:', error, 'ShiftNotes');
         }
     };
 

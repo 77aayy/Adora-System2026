@@ -190,7 +190,7 @@ export default defineConfig({
         },
     },
     server: {
-        port: 5173,
+        port: 5175,
         host: true,
         strictPort: false,
         // ✅ Removed fixed hmr.port to let Vite use actual server port automatically

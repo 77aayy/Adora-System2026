@@ -16,6 +16,7 @@ import { UnifiedRoomInput } from '../shared/UnifiedRoomInput';
 import { haptic } from '../../utils/uxEffects';
 import { getQuickActions } from '../../utils/quickActionsConfig';
 import type { QuickAction } from '../../utils/quickActionsConfig';
+import { useTenant } from '../../context/TenantContext';
 
 interface QuickCreateModalProps {
     isOpen: boolean;
@@ -30,6 +31,7 @@ interface QuickCreateModalProps {
         guestsInRoom?: boolean;
         scheduledAt?: Date;
         emergencyTargetDepartment?: string;
+        idempotencyKey?: string; // F2: dedup within 2-min window
     }) => Promise<void> | void; // ✅ FIX: Support both sync and async
     rooms: { floor: number; rooms: string[] }[];
     requests: ServiceRequest[];
@@ -46,6 +48,7 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
     serviceNames 
 }) => {
     const { t, i18n } = useTranslation();
+    const { tenantId } = useTenant();
     const currentLanguage = i18n.language;
     const [step, setStep] = useState<'room' | 'details'>('room');
     const [selectedRoom, setSelectedRoom] = useState('');
@@ -71,9 +74,10 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
         }
 
         const fetchLastRequest = async () => {
+            if (!tenantId) return;
             try {
                 const q = query(
-                    collection(db, 'requests'),
+                    collection(db, `tenants/${tenantId}/requests`),
                     where('roomNumber', '==', roomNumber),
                     orderBy('createdAt', 'desc'),
                     limit(1)
@@ -95,9 +99,9 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                     setLastRequest(null);
                 }
 
-                if (selectedType === 'other') {
+                if (selectedType === 'other' && tenantId) {
                     const emergencyQuery = query(
-                        collection(db, 'requests'),
+                        collection(db, `tenants/${tenantId}/requests`),
                         where('roomNumber', '==', roomNumber),
                         where('isEmergency', '==', true),
                         orderBy('createdAt', 'desc'),
@@ -302,6 +306,9 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
         setIsSubmitting(true);
         
         try {
+            const idempotencyKey = tenantId
+                ? `${tenantId}_${selectedRoom}_${selectedType}_${Math.floor(Date.now() / 60000)}`
+                : undefined;
             const result = onSubmit({
                 roomNumber: selectedRoom,
                 type: selectedType,
@@ -310,7 +317,8 @@ export const QuickCreateModal: React.FC<QuickCreateModalProps> = ({
                 needsCart,
                 guestsInRoom,
                 scheduledAt,
-                emergencyTargetDepartment: selectedType === 'other' ? emergencyTargetDepartment : undefined
+                emergencyTargetDepartment: selectedType === 'other' ? emergencyTargetDepartment : undefined,
+                idempotencyKey
             } as any);
             
             // ✅ FIX: Handle both sync and async onSubmit

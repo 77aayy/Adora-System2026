@@ -8,6 +8,7 @@
 
 import { collection, query, where, getDocs, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 interface CleanupResult {
     deleted: number;
@@ -73,28 +74,28 @@ export const cleanupFeatureData = async (
             case 'aiAssistant':
                 // ✅ Hide VoiceInputButton - handled by component's useFeatureGate
                 // No data cleanup needed, component will hide automatically
-                console.log('✅ AI Assistant disabled - VoiceInputButton will hide automatically');
+                logger.info('✅ AI Assistant disabled - VoiceInputButton will hide automatically', undefined, 'featureCleanupService');
                 break;
 
             case 'pointsSystem':
                 // ✅ Points system cleanup (optional - can keep historical data)
                 // Points history is usually kept for reporting
-                console.log('✅ Points system disabled - historical data preserved');
+                logger.info('✅ Points system disabled - historical data preserved', undefined, 'featureCleanupService');
                 break;
 
             case 'inventoryManagement':
                 // ✅ Inventory cleanup (optional - can keep historical data)
-                console.log('✅ Inventory management disabled - historical data preserved');
+                logger.info('✅ Inventory management disabled - historical data preserved', undefined, 'featureCleanupService');
                 break;
 
             case 'procurementSystem':
                 // ✅ Procurement cleanup (optional - can keep historical data)
-                console.log('✅ Procurement system disabled - historical data preserved');
+                logger.info('✅ Procurement system disabled - historical data preserved', undefined, 'featureCleanupService');
                 break;
 
             case 'laundryManagement':
                 // ✅ Laundry cleanup (optional - can keep historical data)
-                console.log('✅ Laundry management disabled - historical data preserved');
+                logger.info('✅ Laundry management disabled - historical data preserved', undefined, 'featureCleanupService');
                 break;
 
             // ✅ إضافة حالات أخرى للميزات الجديدة هنا
@@ -103,11 +104,11 @@ export const cleanupFeatureData = async (
             //     break;
 
             default:
-                console.warn(`⚠️ No cleanup defined for feature: ${featureKey}`);
+                logger.warn(`⚠️ No cleanup defined for feature: ${featureKey}`, undefined, 'featureCleanupService');
         }
     } catch (error: any) {
         errors.push(`Error cleaning up ${featureKey}: ${error.message}`);
-        console.error(`Cleanup error for ${featureKey}:`, error);
+        logger.error(`Cleanup error for ${featureKey}:`, error, 'featureCleanupService');
     }
 
     return { deleted, errors };

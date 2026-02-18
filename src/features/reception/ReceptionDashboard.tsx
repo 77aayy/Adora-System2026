@@ -94,6 +94,7 @@ import { awardPoints } from '../../services/pointsService';
 import { markAsViewed, markAsDelivered, subscribeToRequests } from '../../services/requestService';
 // ✅ Lost & Found imports - MOVED TO: components/reception/modals/LostFoundModal.tsx
 import { useSmartAgent } from '../../hooks/useSmartAgent';
+import { logger } from '../../services/loggerService';
 import { useOnboardingTour } from '../../hooks/useOnboardingTour';
 import { OverflowAlert } from '../../components/shared/OverflowAlert'; // 🔄 Overflow Alert // ✅ Onboarding tour
 import { TourGuide } from '../../components/shared/TourGuide'; // ✅ Tour guide component
@@ -325,7 +326,7 @@ export const ReceptionDashboard: React.FC = () => {
             required: ["roomNumber", "type"]
         },
         onSuccess: (action, params) => {
-            console.log("AI Action Success:", action, params);
+            logger.info("AI Action Success:", { action, params }, 'ReceptionDashboard');
             haptic('success');
             // Additional fallback: if it's a known UI update needed
             if (action === 'UPDATE_STATUS') {
@@ -341,7 +342,7 @@ export const ReceptionDashboard: React.FC = () => {
     useEffect(() => {
         const fallbackTimeout = setTimeout(() => {
             if (loading && requests.length === 0) {
-                console.warn('⚠️ Data loading timeout - showing page with empty state');
+                logger.warn('⚠️ Data loading timeout - showing page with empty state', undefined, 'ReceptionDashboard');
                 setLoading(false);
             }
         }, 5000); // 5 seconds fallback (only if no data loaded)
@@ -385,7 +386,7 @@ export const ReceptionDashboard: React.FC = () => {
                     setShowLocationWarning(true);
                 }
             } catch (err) {
-                console.error('Location check error:', err);
+                logger.error('Location check error:', err, 'ReceptionDashboard');
                 // Fail open - allow access
             }
         };
@@ -420,7 +421,7 @@ export const ReceptionDashboard: React.FC = () => {
         // Subscribe to rooms (Grouped for Modal)
         // ✅ FIX: Pass tenantId as required parameter
         if (!tenantId) {
-            console.warn('⚠️ [ReceptionDashboard] Cannot subscribe to rooms: tenantId is missing');
+            logger.warn('⚠️ [ReceptionDashboard] Cannot subscribe to rooms: tenantId is missing', undefined, 'ReceptionDashboard');
             return;
         }
         
@@ -514,7 +515,7 @@ export const ReceptionDashboard: React.FC = () => {
         // ✅ FIX: Use subscribeToRequests from requestService (Tenant-Scoped + Real-time)
         // This ensures proper Tenant Isolation and Security
         if (!tenantId) {
-            console.warn('⚠️ [ReceptionDashboard] Cannot subscribe to requests: tenantId is missing');
+            logger.warn('⚠️ [ReceptionDashboard] Cannot subscribe to requests: tenantId is missing', undefined, 'ReceptionDashboard');
             setLoading(false);
             return;
         }
@@ -577,10 +578,10 @@ export const ReceptionDashboard: React.FC = () => {
     // ✅ Wrapper to pass existing requests for duplication check
     // ✅ FIX: Add request deduplication guard to prevent double submission
     const [isCreatingRequest, setIsCreatingRequest] = React.useState(false);
-    const handleCreateRequest = async (data: { roomNumber: string; type: string; priority: 'normal' | 'urgent' | 'scheduled'; notes: string; needsCart?: boolean; guestsInRoom?: boolean; scheduledAt?: Date; emergencyTargetDepartment?: string }) => {
+    const handleCreateRequest = async (data: { roomNumber: string; type: string; priority: 'normal' | 'urgent' | 'scheduled'; notes: string; needsCart?: boolean; guestsInRoom?: boolean; scheduledAt?: Date; emergencyTargetDepartment?: string; idempotencyKey?: string }) => {
         // ✅ FIX: Prevent double submission
         if (isCreatingRequest) {
-            console.warn('⚠️ Request creation already in progress, ignoring duplicate call');
+            logger.warn('⚠️ Request creation already in progress, ignoring duplicate call', undefined, 'ReceptionDashboard');
             return;
         }
         
@@ -598,18 +599,19 @@ export const ReceptionDashboard: React.FC = () => {
     // ✅ Removed - using handlers from useReceptionActions hook
 
     const confirmDelete = async () => {
-        if (!deleteConfirmationFromHook?.id) return;
+        if (!deleteConfirmationFromHook?.id || !tenantId) return;
 
         const requestId = deleteConfirmationFromHook.id;
         setDeleteConfirmationFromHook(null); // Close modal immediately for better UX
 
         try {
-            console.log('🗑️ Attempting to delete request:', requestId);
-            await deleteDoc(doc(db, 'requests', requestId));
-            console.log('✅ Delete successful');
+            logger.info('🗑️ Attempting to delete request:', requestId, 'ReceptionDashboard');
+            const { deleteRequest: deleteRequestService } = await import('../../services/requestService');
+            await deleteRequestService(requestId, tenantId);
+            logger.info('✅ Delete successful', undefined, 'ReceptionDashboard');
             success(t('reception.requestDeletedSuccess'));
         } catch (err: any) {
-            console.error('❌ Delete failed:', err);
+            logger.error('❌ Delete failed:', err, 'ReceptionDashboard');
             const errorMsg = err?.code === 'permission-denied'
                 ? t('reception.noPermissionToDelete')
                 : t('reception.requestDeleteFailed') + ' ' + (err?.message || t('reception.unknownError'));
@@ -654,10 +656,11 @@ export const ReceptionDashboard: React.FC = () => {
     // DELETION WORKFLOW (Scenario 3)
     // ============================================================
 
-    // 1. Staff Requests Deletion
+    // 1. Staff Requests Deletion — use tenant-scoped path
     const handleRequestDeletion = async (requestId: string) => {
+        if (!tenantId) return;
         try {
-            await updateDoc(doc(db, 'requests', requestId), {
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, requestId), {
                 deletionRequest: {
                     requestedBy: user?.name || 'Unknown',
                     requestedById: user?.id || '',
@@ -668,34 +671,36 @@ export const ReceptionDashboard: React.FC = () => {
             success(t('reception.deletionRequestSent'));
             haptic('success');
         } catch (err) {
-            console.error('Error requesting deletion:', err);
+            logger.error('Error requesting deletion:', err, 'ReceptionDashboard');
             error(t('reception.deletionRequestSendFailed'));
             haptic('error');
         }
     };
 
-    // 2. Manager Approves Deletion (Permanently Delete)
+    // 2. Manager Approves Deletion (Permanently Delete) — use tenant-scoped path
     const handleApproveDeletion = async (requestId: string) => {
+        if (!tenantId) return;
         try {
-            await deleteDoc(doc(db, 'requests', requestId));
+            await deleteDoc(doc(db, `tenants/${tenantId}/requests`, requestId));
             haptic('success');
             setDeleteConfirmationFromHook(null); // Close modal if open
         } catch (error) {
-            console.error('Error approving deletion:', error);
+            logger.error('Error approving deletion:', error, 'ReceptionDashboard');
             haptic('error');
         }
     };
 
-    // 3. Manager Rejects Deletion (Remove Flag)
+    // 3. Manager Rejects Deletion (Remove Flag) — use tenant-scoped path
     const handleRejectDeletion = async (requestId: string) => {
+        if (!tenantId) return;
         try {
-            await updateDoc(doc(db, 'requests', requestId), {
+            await updateDoc(doc(db, `tenants/${tenantId}/requests`, requestId), {
                 deletionRequest: deleteField() // Remove the field
             });
             success(t('reception.deletionRequestRejected'));
             haptic('success');
         } catch (err) {
-            console.error('Error rejecting deletion:', err);
+            logger.error('Error rejecting deletion:', err, 'ReceptionDashboard');
             error(t('reception.deletionRequestRejectFailed'));
             haptic('error');
         }
@@ -705,11 +710,12 @@ export const ReceptionDashboard: React.FC = () => {
     // LOST ITEMS ARCHIVE (Scenario 4)
     // ============================================================
 
-    // ✅ Archive lost items from inspection to Lost & Found
+    // ✅ Archive lost items from inspection to Lost & Found — use tenant-scoped path
     const handleArchiveToLostFound = async (requestId: string) => {
+        if (!tenantId) return;
         try {
             // Get request data
-            const requestRef = doc(db, 'requests', requestId);
+            const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
             const requestSnap = await getDoc(requestRef);
             
             if (!requestSnap.exists()) {
@@ -763,13 +769,13 @@ export const ReceptionDashboard: React.FC = () => {
                     });
                 }
             } catch (e) {
-                console.warn('Failed to update live feed:', e);
+                logger.warn('Failed to update live feed:', e, 'ReceptionDashboard');
             }
 
             success(t('reception.lostFoundArchivedSuccess'));
             haptic('success');
         } catch (err: any) {
-            console.error('Error archiving to Lost & Found:', err);
+            logger.error('Error archiving to Lost & Found:', err, 'ReceptionDashboard');
             error(t('reception.lostFoundArchiveFailed') + ' ' + (err.message || t('reception.unknownError')));
             haptic('error');
         }
@@ -972,7 +978,7 @@ export const ReceptionDashboard: React.FC = () => {
                         tenantId={tenantId}
                         branchId={branchId}
                         onDepartmentClick={(dept) => {
-                            console.log(`📞 Calling department: ${dept}`);
+                            logger.info(`📞 Calling department: ${dept}`, undefined, 'ReceptionDashboard');
                             // Could trigger a phone call or notification
                         }}
                     />
@@ -1072,6 +1078,11 @@ export const ReceptionDashboard: React.FC = () => {
                 serviceNames={SERVICE_NAMES}
                 statusConfig={STATUS_CONFIG}
                 t={t}
+                tenantId={tenantId}
+                userId={user?.id}
+                userName={user?.name}
+                onSuccess={success}
+                onError={error}
             />
 
             {/* Room Transfer Modal */}

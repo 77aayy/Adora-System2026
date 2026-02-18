@@ -83,6 +83,17 @@ const mapDocToRoom = (doc: any): Room => {
  */
 const getRoomDocId = (branchId: string, roomNumber: string) => `${branchId}_${roomNumber}`;
 
+/** Allowed room status transitions (from -> to[]) to prevent invalid states */
+const ALLOWED_ROOM_TRANSITIONS: Record<string, string[]> = {
+    available: ['occupied', 'blocked'],
+    occupied: ['cleaning', 'maintenance', 'blocked'],
+    dirty: ['cleaning', 'maintenance', 'blocked', 'ready'], // ready: after checkout inspection approved (room was never set to cleaning)
+    cleaning: ['available', 'ready', 'maintenance', 'blocked'],
+    ready: ['available', 'occupied', 'blocked'],
+    maintenance: ['available', 'blocked'],
+    blocked: ['available'],
+};
+
 // ============================================================
 // READ OPERATIONS (Real-time)
 // ============================================================
@@ -175,7 +186,7 @@ export const subscribeToRooms = (
 ): Unsubscribe => {
     // 🛡️ ADORA PROTECTION: Block subscription without TenantId
     if (!tenantId || tenantId.trim() === '') {
-        console.warn('⚠️ ADORA: Attempted to subscribe to rooms without TenantId. Blocked.');
+        logger.warn('⚠️ ADORA: Attempted to subscribe to rooms without TenantId. Blocked.', undefined, 'roomService');
         logger.error('TenantId is required for subscribeToRooms', undefined, 'roomService');
         callback([]);
         return () => { }; // Return empty unsubscribe function
@@ -211,17 +222,15 @@ export const subscribeToRooms = (
                     });
                 callback(rooms);
             } catch (error) {
-                console.error('🔥 ADORA Firestore Error in subscribeToRooms callback:', error);
-                logger.error('Error processing rooms snapshot', error, 'roomService');
+                logger.error('🔥 ADORA Firestore Error in subscribeToRooms callback:', error, 'roomService');
                 callback([]); // Return empty array on error
             }
         }, (error) => {
-            console.error('🔥 ADORA Firestore Error subscribing to rooms:', error);
-            logger.error('Error subscribing to rooms', error, 'roomService');
+            logger.error('🔥 ADORA Firestore Error subscribing to rooms:', error, 'roomService');
             callback([]); // Return empty array on subscription error
         });
     } catch (error) {
-        console.error('🔥 ADORA Firestore Error in subscribeToRooms:', error);
+        logger.error('🔥 ADORA Firestore Error in subscribeToRooms:', error, 'roomService');
         logger.error('Error in subscribeToRooms', error, 'roomService');
         callback([]);
         return () => { }; // Return empty unsubscribe function
@@ -588,23 +597,38 @@ export const updateRoomStatus = async (
         throw new Error('النظام غير جاهز. يرجى إعادة المحاولة.');
     }
 
+    const validatedTenantId = validateTenantId(tenantId);
+    validateTenantAccess(validatedTenantId);
+    const docId = getRoomDocId(branchId, roomNumber);
+    const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, docId);
+    const newStatusStr = typeof status === 'string' ? status : (status as string);
+
     try {
-        const validatedTenantId = validateTenantId(tenantId);
-        validateTenantAccess(validatedTenantId);
-        const docId = getRoomDocId(branchId, roomNumber);
-        
-        // ✅ Get room before update (for audit log)
-        const roomRef = doc(db, `tenants/${validatedTenantId}/rooms`, docId);
-        const roomSnap = await getDoc(roomRef);
-        const oldStatus = roomSnap.exists() ? (roomSnap.data().status as RoomStatus) : null;
-        
-        // ✅ Use tenant-scoped collection
-        await updateDoc(roomRef, {
-            status,
-            updatedAt: serverTimestamp()
+        let oldStatus: string | null = null;
+
+        await runTransaction(db, async (tx) => {
+            const roomSnap = await tx.get(roomRef);
+            if (!roomSnap.exists()) {
+                throw new Error(`غرفة ${roomNumber} غير موجودة`);
+            }
+            const data = roomSnap.data();
+            const currentStatus = (data?.status as string) || 'available';
+            oldStatus = currentStatus;
+
+            const allowed = ALLOWED_ROOM_TRANSITIONS[currentStatus];
+            if (allowed && !allowed.includes(newStatusStr)) {
+                throw new Error(
+                    `لا يمكن تغيير حالة الغرفة من "${currentStatus}" إلى "${newStatusStr}". المسموح: ${allowed.join(', ')}`
+                );
+            }
+
+            tx.update(roomRef, {
+                status: newStatusStr,
+                updatedAt: serverTimestamp()
+            });
         });
 
-        // 📝 Audit Log: Room Status Change
+        // 📝 Audit Log: Room Status Change (after transaction)
         try {
             const storedUser = localStorage.getItem('adora_user');
             const userData = storedUser ? JSON.parse(storedUser) : {};
@@ -627,17 +651,23 @@ export const updateRoomStatus = async (
                     roomNumber: roomNumber
                 },
                 {
-                    description: `تم تغيير حالة الغرفة من ${oldStatus || 'unknown'} إلى ${status}`,
+                    description: `تم تغيير حالة الغرفة من ${oldStatus || 'unknown'} إلى ${newStatusStr}`,
                     previousValue: oldStatus,
-                    newValue: status,
+                    newValue: newStatusStr,
                     metadata: { roomNumber, branchId }
                 }
             ).catch(err => logger.warn('Failed to log room status change', err, 'roomService'));
         } catch (auditError) {
             logger.warn('Failed to create audit log for room status change', auditError, 'roomService');
         }
-    } catch (error) {
-        console.error(`Error updating room ${roomNumber} status:`, error);
+
+        // Invalidate room list cache so next getRooms() is fresh (avoids stale assignment)
+        try {
+            const { invalidateCache } = await import('../utils/requestCache');
+            invalidateCache(`rooms:${validatedTenantId}:${branchId}`);
+        } catch (_) { /* ignore */ }
+    } catch (error: any) {
+        logger.error(`Error updating room ${roomNumber} status:`, error, 'roomService');
         throw error;
     }
 };
@@ -678,7 +708,7 @@ export const getRoomStatus = async (
         return snapshot.docs[0].data().status as RoomStatus;
 
     } catch (error) {
-        console.error(`Error getting room ${roomNumber} status:`, error);
+        logger.error(`Error getting room ${roomNumber} status:`, error, 'roomService');
         return null;
     }
 };
@@ -744,7 +774,7 @@ export const migrateLegacyRoom = async (
             transaction.delete(legacyRef);
         });
     } catch (error) {
-        console.error("Migration failed:", error);
+        logger.error("Migration failed:", error, 'roomService');
         throw error;
     }
 };
@@ -863,12 +893,12 @@ export const transferGuest = async (
         const timestamp = serverTimestamp();
         const batch = writeBatch(db);
 
-        // Find active requests for the old room
+        // Find active requests for the old room (requests use field 'branch', not 'branchId')
         const q = query(
             requestsRef,
             where('roomNumber', '==', oldRoomNumber),
-            where('branchId', '==', branchId),
-            where('status', 'in', ['PENDING_RECEPTION', 'CONFIRMED', 'IN_PROGRESS', 'WAITING_PARTS'])
+            where('branch', '==', branchId),
+            where('status', 'in', ['PENDING_RECEPTION', 'CONFIRMED', 'IN_PROGRESS', 'WAITING_PARTS', 'NEW'])
         );
         const activeRequests = await getDocs(q);
 
@@ -896,7 +926,7 @@ export const transferGuest = async (
             roomNumber: newRoomNumber,
             title: `نقل أمتعة (تحويل غرفة)`,
             description: `نقل الأمتعة من الغرفة ${oldRoomNumber} إلى ${newRoomNumber}`,
-            branchId: branchId,
+            branch: branchId,
             tenantId: validatedTenantId,
             createdAt: timestamp,
             timeline: { created: timestamp },
@@ -912,7 +942,7 @@ export const transferGuest = async (
             roomNumber: oldRoomNumber,
             title: 'تنظيف خروج (نقل نزيل)',
             description: `الغرفة بحاجة لتنظيف بعد نقل النزيل إلى ${newRoomNumber}`,
-            branchId: branchId,
+            branch: branchId,
             tenantId: validatedTenantId,
             createdAt: timestamp,
             timeline: { created: timestamp },
@@ -922,7 +952,7 @@ export const transferGuest = async (
         await batch.commit();
 
     } catch (error) {
-        console.error("Transfer Guest failed:", error);
+        logger.error("Transfer Guest failed:", error, 'roomService');
         throw error;
     }
 };

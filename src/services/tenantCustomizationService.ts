@@ -5,6 +5,7 @@
 
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -91,7 +92,7 @@ export const getTenantBranding = async (tenantId: string): Promise<TenantBrandin
         
         return null;
     } catch (error) {
-        console.error('Error getting tenant branding:', error);
+        logger.error('Error getting tenant branding:', error, 'tenantCustomizationService');
         return null;
     }
 };
@@ -113,7 +114,7 @@ export const saveTenantBranding = async (
             updatedBy
         }, { merge: true });
     } catch (error) {
-        console.error('Error saving tenant branding:', error);
+        logger.error('Error saving tenant branding:', error, 'tenantCustomizationService');
         throw error;
     }
 };
@@ -141,7 +142,7 @@ export const getTenantSettings = async (tenantId: string): Promise<TenantSetting
         
         return null;
     } catch (error) {
-        console.error('Error getting tenant settings:', error);
+        logger.error('Error getting tenant settings:', error, 'tenantCustomizationService');
         return null;
     }
 };
@@ -163,7 +164,7 @@ export const saveTenantSettings = async (
             updatedBy
         }, { merge: true });
     } catch (error) {
-        console.error('Error saving tenant settings:', error);
+        logger.error('Error saving tenant settings:', error, 'tenantCustomizationService');
         throw error;
     }
 };
@@ -196,7 +197,7 @@ export const isFeatureEnabledForTenant = async (
         // Default: enabled
         return true;
     } catch (error) {
-        console.error('Error checking feature:', error);
+        logger.error('Error checking feature:', error, 'tenantCustomizationService');
         return true; // Fail open
     }
 };

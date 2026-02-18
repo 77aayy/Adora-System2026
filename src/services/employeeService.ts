@@ -23,6 +23,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { User } from '../types';
+import { logger } from './loggerService';
 
 // NOTE: Using flat 'users' collection for backward compatibility
 // TODO: Migrate to hotels/{hotelId}/branches/{branchId}/employees structure
@@ -120,7 +121,7 @@ export const getEmployees = async (
                     return users;
                 }
             } catch (error) {
-                console.warn('Failed to fetch from tenant-scoped employees collection, falling back to users:', error);
+                logger.warn('Failed to fetch from tenant-scoped employees collection, falling back to users:', error, 'employeeService');
             }
             
             // ✅ Fallback: Use legacy users collection (backward compatibility)
@@ -202,12 +203,12 @@ export const subscribeToEmployees = (
 
                 callback(users);
             }, (error) => {
-                console.warn('Error subscribing to tenant-scoped employees, falling back to users:', error);
+                logger.warn('Error subscribing to tenant-scoped employees, falling back to users:', error, 'employeeService');
                 // Fallback to users collection
                 return subscribeToEmployeesLegacy(callback, tenantId, branchId, maxResults);
             });
         } catch (error) {
-            console.warn('Failed to subscribe to tenant-scoped employees, falling back to users:', error);
+            logger.warn('Failed to subscribe to tenant-scoped employees, falling back to users:', error, 'employeeService');
             // Fallback to users collection
             return subscribeToEmployeesLegacy(callback, tenantId, branchId, maxResults);
         }
@@ -249,7 +250,7 @@ const subscribeToEmployeesLegacy = (
 
         callback(users);
     }, (error) => {
-        console.error('Error fetching employees:', error);
+        logger.error('Error fetching employees:', error, 'employeeService');
     });
 };
 
@@ -315,7 +316,7 @@ export const generatePinCode = async (): Promise<string> => {
  */
 export const getEmployeeStats = async (tenantId: string): Promise<Record<string, number>> => {
     if (!tenantId) {
-        console.error("CRITICAL: getEmployeeStats called without tenantId");
+        logger.error("CRITICAL: getEmployeeStats called without tenantId", undefined, 'employeeService');
         return {};
     }
     const usersRef = collection(db, 'users');

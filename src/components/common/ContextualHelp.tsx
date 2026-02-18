@@ -221,12 +221,7 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
                                 {affects.map((item, i) => (
                                     <span 
                                         key={i} 
-                                        className="text-xs sm:text-sm px-3 py-1.5 rounded-full font-medium transition-all hover:scale-105"
-                                        style={{
-                                            background: 'var(--theme-primary-100)',
-                                            color: 'var(--theme-primary-700)',
-                                            border: '1px solid var(--theme-primary-300)',
-                                        }}
+                                        className="text-xs sm:text-sm px-3 py-1.5 rounded-full font-medium transition-all hover:scale-105 bg-teal-100 dark:bg-slate-700/50 text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-500/30"
                                     >
                                         {item}
                                     </span>
@@ -252,38 +247,22 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
                                 {steps.map((step, i) => (
                                     <div 
                                         key={i} 
-                                        className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl transition-all hover:scale-[1.02]"
-                                        style={{
-                                            background: step.status === 'done' 
-                                                ? 'var(--theme-success-50, rgba(34, 197, 94, 0.1))'
+                                        className={`flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl transition-all hover:scale-[1.02] ${
+                                            step.status === 'done'
+                                                ? 'bg-green-50 dark:bg-slate-800/60 border border-green-200 dark:border-green-500/30'
                                                 : step.status === 'current'
-                                                ? 'var(--theme-primary-50, rgba(20, 184, 166, 0.1))'
-                                                : 'var(--theme-bg-tertiary)',
-                                            border: `1px solid ${
-                                                step.status === 'done'
-                                                    ? 'var(--theme-success-300, rgba(34, 197, 94, 0.3))'
-                                                    : step.status === 'current'
-                                                    ? 'var(--theme-primary-300, rgba(20, 184, 166, 0.3))'
-                                                    : 'var(--theme-border-primary)'
-                                            }`,
-                                            boxShadow: step.status === 'current' ? 'var(--theme-shadow-sm)' : 'none',
-                                        }}
+                                                ? 'bg-teal-50 dark:bg-slate-800/60 border border-teal-200 dark:border-teal-500/30 shadow-sm'
+                                                : 'bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700'
+                                        }`}
                                     >
                                         <span 
-                                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0 transition-all"
-                                            style={{
-                                                background: step.status === 'done' 
-                                                    ? 'var(--theme-success-500, #22c55e)' 
+                                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold flex-shrink-0 transition-all ${
+                                                step.status === 'done'
+                                                    ? 'bg-green-500 dark:bg-green-600 text-white'
                                                     : step.status === 'current'
-                                                    ? 'var(--theme-primary-500)'
-                                                    : 'var(--theme-bg-tertiary)',
-                                                color: step.status === 'done' || step.status === 'current' 
-                                                    ? 'white' 
-                                                    : 'var(--theme-text-secondary)',
-                                                border: step.status === 'done' || step.status === 'current'
-                                                    ? 'none'
-                                                    : '1px solid var(--theme-border-primary)',
-                                            }}
+                                                    ? 'bg-teal-500 dark:bg-teal-600 text-white'
+                                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600'
+                                            }`}
                                         >
                                             {step.status === 'done' ? (
                                                 <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -293,14 +272,13 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
                                         </span>
                                         <div className="flex-1 min-w-0">
                                             <span 
-                                                className="text-sm sm:text-base font-medium block"
-                                                style={{
-                                                    color: step.status === 'done'
-                                                        ? 'var(--theme-success-600, #16a34a)'
+                                                className={`text-sm sm:text-base font-medium block ${
+                                                    step.status === 'done'
+                                                        ? 'text-green-600 dark:text-green-400'
                                                         : step.status === 'current'
-                                                        ? 'var(--theme-primary-600)'
-                                                        : 'var(--theme-text-primary)',
-                                                }}
+                                                        ? 'text-teal-600 dark:text-teal-400'
+                                                        : 'text-slate-900 dark:text-white'
+                                                }`}
                                             >
                                                 {step.title}
                                             </span>
@@ -322,15 +300,10 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
                     {/* Tips - Theme Compatible */}
                     {tips && tips.length > 0 && (
                         <div 
-                            className="p-4 sm:p-5 rounded-xl transition-all hover:scale-[1.01]"
-                            style={{
-                                background: 'var(--theme-primary-50, rgba(20, 184, 166, 0.1))',
-                                border: '1px solid var(--theme-primary-200, rgba(20, 184, 166, 0.2))',
-                            }}
+                            className="p-4 sm:p-5 rounded-xl transition-all hover:scale-[1.01] bg-teal-50 dark:bg-slate-800/60 border border-teal-200 dark:border-teal-500/30"
                         >
                             <h4 
-                                className="text-sm sm:text-base font-semibold mb-3 flex items-center gap-2"
-                                style={{ color: 'var(--theme-primary-600)' }}
+                                className="text-sm sm:text-base font-semibold mb-3 flex items-center gap-2 text-teal-600 dark:text-teal-400"
                             >
                                 <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5" />
                                 نصائح:
@@ -342,7 +315,7 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
                                         className="text-xs sm:text-sm flex items-start gap-2.5"
                                         style={{ color: 'var(--theme-text-secondary)' }}
                                     >
-                                        <span style={{ color: 'var(--theme-primary-500)' }}>•</span>
+                                        <span className="text-teal-500 dark:text-teal-400">•</span>
                                         <span>{tip}</span>
                                     </li>
                                 ))}
@@ -353,15 +326,10 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
                     {/* Warnings - Theme Compatible */}
                     {warnings && warnings.length > 0 && (
                         <div 
-                            className="p-4 sm:p-5 rounded-xl transition-all hover:scale-[1.01]"
-                            style={{
-                                background: 'var(--theme-error-50, rgba(239, 68, 68, 0.1))',
-                                border: '1px solid var(--theme-error-200, rgba(239, 68, 68, 0.2))',
-                            }}
+                            className="p-4 sm:p-5 rounded-xl transition-all hover:scale-[1.01] bg-red-50 dark:bg-slate-800/60 border border-red-200 dark:border-red-500/30"
                         >
                             <h4 
-                                className="text-sm sm:text-base font-semibold mb-3 flex items-center gap-2"
-                                style={{ color: 'var(--theme-error-600, #dc2626)' }}
+                                className="text-sm sm:text-base font-semibold mb-3 flex items-center gap-2 text-red-600 dark:text-red-400"
                             >
                                 <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
                                 تنبيهات:
@@ -370,8 +338,7 @@ export const ContextualHelp: React.FC<ContextualHelpProps> = ({
                                 {warnings.map((warn, i) => (
                                     <li 
                                         key={i} 
-                                        className="text-xs sm:text-sm flex items-start gap-2.5"
-                                        style={{ color: 'var(--theme-error-700, #b91c1c)' }}
+                                        className="text-xs sm:text-sm flex items-start gap-2.5 text-red-700 dark:text-red-300"
                                     >
                                         <span>⚠</span>
                                         <span>{warn}</span>

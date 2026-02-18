@@ -4,6 +4,8 @@
  * Adora Hotel Management System V2
  */
 
+import { formatDateTimeGregorianEn } from '../utils/dateUtils';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -200,7 +202,7 @@ export const exportToPDF = (
                 <tbody>${dataRows}</tbody>
             </table>
             <div class="footer">
-                تم التصدير بواسطة نظام أدورا - ${new Date().toLocaleString('ar-SA')}
+                تم التصدير بواسطة نظام أدورا - ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}
             </div>
             <script>
                 window.onload = function() {
@@ -358,7 +360,7 @@ const formatRoomStatus = (status: string): string => {
 const formatDate = (date: any): string => {
     if (!date) return '-';
     const d = date.toDate ? date.toDate() : new Date(date);
-    return d.toLocaleString('ar-SA');
+    return formatDateTimeGregorianEn(d, { showSeconds: false });
 };
 
 const formatDateFilename = (date: Date): string => {

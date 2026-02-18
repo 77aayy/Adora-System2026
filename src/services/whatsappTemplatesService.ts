@@ -7,6 +7,7 @@
 
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, Timestamp, addDoc, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -108,7 +109,7 @@ export const createWhatsAppTemplate = async (
 
         return docRef.id;
     } catch (error) {
-        console.error('Error creating WhatsApp template:', error);
+        logger.error('Error creating WhatsApp template:', error, 'whatsappTemplatesService');
         throw error;
     }
 };
@@ -130,7 +131,7 @@ export const updateWhatsAppTemplate = async (
             updatedBy: { id: managerId, name: managerName }
         });
     } catch (error) {
-        console.error('Error updating WhatsApp template:', error);
+        logger.error('Error updating WhatsApp template:', error, 'whatsappTemplatesService');
         throw error;
     }
 };
@@ -145,7 +146,7 @@ export const deactivateWhatsAppTemplate = async (tenantId: string, templateId: s
             updatedAt: Timestamp.now()
         });
     } catch (error) {
-        console.error('Error deactivating WhatsApp template:', error);
+        logger.error('Error deactivating WhatsApp template:', error, 'whatsappTemplatesService');
         throw error;
     }
 };
@@ -183,7 +184,7 @@ export const getActiveTemplates = async (
 
         return templates;
     } catch (error) {
-        console.error('Error getting active templates:', error);
+        logger.error('Error getting active templates:', error, 'whatsappTemplatesService');
         return [];
     }
 };
@@ -224,7 +225,7 @@ export const subscribeToActiveTemplates = (
             callback(templates);
         },
         (error) => {
-            console.error('Error subscribing to templates:', error);
+            logger.error('Error subscribing to templates:', error, 'whatsappTemplatesService');
             callback([]);
         }
     );
@@ -245,7 +246,7 @@ export const getAllTemplates = async (tenantId: string): Promise<WhatsAppTemplat
             ...doc.data()
         } as WhatsAppTemplate));
     } catch (error) {
-        console.error('Error getting all templates:', error);
+        logger.error('Error getting all templates:', error, 'whatsappTemplatesService');
         return [];
     }
 };
@@ -272,7 +273,7 @@ export const subscribeToAllTemplates = (
             callback(templates);
         },
         (error) => {
-            console.error('Error subscribing to all templates:', error);
+            logger.error('Error subscribing to all templates:', error, 'whatsappTemplatesService');
             callback([]);
         }
     );
@@ -367,7 +368,7 @@ export const sendWhatsAppMessage = async (
 
         return docRef.id;
     } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
+        logger.error('Error sending WhatsApp message:', error, 'whatsappTemplatesService');
         throw error;
     }
 };

@@ -8,6 +8,7 @@
 
 import { db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -64,7 +65,7 @@ class ConnectivityMonitor {
             }
         }, 10000);
 
-        console.log('✅ Connectivity Monitor initialized');
+        logger.info('✅ Connectivity Monitor initialized', undefined, 'connectivityService');
     }
 
     /**
@@ -101,7 +102,7 @@ class ConnectivityMonitor {
                 this.firebaseConnected = false;
                 if (this.isOnline) {
                     // Browser says online but Firebase is not reachable
-                    console.warn('⚠️ Firebase connection lost');
+                    logger.warn('⚠️ Firebase connection lost', undefined, 'connectivityService');
                 }
             }
             return false;
@@ -153,7 +154,7 @@ class ConnectivityMonitor {
             try {
                 cb(isOnline);
             } catch (e) {
-                console.error('Connectivity callback error:', e);
+                logger.error('Connectivity callback error:', e, 'connectivityService');
             }
         });
     }

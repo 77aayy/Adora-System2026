@@ -104,7 +104,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
             );
         }
 
-        // Update body background immediately for smooth transition
+        // تحديث خلفية body مع انتقال سلس
+        document.body.style.transition = 'background-color 0.5s ease, color 0.5s ease';
         document.body.style.backgroundColor = newTheme === 'dark' ? '#0f172a' : '#f8fafc';
         document.body.style.color = newTheme === 'dark' ? '#f8fafc' : '#1e293b';
     }, []);
@@ -113,6 +114,21 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     useEffect(() => {
         applyTheme(theme);
     }, [theme, applyTheme]);
+
+    // Apply saved branding colors (from DynamicBrandingSection) on load
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const primary = localStorage.getItem('adora_primary_color');
+        const secondary = localStorage.getItem('adora_secondary_color');
+        if (!primary || !secondary) return;
+        const root = document.documentElement.style;
+        root.setProperty('--color-primary', primary);
+        root.setProperty('--color-secondary', secondary);
+        root.setProperty('--theme-primary-500', primary);
+        root.setProperty('--theme-primary-400', secondary);
+        root.setProperty('--theme-primary-600', primary);
+        root.setProperty('--theme-gradient-primary', `linear-gradient(135deg, ${secondary} 0%, ${primary} 100%)`);
+    }, []);
 
     // Persist theme to localStorage
     useEffect(() => {

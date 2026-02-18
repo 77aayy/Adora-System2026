@@ -46,6 +46,7 @@ import {
     markMessagesAsRead
 } from '../../services/smartChatService';
 import { haptic, playSound } from '../../utils/uxEffects';
+import { formatTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -201,7 +202,7 @@ const MessageView: React.FC<MessageViewProps> = ({
                             {messages.map((msg, index) => {
                                 const isGuest = msg.sender === 'guest';
                                 const time = msg.createdAt instanceof Timestamp
-                                    ? msg.createdAt.toDate().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+                                    ? formatTimeGregorianEn(msg.createdAt.toDate(), { showSeconds: false })
                                     : '';
 
                                 return (
@@ -498,7 +499,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
             );
             playSound('success');
         } catch (error) {
-            console.error('Error approving request:', error);
+            logger.error('Error approving request:', error, 'ChatInbox');
         } finally {
             setSending(false);
         }
@@ -522,7 +523,7 @@ export const ChatInbox: React.FC<ChatInboxProps> = ({
             );
             playSound('pop');
         } catch (error) {
-            console.error('Error forwarding request:', error);
+            logger.error('Error forwarding request:', error, 'ChatInbox');
         } finally {
             setSending(false);
         }

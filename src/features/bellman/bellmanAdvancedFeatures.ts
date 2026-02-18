@@ -11,6 +11,8 @@ import {
     serverTimestamp, Timestamp
 } from 'firebase/firestore';
 import { awardPerformancePoints, awardPoints } from '../../services/pointsService';
+import { logger } from '../../services/loggerService';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -76,22 +78,25 @@ interface Employee {
 // ============================================================
 
 /**
- * Subscribe to active room cards
+ * Subscribe to active room cards (tenant-scoped)
  */
 export const subscribeToRoomCards = (
+    tenantId: string,
     branchId: string,
     callback: (cards: RoomCard[]) => void
 ): (() => void) => {
+    const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
     const cardsQuery = query(
-        collection(db, 'roomCards'),
-        where('branch', '==', branchId),
+        roomCardsRef,
         where('status', '==', 'active')
     );
-
     return onSnapshot(cardsQuery, snapshot => {
         const cards: RoomCard[] = [];
         snapshot.forEach(doc => {
-            cards.push({ id: doc.id, ...doc.data() } as RoomCard);
+            const data = doc.data();
+            if (data.branch === branchId || data.branchId === branchId) {
+                cards.push({ id: doc.id, ...data } as RoomCard);
+            }
         });
 
         // Sort by checkinAt descending
@@ -118,17 +123,19 @@ export const getAvailableRooms = async (
             collection(db, `tenants/${hotelId}/branches/${branchId}/rooms`)
         );
 
-        // Get active room cards
+        const roomCardsRef = collection(db, `tenants/${hotelId}/roomCards`);
         const activeQuery = query(
-            collection(db, 'roomCards'),
-            where('branch', '==', branchId),
+            roomCardsRef,
             where('status', '==', 'active')
         );
         const activeSnapshot = await getDocs(activeQuery);
 
         const activeRoomNumbers = new Set<string>();
         activeSnapshot.forEach(doc => {
-            activeRoomNumbers.add(doc.data().roomNumber);
+            const data = doc.data();
+            if (data.branch === branchId || data.branchId === branchId) {
+                activeRoomNumbers.add(data.roomNumber);
+            }
         });
 
         // Filter available rooms
@@ -142,7 +149,7 @@ export const getAvailableRooms = async (
 
         return availableRooms;
     } catch (error) {
-        console.error('Error loading available rooms:', error);
+        logger.error('Error loading available rooms:', error, 'bellmanAdvancedFeatures');
         return [];
     }
 };
@@ -194,22 +201,20 @@ export const submitCheckin = async (
     hotelId: string
 ): Promise<boolean> => {
     try {
-        // Check if room is already active
+        const roomCardsRef = collection(db, `tenants/${hotelId}/roomCards`);
         const existingQuery = query(
-            collection(db, 'roomCards'),
-            where('branch', '==', branchId),
+            roomCardsRef,
             where('roomNumber', '==', roomNumber),
             where('status', '==', 'active'),
             limit(1)
         );
         const existingSnapshot = await getDocs(existingQuery);
-
-        if (!existingSnapshot.empty) {
+        const alreadyActive = existingSnapshot.docs.some(d => d.data().branch === branchId || d.data().branchId === branchId);
+        if (alreadyActive) {
             throw new Error(`الغرفة ${roomNumber} نشطة بالفعل`);
         }
 
-        // Create room card
-        await addDoc(collection(db, 'roomCards'), {
+        await addDoc(roomCardsRef, {
             roomNumber,
             branch: branchId,
             hotel: hotelId,
@@ -226,7 +231,7 @@ export const submitCheckin = async (
 
         return true;
     } catch (error) {
-        console.error('Error during checkin:', error);
+        logger.error('Error during checkin:', error, 'bellmanAdvancedFeatures');
         throw error;
     }
 };
@@ -246,10 +251,15 @@ export const submitCheckout = async (
     branchId: string,
     hotelId: string
 ): Promise<boolean> => {
+    if (!hotelId) {
+        throw new Error('hotelId (tenantId) is required');
+    }
     try {
+        // ✅ FIX: Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${hotelId}/requests`);
         // Check for existing inspection request
         const existingQuery = query(
-            collection(db, 'requests'),
+            requestsRef,
             where('branch', '==', branchId),
             where('roomNumber', '==', card.roomNumber),
             where('serviceType', '==', 'inspection'),
@@ -264,8 +274,9 @@ export const submitCheckout = async (
 
         const batch = writeBatch(db);
 
+        // ✅ FIX: Use tenant-scoped collection for room cards
         // 1. Update room card
-        const cardRef = doc(db, 'roomCards', cardId);
+        const cardRef = doc(db, `tenants/${hotelId}/roomCards`, cardId);
         batch.update(cardRef, {
             status: 'checkout_pending',
             checkoutBy: { id: employeeId, name: employeeName },
@@ -276,8 +287,10 @@ export const submitCheckout = async (
             qrActive: false
         });
 
+        // ✅ FIX: Use tenant-scoped collection for requests
         // 2. Create inspection request
-        const inspectionRef = doc(collection(db, 'requests'));
+        const requestsRef = collection(db, `tenants/${hotelId}/requests`);
+        const inspectionRef = doc(requestsRef);
         batch.set(inspectionRef, {
             roomNumber: card.roomNumber,
             branch: branchId,
@@ -312,7 +325,7 @@ export const submitCheckout = async (
         await batch.commit();
         return true;
     } catch (error) {
-        console.error('Error during checkout:', error);
+        logger.error('Error during checkout:', error, 'bellmanAdvancedFeatures');
         throw error;
     }
 };
@@ -323,13 +336,20 @@ export const submitCheckout = async (
 
 /**
  * Subscribe to bellman requests
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const subscribeToBellmanRequests = (
+    tenantId: string,
     branchId: string,
     callback: (requests: BellmanRequest[]) => void
 ): (() => void) => {
+    if (!tenantId) {
+        logger.error('subscribeToBellmanRequests: tenantId is required', undefined, 'bellmanAdvancedFeatures');
+        callback([]);
+        return () => {};
+    }
     const requestsQuery = query(
-        collection(db, 'requests'),
+        collection(db, `tenants/${tenantId}/requests`),
         where('branch', '==', branchId),
         where('serviceType', '==', 'bellman'),
         where('status', 'in', ['CONFIRMED', 'IN_PROGRESS'])
@@ -360,8 +380,11 @@ export const startBellmanRequest = async (
     employeeId: string,
     employeeName: string
 ): Promise<boolean> => {
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     try {
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
         const requestDoc = await getDoc(requestRef);
         const request = requestDoc.data();
 
@@ -382,7 +405,7 @@ export const startBellmanRequest = async (
 
         return true;
     } catch (error) {
-        console.error('Error starting request:', error);
+        logger.error('Error starting request:', error, 'bellmanAdvancedFeatures');
         return false;
     }
 };
@@ -395,13 +418,16 @@ export const completeBellmanRequest = async (
     employeeId: string,
     employeeName: string
 ): Promise<{ success: boolean; request?: any }> => {
+    if (!tenantId) {
+        throw new Error('tenantId is required');
+    }
     try {
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
         const requestDoc = await getDoc(requestRef);
         const request = requestDoc.data();
 
         if (!request) {
-            console.error('Request not found');
+            logger.error('Request not found', undefined, 'bellmanAdvancedFeatures');
             return { success: false };
         }
 
@@ -440,12 +466,12 @@ export const completeBellmanRequest = async (
                 );
             }
         } catch (pointError) {
-            console.error('Failed to award bellman points:', pointError);
+            logger.error('Failed to award bellman points:', pointError, 'bellmanAdvancedFeatures');
         }
 
         return { success: true, request };
     } catch (error) {
-        console.error('Error completing request:', error);
+        logger.error('Error completing request:', error, 'bellmanAdvancedFeatures');
         return { success: false };
     }
 };
@@ -478,7 +504,7 @@ export const loadReceptionEmployees = async (
 
         return employees;
     } catch (error) {
-        console.error('Error loading reception employees:', error);
+        logger.error('Error loading reception employees:', error, 'bellmanAdvancedFeatures');
         return [];
     }
 };
@@ -569,25 +595,26 @@ const getDateRange = (
  * Load bellman history with filters
  */
 export const loadBellmanHistory = async (
+    tenantId: string,
     branchId: string,
     employeeId: string,
     filter: HistoryFilter
 ): Promise<HistoryItem[]> => {
     const history: HistoryItem[] = [];
     const dateRange = getDateRange(filter.period, filter.customFrom, filter.customTo);
+    const roomCardsRef = collection(db, `tenants/${tenantId}/roomCards`);
 
     try {
-        // Get check-ins
         if (filter.action === 'all' || filter.action === 'checkin') {
             const checkinQuery = query(
-                collection(db, 'roomCards'),
-                where('branch', '==', branchId),
+                roomCardsRef,
                 where('checkinBy.id', '==', employeeId)
             );
             const checkinSnapshot = await getDocs(checkinQuery);
 
             checkinSnapshot.forEach(doc => {
                 const data = doc.data();
+                if (data.branch !== branchId && data.branchId !== branchId) return;
                 const checkinDate = data.checkinAt?.toDate
                     ? data.checkinAt.toDate()
                     : new Date(data.checkinAt || 0);
@@ -604,17 +631,16 @@ export const loadBellmanHistory = async (
             });
         }
 
-        // Get check-outs
         if (filter.action === 'all' || filter.action === 'checkout') {
             const checkoutQuery = query(
-                collection(db, 'roomCards'),
-                where('branch', '==', branchId),
+                roomCardsRef,
                 where('checkoutBy.id', '==', employeeId)
             );
             const checkoutSnapshot = await getDocs(checkoutQuery);
 
             checkoutSnapshot.forEach(doc => {
                 const data = doc.data();
+                if (data.branch !== branchId && data.branchId !== branchId) return;
                 if (!data.checkoutAt) return;
 
                 const checkoutDate = data.checkoutAt?.toDate
@@ -638,7 +664,7 @@ export const loadBellmanHistory = async (
 
         return history;
     } catch (error) {
-        console.error('Error loading bellman history:', error);
+        logger.error('Error loading bellman history:', error, 'bellmanAdvancedFeatures');
         return [];
     }
 };
@@ -794,7 +820,7 @@ export const printBellmanHistory = (
         <html dir="rtl" lang="ar">
         <head>
             <meta charset="UTF-8">
-            <title>سجل البيلمان - ${new Date().toLocaleDateString('ar-SA')}</title>
+            <title>سجل البيلمان - ${formatDateGregorianEn(new Date())}</title>
             <style>
                 body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 20px; }
                 h1 { text-align: center; margin-bottom: 20px; color: #1a1a2e; }
@@ -811,7 +837,7 @@ export const printBellmanHistory = (
         <body>
             <h1>سجل البيلمان</h1>
             <div class="info">
-                <p><strong>التاريخ:</strong> ${new Date().toLocaleDateString('ar-SA')}</p>
+                <p><strong>التاريخ:</strong> ${formatDateGregorianEn(new Date())}</p>
                 <p><strong>الموظف:</strong> ${employeeName || '--'}</p>
                 <p><strong>الفرع:</strong> ${branchName || '--'}</p>
             </div>
@@ -825,13 +851,7 @@ export const printBellmanHistory = (
                 </thead>
                 <tbody>
                     ${items.map(item => {
-        const date = item.timestamp.toLocaleString('ar-SA', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const date = formatDateTimeGregorianEn(item.timestamp, { dateStyle: 'medium', showSeconds: false });
         const type = item.type === 'checkin' ? 'دخول' : 'خروج';
         const typeClass = item.type === 'checkin' ? 'checkin' : 'checkout';
 
@@ -846,7 +866,7 @@ export const printBellmanHistory = (
                 </tbody>
             </table>
             <div class="footer">
-                تم الطباعة بواسطة نظام أدورا - ${new Date().toLocaleString('ar-SA')}
+                تم الطباعة بواسطة نظام أدورا - ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}
             </div>
         </body>
         </html>

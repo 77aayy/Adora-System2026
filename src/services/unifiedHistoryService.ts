@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { logger } from './loggerService';
+import { formatDateGregorianEn, formatTimeGregorianEn } from '../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -190,25 +191,23 @@ const fetchReceptionHistory = async (
             return [];
         }
 
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         let q;
         try {
-            // ✅ Try with orderBy for better performance
             q = query(
-                collection(db, 'requests'),
+                requestsRef,
                 where('branch', '==', branchId),
-                where('tenantId', '==', tenantId),
                 where('originDepartment', '==', 'reception'),
                 orderBy('timestamp', 'desc'),
-                limit(maxResults * 2) // Get more to filter by date range
+                limit(maxResults * 2)
             );
-        } catch (indexError: any) {
-            // ✅ Fallback if index doesn't exist
-            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        } catch (indexError: unknown) {
+            const err = indexError as { code?: string; message?: string };
+            if (err?.code === 'failed-precondition' || err?.message?.includes('INTERNAL ASSERTION FAILED')) {
                 logger.warn('Using fallback query (no orderBy) in fetchReceptionHistory', indexError, 'unifiedHistoryService');
                 q = query(
-                    collection(db, 'requests'),
+                    requestsRef,
                     where('branch', '==', branchId),
-                    where('tenantId', '==', tenantId),
                     where('originDepartment', '==', 'reception')
                 );
             } else {
@@ -266,25 +265,23 @@ const fetchBellmanHistory = async (
             return [];
         }
 
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         let q;
         try {
-            // ✅ Try with orderBy for better performance
             q = query(
-                collection(db, 'requests'),
+                requestsRef,
                 where('branch', '==', branchId),
-                where('tenantId', '==', tenantId),
                 where('type', '==', 'bellman'),
                 orderBy('timestamp', 'desc'),
-                limit(maxResults * 2) // Get more to filter by date range
+                limit(maxResults * 2)
             );
-        } catch (indexError: any) {
-            // ✅ Fallback if index doesn't exist
-            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        } catch (indexError: unknown) {
+            const err = indexError as { code?: string; message?: string };
+            if (err?.code === 'failed-precondition' || err?.message?.includes('INTERNAL ASSERTION FAILED')) {
                 logger.warn('Using fallback query (no orderBy) in fetchBellmanHistory', indexError, 'unifiedHistoryService');
                 q = query(
-                    collection(db, 'requests'),
+                    requestsRef,
                     where('branch', '==', branchId),
-                    where('tenantId', '==', tenantId),
                     where('type', '==', 'bellman')
                 );
             } else {
@@ -343,25 +340,23 @@ const fetchHousekeepingHistory = async (
             return [];
         }
 
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         let q;
         try {
-            // ✅ Try with orderBy for better performance
             q = query(
-                collection(db, 'requests'),
+                requestsRef,
                 where('branch', '==', branchId),
-                where('tenantId', '==', tenantId),
                 where('type', 'in', ['cleaning', 'inspection']),
                 orderBy('timestamp', 'desc'),
-                limit(maxResults * 2) // Get more to filter by date range
+                limit(maxResults * 2)
             );
-        } catch (indexError: any) {
-            // ✅ Fallback if index doesn't exist
-            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        } catch (indexError: unknown) {
+            const err = indexError as { code?: string; message?: string };
+            if (err?.code === 'failed-precondition' || err?.message?.includes('INTERNAL ASSERTION FAILED')) {
                 logger.warn('Using fallback query (no orderBy) in fetchHousekeepingHistory', indexError, 'unifiedHistoryService');
                 q = query(
-                    collection(db, 'requests'),
+                    requestsRef,
                     where('branch', '==', branchId),
-                    where('tenantId', '==', tenantId),
                     where('type', 'in', ['cleaning', 'inspection'])
                 );
             } else {
@@ -424,25 +419,23 @@ const fetchMaintenanceHistory = async (
             return [];
         }
 
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         let q;
         try {
-            // ✅ Try with orderBy for better performance
             q = query(
-                collection(db, 'requests'),
+                requestsRef,
                 where('branch', '==', branchId),
-                where('tenantId', '==', tenantId),
                 where('type', '==', 'maintenance'),
                 orderBy('timestamp', 'desc'),
-                limit(maxResults * 2) // Get more to filter by date range
+                limit(maxResults * 2)
             );
-        } catch (indexError: any) {
-            // ✅ Fallback if index doesn't exist
-            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        } catch (indexError: unknown) {
+            const err = indexError as { code?: string; message?: string };
+            if (err?.code === 'failed-precondition' || err?.message?.includes('INTERNAL ASSERTION FAILED')) {
                 logger.warn('Using fallback query (no orderBy) in fetchMaintenanceHistory', indexError, 'unifiedHistoryService');
                 q = query(
-                    collection(db, 'requests'),
+                    requestsRef,
                     where('branch', '==', branchId),
-                    where('tenantId', '==', tenantId),
                     where('type', '==', 'maintenance')
                 );
             } else {
@@ -600,25 +593,20 @@ const fetchLaundryHistory = async (
             return [];
         }
 
+        // Tenant-scoped: tenants/{tenantId}/branches/{branchId}/laundry_records (align with laundryInventoryService)
+        const laundryRef = collection(db, `tenants/${tenantId}/branches/${branchId}/laundry_records`);
         let q;
         try {
-            // ✅ Try with orderBy for better performance (using date field if available)
             q = query(
-                collection(db, 'laundryRecords'),
-                where('branch', '==', branchId),
-                where('tenantId', '==', tenantId),
+                laundryRef,
                 orderBy('date', 'desc'),
-                limit(maxResults * 2) // Get more to filter by date range
+                limit(maxResults * 2)
             );
-        } catch (indexError: any) {
-            // ✅ Fallback if index doesn't exist
-            if (indexError?.code === 'failed-precondition' || indexError?.message?.includes('INTERNAL ASSERTION FAILED')) {
+        } catch (indexError: unknown) {
+            const err = indexError as { code?: string; message?: string };
+            if (err?.code === 'failed-precondition' || err?.message?.includes('INTERNAL ASSERTION FAILED')) {
                 logger.warn('Using fallback query (no orderBy) in fetchLaundryHistory', indexError, 'unifiedHistoryService');
-                q = query(
-                    collection(db, 'laundryRecords'),
-                    where('branch', '==', branchId),
-                    where('tenantId', '==', tenantId)
-                );
+                q = query(laundryRef, limit(maxResults * 2));
             } else {
                 throw indexError;
             }
@@ -718,23 +706,14 @@ export const getHistorySummary = (items: UnifiedHistoryItem[]): HistorySummary =
  * Format date for display
  */
 export const formatDisplayDate = (date: Date): string => {
-    return date.toLocaleDateString('ar-SA', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return formatDateGregorianEn(date, 'long') + ' ' + formatTimeGregorianEn(date, { showSeconds: false });
 };
 
 /**
- * Format time only
+ * Format time only (Gregorian, Arabic numerals)
  */
 export const formatTime = (date: Date): string => {
-    return date.toLocaleTimeString('ar-SA', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return formatTimeGregorianEn(date, { showSeconds: false });
 };
 
 // ============================================================

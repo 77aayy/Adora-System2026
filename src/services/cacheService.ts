@@ -7,6 +7,8 @@
  * ✅ BENEFIT: Reduces Firebase costs & improves load times
  */
 
+import { logger } from './loggerService';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -173,12 +175,12 @@ export async function getCachedData<T>(
     // Try cache first
     const cached = getFromCache<T>(key);
     if (cached !== null) {
-        console.log(`📦 Cache HIT: ${key}`);
+        logger.info(`📦 Cache HIT: ${key}`, undefined, 'cacheService');
         return cached;
     }
     
     // Fetch from source
-    console.log(`🔄 Cache MISS: ${key} - fetching...`);
+    logger.info(`🔄 Cache MISS: ${key} - fetching...`, undefined, 'cacheService');
     const data = await fetcher();
     
     // Store in cache
@@ -203,21 +205,21 @@ export async function getCachedData<T>(
 export async function prefetchData(
     items: Array<{ key: string; fetcher: () => Promise<any>; ttl: number }>
 ): Promise<void> {
-    console.log('🚀 Prefetching data...');
+    logger.info('🚀 Prefetching data...', undefined, 'cacheService');
     
     await Promise.all(
         items.map(async ({ key, fetcher, ttl }) => {
             try {
                 const data = await fetcher();
                 setInCache(key, data, ttl);
-                console.log(`✅ Prefetched: ${key}`);
+                logger.info(`✅ Prefetched: ${key}`, undefined, 'cacheService');
             } catch (error) {
-                console.warn(`⚠️ Failed to prefetch: ${key}`, error);
+                logger.warn(`⚠️ Failed to prefetch: ${key}`, error, 'cacheService');
             }
         })
     );
     
-    console.log('✅ Prefetch complete');
+    logger.info('✅ Prefetch complete', undefined, 'cacheService');
 }
 
 // ============================================================
@@ -305,7 +307,7 @@ export function invalidateRelatedCaches(
             break;
     }
     
-    console.log(`🗑️ Invalidated ${dataType} cache for tenant ${tenantId}`);
+    logger.info(`🗑️ Invalidated ${dataType} cache for tenant ${tenantId}`, undefined, 'cacheService');
 }
 
 // ============================================================

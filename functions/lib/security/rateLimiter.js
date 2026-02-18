@@ -59,8 +59,8 @@ const db = admin.firestore();
 const RATE_LIMITS = {
     login: {
         windowMs: 15 * 60 * 1000, // 15 minutes
-        maxRequests: 5, // 5 attempts
-        blockDuration: 15 * 60 * 1000, // Block for 15 minutes
+        maxRequests: 25, // 25 attempts per window (كان 5)
+        blockDuration: 5 * 60 * 1000, // Block 5 minutes only (كان 15)
     },
     passwordReset: {
         windowMs: 60 * 60 * 1000, // 1 hour

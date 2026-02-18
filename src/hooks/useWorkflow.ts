@@ -95,17 +95,23 @@ export function useWorkflow(department: DepartmentId) {
         setLoading(true);
         setError(null);
         
-        const requestsRef = collection(db, 'requests');
+        // ✅ FIX: Use tenant-scoped collection
+        if (!tenantId) {
+            console.error('useWorkflow: tenantId is required');
+            setLoading(false);
+            return () => {};
+        }
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         
         // Get request types that target this department
         const targetTypes = Object.entries(REQUEST_TYPE_TO_DEPARTMENT)
             .filter(([_, dept]) => dept === department)
             .map(([type]) => type);
         
+        // ✅ FIX: No need for tenantId where clause - already tenant-scoped
         // Query for all requests in this branch
         const q = query(
             requestsRef,
-            where('tenantId', '==', tenantId),
             where('branch', '==', branchId),
             orderBy('createdAt', 'desc')
         );
@@ -219,7 +225,11 @@ export function useWorkflow(department: DepartmentId) {
     ) => {
         if (!user?.id || !user?.name) throw new Error('User not authenticated');
         
+        if (!tenantId) {
+            throw new Error('tenantId is required');
+        }
         await sendToTargetDepartment(
+            tenantId,
             cardId,
             department,
             targetDept,
@@ -235,7 +245,10 @@ export function useWorkflow(department: DepartmentId) {
     const startCard = useCallback(async (cardId: string, notes?: string) => {
         if (!user?.id || !user?.name) throw new Error('User not authenticated');
         
-        await startWorkService(cardId, department, user.id, user.name, notes);
+        if (!tenantId) {
+            throw new Error('tenantId is required');
+        }
+        await startWorkService(tenantId, cardId, department, user.id, user.name, notes);
     }, [department, user]);
     
     /**
@@ -248,7 +261,10 @@ export function useWorkflow(department: DepartmentId) {
     ) => {
         if (!user?.id || !user?.name) throw new Error('User not authenticated');
         
-        await completeAndReturn(cardId, department, user.id, user.name, notes, additionalData);
+        if (!tenantId) {
+            throw new Error('tenantId is required');
+        }
+        await completeAndReturn(tenantId, cardId, department, user.id, user.name, notes, additionalData);
     }, [department, user]);
     
     /**

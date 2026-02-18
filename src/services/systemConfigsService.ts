@@ -7,6 +7,7 @@
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { validateRoleAccess } from './tenantSecurityService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -63,7 +64,7 @@ export const getSystemConfigs = async (): Promise<SystemConfigs | null> => {
         }
 
         if (!db) {
-            console.warn('⚠️ Database not initialized, using fallback configs');
+            logger.warn('⚠️ Database not initialized, using fallback configs', undefined, 'systemConfigsService');
             return null;
         }
 
@@ -85,7 +86,7 @@ export const getSystemConfigs = async (): Promise<SystemConfigs | null> => {
 
         return null;
     } catch (error) {
-        console.error('Error fetching system configs:', error);
+        logger.error('Error fetching system configs:', error, 'systemConfigsService');
         throw error; // ✅ Re-throw to show error to caller (don't silently fail)
     }
 };
@@ -126,7 +127,7 @@ export const saveSystemConfigs = async (
 
         return { success: true, message: 'تم حفظ الإعدادات بنجاح' };
     } catch (error) {
-        console.error('Error saving system configs:', error);
+        logger.error('Error saving system configs:', error, 'systemConfigsService');
         return { success: false, message: 'حدث خطأ أثناء حفظ الإعدادات' };
     }
 };

@@ -27,6 +27,7 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -73,7 +74,7 @@ export const hasMasterAccess = async (userId: string): Promise<boolean> => {
         const userData = userDoc.data();
         return userData?.role === 'owner' || userData?.role === 'super-admin';
     } catch (error) {
-        console.error('Master access check failed:', error);
+        logger.error('Master access check failed:', error, 'masterAccessService');
         return false;
     }
 };
@@ -199,7 +200,7 @@ export const fixTenantFirebaseConfig = async (
             details: { projectId: updatedConfig.projectId }
         };
     } catch (error: any) {
-        console.error('Fix Firebase config error:', error);
+        logger.error('Fix Firebase config error:', error, 'masterAccessService');
         return { success: false, message: `❌ فشل التحديث: ${error.message}` };
     }
 };
@@ -422,7 +423,7 @@ const addAuditLog = async (
             ip: 'server-side' // In production, get real IP
         });
     } catch (e) {
-        console.warn('Audit log failed:', e);
+        logger.warn('Audit log failed:', e, 'masterAccessService');
     }
 };
 

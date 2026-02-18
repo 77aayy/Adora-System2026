@@ -10,6 +10,7 @@ import {
     query, where, orderBy, limit, onSnapshot,
     serverTimestamp, Timestamp
 } from 'firebase/firestore';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -111,7 +112,7 @@ export const extractRoomFromURL = (): RoomData => {
             room = data.r;
             branch = data.b;
         } catch (e) {
-            console.log('Invalid hash data');
+            logger.info('Invalid hash data', undefined, 'guestAdvancedFeatures');
         }
     }
 
@@ -176,26 +177,33 @@ export const isSessionValid = (session: GuestSession, room: string, branch: stri
 // ============================================================
 
 /**
- * Verify room card is active
+ * Verify room card is active (tenant-scoped when tenantId provided)
  */
 export const verifyActiveRoomCard = async (
     room: string,
-    branch: string
+    branch: string,
+    tenantId?: string
 ): Promise<boolean> => {
     try {
-        const roomCardsQuery = query(
-            collection(db, 'roomCards'),
+        const roomCardsRef = tenantId
+            ? collection(db, `tenants/${tenantId}/roomCards`)
+            : collection(db, 'roomCards');
+        const constraints: any[] = [
             where('roomNumber', '==', room),
-            where('branch', '==', branch || 'main'),
             where('status', '==', 'active'),
             where('qrActive', '==', true),
             limit(1)
-        );
-
+        ];
+        if (!tenantId) constraints.push(where('branch', '==', branch || 'main'));
+        const roomCardsQuery = query(roomCardsRef, ...constraints);
         const snapshot = await getDocs(roomCardsQuery);
+        if (tenantId && !snapshot.empty) {
+            const match = snapshot.docs.some(d => d.data().branch === branch || d.data().branchId === branch);
+            return match;
+        }
         return !snapshot.empty;
     } catch (error) {
-        console.error('Error checking room card:', error);
+        logger.error('Error checking room card:', error, 'guestAdvancedFeatures');
         return true; // Allow entry on error
     }
 };
@@ -318,7 +326,7 @@ export const submitRequest = async (
 ): Promise<string | null> => {
     // 🔐 Security: Validate tenantId
     if (!tenantId) {
-        console.error('🚨 Security Error: tenantId is required for guest request');
+        logger.error('🚨 Security Error: tenantId is required for guest request', undefined, 'guestAdvancedFeatures');
         return null;
     }
 
@@ -342,22 +350,31 @@ export const submitRequest = async (
             }
         };
 
-        const docRef = await addDoc(collection(db, 'requests'), request);
+        // ✅ FIX: Use tenant-scoped collection
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+        const docRef = await addDoc(requestsRef, request);
         return docRef.id;
     } catch (error) {
-        console.error('Submit error:', error);
+        logger.error('Submit error:', error, 'guestAdvancedFeatures');
         return null;
     }
 };
 
 /**
  * Subscribe to request updates
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const subscribeToRequest = (
+    tenantId: string,
     requestId: string,
     callback: (request: GuestRequest | null) => void
 ): (() => void) => {
-    const requestRef = doc(db, 'requests', requestId);
+    if (!tenantId) {
+        logger.error('subscribeToRequest: tenantId is required', undefined, 'guestAdvancedFeatures');
+        callback(null);
+        return () => {};
+    }
+    const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
 
     return onSnapshot(requestRef, docSnap => {
         if (docSnap.exists()) {
@@ -370,17 +387,30 @@ export const subscribeToRequest = (
 
 /**
  * Listen for active requests for room
+ * ✅ FIX: Added tenantId parameter for tenant-scoped collection
  */
 export const subscribeToActiveRequests = (
+    tenantId: string,
     room: string,
     branch: string,
     callback: (requests: GuestRequest[]) => void
 ): (() => void) => {
+    if (!tenantId) {
+        logger.error('subscribeToActiveRequests: tenantId is required', undefined, 'guestAdvancedFeatures');
+        callback([]);
+        return () => {};
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // ✅ FIX: Use tenant-scoped collection
+    if (!tenantId) {
+        logger.error('listenForActiveRequests: tenantId is required', undefined, 'guestAdvancedFeatures');
+        callback([]);
+        return () => {};
+    }
     const requestsQuery = query(
-        collection(db, 'requests'),
+        collection(db, `tenants/${tenantId}/requests`),
         where('roomNumber', '==', room),
         where('branch', '==', branch || 'main'),
         where('source', '==', 'QR'),
@@ -404,15 +434,17 @@ export const subscribeToActiveRequests = (
 // ============================================================
 
 /**
- * Submit rating for completed request
+ * Submit rating for completed request (tenant-scoped)
  */
 export const submitRating = async (
+    tenantId: string,
     requestId: string,
     rating: number,
     feedback?: string
 ): Promise<boolean> => {
+    if (!tenantId) return false;
     try {
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
         await updateDoc(requestRef, {
             rating,
             feedback: feedback || null,
@@ -420,7 +452,7 @@ export const submitRating = async (
         });
         return true;
     } catch (error) {
-        console.error('Rating error:', error);
+        logger.error('Rating error:', error, 'guestAdvancedFeatures');
         return false;
     }
 };
@@ -451,7 +483,7 @@ export const logGuestActivity = async (
             timestamp: serverTimestamp()
         });
     } catch (error) {
-        console.error('Log error:', error);
+        logger.error('Log error:', error, 'guestAdvancedFeatures');
     }
 };
 
@@ -493,7 +525,7 @@ export const loadMenuItems = async (
 
         return items;
     } catch (error) {
-        console.error('Error loading menu:', error);
+        logger.error('Error loading menu:', error, 'guestAdvancedFeatures');
         return [];
     }
 };
@@ -565,7 +597,7 @@ export const loadBranchSettings = async (
         }
         return null;
     } catch (error) {
-        console.error('Error loading branch settings:', error);
+        logger.error('Error loading branch settings:', error, 'guestAdvancedFeatures');
         return null;
     }
 };

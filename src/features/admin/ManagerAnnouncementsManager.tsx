@@ -25,6 +25,7 @@ import {
     type ManagerAnnouncementView
 } from '../../services/managerAnnouncementService';
 import { Timestamp } from 'firebase/firestore';
+import { formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 const DEPARTMENTS: { value: DepartmentType; label: string; icon: React.ReactNode }[] = [
     { value: 'all', label: 'جميع الأقسام', icon: <Users className="w-4 h-4" /> },
@@ -426,7 +427,7 @@ export const ManagerAnnouncementsManager: React.FC = () => {
                                     {announcement.expiresAt && (
                                         <span className="flex items-center gap-1">
                                             <Clock className="w-3 h-3" />
-                                            {new Date(announcement.expiresAt.toDate ? announcement.expiresAt.toDate() : announcement.expiresAt).toLocaleString('ar-SA')}
+                                            {formatDateTimeGregorianEn(announcement.expiresAt.toDate ? announcement.expiresAt.toDate() : announcement.expiresAt, { showSeconds: false })}
                                         </span>
                                     )}
                                 </div>
@@ -779,13 +780,13 @@ const AuditLogModal: React.FC<{
                                                 <div className="space-y-1 text-sm">
                                                     <div className="flex items-center gap-2 text-green-400">
                                                         <Eye className="w-4 h-4" />
-                                                        <span>شاهد: {viewedAt.toLocaleString('ar-SA')}</span>
+                                                        <span>شاهد: {formatDateTimeGregorianEn(viewedAt, { showSeconds: false })}</span>
                                                         <span className="text-white/40">({log.viewCount} مرة)</span>
                                                     </div>
                                                     {dismissedAt && (
                                                         <div className="flex items-center gap-2 text-red-400">
                                                             <X className="w-4 h-4" />
-                                                            <span>ألغى: {dismissedAt.toLocaleString('ar-SA')}</span>
+                                                            <span>ألغى: {formatDateTimeGregorianEn(dismissedAt, { showSeconds: false })}</span>
                                                         </div>
                                                     )}
                                                 </div>

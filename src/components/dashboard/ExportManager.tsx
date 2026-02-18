@@ -18,6 +18,7 @@ import {
     X,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -149,7 +150,7 @@ function exportToPDF(data: ExportData): void {
                     <div class="stat-label">إجمالي السجلات</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value">${new Date().toLocaleDateString('ar-SA')}</div>
+                    <div class="stat-value">${formatDateGregorianEn(new Date())}</div>
                     <div class="stat-label">تاريخ التقرير</div>
                 </div>
             </div>
@@ -162,7 +163,7 @@ function exportToPDF(data: ExportData): void {
                 </tbody>
             </table>
             <div class="footer">
-                تم إنشاء هذا التقرير بواسطة Adora Hotel Management System • ${new Date().toLocaleString('ar-SA')}
+                تم إنشاء هذا التقرير بواسطة Adora Hotel Management System • ${formatDateTimeGregorianEn(new Date(), { showSeconds: false })}
             </div>
         </body>
         </html>

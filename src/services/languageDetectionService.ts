@@ -5,6 +5,8 @@
  * Adora Hotel Management System V2
  */
 
+import { logger } from './loggerService';
+
 // Supported languages with their STT codes
 export const SUPPORTED_LANGUAGES = {
     arabic: {
@@ -71,7 +73,7 @@ export const detectLanguage = (text: string): LanguageKey => {
         }
     }
 
-    console.log(`🌐 Language detected: ${maxLang} (${SUPPORTED_LANGUAGES[maxLang].nameEn})`);
+    logger.info(`🌐 Language detected: ${maxLang} (${SUPPORTED_LANGUAGES[maxLang].nameEn})`, undefined, 'languageDetectionService');
     return maxLang;
 };
 
@@ -131,7 +133,7 @@ export const detectRomanizedLanguage = (text: string): LanguageKey | null => {
     // Check Hindi patterns
     for (const pattern of ROMANIZED_HINDI_PATTERNS) {
         if (pattern.test(normalizedText)) {
-            console.log('🌐 Romanized Hindi detected');
+            logger.info('🌐 Romanized Hindi detected', undefined, 'languageDetectionService');
             return 'hindi';
         }
     }
@@ -139,7 +141,7 @@ export const detectRomanizedLanguage = (text: string): LanguageKey | null => {
     // Check Bengali patterns
     for (const pattern of ROMANIZED_BENGALI_PATTERNS) {
         if (pattern.test(normalizedText)) {
-            console.log('🌐 Romanized Bengali detected');
+            logger.info('🌐 Romanized Bengali detected', undefined, 'languageDetectionService');
             return 'bengali';
         }
     }

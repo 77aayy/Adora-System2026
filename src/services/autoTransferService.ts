@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { transferRequestToDepartment, getRequest } from './requestService';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -65,7 +66,7 @@ export const startAutoTransfer = async (
         const config = await loadAutoTransferConfig(branchId, tenantId);
         
         if (!config || !config.enabled) {
-            console.log('🔄 Auto-transfer is disabled');
+            logger.info('🔄 Auto-transfer is disabled', undefined, 'autoTransferService');
             stopAutoTransfer();
             return;
         }
@@ -77,7 +78,7 @@ export const startAutoTransfer = async (
 
         // ✅ SECURITY FIX: Use tenant-scoped collection
         if (!db) {
-            console.error('🔄 Auto-transfer: Firestore not initialized');
+            logger.error('🔄 Auto-transfer: Firestore not initialized', undefined, 'autoTransferService');
             return;
         }
         
@@ -106,7 +107,7 @@ export const startAutoTransfer = async (
             // Check immediately on update
             checkAndTransfer();
         }, (error) => {
-            console.error('❌ Auto-transfer subscription error:', error);
+            logger.error('❌ Auto-transfer subscription error:', error, 'autoTransferService');
         });
 
         // Start periodic checks
@@ -114,9 +115,9 @@ export const startAutoTransfer = async (
             checkAndTransfer();
         }, config.checkIntervalMs || 60000);
 
-        console.log('🔄 Auto-transfer monitoring started');
+        logger.info('🔄 Auto-transfer monitoring started', undefined, 'autoTransferService');
     } catch (error) {
-        console.error('Error starting auto-transfer:', error);
+        logger.error('Error starting auto-transfer:', error, 'autoTransferService');
     }
 };
 
@@ -150,7 +151,7 @@ export const loadAutoTransferConfig = async (
     tenantId: string
 ): Promise<AutoTransferConfig | null> => {
     if (!db) {
-        console.error('🔄 [Auto-Transfer] Firestore not initialized');
+        logger.error('🔄 [Auto-Transfer] Firestore not initialized', undefined, 'autoTransferService');
         return null;
     }
     
@@ -160,7 +161,7 @@ export const loadAutoTransferConfig = async (
         const configRef = doc(db, `tenants/${tenantId}/settings`, `autoTransfer_${branchId}`);
         const configSnap = await getDoc(configRef);
         
-        console.log(`🔍 [Auto-Transfer] Loading config for branch ${branchId}, tenant ${tenantId}`);
+        logger.debug(`🔍 [Auto-Transfer] Loading config for branch ${branchId}, tenant ${tenantId}`, undefined, 'autoTransferService');
 
         if (configSnap.exists()) {
             const data = configSnap.data();
@@ -171,12 +172,12 @@ export const loadAutoTransferConfig = async (
                 branch: branchId,
                 tenantId,
             };
-            console.log(`✅ [Auto-Transfer] Config loaded: ${config.enabled ? 'ENABLED' : 'DISABLED'}, ${config.rules.length} rule(s)`);
+            logger.info(`✅ [Auto-Transfer] Config loaded: ${config.enabled ? 'ENABLED' : 'DISABLED'}, ${config.rules.length} rule(s)`, undefined, 'autoTransferService');
             return config;
         }
 
         // Return default config if not exists
-        console.log(`ℹ️ [Auto-Transfer] No config found, using default (disabled)`);
+        logger.info(`ℹ️ [Auto-Transfer] No config found, using default (disabled)`, undefined, 'autoTransferService');
         return {
             enabled: false,
             checkIntervalMs: 60000,
@@ -185,7 +186,7 @@ export const loadAutoTransferConfig = async (
             tenantId,
         };
     } catch (error) {
-        console.error('Error loading auto-transfer config:', error);
+        logger.error('Error loading auto-transfer config:', error, 'autoTransferService');
         return null;
     }
 };
@@ -217,7 +218,7 @@ export const saveAutoTransferConfig = async (
             await startAutoTransfer(config.branch, config.tenantId);
         }
     } catch (error) {
-        console.error('Error saving auto-transfer config:', error);
+        logger.error('Error saving auto-transfer config:', error, 'autoTransferService');
         throw error;
     }
 };
@@ -260,7 +261,7 @@ const getDepartmentEntryTime = (request: any): Date => {
     }
     
     // Last resort: current time (shouldn't happen)
-    console.warn('⚠️ Could not determine department entry time for request, using current time');
+    logger.warn('⚠️ Could not determine department entry time for request, using current time', undefined, 'autoTransferService');
     return new Date();
 };
 
@@ -325,10 +326,10 @@ const checkAndTransfer = async (): Promise<void> => {
 
     // Perform transfers
     if (transfers.length > 0) {
-        console.log(`🔄 [Auto-Transfer] Found ${transfers.length} request(s) ready for transfer`);
+        logger.info(`🔄 [Auto-Transfer] Found ${transfers.length} request(s) ready for transfer`, undefined, 'autoTransferService');
         
         if (!db) {
-            console.error('❌ [Auto-Transfer] Firestore not initialized - cannot perform transfers');
+            logger.error('❌ [Auto-Transfer] Firestore not initialized - cannot perform transfers', undefined, 'autoTransferService');
             return;
         }
         
@@ -359,23 +360,23 @@ const checkAndTransfer = async (): Promise<void> => {
                     autoTransferredTo: rule.toDepartment,
                 });
 
-                console.log(`✅ [Auto-Transfer] Successfully transferred request ${requestId} from ${rule.fromDepartment} to ${rule.toDepartment} after ${rule.timeoutMinutes} minutes`);
+                logger.info(`✅ [Auto-Transfer] Successfully transferred request ${requestId} from ${rule.fromDepartment} to ${rule.toDepartment} after ${rule.timeoutMinutes} minutes`, undefined, 'autoTransferService');
             } catch (error) {
-                console.error(`❌ [Auto-Transfer] Failed to transfer request ${requestId} from ${rule.fromDepartment} to ${rule.toDepartment}:`, error);
+                logger.error(`❌ [Auto-Transfer] Failed to transfer request ${requestId} from ${rule.fromDepartment} to ${rule.toDepartment}:`, error, 'autoTransferService');
                 // Continue with other transfers even if one fails
             }
         }
 
         try {
             await batch.commit();
-            console.log(`✅ [Auto-Transfer] Batch committed successfully for ${transfers.length} transfer(s)`);
+            logger.info(`✅ [Auto-Transfer] Batch committed successfully for ${transfers.length} transfer(s)`, undefined, 'autoTransferService');
         } catch (error) {
-            console.error(`❌ [Auto-Transfer] Failed to commit batch:`, error);
+            logger.error(`❌ [Auto-Transfer] Failed to commit batch:`, error, 'autoTransferService');
         }
     } else {
         // Log when no transfers are needed (only in debug mode)
         if (monitoredRequests.size > 0) {
-            console.debug(`🔍 [Auto-Transfer] Checked ${monitoredRequests.size} request(s), none ready for transfer`);
+            logger.debug(`🔍 [Auto-Transfer] Checked ${monitoredRequests.size} request(s), none ready for transfer`, undefined, 'autoTransferService');
         }
     }
 };
@@ -441,12 +442,12 @@ export const checkImmediateTransferForDisabledDepartment = async (
         }
 
         // Department is disabled and we have a matching rule - transfer immediately
-        console.log(`🔄 [Auto-Transfer] Department ${targetDepartment} is disabled, transferring request ${requestId} immediately to ${matchingRule.toDepartment}`);
+        logger.info(`🔄 [Auto-Transfer] Department ${targetDepartment} is disabled, transferring request ${requestId} immediately to ${matchingRule.toDepartment}`, undefined, 'autoTransferService');
 
         // Get the request to transfer
         const request = await getRequest(requestId, tenantId);
         if (!request) {
-            console.error(`❌ [Auto-Transfer] Request ${requestId} not found`);
+            logger.error(`❌ [Auto-Transfer] Request ${requestId} not found`, undefined, 'autoTransferService');
             return false;
         }
 
@@ -464,7 +465,7 @@ export const checkImmediateTransferForDisabledDepartment = async (
 
         // Update request notes
         if (!db) {
-            console.error('❌ [Auto-Transfer] Firestore not initialized');
+            logger.error('❌ [Auto-Transfer] Firestore not initialized', undefined, 'autoTransferService');
             return false;
         }
 
@@ -479,10 +480,10 @@ export const checkImmediateTransferForDisabledDepartment = async (
             immediateTransfer: true, // Mark as immediate transfer (not time-based)
         });
 
-        console.log(`✅ [Auto-Transfer] Successfully transferred request ${requestId} from disabled department ${targetDepartment} to ${matchingRule.toDepartment}`);
+        logger.info(`✅ [Auto-Transfer] Successfully transferred request ${requestId} from disabled department ${targetDepartment} to ${matchingRule.toDepartment}`, undefined, 'autoTransferService');
         return true;
     } catch (error) {
-        console.error(`❌ [Auto-Transfer] Failed to check immediate transfer for request ${requestId}:`, error);
+        logger.error(`❌ [Auto-Transfer] Failed to check immediate transfer for request ${requestId}:`, error, 'autoTransferService');
         return false; // Fail silently - don't block request creation
     }
 };

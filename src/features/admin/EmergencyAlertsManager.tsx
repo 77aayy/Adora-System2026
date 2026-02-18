@@ -22,6 +22,7 @@ import {
 import { getAllEmergencyAlertsForBranch } from '../../services/emergencyAlertsAdminService';
 import { logger } from '../../services/loggerService';
 import { subscribeToRooms } from '../../services/roomService';
+import { formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 interface EmergencyAlertsManagerProps {
     branchId: string;
@@ -359,7 +360,7 @@ export const EmergencyAlertsManager: React.FC<EmergencyAlertsManagerProps> = ({ 
                                         {alert.expiresAt && (
                                             <span className="flex items-center gap-1">
                                                 <Clock className="w-3 h-3" />
-                                                {new Date(alert.expiresAt.toDate ? alert.expiresAt.toDate() : alert.expiresAt).toLocaleString('ar-SA')}
+                                                {formatDateTimeGregorianEn(alert.expiresAt.toDate ? alert.expiresAt.toDate() : alert.expiresAt, { showSeconds: false })}
                                             </span>
                                         )}
                                     </div>

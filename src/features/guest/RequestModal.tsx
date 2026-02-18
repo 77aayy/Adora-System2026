@@ -15,6 +15,7 @@ import {
     GuestButton, 
     GuestSuccessState 
 } from '../../components/guest/GuestModal';
+import { logger } from '../../services/loggerService';
 
 interface RequestModalProps {
     isOpen: boolean;
@@ -60,7 +61,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                 onClose();
             }, 1500);
         } catch (error) {
-            console.error('Failed to submit request:', error);
+            logger.error('Failed to submit request:', error, 'RequestModal');
         } finally {
             setIsSubmitting(false);
         }

@@ -6,10 +6,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    DollarSign, CreditCard, FileText, CheckCircle,
+    Banknote, Wallet, Landmark, Sparkles, Receipt, FileText, CreditCard,
     Clock, Calendar, RefreshCw, Plus, Eye, Download, ArrowLeft,
     Printer, Filter, ChevronDown, X, Check, Trash2, TrendingUp,
-    TrendingDown, Users, Building2, Activity, Percent, BarChart3
+    TrendingDown, Users, Building2, Activity, Percent, BarChart3,
+    Bell
 } from 'lucide-react';
 import {
     getSubscription,
@@ -57,10 +58,12 @@ import { AdoraLoader } from '../../components/common/AdoraLoader'; // ✅ Custom
 import { useUX } from '../../context/UXContext';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
+import { formatDateGregorianEn } from '../../utils/dateUtils';
 import { confirm as customConfirm } from '../../services/customConfirmService';
 import { AdminSidebar } from '../../components/admin/AdminSidebar';
 import { UnifiedModal, ModalActions } from '../../components/common/UnifiedModal';
 import { Lock, AlertTriangle } from 'lucide-react';
+import { logger } from '../../services/loggerService';
 
 interface BillingDashboardProps {
     embedded?: boolean; // ✅ When true, hides header and transitions (for tab embedding)
@@ -84,6 +87,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
     const [overdue, setOverdue] = useState<Invoice[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'receiptVouchers' | 'invoices' | 'expenseVouchers'>('receiptVouchers');
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     
     // ✅ REAL DATA: Calculate total revenue from actual billing data - MOVED BEFORE EARLY RETURN
     const [totalRevenue, setTotalRevenue] = useState(0);
@@ -129,9 +133,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
         } catch (error: any) {
             // ✅ Handle Firestore internal errors gracefully
             if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-                console.warn('⚠️ [BillingDashboard] Firestore internal error calculating expenses (likely cache issue)', error);
+                logger.warn('⚠️ [BillingDashboard] Firestore internal error calculating expenses (likely cache issue)', error, 'BillingDashboard');
             } else {
-                console.error('Error calculating total expenses:', error);
+                logger.error('Error calculating total expenses:', error, 'BillingDashboard');
             }
             return 0;
         }
@@ -141,6 +145,30 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
         loadData();
         loadSystemSettings();
     }, []);
+
+    // ✅ Listen for manager creation events to refresh billing data
+    useEffect(() => {
+        const handleManagerCreated = () => {
+            logger.info('🔄 [BillingDashboard] Manager created event detected - refreshing billing data...', undefined, 'BillingDashboard');
+            // ✅ Use setTimeout to ensure loadData is available and avoid race conditions
+            setTimeout(() => {
+                loadData().catch(err => {
+                    logger.error('❌ [BillingDashboard] Error refreshing data after manager creation:', err, 'BillingDashboard');
+                });
+            }, 500); // Small delay to ensure manager creation is complete
+        };
+
+        // Listen for custom event when manager is created
+        window.addEventListener('manager-created', handleManagerCreated);
+        
+        // Also listen for billing data refresh events
+        window.addEventListener('billing-data-refresh', handleManagerCreated);
+
+        return () => {
+            window.removeEventListener('manager-created', handleManagerCreated);
+            window.removeEventListener('billing-data-refresh', handleManagerCreated);
+        };
+    }, []); // ✅ Empty dependency array is correct - we want this to run once on mount
     
     const loadSystemSettings = async () => {
         try {
@@ -149,9 +177,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
         } catch (error: any) {
             // ✅ Handle Firestore internal errors gracefully
             if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-                console.warn('⚠️ [BillingDashboard] Firestore internal error loading system settings (likely cache issue)', error);
+                logger.warn('⚠️ [BillingDashboard] Firestore internal error loading system settings (likely cache issue)', error, 'BillingDashboard');
             } else {
-                console.error('Error loading system settings:', error);
+                logger.error('Error loading system settings:', error, 'BillingDashboard');
             }
         }
     };
@@ -182,9 +210,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             } catch (error: any) {
                 // ✅ Handle Firestore internal errors gracefully
                 if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-                    console.warn('⚠️ [BillingDashboard] Firestore internal error in financial stats (likely cache issue)', error);
+                    logger.warn('⚠️ [BillingDashboard] Firestore internal error in financial stats (likely cache issue)', error, 'BillingDashboard');
                 } else {
-                    console.error('Error loading financial stats:', error);
+                    logger.error('Error loading financial stats:', error, 'BillingDashboard');
                 }
             }
         };
@@ -260,7 +288,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
                     : 0;
                 setAverageVoucherAmount(avgAmount);
             } catch (error) {
-                console.error('Error calculating additional stats:', error);
+                logger.error('Error calculating additional stats:', error, 'BillingDashboard');
             }
         };
 
@@ -272,42 +300,47 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
     const loadData = async () => {
         setLoading(true);
         try {
-            console.log('🔄 [BillingDashboard] Starting to load data...');
+            logger.debug('🔄 [BillingDashboard] Starting to load data...', undefined, 'BillingDashboard');
+            
+            // ✅ CRITICAL FIX: Don't attempt Firestore recovery here
+            // Recovery causes "INTERNAL ASSERTION FAILED" when listeners are active
+            // Errors are handled globally in errorHandlerService.ts (auto-reload)
             
             // ✅ REAL DATA: Load all subscriptions directly
             const allSubs = await getAllSubscriptions();
-            console.log(`✅ [BillingDashboard] Loaded ${allSubs.length} subscriptions`);
+            logger.info(`✅ [BillingDashboard] Loaded ${allSubs.length} subscriptions`, undefined, 'BillingDashboard');
             setSubscriptions(allSubs);
 
             // ✅ Load receipt vouchers (سندات القبض)
             const vouchers = await getAllReceiptVouchers();
-            console.log(`✅ [BillingDashboard] Loaded ${vouchers.length} receipt vouchers`, vouchers);
+            logger.info(`✅ [BillingDashboard] Loaded ${vouchers.length} receipt vouchers`, vouchers, 'BillingDashboard');
             
             // ✅ DEBUG: Check if vouchers are deleted
             const deletedCount = vouchers.filter(v => v.isDeleted).length;
             const activeCount = vouchers.filter(v => !v.isDeleted).length;
-            console.log(`📊 [BillingDashboard] Vouchers breakdown: ${activeCount} active, ${deletedCount} deleted, ${vouchers.length} total`);
+            logger.debug(`📊 [BillingDashboard] Vouchers breakdown: ${activeCount} active, ${deletedCount} deleted, ${vouchers.length} total`, undefined, 'BillingDashboard');
             
             // ✅ DEBUG: Check tenantId mapping for vouchers
             const managers = await getAllManagers();
             const managerTenantIds = managers.map(m => ({ id: m.id, name: m.name, code: m.code, tenantId: m.tenantId }));
-            console.log('📊 [BillingDashboard] Manager tenantIds:', managerTenantIds);
+            logger.debug('📊 [BillingDashboard] Manager tenantIds:', managerTenantIds, 'BillingDashboard');
             
             const voucherTenantIds = [...new Set(vouchers.map(v => v.tenantId))];
-            console.log('📊 [BillingDashboard] Voucher tenantIds:', voucherTenantIds);
+            logger.debug('📊 [BillingDashboard] Voucher tenantIds:', voucherTenantIds, 'BillingDashboard');
             
             // ✅ Check if any manager has vouchers
             managers.forEach(m => {
                 const managerVouchers = vouchers.filter(v => v.tenantId === m.tenantId);
                 const activeManagerVouchers = managerVouchers.filter(v => !v.isDeleted);
                 if (activeManagerVouchers.length > 0) {
-                    console.log(`✅ [BillingDashboard] Manager ${m.name} (${m.code}) has ${activeManagerVouchers.length} active vouchers (${managerVouchers.length} total)`);
+                    logger.debug(`✅ [BillingDashboard] Manager ${m.name} (${m.code}) has ${activeManagerVouchers.length} active vouchers (${managerVouchers.length} total)`, undefined, 'BillingDashboard');
                 } else if (managerVouchers.length > 0) {
-                    console.warn(`⚠️ [BillingDashboard] Manager ${m.name} (${m.code}) has ${managerVouchers.length} vouchers but ALL are deleted!`);
+                    logger.warn(`⚠️ [BillingDashboard] Manager ${m.name} (${m.code}) has ${managerVouchers.length} vouchers but ALL are deleted!`, undefined, 'BillingDashboard');
                 } else if (m.tenantId) {
-                    console.warn(`⚠️ [BillingDashboard] Manager ${m.name} (${m.code}) has tenantId ${m.tenantId} but NO vouchers found!`);
+                    // ✅ INFO: No vouchers is normal for new managers or managers without billing activity
+                    logger.info(`ℹ️ [BillingDashboard] Manager ${m.name} (${m.code}) has tenantId ${m.tenantId} but no vouchers yet (this is normal for new managers)`, undefined, 'BillingDashboard');
                 } else {
-                    console.error(`❌ [BillingDashboard] Manager ${m.name} (${m.code}) has NO tenantId!`);
+                    logger.error(`❌ [BillingDashboard] Manager ${m.name} (${m.code}) has NO tenantId!`, undefined, 'BillingDashboard');
                 }
             });
             
@@ -317,25 +350,26 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             const expenseVouchersData = await getAllExpenseVouchers();
             const deletedExpenseCount = expenseVouchersData.filter(v => v.isDeleted).length;
             const activeExpenseCount = expenseVouchersData.filter(v => !v.isDeleted).length;
-            console.log(`✅ [BillingDashboard] Loaded ${expenseVouchersData.length} expense vouchers (${activeExpenseCount} active, ${deletedExpenseCount} deleted)`, expenseVouchersData);
+            logger.info(`✅ [BillingDashboard] Loaded ${expenseVouchersData.length} expense vouchers (${activeExpenseCount} active, ${deletedExpenseCount} deleted)`, expenseVouchersData, 'BillingDashboard');
             setExpenseVouchers(expenseVouchersData);
 
             // ✅ Load all invoices
             const allInvs = await getAllInvoices();
-            console.log(`✅ [BillingDashboard] Loaded ${allInvs.length} invoices`, allInvs);
+            logger.info(`✅ [BillingDashboard] Loaded ${allInvs.length} invoices`, allInvs, 'BillingDashboard');
             
             // ✅ DEBUG: Check tenantId mapping for invoices
             const invoiceTenantIds = [...new Set(allInvs.map(inv => inv.tenantId))];
-            console.log('📊 [BillingDashboard] Invoice tenantIds:', invoiceTenantIds);
+            logger.debug('📊 [BillingDashboard] Invoice tenantIds:', invoiceTenantIds, 'BillingDashboard');
             
             managers.forEach(m => {
                 const managerInvoices = allInvs.filter(inv => inv.tenantId === m.tenantId);
                 if (managerInvoices.length > 0) {
-                    console.log(`✅ [BillingDashboard] Manager ${m.name} (${m.code}) has ${managerInvoices.length} invoices`);
+                    logger.debug(`✅ [BillingDashboard] Manager ${m.name} (${m.code}) has ${managerInvoices.length} invoices`, undefined, 'BillingDashboard');
                 } else if (m.tenantId) {
-                    console.warn(`⚠️ [BillingDashboard] Manager ${m.name} (${m.code}) has tenantId ${m.tenantId} but NO invoices found!`);
+                    // ✅ INFO: No invoices is normal for new managers or managers without billing activity
+                    logger.info(`ℹ️ [BillingDashboard] Manager ${m.name} (${m.code}) has tenantId ${m.tenantId} but no invoices yet (this is normal for new managers)`, undefined, 'BillingDashboard');
                 } else {
-                    console.error(`❌ [BillingDashboard] Manager ${m.name} (${m.code}) has NO tenantId!`);
+                    logger.error(`❌ [BillingDashboard] Manager ${m.name} (${m.code}) has NO tenantId!`, undefined, 'BillingDashboard');
                 }
             });
             
@@ -343,21 +377,21 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
 
             // Load expiring subscriptions
             const expiringSubs = await getExpiringSubscriptions(7);
-            console.log(`✅ [BillingDashboard] Loaded ${expiringSubs.length} expiring subscriptions`);
+            logger.info(`✅ [BillingDashboard] Loaded ${expiringSubs.length} expiring subscriptions`, undefined, 'BillingDashboard');
             setExpiring(expiringSubs);
 
             // Load overdue invoices
             const overdueInvs = await getOverdueInvoices();
-            console.log(`✅ [BillingDashboard] Loaded ${overdueInvs.length} overdue invoices`);
+            logger.info(`✅ [BillingDashboard] Loaded ${overdueInvs.length} overdue invoices`, undefined, 'BillingDashboard');
             setOverdue(overdueInvs);
             
-            console.log('✅ [BillingDashboard] Data loading completed successfully');
+            logger.info('✅ [BillingDashboard] Data loading completed successfully', undefined, 'BillingDashboard');
         } catch (error: any) {
             // ✅ Handle Firestore internal errors gracefully
             if (error?.message?.includes('INTERNAL ASSERTION FAILED')) {
-                console.warn('⚠️ [BillingDashboard] Firestore internal error (likely cache issue) - continuing with available data', error);
+                logger.warn('⚠️ [BillingDashboard] Firestore internal error (likely cache issue) - continuing with available data', error, 'BillingDashboard');
             } else {
-                console.error('❌ [BillingDashboard] Error loading billing data:', error);
+                logger.error('❌ [BillingDashboard] Error loading billing data:', error, 'BillingDashboard');
             }
         } finally {
             setLoading(false);
@@ -425,9 +459,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
             {/* Tabs */}
             <div className="glass rounded-2xl p-2 flex gap-2 overflow-x-auto">
                 {[
-                    { id: 'receiptVouchers' as const, label: t('admin.receiptVouchers'), icon: CreditCard },
+                    { id: 'receiptVouchers' as const, label: t('admin.receiptVouchers'), icon: Receipt },
                     { id: 'invoices' as const, label: t('admin.invoices'), icon: FileText },
-                    { id: 'expenseVouchers' as const, label: t('admin.expenseVouchers'), icon: DollarSign }
+                    { id: 'expenseVouchers' as const, label: t('admin.expenseVouchers'), icon: Wallet }
                 ].map(tab => {
                     const Icon = tab.icon;
                     return (
@@ -485,19 +519,20 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
                     <aside id="admin-sidebar" className="h-full">
                         <AdminSidebar
                             isOwner={isOwner}
+                            onCollapseChange={setSidebarCollapsed}
                         />
                     </aside>
                 </div>
 
-                {/* Main Content Area - Responsive margin for sidebar */}
-                <main className="flex-1 p-3 sm:p-4 pb-24 lg:pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col lg:mr-[280px]">
+                {/* Main Content Area — هامش يمين يتغير مع طي الشريط */}
+                <main className={`flex-1 p-3 sm:p-4 pb-24 lg:pb-32 lg:pt-4 pt-4 overflow-x-hidden min-w-0 flex flex-col transition-[margin-right] duration-300 ease-out ${sidebarCollapsed ? 'lg:mr-[80px]' : 'lg:mr-[280px]'}`}>
                     <div className="flex-1">
                         {/* Header */}
                         <div className="mb-4">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-3">
                                     <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center">
-                                        <DollarSign className="w-6 h-6 text-teal-400" />
+                                        <Banknote className="w-6 h-6 text-teal-400" />
                                     </div>
                                     <div>
                                         <h1 className="text-2xl font-bold text-white">إدارة الفواتير والاشتراكات</h1>
@@ -511,7 +546,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
                                                 exportToPDF({ subscriptions, invoices, payments }, 'billing-report.pdf');
                                                 success('تم تصدير التقرير PDF بنجاح');
                                             } catch (err) {
-                                                console.error('PDF export failed:', err);
+                                                logger.error('PDF export failed:', err, 'BillingDashboard');
                                                 error('فشل تصدير PDF');
                                             }
                                         }}
@@ -526,7 +561,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({ embedded = f
                                                 exportToExcel({ subscriptions, invoices, payments }, 'billing-report.xlsx');
                                                 success('تم تصدير التقرير Excel بنجاح');
                                             } catch (err) {
-                                                console.error('Excel export failed:', err);
+                                                logger.error('Excel export failed:', err, 'BillingDashboard');
                                                 error('فشل تصدير Excel');
                                             }
                                         }}
@@ -615,7 +650,7 @@ const ComprehensiveFinancialStats: React.FC<{
                 {/* 1. إجمالي الإيرادات */}
                 <div className="stat-card-pro-compact">
                     <StatCard
-                        icon={TrendingUp}
+                        icon={Sparkles}
                         iconColor="green"
                         label={t('admin.totalRevenue')}
                         value={`${totalRevenue.toLocaleString()} ${t('common.rs')}`}
@@ -635,7 +670,7 @@ const ComprehensiveFinancialStats: React.FC<{
                 {/* 3. صافي الربح */}
                 <div className="stat-card-pro-compact">
                     <StatCard
-                        icon={netProfit >= 0 ? TrendingUp : TrendingDown}
+                        icon={netProfit >= 0 ? Sparkles : TrendingDown}
                         iconColor={netProfit >= 0 ? "teal" : "orange"}
                         label={t('admin.netProfit')}
                         value={`${netProfit.toLocaleString()} ${t('common.rs')}`}
@@ -646,7 +681,7 @@ const ComprehensiveFinancialStats: React.FC<{
                 {/* 4. سندات القبض */}
                 <div className="stat-card-pro-compact">
                     <StatCard
-                        icon={CreditCard}
+                        icon={Receipt}
                         iconColor="blue"
                         label={t('admin.receiptVouchers')}
                         count={totalReceiptVouchers}
@@ -657,7 +692,7 @@ const ComprehensiveFinancialStats: React.FC<{
                 {/* 5. سندات الصرف */}
                 <div className="stat-card-pro-compact">
                     <StatCard
-                        icon={DollarSign}
+                        icon={Wallet}
                         iconColor="purple"
                         label={t('admin.expenseVouchers')}
                         count={totalExpenseVouchers}
@@ -665,11 +700,11 @@ const ComprehensiveFinancialStats: React.FC<{
                     />
                 </div>
                 
-                {/* 6. مستحقات متأخرة - Only show if there are overdue */}
+                {/* 6. مستحقات متأخرة */}
                 {overdue.length > 0 && (
                     <div className="stat-card-pro-compact">
                         <StatCard
-                            icon={AlertTriangle}
+                            icon={Bell}
                             iconColor="orange"
                             label={t('admin.overdue')}
                             value={`${totalOverdueAmount.toLocaleString()} ${t('common.rs')}`}
@@ -728,7 +763,7 @@ const ReceiptVouchersStats: React.FC<{
         >
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
-                    icon={DollarSign}
+                    icon={Banknote}
                     iconColor="green"
                     label={t('billing.stats.cash')}
                     value={`${cashAmount.toLocaleString()} ${t('common.rs')}`}
@@ -737,7 +772,7 @@ const ReceiptVouchersStats: React.FC<{
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
-                    icon={CreditCard}
+                    icon={Wallet}
                     iconColor="blue"
                     label={t('billing.stats.credit')}
                     value={`${creditAmount.toLocaleString()} ${t('common.rs')}`}
@@ -746,7 +781,7 @@ const ReceiptVouchersStats: React.FC<{
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
-                    icon={FileText}
+                    icon={Landmark}
                     iconColor="purple"
                     label={t('billing.stats.bankTransfer')}
                     value={`${bankTransferAmount.toLocaleString()} ${t('common.rs')}`}
@@ -764,9 +799,9 @@ const ReceiptVouchersStats: React.FC<{
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
-                    icon={CheckCircle}
+                    icon={Sparkles}
                     iconColor="teal"
-                    label={`✅ ${t('common.total')}`}
+                    label={t('common.total')}
                     value={`${totalAmount.toLocaleString()} ${t('common.rs')}`}
                     lastUpdate={t('common.lastUpdate')}
                 />
@@ -820,7 +855,7 @@ const ExpenseVouchersStats: React.FC<{
         >
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
-                    icon={DollarSign}
+                    icon={Banknote}
                     iconColor="green"
                     label={t('billing.stats.cash')}
                     value={`${cashAmount.toLocaleString()} ${t('common.rs')}`}
@@ -829,7 +864,7 @@ const ExpenseVouchersStats: React.FC<{
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
-                    icon={CreditCard}
+                    icon={Wallet}
                     iconColor="blue"
                     label={t('billing.stats.credit')}
                     value={`${creditAmount.toLocaleString()} ${t('common.rs')}`}
@@ -838,7 +873,7 @@ const ExpenseVouchersStats: React.FC<{
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
-                    icon={FileText}
+                    icon={Landmark}
                     iconColor="purple"
                     label={t('billing.stats.bankTransfer')}
                     value={`${bankTransferAmount.toLocaleString()} ${t('common.rs')}`}
@@ -856,9 +891,9 @@ const ExpenseVouchersStats: React.FC<{
             </div>
             <div className="stat-card-pro-compact stat-card-billing">
                 <StatCard
-                    icon={CheckCircle}
+                    icon={Sparkles}
                     iconColor="teal"
-                    label={`✅ ${t('common.total')}`}
+                    label={t('common.total')}
                     value={`${totalAmount.toLocaleString()} ${t('common.rs')}`}
                     lastUpdate={t('common.lastUpdate')}
                 />
@@ -915,7 +950,7 @@ const ReceiptVouchersTab: React.FC<{
             window.location.reload();
         } catch (err: any) {
             error('فشل حذف السندات');
-            console.error('Error deleting vouchers:', err);
+            logger.error('Error deleting vouchers:', err, 'BillingDashboard');
         } finally {
             setDeleting(false);
         }
@@ -930,7 +965,7 @@ const ReceiptVouchersTab: React.FC<{
     const [sortBy, setSortBy] = useState<'highest' | 'lowest' | 'date' | 'payment' | 'duration'>('date');
     const [paymentMethodFilter, setPaymentMethodFilter] = useState<'all' | 'cash' | 'credit' | 'bank_transfer' | 'deferred'>('all');
     const [durationFilter, setDurationFilter] = useState<'all' | '1' | '2'>('all');
-    const [deletedFilter, setDeletedFilter] = useState<'all' | 'deleted' | 'not_deleted'>('not_deleted'); // ✅ فلتر السندات المحذوفة
+    const [deletedFilter, setDeletedFilter] = useState<'all' | 'deleted' | 'not_deleted'>('all'); // ✅ فلتر السندات المحذوفة - عرض جميع السندات افتراضياً
     const [selectedVouchers, setSelectedVouchers] = useState<Set<string>>(new Set());
     const [showFilters, setShowFilters] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -1555,7 +1590,7 @@ const ReceiptVouchersTab: React.FC<{
             
             success('تم فتح نافذة الطباعة. اختر "حفظ كـ PDF" من خيارات الطباعة.');
         } catch (err) {
-            console.error('Error exporting to PDF:', err);
+            logger.error('Error exporting to PDF:', err, 'BillingDashboard');
             error('فشل تصدير PDF');
         }
     };
@@ -1686,7 +1721,7 @@ const ReceiptVouchersTab: React.FC<{
             
             success('تم تصدير Excel بنجاح');
         } catch (err) {
-            console.error('Error exporting to Excel:', err);
+            logger.error('Error exporting to Excel:', err, 'BillingDashboard');
             error('فشل تصدير Excel');
         }
     };
@@ -2413,7 +2448,7 @@ const ExpenseVouchersTab: React.FC<{
                 const settings = await getSystemSettings();
                 setSystemSettings(settings);
             } catch (err) {
-                console.error('Error loading system settings:', err);
+                logger.error('Error loading system settings:', err, 'BillingDashboard');
             }
         };
         loadSettings();
@@ -2542,7 +2577,7 @@ const ExpenseVouchersTab: React.FC<{
             onRefresh();
         } catch (err: any) {
             error('فشل حذف السندات');
-            console.error('Error deleting vouchers:', err);
+            logger.error('Error deleting vouchers:', err, 'BillingDashboard');
         } finally {
             setDeleting(false);
         }
@@ -3094,7 +3129,7 @@ const ExpenseVouchersTab: React.FC<{
         try {
             await exportToPDF(vouchersToExport.map(v => ({
                 'رقم السند': v.voucherNumber || '-',
-                'التاريخ': new Date(v.createdAt).toLocaleDateString('ar-SA'),
+                'التاريخ': formatDateGregorianEn(new Date(v.createdAt)),
                 'دفع لـ': v.paidTo,
                 'طريقة الدفع': v.paymentMethod === 'cash' ? 'نقداً' : v.paymentMethod === 'credit' ? 'كريديت' : v.paymentMethod === 'bank_transfer' ? 'تحويل بنكي' : 'مؤجل الدفع',
                 'الغرض': v.purpose,
@@ -3103,7 +3138,7 @@ const ExpenseVouchersTab: React.FC<{
             success('تم تصدير الملف بنجاح');
         } catch (err) {
             error('فشل تصدير الملف');
-            console.error('Error exporting PDF:', err);
+            logger.error('Error exporting PDF:', err, 'BillingDashboard');
         }
     };
     
@@ -3121,7 +3156,7 @@ const ExpenseVouchersTab: React.FC<{
         try {
             await exportToExcel(vouchersToExport.map(v => ({
                 'رقم السند': v.voucherNumber || '-',
-                'التاريخ': new Date(v.createdAt).toLocaleDateString('ar-SA'),
+                'التاريخ': formatDateGregorianEn(new Date(v.createdAt)),
                 'دفع لـ': v.paidTo,
                 'طريقة الدفع': v.paymentMethod === 'cash' ? 'نقداً' : v.paymentMethod === 'credit' ? 'كريديت' : v.paymentMethod === 'bank_transfer' ? 'تحويل بنكي' : 'مؤجل الدفع',
                 'الغرض': v.purpose,
@@ -3130,7 +3165,7 @@ const ExpenseVouchersTab: React.FC<{
             success('تم تصدير الملف بنجاح');
         } catch (err) {
             error('فشل تصدير الملف');
-            console.error('Error exporting Excel:', err);
+            logger.error('Error exporting Excel:', err, 'BillingDashboard');
         }
     };
     
@@ -3515,7 +3550,7 @@ const InvoicesTab: React.FC<{
                 const settings = await getSystemSettings();
                 setSystemSettings(settings);
             } catch (err) {
-                console.error('Error loading system settings:', err);
+                logger.error('Error loading system settings:', err, 'BillingDashboard');
             }
         };
         loadSettings();
@@ -3530,7 +3565,7 @@ const InvoicesTab: React.FC<{
     const [sortBy, setSortBy] = useState<'highest' | 'lowest' | 'date' | 'payment' | 'duration'>('date');
     const [paymentMethodFilter, setPaymentMethodFilter] = useState<'all' | 'cash' | 'credit' | 'bank_transfer' | 'deferred'>('all');
     const [durationFilter, setDurationFilter] = useState<'all' | '1' | '2'>('all');
-    const [deletedFilter, setDeletedFilter] = useState<'all' | 'deleted' | 'not_deleted'>('not_deleted');
+    const [deletedFilter, setDeletedFilter] = useState<'all' | 'deleted' | 'not_deleted'>('all'); // ✅ عرض جميع الفواتير افتراضياً
     const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
     const [showFilters, setShowFilters] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -3574,7 +3609,7 @@ const InvoicesTab: React.FC<{
             window.location.reload();
         } catch (err: any) {
             error('فشل حذف الفواتير');
-            console.error('Error deleting invoices:', err);
+            logger.error('Error deleting invoices:', err, 'BillingDashboard');
         } finally {
             setDeleting(false);
         }
@@ -4683,7 +4718,7 @@ const AddExpenseVoucherModal: React.FC<{
             onSuccess();
         } catch (err: any) {
             error('فشل إنشاء سند الصرف');
-            console.error('Error creating expense voucher:', err);
+            logger.error('Error creating expense voucher:', err, 'BillingDashboard');
         } finally {
             setLoading(false);
         }

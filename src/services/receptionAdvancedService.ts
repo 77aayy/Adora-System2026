@@ -5,6 +5,7 @@
 
 import { collection, query, where, getDocs, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // 1. ADVANCED ROOM ASSIGNMENT LOGIC
@@ -20,12 +21,13 @@ interface RoomAssignmentCriteria {
 }
 
 export const smartRoomAssignment = async (
+    tenantId: string,
     branch: string,
     criteria: RoomAssignmentCriteria
 ): Promise<string | null> => {
     try {
         let q = query(
-            collection(db, 'rooms'),
+            collection(db, `tenants/${tenantId}/rooms`),
             where('branch', '==', branch),
             where('isOccupied', '==', false)
         );
@@ -48,7 +50,7 @@ export const smartRoomAssignment = async (
         scored.sort((a, b) => b.score - a.score);
         return scored[0].roomNumber;
     } catch (error) {
-        console.error('Smart assignment error:', error);
+        logger.error('Smart assignment error:', error, 'receptionAdvancedService');
         return null;
     }
 };
@@ -76,12 +78,13 @@ interface VIPService {
 }
 
 export const handleVIPGuest = async (
+    tenantId: string,
     requestId: string,
     vipLevel: 'gold' | 'platinum' | 'diamond',
     services: VIPService
 ): Promise<void> => {
     try {
-        const requestRef = doc(db, 'requests', requestId);
+        const requestRef = doc(db, `tenants/${tenantId}/requests`, requestId);
 
         await updateDoc(requestRef, {
             isVIP: true,
@@ -92,9 +95,9 @@ export const handleVIPGuest = async (
         });
 
         // Log VIP handling
-        console.log(`VIP ${vipLevel} guest handled:`, requestId);
+        logger.info(`VIP ${vipLevel} guest handled: ${requestId}`, undefined, 'receptionAdvancedService');
     } catch (error) {
-        console.error('VIP handling error:', error);
+        logger.error('VIP handling error:', error, 'receptionAdvancedService');
         throw error;
     }
 };
@@ -170,15 +173,17 @@ interface EmployeeWorkload {
 }
 
 export const autoAssignRequest = async (
+    tenantId: string,
     requestId: string,
     department: string,
     branch: string
 ): Promise<string | null> => {
     try {
-        // Get available employees
+        // Get available employees (tenant-scoped)
+        const employeesRef = collection(db, `tenants/${tenantId}/employees`);
         const employeesSnapshot = await getDocs(
             query(
-                collection(db, 'employees'),
+                employeesRef,
                 where('branch', '==', branch),
                 where('department', '==', department),
                 where('isActive', '==', true)
@@ -187,15 +192,16 @@ export const autoAssignRequest = async (
 
         if (employeesSnapshot.empty) return null;
 
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
         const employees: EmployeeWorkload[] = await Promise.all(
             employeesSnapshot.docs.map(async (empDoc) => {
                 const emp = empDoc.data();
 
-                // Get current workload
+                // Get current workload (assignedTo may be userId; match by assignedTo.id if stored as object)
                 const workloadSnapshot = await getDocs(
                     query(
-                        collection(db, 'requests'),
-                        where('assignedTo', '==', empDoc.id),
+                        requestsRef,
+                        where('assignedTo.id', '==', empDoc.id),
                         where('status', 'in', ['CONFIRMED', 'IN_PROGRESS'])
                     )
                 );
@@ -225,8 +231,8 @@ export const autoAssignRequest = async (
 
         const selected = scored[0];
 
-        // Assign
-        await updateDoc(doc(db, 'requests', requestId), {
+        // Assign (tenant-scoped)
+        await updateDoc(doc(db, `tenants/${tenantId}/requests`, requestId), {
             assignedTo: selected.employeeId,
             assignedToName: selected.employeeName,
             'timeline.assigned': Timestamp.now()
@@ -234,7 +240,7 @@ export const autoAssignRequest = async (
 
         return selected.employeeId;
     } catch (error) {
-        console.error('Auto-assignment error:', error);
+        logger.error('Auto-assignment error:', error, 'receptionAdvancedService');
         return null;
     }
 };
@@ -250,11 +256,11 @@ export interface PriorityQueue {
     low: any[];
 }
 
-export const getPriorityQueue = async (branch: string): Promise<PriorityQueue> => {
+export const getPriorityQueue = async (tenantId: string, branch: string): Promise<PriorityQueue> => {
     try {
         const snapshot = await getDocs(
             query(
-                collection(db, 'requests'),
+                collection(db, `tenants/${tenantId}/requests`),
                 where('branch', '==', branch),
                 where('status', '==', 'PENDING')
             )
@@ -289,7 +295,7 @@ export const getPriorityQueue = async (branch: string): Promise<PriorityQueue> =
 
         return queue;
     } catch (error) {
-        console.error('Priority queue error:', error);
+        logger.error('Priority queue error:', error, 'receptionAdvancedService');
         return { urgent: [], high: [], normal: [], low: [] };
     }
 };

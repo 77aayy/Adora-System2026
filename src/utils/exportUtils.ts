@@ -6,6 +6,7 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { formatDateGregorianEn } from './dateUtils';
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -187,13 +188,13 @@ export const exportToPDF = (data: any, filename: string = 'report.pdf') => {
                     const startDate = data.reportPeriod.start instanceof Date 
                         ? data.reportPeriod.start 
                         : new Date(data.reportPeriod.start);
-                    summaryData.push(['من', startDate.toLocaleDateString('ar-SA')]);
+                    summaryData.push(['من', formatDateGregorianEn(startDate)]);
                 }
                 if (data.reportPeriod?.end) {
                     const endDate = data.reportPeriod.end instanceof Date 
                         ? data.reportPeriod.end 
                         : new Date(data.reportPeriod.end);
-                    summaryData.push(['إلى', endDate.toLocaleDateString('ar-SA')]);
+                    summaryData.push(['إلى', formatDateGregorianEn(endDate)]);
                 }
                 
                 if (summaryData.length > 0) {
@@ -337,13 +338,13 @@ export const exportToExcel = (data: any, filename: string = 'report.xlsx') => {
                     const startDate = data.reportPeriod.start instanceof Date 
                         ? data.reportPeriod.start 
                         : new Date(data.reportPeriod.start);
-                    summaryData.push(['من', startDate.toLocaleDateString('ar-SA')]);
+                    summaryData.push(['من', formatDateGregorianEn(startDate)]);
                 }
                 if (data.reportPeriod?.end) {
                     const endDate = data.reportPeriod.end instanceof Date 
                         ? data.reportPeriod.end 
                         : new Date(data.reportPeriod.end);
-                    summaryData.push(['إلى', endDate.toLocaleDateString('ar-SA')]);
+                    summaryData.push(['إلى', formatDateGregorianEn(endDate)]);
                 }
                 
                 if (summaryData.length > 0) {
@@ -380,8 +381,8 @@ export const exportToExcel = (data: any, filename: string = 'report.xlsx') => {
                     'الرسالة': err.message || '',
                     'التكرار': err.count || 0,
                     'آخر حدوث': err.lastOccurrence instanceof Date 
-                        ? err.lastOccurrence.toLocaleDateString('ar-SA')
-                        : new Date(err.lastOccurrence).toLocaleDateString('ar-SA')
+                        ? formatDateGregorianEn(err.lastOccurrence)
+                        : formatDateGregorianEn(new Date(err.lastOccurrence))
                 })));
                 XLSX.utils.book_append_sheet(workbook, errorSheet, 'الأخطاء');
             }

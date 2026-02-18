@@ -15,6 +15,7 @@ import {
     collection, addDoc, getDocs, updateDoc, doc,
     query, where, orderBy, limit, serverTimestamp, Timestamp
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -153,9 +154,9 @@ class AuditTrailManager {
             };
 
             await addDoc(collection(db, 'audit_logs'), log);
-            console.log('✅ Transaction logged:', transaction.action);
+            logger.info('✅ Transaction logged:', transaction.action, 'auditTrailService');
         } catch (error) {
-            console.error('Log transaction error:', error);
+            logger.error('Log transaction error:', error, 'auditTrailService');
         }
     }
 
@@ -202,7 +203,7 @@ class AuditTrailManager {
             });
         }
 
-        console.log('✅ Settlement logged');
+        logger.info('✅ Settlement logged', undefined, 'auditTrailService');
         return log;
     }
 
@@ -238,9 +239,9 @@ class AuditTrailManager {
             };
 
             await addDoc(collection(db, 'audit_logs'), log);
-            console.log('✅ Modification logged');
+            logger.info('✅ Modification logged', undefined, 'auditTrailService');
         } catch (error) {
-            console.error('Log modification error:', error);
+            logger.error('Log modification error:', error, 'auditTrailService');
         }
     }
 
@@ -265,7 +266,7 @@ class AuditTrailManager {
 
             await addDoc(collection(db, 'audit_logs'), log);
         } catch (error) {
-            console.error('Log action error:', error);
+            logger.error('Log action error:', error, 'auditTrailService');
         }
     }
 
@@ -328,7 +329,7 @@ class AuditTrailManager {
 
             return logs;
         } catch (error) {
-            console.error('Get logs error:', error);
+            logger.error('Get logs error:', error, 'auditTrailService');
             return [];
         }
     }
@@ -354,7 +355,7 @@ class AuditTrailManager {
 
             return logs;
         } catch (error) {
-            console.error('Get document history error:', error);
+            logger.error('Get document history error:', error, 'auditTrailService');
             return [];
         }
     }
@@ -380,7 +381,7 @@ class AuditTrailManager {
 
             return logs;
         } catch (error) {
-            console.error('Get settlements error:', error);
+            logger.error('Get settlements error:', error, 'auditTrailService');
             return [];
         }
     }

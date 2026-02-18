@@ -65,7 +65,7 @@ export const getNotificationConfig = async (tenantId: string): Promise<Notificat
         }
         return DEFAULT_NOTIFICATION_CONFIG;
     } catch (error) {
-        console.error('Error getting notification config:', error);
+        logger.error('Error getting notification config:', error, 'communicationService');
         return DEFAULT_NOTIFICATION_CONFIG;
     }
 };
@@ -81,7 +81,7 @@ export const saveNotificationConfig = async (
         const docRef = doc(db, `tenants/${tenantId}/settings/notifications`);
         await setDoc(docRef, config, { merge: true });
     } catch (error) {
-        console.error('Error saving notification config:', error);
+        logger.error('Error saving notification config:', error, 'communicationService');
         throw error;
     }
 };
@@ -124,7 +124,7 @@ export const queueNotification = async (
         });
         return docRef.id;
     } catch (error) {
-        console.error('Error queueing notification:', error);
+        logger.error('Error queueing notification:', error, 'communicationService');
         throw error;
     }
 };
@@ -143,7 +143,7 @@ export const getPendingNotifications = async (limit: number = 100): Promise<Noti
         const snapshot = await getDocs(q);
         return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as NotificationQueueItem));
     } catch (error) {
-        console.error('Error getting pending notifications:', error);
+        logger.error('Error getting pending notifications:', error, 'communicationService');
         return [];
     }
 };
@@ -175,13 +175,13 @@ export const sendSMS = async (
         const plan = tenantDoc.data()?.info?.plan;
         const isEnabled = await isFeatureEnabled('smsNotifications', plan);
         if (!isEnabled) {
-            console.log('📱 SMS feature is disabled for this tenant');
+            logger.info('📱 SMS feature is disabled for this tenant', undefined, 'communicationService');
             return { success: false, error: 'SMS_FEATURE_DISABLED' };
         }
         
         const config = await getNotificationConfig(tenantId);
         if (!config.sms.enabled) {
-            console.log('📱 SMS is not configured for this tenant');
+            logger.info('📱 SMS is not configured for this tenant', undefined, 'communicationService');
             // Queue for later processing
             const queueId = await queueNotification(tenantId, {
                 type: 'sms',
@@ -222,7 +222,7 @@ export const sendBulkSMS = async (phoneNumbers: string[], message: string): Prom
             await sendSMS(phone, message);
             sent++;
         } catch (e) {
-            console.error(`Failed to send SMS to ${phone}`);
+            logger.error(`Failed to send SMS to ${phone}`, e, 'communicationService');
         }
     }
     return sent;
@@ -267,13 +267,13 @@ export const sendEmail = async (
         const plan = tenantDoc.data()?.info?.plan;
         const isEnabled = await isFeatureEnabled('emailNotifications', plan);
         if (!isEnabled) {
-            console.log('📧 Email feature is disabled for this tenant');
+            logger.info('📧 Email feature is disabled for this tenant', undefined, 'communicationService');
             return { success: false, error: 'EMAIL_FEATURE_DISABLED' };
         }
         
         const config = await getNotificationConfig(tenantId);
         if (!config.email.enabled) {
-            console.log('📧 Email is not configured for this tenant');
+            logger.info('📧 Email is not configured for this tenant', undefined, 'communicationService');
             // Queue for later processing
             const queueId = await queueNotification(tenantId, {
                 type: 'email',
@@ -318,7 +318,7 @@ export const sendEmail = async (
 
     // 4. In a real implementation, this would call the email provider API
     // For now, we mark as queued (Cloud Functions would handle actual sending)
-    console.log(`📧 Email queued to ${to}: ${subject}`);
+    logger.info(`📧 Email queued to ${to}: ${subject}`, undefined, 'communicationService');
 
     return { success: true, messageId: docRef.id };
 };
@@ -353,7 +353,7 @@ export const sendCustomEmail = async (
         createdAt: Timestamp.now()
     });
 
-    console.log(`📧 Custom email queued to ${to}: ${subject}`);
+    logger.info(`📧 Custom email queued to ${to}: ${subject}`, undefined, 'communicationService');
     return { success: true, messageId: docRef.id };
 };
 
@@ -371,7 +371,7 @@ export const sendWhatsApp = async (
     if (tenantId) {
         const isEnabled = await isFeatureEnabled('whatsappIntegration', undefined, false);
         if (!isEnabled) {
-            console.log('📱 WhatsApp feature is disabled globally');
+            logger.info('📱 WhatsApp feature is disabled globally', undefined, 'communicationService');
             throw new Error('WHATSAPP_FEATURE_DISABLED');
         }
     }

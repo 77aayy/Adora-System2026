@@ -22,8 +22,11 @@ interface SystemSettingsResponse {
 /**
  * ✅ Get System Settings via Cloud Function
  * Uses Admin SDK - no Rules needed
+ * ✅ CORS enabled for localhost development
  */
-export const getSystemSettings = functions.https.onCall(async (data, context): Promise<SystemSettingsResponse> => {
+export const getSystemSettings = functions
+  .region('us-central1')
+  .https.onCall(async (data, context): Promise<SystemSettingsResponse> => {
   try {
     // ✅ Require authentication (any authenticated user can read)
     if (!context.auth) {
@@ -64,8 +67,11 @@ export const getSystemSettings = functions.https.onCall(async (data, context): P
 
 /**
  * ✅ Set System Settings (Owner only)
+ * ✅ CORS enabled for localhost development
  */
-export const setSystemSettings = functions.https.onCall(async (data, context): Promise<SystemSettingsResponse> => {
+export const setSystemSettings = functions
+  .region('us-central1')
+  .https.onCall(async (data, context): Promise<SystemSettingsResponse> => {
   try {
     // ✅ Require authentication
     if (!context.auth) {

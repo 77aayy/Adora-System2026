@@ -25,6 +25,7 @@ import {
     toggleLicenseStatus,
 } from '../../services/ownerService';
 import { confirm as customConfirm } from '../../services/customConfirmService';
+import { logger } from '../../services/loggerService';
 import {
     collection,
     query,
@@ -38,6 +39,7 @@ import {
 import { db } from '../../services/firebase';
 import { Tenant, TenantInfo } from '../../types/tenant';
 import { haptic, playSound } from '../../utils/uxEffects';
+import { formatDateGregorianEn } from '../../utils/dateUtils';
 
 interface TenantWithId extends Tenant {
     id: string;
@@ -117,7 +119,7 @@ export const SuperAdminPanel: React.FC = () => {
             });
 
         } catch (error: any) {
-            console.error('Error creating hotel:', error);
+            logger.error('Error creating hotel:', error, 'SuperAdminPanel');
             haptic('error');
             await customConfirm({
                 title: t('common.error') || 'خطأ',
@@ -137,7 +139,7 @@ export const SuperAdminPanel: React.FC = () => {
             haptic('success');
             playSound('notification');
         } catch (error) {
-            console.error('Error toggling status:', error);
+            logger.error('Error toggling status:', error, 'SuperAdminPanel');
             haptic('error');
         }
     };
@@ -245,7 +247,7 @@ export const SuperAdminPanel: React.FC = () => {
                                                     {tenant.info.status === 'active' ? ' نشط' : ' موقوف'}
                                                 </p>
                                                 <p className="text-xs text-white/40 mt-1">
-                                                    تم الإنشاء: {tenant.info.createdAt.toDate().toLocaleDateString('ar-SA')}
+                                                    تم الإنشاء: {formatDateGregorianEn(tenant.info.createdAt.toDate())}
                                                 </p>
                                             </div>
                                         </div>

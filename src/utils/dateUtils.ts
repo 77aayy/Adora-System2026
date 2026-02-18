@@ -48,16 +48,19 @@ export function formatDualDate(
     
     const parts: string[] = [];
     
-    // التاريخ الميلادي
+    // التاريخ الميلادي + أرقام إنجليزية (0-9)
     if (showGregorian) {
-        const gregorianOptions: Intl.DateTimeFormatOptions = dateStyle === 'full'
-            ? { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }
-            : dateStyle === 'long'
-            ? { year: 'numeric', month: 'long', day: 'numeric' }
-            : dateStyle === 'short'
-            ? { year: '2-digit', month: 'numeric', day: 'numeric' }
-            : { year: 'numeric', month: 'short', day: 'numeric' };
-        
+        const gregorianOptions: Intl.DateTimeFormatOptions = {
+            calendar: 'gregory',
+            numberingSystem: 'latn',
+            ...(dateStyle === 'full'
+                ? { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }
+                : dateStyle === 'long'
+                ? { year: 'numeric', month: 'long', day: 'numeric' }
+                : dateStyle === 'short'
+                ? { year: '2-digit', month: 'numeric', day: 'numeric' }
+                : { year: 'numeric', month: 'short', day: 'numeric' }),
+        };
         parts.push(dateObj.toLocaleDateString('ar-EG', gregorianOptions));
     }
     
@@ -86,6 +89,161 @@ export function formatGregorianDate(
     style: 'full' | 'long' | 'medium' | 'short' = 'medium'
 ): string {
     return formatDualDate(date, { showGregorian: true, showHijri: false, dateStyle: style });
+}
+
+/** خيارات تنسيق موحّدة: تقويم ميلادي + أرقام عربية (٠١٢٣٤٥٦٧٨٩) في كل المشروع */
+const GREGORIAN_AR_OPTIONS: Intl.DateTimeFormatOptions = {
+    calendar: 'gregory',
+    numberingSystem: 'arab',
+};
+
+/**
+ * 📅 ميلادي فقط + أرقام عربية (للعرض في كل المشروع عند اللغة العربية)
+ * Gregorian calendar, Arabic numerals (٠١٢٣٤٥٦٧٨٩).
+ */
+export function formatDateGregorianAr(
+    date: Date | string | number | { toDate: () => Date } | any,
+    style: 'full' | 'long' | 'medium' | 'short' = 'long'
+): string {
+    let dateObj: Date;
+    if (date instanceof Date) {
+        dateObj = date;
+    } else if (typeof date === 'string' || typeof date === 'number') {
+        dateObj = new Date(date);
+    } else if (date?.toDate && typeof date.toDate === 'function') {
+        dateObj = date.toDate();
+    } else if (date?.seconds != null) {
+        dateObj = new Date(date.seconds * 1000);
+    } else {
+        return '—';
+    }
+    if (isNaN(dateObj.getTime())) return '—';
+    const opts: Intl.DateTimeFormatOptions = {
+        ...GREGORIAN_AR_OPTIONS,
+        ...(style === 'full'
+            ? { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }
+            : style === 'long'
+            ? { year: 'numeric', month: 'long', day: 'numeric' }
+            : style === 'short'
+            ? { year: '2-digit', month: 'numeric', day: 'numeric' }
+            : { year: 'numeric', month: 'short', day: 'numeric' }),
+    };
+    return dateObj.toLocaleDateString('ar-EG', opts);
+}
+
+/**
+ * 📅 وقت فقط: ميلادي + أرقام عربية
+ */
+export function formatTimeGregorianAr(
+    date: Date | string | number | { toDate: () => Date } | any,
+    options: { showSeconds?: boolean; hour12?: boolean } = {}
+): string {
+    let dateObj: Date;
+    if (date instanceof Date) {
+        dateObj = date;
+    } else if (typeof date === 'string' || typeof date === 'number') {
+        dateObj = new Date(date);
+    } else if (date?.toDate && typeof date.toDate === 'function') {
+        dateObj = date.toDate();
+    } else if (date?.seconds != null) {
+        dateObj = new Date(date.seconds * 1000);
+    } else {
+        return '—';
+    }
+    if (isNaN(dateObj.getTime())) return '—';
+    const { showSeconds = true, hour12 = true } = options;
+    return dateObj.toLocaleTimeString('ar-EG', {
+        ...GREGORIAN_AR_OPTIONS,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: showSeconds ? '2-digit' : undefined,
+        hour12,
+    });
+}
+
+/**
+ * 📅 تاريخ + وقت: ميلادي + أرقام عربية
+ */
+export function formatDateTimeGregorianAr(
+    date: Date | string | number | { toDate: () => Date } | any,
+    options: { dateStyle?: 'full' | 'long' | 'short'; showSeconds?: boolean } = {}
+): string {
+    const d = formatDateGregorianAr(date, options.dateStyle ?? 'long');
+    const t = formatTimeGregorianAr(date, { showSeconds: options.showSeconds ?? true });
+    return `${d} ${t}`;
+}
+
+/**
+ * 📅 ميلادي فقط + أرقام إنجليزي (للعرض الموحد في المشروع)
+ * Gregorian only, English numerals (0-9). Arabic month/weekday names when style allows.
+ */
+export function formatDateGregorianEn(
+    date: Date | string | number | { toDate: () => Date } | any,
+    style: 'full' | 'long' | 'medium' | 'short' = 'long'
+): string {
+    let dateObj: Date;
+    if (date instanceof Date) {
+        dateObj = date;
+    } else if (typeof date === 'string' || typeof date === 'number') {
+        dateObj = new Date(date);
+    } else if (date?.toDate && typeof date.toDate === 'function') {
+        dateObj = date.toDate();
+    } else if (date?.seconds != null) {
+        dateObj = new Date(date.seconds * 1000);
+    } else {
+        return '—';
+    }
+    if (isNaN(dateObj.getTime())) return '—';
+    const day = dateObj.getDate();
+    const year = dateObj.getFullYear();
+    const month = dateObj.toLocaleDateString('ar-SA', { month: 'long', calendar: 'gregory' });
+    if (style === 'full') {
+        const weekday = dateObj.toLocaleDateString('ar-SA', { weekday: 'long', calendar: 'gregory' });
+        return `${weekday} ${day} ${month} ${year}`;
+    }
+    if (style === 'short') return `${day}/${dateObj.getMonth() + 1}/${year}`;
+    /* long | medium */
+    return `${day} ${month} ${year}`;
+}
+
+/** ميلادي + أرقام إنجليزية (0-9) للوقت فقط */
+export function formatTimeGregorianEn(
+    date: Date | string | number | { toDate: () => Date } | any,
+    options: { showSeconds?: boolean; hour12?: boolean } = {}
+): string {
+    let dateObj: Date;
+    if (date instanceof Date) {
+        dateObj = date;
+    } else if (typeof date === 'string' || typeof date === 'number') {
+        dateObj = new Date(date);
+    } else if (date?.toDate && typeof date.toDate === 'function') {
+        dateObj = date.toDate();
+    } else if (date?.seconds != null) {
+        dateObj = new Date(date.seconds * 1000);
+    } else {
+        return '—';
+    }
+    if (isNaN(dateObj.getTime())) return '—';
+    const { showSeconds = true, hour12 = true } = options;
+    return dateObj.toLocaleTimeString('ar-EG', {
+        calendar: 'gregory',
+        numberingSystem: 'latn',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: showSeconds ? '2-digit' : undefined,
+        hour12,
+    });
+}
+
+/** ميلادي + أرقام إنجليزية: تاريخ ووقت */
+export function formatDateTimeGregorianEn(
+    date: Date | string | number | { toDate: () => Date } | any,
+    options: { dateStyle?: 'full' | 'long' | 'short'; showSeconds?: boolean } = {}
+): string {
+    const style = options.dateStyle ?? 'long';
+    const d = formatDateGregorianEn(date, style === 'medium' ? 'long' : style);
+    const t = formatTimeGregorianEn(date, { showSeconds: options.showSeconds ?? true });
+    return `${d} ${t}`;
 }
 
 /**
@@ -143,6 +301,7 @@ export function formatTime(
         minute: '2-digit',
         second: showSeconds ? '2-digit' : undefined,
         hour12: !use24Hour,
+        ...(finalLocale.startsWith('ar') ? { numberingSystem: 'latn' as const } : {}),
     };
     
     return dateObj.toLocaleTimeString(finalLocale, timeOptions);
@@ -162,17 +321,19 @@ export function formatDateTimeWithLocale(
     }
     
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    const locale = currentLanguage === 'ar' ? 'ar-SA' : 
+    const locale = currentLanguage === 'ar' ? 'ar-EG' : 
                    currentLanguage === 'hi' ? 'hi-IN' : 
                    currentLanguage === 'bn' ? 'bn-BD' : 'en-US';
     
-    return date.toLocaleString(locale, {
+    const opts: Intl.DateTimeFormatOptions = {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
-    });
+        minute: '2-digit',
+        ...(currentLanguage === 'ar' ? { calendar: 'gregory', numberingSystem: 'latn' } : {}),
+    };
+    return date.toLocaleString(locale, opts);
 }
 
 /**
@@ -308,6 +469,12 @@ export function timestampToDate(timestamp: any): Date | null {
 export default {
     formatDualDate,
     formatGregorianDate,
+    formatDateGregorianAr,
+    formatTimeGregorianAr,
+    formatDateTimeGregorianAr,
+    formatDateGregorianEn,
+    formatTimeGregorianEn,
+    formatDateTimeGregorianEn,
     formatHijriDate,
     formatTime,
     formatDateTime,

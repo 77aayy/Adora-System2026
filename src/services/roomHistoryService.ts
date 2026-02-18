@@ -13,6 +13,7 @@ import { db } from './firebase';
 import {
     collection, getDocs, query, where, orderBy, limit, Timestamp
 } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -143,7 +144,7 @@ export const loadCleaningHistory = async (
 
         return records.slice(0, maxResults);
     } catch (error) {
-        console.error('Error loading cleaning history:', error);
+        logger.error('Error loading cleaning history:', error, 'roomHistoryService');
         return [];
     }
 };
@@ -182,7 +183,7 @@ export const loadRequestsHistory = async (
 
         return records.slice(0, maxResults);
     } catch (error) {
-        console.error('Error loading requests history:', error);
+        logger.error('Error loading requests history:', error, 'roomHistoryService');
         return [];
     }
 };
@@ -221,7 +222,7 @@ export const loadMaintenanceHistory = async (
 
         return records.slice(0, maxResults);
     } catch (error) {
-        console.error('Error loading maintenance history:', error);
+        logger.error('Error loading maintenance history:', error, 'roomHistoryService');
         return [];
     }
 };

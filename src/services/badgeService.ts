@@ -6,6 +6,7 @@
 
 import { db } from './firebase';
 import { collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -44,16 +45,18 @@ let unsubscribers: (() => void)[] = [];
 // ============================================================
 
 /**
- * Initialize badge service
+ * Initialize badge service (tenant-scoped requests)
  */
 export const initBadgeService = (
+    tenantId: string,
     userId: string,
     branch: string,
     department: string
 ): void => {
-    // Subscribe to pending requests
+    if (!tenantId) return;
+    const requestsRef = collection(db, `tenants/${tenantId}/requests`);
     const requestsQuery = query(
-        collection(db, 'requests'),
+        requestsRef,
         where('branch', '==', branch),
         where('status', 'in', ['PENDING', 'CONFIRMED']),
         orderBy('createdAt', 'desc')
@@ -92,7 +95,7 @@ export const initBadgeService = (
 
     unsubscribers.push(unsubNotifications);
 
-    console.log('✅ Badge service initialized');
+    logger.info('✅ Badge service initialized', undefined, 'badgeService');
 };
 
 /**
@@ -325,18 +328,18 @@ const playNotificationSound = (): void => {
 
 import { useState, useEffect } from 'react';
 
-export const useNotificationBadge = (userId: string, branch: string, department: string) => {
+export const useNotificationBadge = (tenantId: string, userId: string, branch: string, department: string) => {
     const [notificationCounts, setNotificationCounts] = useState<NotificationCount>(counts);
 
     useEffect(() => {
-        initBadgeService(userId, branch, department);
+        initBadgeService(tenantId, userId, branch, department);
         const unsubscribe = subscribeToCounts(setNotificationCounts);
 
         return () => {
             unsubscribe();
             destroyBadgeService();
         };
-    }, [userId, branch, department]);
+    }, [tenantId, userId, branch, department]);
 
     return {
         ...notificationCounts,

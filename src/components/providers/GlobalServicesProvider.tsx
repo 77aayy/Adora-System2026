@@ -9,13 +9,15 @@ import { useAuth } from '../../context/AuthContext';
 import { WifiOff, Wifi, Cloud } from 'lucide-react';
 
 // Import services
-import { initOfflineSync, cleanupOfflineSync, useOfflineSync } from '../../services/offlineSyncService';
+import { initOfflineSync, cleanupOfflineSync, useOfflineSync, onOnline } from '../../services/offlineSyncService';
+import { syncOfflineCheckoutQueue } from '../../services/roomCardService';
 import { startOverdueMonitoring, stopOverdueMonitoring, useOverdueAlerts, OverdueRequest } from '../../services/overdueAlertService';
 import { startLiveTimers, stopLiveTimers } from '../../services/liveTimerService';
 import { startPendingAlerts, stopPendingAlerts, usePendingAlerts, requestNotificationPermission, PendingRequest } from '../../services/pendingAlertService';
 import { startAutoTransfer, stopAutoTransfer } from '../../services/autoTransferService';
 import { BackupScheduler } from '../common/BackupScheduler';
 import { LicenseNotificationScheduler } from '../common/LicenseNotificationScheduler';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -107,15 +109,14 @@ export const GlobalServicesProvider: React.FC<GlobalServicesProviderProps> = ({ 
                     try {
                         const { signInAnonymously } = await import('firebase/auth');
                         await signInAnonymously(auth);
-                        console.log('✅ Anonymous auth initialized at app startup');
                     } catch (authError: any) {
                         // Don't block app initialization if Anonymous Auth fails
                         // It will be retried during login
-                        console.warn('⚠️ Anonymous auth failed at startup (non-critical):', authError?.message);
+                        logger.warn('⚠️ Anonymous auth failed at startup (non-critical):', authError?.message, 'GlobalServicesProvider');
                     }
                 }
             } catch (error) {
-                console.warn('⚠️ Failed to ensure Anonymous Auth at startup:', error);
+                logger.warn('⚠️ Failed to ensure Anonymous Auth at startup:', error, 'GlobalServicesProvider');
             }
         };
         
@@ -123,6 +124,14 @@ export const GlobalServicesProvider: React.FC<GlobalServicesProviderProps> = ({ 
 
         // Initialize offline sync
         initOfflineSync();
+        // Replay room-card checkout inspection queue when back online (and once on init if online)
+        const runCheckoutQueueSync = () => {
+            syncOfflineCheckoutQueue().then(({ synced }) => {
+                if (synced > 0) logger.info('syncOfflineCheckoutQueue synced', synced, 'GlobalServicesProvider');
+            });
+        };
+        onOnline(runCheckoutQueueSync);
+        if (navigator.onLine) runCheckoutQueueSync();
 
         // Start live timers
         startLiveTimers({ updateIntervalMs: 1000 });
@@ -146,9 +155,11 @@ export const GlobalServicesProvider: React.FC<GlobalServicesProviderProps> = ({ 
             if (!user?.tenantId || !branch) return;
             try {
                 const { doc, getDoc } = await import('firebase/firestore');
-                const { db } = await import('../../services/firebase');
+                const { getSafeFirestore } = await import('../../services/firebase');
+                const safeDb = await getSafeFirestore();
+                if (!safeDb) return; // Firestore not ready; avoid collection() invalid-arg error
 
-                const settingsRef = doc(db, `tenants/${user.tenantId}/branches/${branch}/settings`, 'system');
+                const settingsRef = doc(safeDb, 'tenants', user.tenantId, 'branches', branch, 'settings', 'system');
                 const snap = await getDoc(settingsRef);
 
                 if (snap.exists()) {
@@ -165,10 +176,15 @@ export const GlobalServicesProvider: React.FC<GlobalServicesProviderProps> = ({ 
                         await startAutoTransfer(branch, user.tenantId);
                     }
                 } catch (err) {
-                    console.warn('Failed to start auto-transfer service:', err);
+                    logger.warn('Failed to start auto-transfer service:', err, 'GlobalServicesProvider');
                 }
-            } catch (error) {
-                console.error('Error loading system settings:', error);
+            } catch (error: any) {
+                const isPerm = error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient');
+                if (isPerm) {
+                    logger.debug('System settings read skipped (permission not yet ready)', undefined, 'GlobalServicesProvider');
+                } else {
+                    logger.error('Error loading system settings:', error, 'GlobalServicesProvider');
+                }
             }
         };
 

@@ -20,6 +20,8 @@ import * as PointsService from '../../services/pointsService';
 import { requestPayout, getEmployeePayoutHistory } from '../../services/payoutService';
 import { PayoutRequest } from '../../types';
 import { useTranslation } from 'react-i18next';
+import { logger } from '../../services/loggerService';
+import { formatDateTimeGregorianEn } from '../../utils/dateUtils';
 
 // ============================================================
 // TYPES
@@ -192,7 +194,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
 
             setPayoutHistory(payoutItems);
         } catch (error) {
-            console.error('Failed to load history:', error);
+            logger.error('Failed to load history:', error, 'PointsTracker');
         }
     };
 
@@ -231,12 +233,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
     const formatDate = (timestamp: any): string => {
         if (!timestamp) return '';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return date.toLocaleDateString('ar-SA', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        return formatDateTimeGregorianEn(date, { dateStyle: 'medium', showSeconds: false });
     };
 
     const getRankIcon = (rank: number) => {
@@ -338,7 +335,7 @@ export const PointsTracker: React.FC<PointsTrackerProps> = ({
                 alert(res.error || t('pointsTracker.redeemFailed'));
             }
         } catch (e) {
-            console.error(e);
+            logger.error('Error redeeming points:', e, 'PointsTracker');
         } finally {
             setRedeeming(false);
         }

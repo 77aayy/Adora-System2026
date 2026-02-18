@@ -2,8 +2,11 @@
  * Demo Factory Service
  * Creates isolated demo instances with pre-populated data
  * Adora Hotel Management System
- * 
+ *
  * SECURITY: Demo instances are completely isolated via Firebase Security Rules
+ *
+ * SaaS/tenant: Demo may use root requests/rooms for isolated demo tenants; or use
+ * tenants/${demoTenantId}/... for consistency. Document if root is intentional.
  */
 
 /** @license Property of Ayman Ahmed - Adora Hotels Management System */
@@ -22,6 +25,7 @@ import {
     deleteDoc
 } from 'firebase/firestore';
 import { signInAnonymously, signOut } from 'firebase/auth';
+import { logger } from './loggerService';
 
 // ============================================================
 // UTILITY FUNCTIONS
@@ -220,7 +224,7 @@ export const createDemoInstance = async (
             ];
             
             enhancedRooms.forEach((room, index) => {
-                const roomRef = doc(db, 'rooms', `${DEMO_BRANCH_ID}_${room.number}`);
+                const roomRef = doc(db, `tenants/${DEMO_TENANT_ID}/rooms`, `${DEMO_BRANCH_ID}_${room.number}`);
                 batch.set(roomRef, {
                     number: room.number,
                     floor: room.floor,
@@ -311,7 +315,7 @@ export const createDemoInstance = async (
             ];
             
             enhancedRequests.forEach((req, index) => {
-                const requestRef = doc(collection(db, 'requests'));
+                const requestRef = doc(collection(db, `tenants/${DEMO_TENANT_ID}/requests`));
                 batch.set(requestRef, {
                     ...req,
                     id: requestRef.id,
@@ -354,7 +358,7 @@ export const createDemoInstance = async (
             createdAt: new Date()
         };
     } catch (error) {
-        console.error('Error creating demo instance:', error);
+        logger.error('Error creating demo instance:', error, 'demoFactory');
         throw new Error('Failed to create demo instance');
     }
 };
@@ -384,7 +388,7 @@ export const clearDemoData = async (tenantId: string): Promise<{
 }> => {
     // ✅ SECURITY: Strict guard clause - only allow demo tenant IDs
     if (!tenantId || !tenantId.startsWith('demo-')) {
-        console.error('SECURITY: clearDemoData called with non-demo tenant ID:', tenantId);
+        logger.error(`SECURITY: clearDemoData called with non-demo tenant ID: ${tenantId}`, undefined, 'demoFactory');
         return {
             success: false,
             deleted: {
@@ -407,31 +411,25 @@ export const clearDemoData = async (tenantId: string): Promise<{
     };
 
     try {
-        // 1. Delete all requests for this tenant
-        const requestsQuery = query(
-            collection(db, 'requests'),
-            where('tenantId', '==', tenantId)
-        );
-        const requestsSnapshot = await getDocs(requestsQuery);
+        // 1. Delete all requests for this tenant (tenant-scoped path)
+        const requestsRef = collection(db, `tenants/${tenantId}/requests`);
+        const requestsSnapshot = await getDocs(requestsRef);
         const requestsBatch = writeBatch(db);
-        requestsSnapshot.forEach((doc) => {
-            requestsBatch.delete(doc.ref);
+        requestsSnapshot.docs.forEach((d) => {
+            requestsBatch.delete(d.ref);
             deleted.requests++;
         });
-        await requestsBatch.commit();
+        if (requestsSnapshot.docs.length > 0) await requestsBatch.commit();
 
-        // 2. Delete all rooms for this tenant
-        const roomsQuery = query(
-            collection(db, 'rooms'),
-            where('tenantId', '==', tenantId)
-        );
-        const roomsSnapshot = await getDocs(roomsQuery);
+        // 2. Delete all rooms for this tenant (tenant-scoped path)
+        const roomsRef = collection(db, `tenants/${tenantId}/rooms`);
+        const roomsSnapshot = await getDocs(roomsRef);
         const roomsBatch = writeBatch(db);
-        roomsSnapshot.forEach((doc) => {
-            roomsBatch.delete(doc.ref);
+        roomsSnapshot.docs.forEach((d) => {
+            roomsBatch.delete(d.ref);
             deleted.rooms++;
         });
-        await roomsBatch.commit();
+        if (roomsSnapshot.docs.length > 0) await roomsBatch.commit();
 
         // 3. Delete all employees for this tenant
         const employeesQuery = query(
@@ -469,9 +467,9 @@ export const clearDemoData = async (tenantId: string): Promise<{
         try {
             localStorage.clear();
             sessionStorage.clear();
-            console.log('✅ Zero-Trace: All localStorage and sessionStorage cleared');
+            logger.info('✅ Zero-Trace: All localStorage and sessionStorage cleared', undefined, 'demoFactory');
         } catch (clearError) {
-            console.warn('Warning: Could not clear all storage:', clearError);
+            logger.warn('Warning: Could not clear all storage:', clearError, 'demoFactory');
             // Fallback: Remove only demo-related keys
             const keysToRemove: string[] = [];
             for (let i = 0; i < localStorage.length; i++) {
@@ -502,7 +500,7 @@ export const clearDemoData = async (tenantId: string): Promise<{
             deleted
         };
     } catch (error: any) {
-        console.error('Error clearing demo data:', error);
+        logger.error('Error clearing demo data:', error, 'demoFactory');
         return {
             success: false,
             deleted,
@@ -607,7 +605,7 @@ export const autoLoginDemoManager = async (tenantId?: string, branchId?: string)
             isDemo: true
         };
     } catch (error) {
-        console.error('Error auto-logging in demo manager:', error);
+        logger.error('Error auto-logging in demo manager:', error, 'demoFactory');
         throw error;
     }
 };

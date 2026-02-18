@@ -1,101 +1,38 @@
 /**
- * i18n Configuration
+ * i18n Re-exports & metadata
  * Adora Hotel Management System V2
- * Supports: Arabic, English, Hindi, Bengali
+ * Does NOT init i18n - app uses src/i18n.ts with full src/locales/ resources.
+ * This file only exports LANGUAGES and utils that use the main i18n instance.
  */
 
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
-
-// Import translations
-import ar from './locales/ar.json';
-import en from './locales/en.json';
-import hi from './locales/hi.json';
-import bn from './locales/bn.json';
-
-// ============================================================
-// CONFIGURATION
-// ============================================================
-
-const resources = {
-    ar: { translation: ar },
-    en: { translation: en },
-    hi: { translation: hi },
-    bn: { translation: bn },
-};
+import i18n from '../i18n';
 
 // RTL languages
 export const RTL_LANGUAGES = ['ar'];
 
 // Language metadata
 export const LANGUAGES = [
-    { code: 'ar', name: 'العربية', nativeName: 'العربية', dir: 'rtl' },
-    { code: 'en', name: 'English', nativeName: 'English', dir: 'ltr' },
-    { code: 'hi', name: 'हिंदी', nativeName: 'हिंदी', dir: 'ltr' },
-    { code: 'bn', name: 'বাংলা', nativeName: 'বাংলা', dir: 'ltr' },
+    { code: 'ar', name: 'العربية', nativeName: 'العربية', dir: 'rtl' as const },
+    { code: 'en', name: 'English', nativeName: 'English', dir: 'ltr' as const },
+    { code: 'hi', name: 'हिंदी', nativeName: 'हिंदी', dir: 'ltr' as const },
+    { code: 'bn', name: 'বাংলা', nativeName: 'বাংলা', dir: 'ltr' as const },
 ];
 
-// ============================================================
-// INIT
-// ============================================================
+export const isRTL = (): boolean => RTL_LANGUAGES.includes(i18n.language);
 
-i18n
-    .use(LanguageDetector)
-    .use(initReactI18next)
-    .init({
-        resources,
-        fallbackLng: 'ar',
-        defaultNS: 'translation',
-        interpolation: {
-            escapeValue: false,
-        },
-        detection: {
-            order: ['localStorage', 'navigator'],
-            caches: ['localStorage'],
-        },
-    });
+export const getDirection = (): 'rtl' | 'ltr' => (isRTL() ? 'rtl' : 'ltr');
 
-// ============================================================
-// UTILITIES
-// ============================================================
-
-/**
- * Check if current language is RTL
- */
-export const isRTL = (): boolean => {
-    return RTL_LANGUAGES.includes(i18n.language);
-};
-
-/**
- * Get current language direction
- */
-export const getDirection = (): 'rtl' | 'ltr' => {
-    return isRTL() ? 'rtl' : 'ltr';
-};
-
-/**
- * Update document direction based on language
- */
 export const updateDirection = (lang: string): void => {
     const dir = RTL_LANGUAGES.includes(lang) ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', dir);
     document.documentElement.setAttribute('lang', lang);
 };
 
-/**
- * Change language and update document direction
- */
 export const changeLanguage = async (lang: string): Promise<void> => {
     await i18n.changeLanguage(lang);
     updateDirection(lang);
 };
 
-/**
- * Get current language
- */
-export const getCurrentLanguage = (): string => {
-    return i18n.language;
-};
+export const getCurrentLanguage = (): string => i18n.language;
 
 export default i18n;

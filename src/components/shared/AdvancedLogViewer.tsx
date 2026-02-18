@@ -17,6 +17,7 @@ import { AdoraLoader } from '../common/AdoraLoader';
 import { useUX } from '../../context/UXContext';
 import { useTranslation } from 'react-i18next';
 import { useTenantData, useTenantBranches } from '../../hooks/useTenantData';
+import { formatDateGregorianEn, formatDateTimeGregorianEn } from '../../utils/dateUtils';
 import {
     getLogs, getLogStats, subscribeToLogs, downloadCSV, printLogs,
     AdvancedLogEntry, LogFilter, LogStats, LogCategory, LogSeverity, LogAction,
@@ -223,7 +224,7 @@ export const AdvancedLogViewer: React.FC<AdvancedLogViewerProps> = ({
     
     const handlePrint = () => {
         const { start, end } = getDateRange(period);
-        const dateRange = `${t('common.from') || 'من'} ${start.toLocaleDateString('ar-SA')} ${t('common.to') || 'إلى'} ${end.toLocaleDateString('ar-SA')}`;
+        const dateRange = `${t('common.from') || 'من'} ${formatDateGregorianEn(start)} ${t('common.to') || 'إلى'} ${formatDateGregorianEn(end)}`;
         
         const hotelName = activeTenant?.name || t('common.adoraHotel') || 'فندق أدورا';
         const branchName = branches.find(b => b.id === selectedBranch)?.name;
@@ -658,7 +659,7 @@ const LogItem: React.FC<{
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                         <div>
                             <span className="text-white/40 text-xs">التاريخ والوقت</span>
-                            <p className="text-white">{log.timestamp.toLocaleString('ar-SA')}</p>
+                            <p className="text-white">{formatDateTimeGregorianEn(log.timestamp, { showSeconds: false })}</p>
                         </div>
                         <div>
                             <span className="text-white/40 text-xs">نوع الهدف</span>
@@ -725,7 +726,7 @@ const TimelineView: React.FC<{ logs: AdvancedLogEntry[] }> = ({ logs }) => {
     const groupedLogs = useMemo(() => {
         const groups: Record<string, AdvancedLogEntry[]> = {};
         logs.forEach(log => {
-            const dateKey = log.timestamp.toLocaleDateString('ar-SA');
+            const dateKey = formatDateGregorianEn(log.timestamp instanceof Date ? log.timestamp : (log.timestamp?.toDate?.() ?? new Date(log.timestamp)));
             if (!groups[dateKey]) groups[dateKey] = [];
             groups[dateKey].push(log);
         });

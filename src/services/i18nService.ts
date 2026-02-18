@@ -7,6 +7,7 @@
 import { db } from './firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { generateAIContent } from './ai/geminiService';
+import { logger } from './loggerService';
 
 // Import Locales
 import enLocale from '../i18n/locales/en.json';
@@ -171,7 +172,7 @@ export const initI18n = async (lang: Language = 'ar'): Promise<void> => {
             translations[l] = { ...translations[l], ...custom };
         }
     } catch (error) {
-        console.warn('Using default translations:', error);
+        logger.warn('Using default translations:', error, 'i18nService');
     }
 
     setLanguage(lang);

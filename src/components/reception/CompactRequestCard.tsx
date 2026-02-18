@@ -51,6 +51,8 @@ export const CompactRequestCard: React.FC<CompactRequestCardProps> = React.memo(
     const isDelayed = request.status !== 'COMPLETED' && request.createdAt && 
         (Date.now() - (request.createdAt.toDate ? request.createdAt.toDate() : new Date(request.createdAt)).getTime()) > 30 * 60000;
     const isQR = request.source === 'QR';
+    // ✅ Reception Alert: Turquoise border when action required
+    const isActionRequiredByReception = (request as any).isActionRequiredByReception || false;
     
     return (
         <div
@@ -59,7 +61,9 @@ export const CompactRequestCard: React.FC<CompactRequestCardProps> = React.memo(
                 p-3 rounded-xl cursor-pointer
                 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]
                 adora-card border shadow-sm
-                ${isUrgent ? 'border-red-500/50 ring-1 ring-red-500/30' : 'adora-border'}
+                ${isActionRequiredByReception ? 'border-teal-500 ring-2 ring-teal-500/30 reception-alert-pulse' : ''}
+                ${isUrgent ? 'border-red-500/50 ring-1 ring-red-500/30' : ''}
+                ${!isActionRequiredByReception && !isUrgent ? 'adora-border' : ''}
                 ${isDelayed ? 'border-orange-500/50 ring-1 ring-orange-500/30' : ''}
                 ${isQR ? 'border-teal-500/50' : ''}
             `}

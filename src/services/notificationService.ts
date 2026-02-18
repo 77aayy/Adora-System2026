@@ -151,7 +151,7 @@ export const sendNotificationToDepartment = async (
  */
 export const requestNotificationPermission = async (): Promise<boolean> => {
     if (!('Notification' in window)) {
-        console.warn('Browser does not support notifications');
+        logger.warn('Browser does not support notifications', undefined, 'notificationService');
         return false;
     }
 

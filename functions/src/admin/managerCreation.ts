@@ -297,10 +297,9 @@ export const createManager = functions.https.onCall(async (data: CreateManagerRe
       // Don't fail manager creation - achievements can be created later
     }
 
-    // ✅ Create financial documents (if not demo)
+    // ✅ Create financial documents: سند قبض + فاتورة (if not demo)
     if (!data.isDemo) {
       try {
-        // Get system settings
         const settingsDoc = await db.collection('system').doc('settings').get();
         const settings = settingsDoc.exists ? settingsDoc.data() : {};
         const subscriptionPricePerBranch = settings?.defaultSubscriptionPrice || 1000;
@@ -310,43 +309,107 @@ export const createManager = functions.https.onCall(async (data: CreateManagerRe
         const baseAmount = subscriptionPricePerBranch * subscriptionDuration * numberOfBranches;
         let discountAmount = 0;
         let discountRate = 0;
-        
         if (subscriptionDuration === 2 && settings?.twoYearDiscountRate) {
           discountRate = settings.twoYearDiscountRate;
           discountAmount = (baseAmount * discountRate) / 100;
         }
-
         const totalAmount = baseAmount - discountAmount;
         const firstBranchCode = data.branchCodes?.[0] || '1';
         const firstBranchName = data.branchNames?.[firstBranchCode] || `فرع ${firstBranchCode}`;
 
-        // Create receipt voucher
+        // Next voucher number (so لوحة الفوترة تظهر السند)
+        let voucherNumber = 1;
+        try {
+          const vouchersSnap = await db.collection('receiptVouchers').get();
+          vouchersSnap.docs.forEach(d => {
+            const n = d.data()?.voucherNumber;
+            if (typeof n === 'number' && n >= voucherNumber) voucherNumber = n + 1;
+          });
+        } catch (_) { /* keep 1 */ }
+
+        const now = admin.firestore.FieldValue.serverTimestamp();
         const receiptRef = db.collection('receiptVouchers').doc();
         await receiptRef.set({
-          tenantId: tenantId,
+          tenantId,
           managerName: data.name,
           managerCode: data.code,
           branchCode: firstBranchCode,
           branchName: firstBranchName,
-          totalAmount: totalAmount,
+          totalAmount,
           subscriptionPrice: subscriptionPricePerBranch,
-          numberOfBranches: numberOfBranches,
-          subscriptionDuration: subscriptionDuration,
+          numberOfBranches,
+          subscriptionDuration,
           currency: 'SAR',
           paymentMethod: data.paymentMethod || 'deferred',
-          notes: discountAmount > 0 
+          notes: discountAmount > 0
             ? `اشتراك جديد - ${numberOfBranches} فرع - خصم ${discountRate}% للسنتين`
             : `اشتراك جديد - ${numberOfBranches} فرع`,
           discountAmount: discountAmount > 0 ? discountAmount : null,
           discountRate: discountRate > 0 ? discountRate : null,
           createdBy: 'owner',
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
+          voucherNumber,
+          isDeleted: false,
+          createdAt: now
         });
 
-        console.log(`✅ Receipt voucher created for manager ${managerId}`);
+        // إنشاء الفاتورة تلقائياً (مثل createInvoiceFromReceiptVoucher)
+        const taxRate = 15;
+        const amountBeforeDiscount = discountAmount ? totalAmount + discountAmount : totalAmount;
+        const subtotal = amountBeforeDiscount / (1 + taxRate / 100);
+        const taxAmount = amountBeforeDiscount - subtotal;
+        const basePrice = (subtotal / numberOfBranches) / subscriptionDuration;
+        const items: Array<{ description: string; quantity: number; price: number }> = [{
+          description: `اشتراك ${subscriptionDuration === 1 ? 'سنة واحدة' : 'سنتين'} - ${firstBranchName} (${firstBranchCode})`,
+          quantity: numberOfBranches * subscriptionDuration,
+          price: basePrice
+        }];
+        if (discountAmount > 0) {
+          items.push({
+            description: `خصم ${discountRate}% للاشتراك سنتين`,
+            quantity: 1,
+            price: -discountAmount
+          });
+        }
+        let invoiceNumber = 1;
+        try {
+          const invSnap = await db.collection('invoices').get();
+          invSnap.docs.forEach(d => {
+            const n = d.data()?.invoiceNumber;
+            if (typeof n === 'number' && n >= invoiceNumber) invoiceNumber = n + 1;
+          });
+        } catch (_) { /* keep 1 */ }
+        const invoiceNotes = discountAmount > 0
+          ? `فاتورة ضريبية مقابلة لسند قبض رقم ${voucherNumber} - خصم ${discountRate}% للاشتراك سنتين`
+          : `فاتورة ضريبية مقابلة لسند قبض رقم ${voucherNumber}`;
+        await db.collection('invoices').add({
+          receiptVoucherId: receiptRef.id,
+          tenantId,
+          amount: totalAmount,
+          currency: 'SAR',
+          status: 'paid',
+          issueDate: now,
+          dueDate: now,
+          paidDate: now,
+          items,
+          paymentMethod: data.paymentMethod || 'deferred',
+          managerName: data.name,
+          managerCode: data.code,
+          branchCode: firstBranchCode,
+          branchName: firstBranchName,
+          numberOfBranches,
+          subscriptionDuration,
+          subtotal,
+          taxAmount,
+          totalAmount,
+          notes: invoiceNotes,
+          invoiceNumber,
+          isDeleted: false,
+          createdAt: now
+        });
+
+        console.log(`✅ Receipt voucher + invoice created for manager ${managerId}`);
       } catch (financialError: any) {
         console.warn('Failed to create financial documents (non-critical):', financialError);
-        // Don't fail manager creation
       }
     }
 

@@ -59,7 +59,7 @@ export const loadMinibarProducts = async (tenantId?: string): Promise<MinibarPro
         // Return defaults if no products found
         return getDefaultMinibarProducts();
     } catch (error) {
-        console.error('Error loading minibar products:', error);
+        logger.error('Error loading minibar products:', error, 'minibarService');
         return getDefaultMinibarProducts();
     }
 };
@@ -90,7 +90,7 @@ export const saveMinibarProducts = async (
             updatedBy: userId
         }, { merge: true });
     } catch (error) {
-        console.error('Error saving minibar products:', error);
+        logger.error('Error saving minibar products:', error, 'minibarService');
         throw error;
     }
 };

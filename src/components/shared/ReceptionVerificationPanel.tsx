@@ -11,6 +11,7 @@ import { db } from '../../services/firebase';
 import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp, getDoc } from 'firebase/firestore';
 import { calculateVerificationPoints, getVerificationPointsMessage } from '../../utils/pointsCalculator';
 import { awardPoints } from '../../services/pointsService';
+import { logger } from '../../services/loggerService';
 
 // ============================================================
 // TYPES
@@ -66,7 +67,7 @@ export const ReceptionVerificationPanel: React.FC<ReceptionVerificationPanelProp
                     setSettings(settingsSnap.data());
                 }
             } catch (error) {
-                console.error('Error loading settings:', error);
+                logger.error('Error loading settings:', error, 'ReceptionVerificationPanel');
             }
         };
         loadSettings();
@@ -93,7 +94,7 @@ export const ReceptionVerificationPanel: React.FC<ReceptionVerificationPanelProp
             setVerifications(data);
             setLoading(false); // ✅ Always set loading to false
         }, (error) => {
-            console.error('Error loading verifications:', error);
+            logger.error('Error loading verifications:', error, 'ReceptionVerificationPanel');
             setLoading(false); // ✅ Set loading false on error too
         });
 
@@ -150,9 +151,9 @@ export const ReceptionVerificationPanel: React.FC<ReceptionVerificationPanelProp
                 `تحقق من النزيل - غرفة ${verification.roomNumber}`
             );
 
-            console.log('✅ Verification approved:', getVerificationPointsMessage(points));
+            logger.info('✅ Verification approved:', getVerificationPointsMessage(points), 'ReceptionVerificationPanel');
         } catch (error) {
-            console.error('Error approving verification:', error);
+            logger.error('Error approving verification:', error, 'ReceptionVerificationPanel');
         }
     };
 
@@ -166,9 +167,9 @@ export const ReceptionVerificationPanel: React.FC<ReceptionVerificationPanelProp
                 rejectedAt: Timestamp.now()
             });
 
-            console.log('❌ Verification rejected');
+            logger.info('❌ Verification rejected', undefined, 'ReceptionVerificationPanel');
         } catch (error) {
-            console.error('Error rejecting verification:', error);
+            logger.error('Error rejecting verification:', error, 'ReceptionVerificationPanel');
         }
     };
 
@@ -200,9 +201,9 @@ export const ReceptionVerificationPanel: React.FC<ReceptionVerificationPanelProp
                 );
             }
 
-            console.log('⏱️ Auto-approved:', getVerificationPointsMessage(points));
+            logger.info('⏱️ Auto-approved:', getVerificationPointsMessage(points), 'ReceptionVerificationPanel');
         } catch (error) {
-            console.error('Error auto-approving verification:', error);
+            logger.error('Error auto-approving verification:', error, 'ReceptionVerificationPanel');
         }
     };
 

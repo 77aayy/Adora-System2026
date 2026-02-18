@@ -163,7 +163,7 @@ export const generateSecureAccessToken = async (
     const baseUrl = window.location.origin;
     const fullUrl = `${baseUrl}/guest?t=${token}`;
     
-    console.log(`🔐 Secure token generated for Room ${roomNumber}`);
+    logger.info(`🔐 Secure token generated for Room ${roomNumber}`, undefined, 'secureAccessService');
     
     return { token, fullUrl };
 };
@@ -194,7 +194,7 @@ const deactivateExistingTokens = async (
         
         await Promise.all(deactivatePromises);
     } catch (error) {
-        console.error('Error deactivating existing tokens:', error);
+        logger.error('Error deactivating existing tokens:', error, 'secureAccessService');
     }
 };
 
@@ -214,7 +214,7 @@ export const validateSecureAccessToken = async (
     logger.debug('Starting token validation', { tokenLength: token.length }, 'secureAccessService');
     
     if (!db) {
-        console.error(`🔍 [validateSecureAccessToken] Firebase db is null!`);
+        logger.error(`🔍 [validateSecureAccessToken] Firebase db is null!`, undefined, 'secureAccessService');
         return { 
             valid: false, 
             error: 'النظام غير متاح حالياً', 
@@ -223,7 +223,7 @@ export const validateSecureAccessToken = async (
     }
     
     if (!token || token.length < 20) {
-        console.warn(`🔍 [validateSecureAccessToken] Token too short: ${token?.length || 0} chars`);
+        logger.warn(`🔍 [validateSecureAccessToken] Token too short: ${token?.length || 0} chars`, undefined, 'secureAccessService');
         return { 
             valid: false, 
             error: 'رابط الوصول غير صالح', 
@@ -332,7 +332,7 @@ export const validateSecureAccessToken = async (
                     tenantId
                 );
                 
-                console.log(`🔍 [QR Validation] Room card check result:`, {
+                logger.info(`🔍 [QR Validation] Room card check result:`, {
                     valid: roomCardValid.valid,
                     error: roomCardValid.error,
                     guestName: roomCardValid.guestName
@@ -380,7 +380,7 @@ export const validateSecureAccessToken = async (
         };
         
     } catch (error) {
-        console.error('Token validation error:', error);
+        logger.error('Token validation error:', error, 'secureAccessService');
         return { 
             valid: false, 
             error: 'عذراً، حدث خطأ تقني غير متوقع أثناء التحقق من الرابط.\n\nيرجى المحاولة مرة أخرى بعد قليل. إذا استمرت المشكلة، يرجى التواصل مع الاستقبال وسنسعد بمساعدتك فوراً.', 
@@ -403,65 +403,44 @@ const verifyActiveCheckIn = async (
         // Check for active room card
         // ✅ FIX: tenantId is optional in roomCards - some old records may not have it
         // ✅ FIX: branch might be stored as 'branch' or 'branchId' in roomCards
-        console.log(`🔍 [verifyActiveCheckIn] Searching for room card: Room ${roomNumber}, Branch ${branchId}, Tenant ${tenantId || 'not provided'}`);
-        const roomCardsRef = collection(db, 'roomCards');
+        logger.info(`🔍 [verifyActiveCheckIn] Searching for room card: Room ${roomNumber}, Branch ${branchId}, Tenant ${tenantId || 'not provided'}`, undefined, 'secureAccessService');
+        const roomCardsRef = tenantId
+            ? collection(db, `tenants/${tenantId}/roomCards`)
+            : collection(db, 'roomCards');
         
-        // ✅ Try multiple query strategies to find the room card
         let snapshot: any = null;
         let foundRoomCard: any = null;
         
-        // Strategy 1: Search by branch (most common)
         const constraints1: any[] = [
             where('roomNumber', '==', roomNumber),
-            where('branch', '==', branchId),
-            where('status', '==', 'active')
+            where('status', '==', 'active'),
+            where('branch', '==', branchId)
         ];
-        if (tenantId) {
-            constraints1.push(where('tenantId', '==', tenantId));
-        }
         const q1 = query(roomCardsRef, ...constraints1);
         snapshot = await getDocs(q1);
-        console.log(`🔍 [verifyActiveCheckIn] Query 1 (branch=${branchId}): ${snapshot.size} result(s)`);
+        logger.info(`🔍 [verifyActiveCheckIn] Query 1 (branch=${branchId}): ${snapshot.size} result(s)`, undefined, 'secureAccessService');
         
-        // Strategy 2: If no results, try without tenantId filter
-        if (snapshot.empty && tenantId) {
-            console.log(`🔍 [verifyActiveCheckIn] Trying without tenantId filter...`);
-            const constraints2 = [
-                where('roomNumber', '==', roomNumber),
-                where('branch', '==', branchId),
-                where('status', '==', 'active')
-            ];
-            const q2 = query(roomCardsRef, ...constraints2);
-            snapshot = await getDocs(q2);
-            console.log(`🔍 [verifyActiveCheckIn] Query 2 (no tenantId): ${snapshot.size} result(s)`);
-        }
-        
-        // Strategy 3: If still no results, try searching by branchId field (some roomCards might use branchId instead of branch)
         if (snapshot.empty) {
-            console.log(`🔍 [verifyActiveCheckIn] Trying with branchId field...`);
-            const constraints3: any[] = [
+            const constraints2 = [
                 where('roomNumber', '==', roomNumber),
                 where('branchId', '==', branchId),
                 where('status', '==', 'active')
             ];
-            if (tenantId) {
-                constraints3.push(where('tenantId', '==', tenantId));
-            }
-            const q3 = query(roomCardsRef, ...constraints3);
-            snapshot = await getDocs(q3);
-            console.log(`🔍 [verifyActiveCheckIn] Query 3 (branchId=${branchId}): ${snapshot.size} result(s)`);
+            const q2 = query(roomCardsRef, ...constraints2);
+            snapshot = await getDocs(q2);
+            logger.info(`🔍 [verifyActiveCheckIn] Query 2 (branchId): ${snapshot.size} result(s)`, undefined, 'secureAccessService');
         }
         
         // Strategy 4: If still no results, try just roomNumber and status (last resort)
         if (snapshot.empty) {
-            console.log(`🔍 [verifyActiveCheckIn] Trying with roomNumber only (last resort)...`);
+            logger.info(`🔍 [verifyActiveCheckIn] Trying with roomNumber only (last resort)...`, undefined, 'secureAccessService');
             const constraints4 = [
                 where('roomNumber', '==', roomNumber),
                 where('status', '==', 'active')
             ];
             const q4 = query(roomCardsRef, ...constraints4);
             snapshot = await getDocs(q4);
-            console.log(`🔍 [verifyActiveCheckIn] Query 4 (roomNumber only): ${snapshot.size} result(s)`);
+            logger.info(`🔍 [verifyActiveCheckIn] Query 4 (roomNumber only): ${snapshot.size} result(s)`, undefined, 'secureAccessService');
             
             // If we found results, verify branch matches manually
             if (!snapshot.empty) {
@@ -471,9 +450,9 @@ const verifyActiveCheckIn = async (
                 });
                 if (matchingCard) {
                     foundRoomCard = matchingCard.data();
-                    console.log(`🔍 [verifyActiveCheckIn] Found matching room card by manual branch check`);
+                    logger.info(`🔍 [verifyActiveCheckIn] Found matching room card by manual branch check`, undefined, 'secureAccessService');
                 } else {
-                    console.log(`🔍 [verifyActiveCheckIn] Found room cards but none match branch ${branchId}`);
+                    logger.info(`🔍 [verifyActiveCheckIn] Found room cards but none match branch ${branchId}`, undefined, 'secureAccessService');
                     snapshot = { empty: true, docs: [] } as any;
                 }
             }
@@ -489,7 +468,7 @@ const verifyActiveCheckIn = async (
         // Get room card data
         const roomCard = foundRoomCard || snapshot.docs[0].data();
         
-        console.log(`🔍 [verifyActiveCheckIn] Found room card:`, {
+        logger.info(`🔍 [verifyActiveCheckIn] Found room card:`, {
             roomNumber: roomCard.roomNumber,
             branch: roomCard.branch,
             branchId: roomCard.branchId,
@@ -501,7 +480,7 @@ const verifyActiveCheckIn = async (
         // ✅ Verify branch matches (check both 'branch' and 'branchId' fields)
         const roomCardBranch = roomCard.branch || roomCard.branchId;
         if (roomCardBranch && roomCardBranch !== branchId) {
-            console.warn(`🔍 [verifyActiveCheckIn] Branch mismatch! Token branch: ${branchId}, RoomCard branch: ${roomCardBranch}`);
+            logger.warn(`🔍 [verifyActiveCheckIn] Branch mismatch! Token branch: ${branchId}, RoomCard branch: ${roomCardBranch}`, undefined, 'secureAccessService');
             return { 
                 valid: false, 
                 error: 'عذراً، يبدو أن هناك عدم تطابق في بيانات الفرع.\n\nيرجى التواصل مع الاستقبال للتحقق من صحة الرابط. نحن في خدمتك دائماً.' 
@@ -510,7 +489,7 @@ const verifyActiveCheckIn = async (
         
         // ✅ FIX: If tenantId was provided, verify it matches (for SaaS security)
         if (tenantId && roomCard.tenantId && roomCard.tenantId !== tenantId) {
-            console.warn(`🔍 [verifyActiveCheckIn] Tenant mismatch! Token tenant: ${tenantId}, RoomCard tenant: ${roomCard.tenantId}`);
+            logger.warn(`🔍 [verifyActiveCheckIn] Tenant mismatch! Token tenant: ${tenantId}, RoomCard tenant: ${roomCard.tenantId}`, undefined, 'secureAccessService');
             return { 
                 valid: false, 
                 error: 'عذراً، يبدو أن هناك عدم تطابق في بيانات الفندق.\n\nيرجى التواصل مع الاستقبال للتحقق من صحة الرابط. نحن في خدمتك دائماً.' 
@@ -519,21 +498,21 @@ const verifyActiveCheckIn = async (
         
         // Check if QR is enabled for this room (defaults to true if not set)
         if (roomCard.qrActive === false) {
-            console.warn(`🔍 [verifyActiveCheckIn] QR is disabled for this room card`);
+            logger.warn(`🔍 [verifyActiveCheckIn] QR is disabled for this room card`, undefined, 'secureAccessService');
             return { 
                 valid: false, 
                 error: 'عذراً، خدمة QR غير مفعلة لهذه الغرفة حالياً.\n\nيرجى التواصل مع الاستقبال لتفعيل الخدمة. نحن في خدمتك دائماً.' 
             };
         }
         
-        console.log(`✅ [verifyActiveCheckIn] Room card validation successful!`);
+        logger.info(`✅ [verifyActiveCheckIn] Room card validation successful!`, undefined, 'secureAccessService');
         return { 
             valid: true, 
             guestName: roomCard.guestName || roomCard.guest_name 
         };
         
     } catch (error) {
-        console.error('Check-in verification error:', error);
+        logger.error('Check-in verification error:', error, 'secureAccessService');
         return { valid: false, error: 'خطأ في التحقق من حالة الغرفة' };
     }
 };
@@ -574,7 +553,7 @@ export const deactivateToken = async (
             }
         }
     } catch (error) {
-        console.error('Error deactivating token:', error);
+        logger.error('Error deactivating token:', error, 'secureAccessService');
     }
 };
 
@@ -671,7 +650,7 @@ export const logSecurityEvent = async (
             timestamp: Timestamp.now()
         });
     } catch (error) {
-        console.error('Failed to log security event:', error);
+        logger.error('Failed to log security event:', error, 'secureAccessService');
     }
 };
 
@@ -710,7 +689,7 @@ export const getTokenInfo = async (
         } as SecureAccessToken;
         
     } catch (error) {
-        console.error('Error getting token info:', error);
+        logger.error('Error getting token info:', error, 'secureAccessService');
         return null;
     }
 };

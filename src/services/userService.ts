@@ -41,7 +41,7 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
-import { db, auth } from './firebase';
+import { db, auth, functions as firebaseFunctions, httpsCallable, getSafeFirestore } from './firebase';
 // ✅ Import for local use
 import { User, Department } from '../types';
 import { isPinAvailable } from './ownerService';
@@ -141,6 +141,18 @@ export const loadAvailableBranches = async (user: User): Promise<Array<{ id: str
         return []; // Owner doesn't need branch selection
     }
 
+    if (!db) {
+        const branches = (user as any).branches;
+        if (branches?.length) {
+            return branches.map((b: any) =>
+                typeof b === 'object' && b?.id
+                    ? { id: b.id, code: b.code, name: b.name || b.id, status: b.status }
+                    : { id: String(b), name: String(b) }
+            );
+        }
+        return [];
+    }
+
     if (user.tenantId) {
         // Manager: Load branches from tenant
         const tenantRef = doc(db, 'tenants', user.tenantId);
@@ -151,7 +163,7 @@ export const loadAvailableBranches = async (user: User): Promise<Array<{ id: str
             const branchCodes = tenantData.info?.branchCodes || [];
 
             // Load branches from tenant/branches collection
-            const branchesRef = collection(db, `tenants/${user.tenantId}/branches`);
+            const branchesRef = collection(db, 'tenants', user.tenantId, 'branches');
             const branchesSnap = await getDocs(branchesRef);
 
             // ✅ FIX: Filter out inactive/deleted branches (SaaS Dynamic)
@@ -179,7 +191,7 @@ export const loadAvailableBranches = async (user: User): Promise<Array<{ id: str
         for (const branchId of user.branches) {
             if (user.tenantId) {
                 // Load from tenant branches
-                const branchRef = doc(db, `tenants/${user.tenantId}/branches`, branchId);
+                const branchRef = doc(db, 'tenants', user.tenantId, 'branches', branchId);
                 const branchDoc = await getDoc(branchRef);
                 if (branchDoc.exists()) {
                     const status = branchDoc.data().status;
@@ -309,12 +321,17 @@ const recordLoginAttempt = async (pin: string, success: boolean): Promise<void> 
                     ip: 'client',
                 });
             } catch (firestoreError: any) {
-                // ✅ Handle Firestore internal errors gracefully
                 if (firestoreError?.message?.includes('INTERNAL ASSERTION FAILED')) {
                     logger.warn('Firestore internal error in recordLoginAttempt (likely cache issue)', firestoreError, 'userService');
                 } else {
-                    // Ignore Firestore errors - localStorage is enough
-                    logger.warn('Failed to record login attempt in Firestore (using localStorage only)', firestoreError, 'userService');
+                    const isPermissionError = firestoreError?.code === 'permission-denied' ||
+                        firestoreError?.message?.includes('permission') ||
+                        firestoreError?.message?.includes('Missing or insufficient');
+                    if (isPermissionError) {
+                        logger.debug('Login attempt not recorded in Firestore (permission denied, using localStorage only)', undefined, 'userService');
+                    } else {
+                        logger.warn('Failed to record login attempt in Firestore (using localStorage only)', firestoreError, 'userService');
+                    }
                 }
             }
         }
@@ -368,8 +385,9 @@ const recordLoginAttempt = async (pin: string, success: boolean): Promise<void> 
  * ```
  */
 export const loginWithPin = async (pin: string, branchId?: string): Promise<User & { availableBranches?: Array<{ id: string; code?: string; name: string }> }> => {
+    const pinNorm = typeof pin === 'string' ? pin.trim() : String(pin || '').trim();
     // ✅ SaaS: Check rate limiting FIRST (before any expensive operations)
-    const rateLimitCheck = await checkRateLimit(pin);
+    const rateLimitCheck = await checkRateLimit(pinNorm);
     if (!rateLimitCheck.allowed) {
         const lockoutMessage = rateLimitCheck.lockoutUntil
             ? `تم تجاوز عدد المحاولات المسموح بها. يرجى المحاولة مرة أخرى بعد ${Math.ceil((rateLimitCheck.lockoutUntil.getTime() - Date.now()) / (60 * 1000))} دقيقة.`
@@ -380,14 +398,14 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     // ✅ CRITICAL: Check owner PIN FIRST (before anonymous auth and Cloud Function)
     // Owner login is handled client-side only (for security)
     // Must check BEFORE anonymous auth to avoid unnecessary auth calls
-    logger.info(`Checking owner PIN for: ${pin.substring(0, 2)}***`, undefined, 'userService');
-    const isOwnerPin = await verifyOwnerPin(pin);
+    logger.info(`Checking owner PIN for: ${pinNorm.substring(0, 2)}***`, undefined, 'userService');
+    const isOwnerPin = await verifyOwnerPin(pinNorm);
     logger.info(`Owner PIN check result: ${isOwnerPin}`, undefined, 'userService');
     
     if (isOwnerPin) {
         // ✅ Owner doesn't need anonymous auth - return immediately
-        await recordLoginAttempt(pin, true);
-        logger.info('Owner PIN verified successfully', { pinLength: pin.length }, 'userService');
+        await recordLoginAttempt(pinNorm, true);
+        logger.info('Owner PIN verified successfully', { pinLength: pinNorm.length }, 'userService');
         return {
             id: 'owner',
             name: 'مالك المشروع',
@@ -432,28 +450,28 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
         }
 
         const loginFunction = httpsCallable(functions, 'loginWithPin');
-        const result = await loginFunction({ pin, branchId });
+        const result = await loginFunction({ pin: pinNorm, branchId: branchId || undefined });
         const response = result.data as any;
 
         if (!response.success) {
-            await recordLoginAttempt(pin, false);
+            await recordLoginAttempt(pinNorm, false);
             throw new Error(response.error || 'فشل تسجيل الدخول');
         }
 
         if (!response.user) {
-            await recordLoginAttempt(pin, false);
+            await recordLoginAttempt(pinNorm, false);
             throw new Error('لم يتم العثور على المستخدم');
         }
 
         // ✅ Record successful login attempt
-        await recordLoginAttempt(pin, true);
+        await recordLoginAttempt(pinNorm, true);
 
         // ✅ Convert response to User format
         const userData = response.user;
         const user: User = {
             id: userData.id,
             name: userData.name,
-            code: pin,
+            code: pinNorm,
             role: userData.role,
             department: userData.department || '',
             points: 0,
@@ -487,20 +505,20 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     // Fallback: Direct Firestore lookup (old method)
     let codeDocSnap;
     try {
-        const codeDocRef = doc(db, 'globalCodes', pin);
+        const codeDocRef = doc(db, 'globalCodes', pinNorm);
         codeDocSnap = await getDoc(codeDocRef);
         
         if (codeDocSnap.exists()) {
             const codeData = codeDocSnap.data();
-            console.log(`✅ Found PIN ${pin} in globalCodes:`, {
+            logger.info(`✅ Found PIN ${pinNorm} in globalCodes:`, {
                 type: codeData?.type,
                 status: codeData?.status,
                 licenseStatus: codeData?.licenseStatus
-            });
+            }, 'userService');
             
             // ✅ Cache successful lookup for offline use
             try {
-                localStorage.setItem(`globalCode_${pin}`, JSON.stringify({
+                localStorage.setItem(`globalCode_${pinNorm}`, JSON.stringify({
                     ...codeData,
                     cachedAt: Date.now()
                 }));
@@ -508,7 +526,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
                 // Ignore cache errors
             }
         } else {
-            console.log(`⚠️ PIN ${pin} not found in globalCodes - checking users collection...`);
+            logger.info(`⚠️ PIN ${pinNorm} not found in globalCodes - checking users collection...`, undefined, 'userService');
         }
     } catch (e: unknown) {
         // If permission denied, it means rules might not be deployed or there's an issue
@@ -516,13 +534,12 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
         const errorCode = (e as any)?.code;
         const errorMessage = error.message || '';
         
-        console.error(`❌ Global code lookup failed for PIN ${pin}:`, errorMessage);
-        logger.error("Global code lookup failed", error, 'userService');
+        logger.error(`❌ Global code lookup failed for PIN ${pinNorm}:`, errorMessage, 'userService');
         
         // ✅ FIX: If offline/unavailable error, try cache first
         if (errorMessage.includes('offline') || errorCode === 'unavailable' || errorCode === 'failed-precondition') {
             // Try to use cached data if available (from previous successful reads)
-            const cachedCodeKey = `globalCode_${pin}`;
+            const cachedCodeKey = `globalCode_${pinNorm}`;
             const cachedCode = localStorage.getItem(cachedCodeKey);
             
             if (cachedCode) {
@@ -532,7 +549,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
                     const MAX_CACHE_AGE = 24 * 60 * 60 * 1000; // 24 hours
                     
                     if (cacheAge < MAX_CACHE_AGE) {
-                        console.log(`📦 Using cached globalCode data for PIN ${pin} (cache age: ${Math.round(cacheAge / 1000 / 60)} minutes)`);
+                        logger.info(`📦 Using cached globalCode data for PIN ${pinNorm} (cache age: ${Math.round(cacheAge / 1000 / 60)} minutes)`, undefined, 'userService');
                         // Create a mock DocumentSnapshot-like object
                         codeDocSnap = {
                             exists: () => true,
@@ -542,14 +559,14 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
                             }
                         } as any;
                     } else {
-                        console.warn(`⚠️ Cached globalCode for PIN ${pin} is too old (${Math.round(cacheAge / 1000 / 60 / 60)} hours), ignoring cache`);
+                        logger.warn(`⚠️ Cached globalCode for PIN ${pinNorm} is too old (${Math.round(cacheAge / 1000 / 60 / 60)} hours), ignoring cache`, undefined, 'userService');
                     }
                 } catch (parseErr) {
-                    console.warn('⚠️ Failed to parse cached globalCode:', parseErr);
+                    logger.warn('⚠️ Failed to parse cached globalCode:', parseErr, 'userService');
                     // Invalid cache, continue to fallback
                 }
             } else {
-                console.warn(`⚠️ No cached data for PIN ${pin}, and client is offline. Cannot login without internet or Anonymous Auth.`);
+                logger.warn(`⚠️ No cached data for PIN ${pinNorm}, and client is offline. Cannot login without internet or Anonymous Auth.`, undefined, 'userService');
             }
         }
         
@@ -624,7 +641,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
         // Check if account is active
         if (userData.status !== 'active') {
             // ✅ Record failed login attempt
-            await recordLoginAttempt(pin, false);
+            await recordLoginAttempt(pinNorm, false);
             throw new Error('الحساب معطل - يرجى التواصل مع الإدارة');
         }
 
@@ -636,20 +653,20 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
 
         if (licenseStatus === 'suspended') {
             // ✅ Record failed login attempt
-            await recordLoginAttempt(pin, false);
+            await recordLoginAttempt(pinNorm, false);
             throw new Error('تم إيقاف الترخيص مؤقتاً - يرجى التواصل مع المالك');
         }
 
         if (licenseExpiry && licenseExpiry < new Date() && licenseStatus !== 'active') {
             // ✅ Record failed login attempt
-            await recordLoginAttempt(pin, false);
+            await recordLoginAttempt(pinNorm, false);
             throw new Error('انتهى الترخيص - يرجى التواصل مع المالك للتجديد');
         }
 
         const user: User = {
             id: managerId,
             name: userData.name,
-            code: pin, // Use the PIN that was entered
+            code: pinNorm, // Use the normalized PIN
             department: userData.department,
             role: userData.role || 'manager',
             points: userData.points || 0,
@@ -702,11 +719,11 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
                         // ✅ Save tenant-specific Firebase Config to localStorage
                         const { saveFirebaseConfig } = await import('./firebase');
                         await saveFirebaseConfig(firebaseConfig, false); // Don't reload page yet
-                        console.log('🏢 Loaded tenant-specific Firebase config:', firebaseConfig.projectId);
+                        logger.info('🏢 Loaded tenant-specific Firebase config:', firebaseConfig.projectId, 'userService');
                         
                         // ✅ CRITICAL: Reload page to ensure clean Firebase initialization
                         // This prevents auth/configuration-not-found errors
-                        console.log('🔄 Reloading page to apply tenant Firebase configuration...');
+                        logger.info('🔄 Reloading page to apply tenant Firebase configuration...', undefined, 'userService');
                         setTimeout(() => {
                             window.location.reload();
                         }, 500); // Small delay to allow login to complete
@@ -720,7 +737,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
                         // ✅ Clear tenant config if manager doesn't have isolated Firebase
                         const { clearFirebaseConfig } = await import('./firebase');
                         clearFirebaseConfig();
-                        console.log('🌐 Using master Firebase configuration (no tenant-specific config)');
+                        logger.info('🌐 Using master Firebase configuration (no tenant-specific config)', undefined, 'userService');
                     }
                 }
             } catch (e) {
@@ -750,7 +767,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
         }
 
         // ✅ Record successful login attempt
-        await recordLoginAttempt(pin, true);
+        await recordLoginAttempt(pinNorm, true);
         
         return {
             ...user,
@@ -763,12 +780,12 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     // ✅ NOTE: Anonymous auth already done at the beginning of loginWithPin
     // ✅ FIX: Check if db is available before querying
     if (!db) {
-        await recordLoginAttempt(pin, false);
+        await recordLoginAttempt(pinNorm, false);
         throw new Error('قاعدة البيانات غير متاحة - تأكد من الاتصال بالإنترنت');
     }
 
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('code', '==', pin));
+    const q = query(usersRef, where('code', '==', pinNorm));
     
     let snapshot;
     try {
@@ -776,7 +793,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     } catch (queryError: any) {
         // If offline, try cache or provide helpful message
         if (queryError.message?.includes('offline') || queryError.code === 'unavailable') {
-            await recordLoginAttempt(pin, false);
+            await recordLoginAttempt(pinNorm, false);
             throw new Error('لا يوجد اتصال بالإنترنت - يرجى التحقق من الاتصال والمحاولة مرة أخرى');
         }
         throw queryError;
@@ -784,7 +801,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
 
     if (snapshot.empty) {
         // ✅ Record failed login attempt
-        await recordLoginAttempt(pin, false);
+        await recordLoginAttempt(pinNorm, false);
         throw new Error('رمز الدخول غير صحيح');
     }
 
@@ -795,14 +812,14 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     // ✅ SaaS Enforcement: No tenant, No access.
     if (!data.tenantId) {
         // ✅ Record failed login attempt
-        await recordLoginAttempt(pin, false);
+        await recordLoginAttempt(pinNorm, false);
         throw new Error('هذا الحساب (نظام قديم) غير مفعل حالياً. يرجى إعادة إنشائه بواسطة المدير.');
     }
 
     // Check if account is active
     if (data.status !== 'active') {
         // ✅ Record failed login attempt
-        await recordLoginAttempt(pin, false);
+        await recordLoginAttempt(pinNorm, false);
         throw new Error('الحساب معطل - يرجى التواصل مع الإدارة');
     }
 
@@ -821,11 +838,11 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
         if (!managerSnapshot.empty) {
             const managerData = managerSnapshot.docs[0].data();
             if (managerData.status === 'suspended') {
-                await recordLoginAttempt(pin, false);
+                await recordLoginAttempt(pinNorm, false);
                 throw new Error('تم إيقاف حساب المدير مؤقتاً - يرجى التواصل مع الإدارة');
             }
             if (managerData.status === 'deleted') {
-                await recordLoginAttempt(pin, false);
+                await recordLoginAttempt(pinNorm, false);
                 throw new Error('تم حذف حساب المدير - يرجى التواصل مع الإدارة');
             }
             // Check license expiry
@@ -834,7 +851,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
                     managerData.licenseExpiryDate.toDate() : 
                     new Date(managerData.licenseExpiryDate);
                 if (expiryDate < new Date()) {
-                    await recordLoginAttempt(pin, false);
+                    await recordLoginAttempt(pinNorm, false);
                     throw new Error('انتهت صلاحية اشتراك المدير - يرجى التواصل مع الإدارة لتجديد الاشتراك');
                 }
             }
@@ -842,7 +859,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     } else {
         // This is a manager - check their own status
         if (data.status === 'suspended') {
-            await recordLoginAttempt(pin, false);
+            await recordLoginAttempt(pinNorm, false);
             throw new Error('تم إيقاف حسابك مؤقتاً - يرجى التواصل مع إدارة النظام');
         }
         // Check license expiry for manager
@@ -851,7 +868,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
                 data.licenseExpiryDate.toDate() : 
                 new Date(data.licenseExpiryDate);
             if (expiryDate < new Date()) {
-                await recordLoginAttempt(pin, false);
+                await recordLoginAttempt(pinNorm, false);
                 throw new Error('انتهت صلاحية اشتراكك - يرجى التواصل مع إدارة النظام لتجديد الاشتراك');
             }
         }
@@ -889,7 +906,7 @@ export const loginWithPin = async (pin: string, branchId?: string): Promise<User
     const availableBranches = await loadAvailableBranches(user);
     
     // ✅ Record successful login attempt
-    await recordLoginAttempt(pin, true);
+    await recordLoginAttempt(pinNorm, true);
     
     return { ...user, availableBranches };
 };
@@ -1019,32 +1036,29 @@ export const saveUserBinding = async (uid: string, tenantId: string, role: strin
             throw new Error(`Invalid role: ${role}`);
         }
         
-        // ✅ SaaS: Get existing binding to prevent role/tenantId changes
-        const existingBinding = await getDoc(doc(db, 'userBindings', uid));
-        if (existingBinding.exists()) {
-            const existingData = existingBinding.data();
-            
-            // Prevent role escalation (users cannot change their own role)
-            if (existingData.role && existingData.role !== role && role !== 'owner') {
-                // Only allow if current user is owner or if role is being downgraded
-                logger.warn(`Attempted role change from ${existingData.role} to ${role}`, undefined, 'userService');
-                // Allow only if it's a downgrade (e.g., manager -> employee)
-                const roleHierarchy = { owner: 5, admin: 4, manager: 3, employee: 2, staff: 1 };
-                const currentLevel = roleHierarchy[existingData.role as keyof typeof roleHierarchy] || 0;
-                const newLevel = roleHierarchy[role as keyof typeof roleHierarchy] || 0;
-                
-                if (newLevel > currentLevel) {
-                    throw new Error('Cannot escalate role');
-                }
-            }
-            
-            // Prevent tenantId changes (users cannot change their own tenantId)
-            if (existingData.tenantId && existingData.tenantId !== tenantId) {
-                throw new Error('Cannot change tenantId');
+        const safeDb = await getSafeFirestore();
+        if (!safeDb) {
+            logger.debug('Firestore not ready for saveUserBinding', undefined, 'userService');
+            return;
+        }
+        // ✅ Do NOT call getDoc(userBindings) here: right after login the client often gets permission-denied
+        // and Firestore SDK logs "Uncaught Error in snapshot listener" before our catch runs. Prefer Cloud
+        // Function first; fallback to setDoc with merge. Role/tenantId escalation is enforced by Firestore
+        // rules and by the createUserBinding Cloud Function when used.
+
+        // Prefer Cloud Function (single source of truth; bypasses client Rules)
+        if (firebaseFunctions) {
+            try {
+                const createUserBinding = httpsCallable<{ uid: string; role: string; tenantId: string; userId?: string }, { success: boolean; error?: string }>(firebaseFunctions, 'createUserBinding');
+                const result = await createUserBinding({ uid, role, tenantId, userId: uid });
+                const data = result.data;
+                if (data?.success) return;
+            } catch (callableError: unknown) {
+                logger.warn('createUserBinding callable failed, falling back to client write', (callableError as Error)?.message, 'userService');
             }
         }
-        
-        await setDoc(doc(db, 'userBindings', uid), {
+
+        await setDoc(doc(safeDb, 'userBindings', uid), {
             uid, // ✅ Required for Security Rules validation
             tenantId,
             role,
@@ -1052,18 +1066,17 @@ export const saveUserBinding = async (uid: string, tenantId: string, role: strin
         }, { merge: true });
     } catch (error: any) {
         // ✅ Handle permission errors gracefully
-        const isPermissionError = error?.code === 'permission-denied' || 
+        const isPermissionError = error?.code === 'permission-denied' ||
                                   error?.message?.includes('permission') ||
                                   error?.message?.includes('Missing or insufficient');
-        
+
         if (isPermissionError) {
             logger.warn('Permission denied for saving user binding (expected in some cases)', undefined, 'userService');
-            // Don't throw - allow caller to continue
             return;
         }
-        
+
         logger.error('Error saving user binding', error, 'userService');
-        throw error; // Re-throw only for non-permission errors
+        throw error;
     }
 };
 

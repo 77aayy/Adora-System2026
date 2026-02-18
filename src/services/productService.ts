@@ -15,6 +15,7 @@ import {
     getDocs,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { logger } from './loggerService';
 
 // ============================================================
 // TYPES
@@ -127,5 +128,5 @@ export const seedInitialProducts = async (): Promise<void> => {
         await setDoc(doc(db, PRODUCTS_COLLECTION, product.id), product);
     }
 
-    console.log('✅ تم إنشاء المنتجات التجريبية');
+    logger.info('✅ تم إنشاء المنتجات التجريبية', undefined, 'productService');
 };

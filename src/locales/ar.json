@@ -205,7 +205,9 @@
         "elapsed": "منقضي",
         "unknown": "غير معروف",
         "from": "من",
-        "to": "إلى"
+        "to": "إلى",
+        "highToLow": "أكثر ← أقل",
+        "lowToHigh": "أقل ← أكثر"
     },
     "status": {
         "pending": "قيد الانتظار",
@@ -290,6 +292,7 @@
         "enterOwnerCode": "أدخل كود المالك (6 أرقام)",
         "afterBranchEnterPin": "بعد إدخال كود الفرع، اضغط على \"كود الموظف\" للمتابعة",
         "loginSuccess": "تم تسجيل الدخول بنجاح! ✨",
+        "loggingIn": "جاري تسجيل الدخول...",
         "wrongCode": "كود خاطئ",
         "biometricFailed": "فشل التحقق من البصمة",
         "forgotCode": "نسيت الكود؟",
@@ -300,6 +303,7 @@
         "goodEvening": "مساء الخير، أنا مهتم بمشروعك",
         "dayMode": "الوضع النهاري",
         "nightMode": "الوضع الليلي",
+        "language": "تغيير اللغة",
         "branchNotSpecified": "غير محدد",
         "morningMessage": "ابدأ يومك بإنتاجية عالية",
         "afternoonMessage": "استمر في تحقيق النجاح",
@@ -1287,18 +1291,26 @@
         "hiddenPageOwnerOnly": "صفحة مخفية - للمالك فقط",
         "enterPasswordForConfigMode": "يرجى إدخال كلمة المرور للوصول إلى Configuration Mode",
         "enterRequiredPassword": "إدخال كلمة المرور المطلوبة",
-        "typeAdoraToEnter": "اكتب <span className=\"font-bold text-teal-400\">adora</span> للدخول:",
+        "typeAdoraToEnter": "اكتب <span className=\"font-bold text-teal-400\">ADORA2026</span> للدخول:",
         "enterPassword": "أدخل كلمة المرور",
+        "scanPasswordTitle": "🔐 كلمة المرور",
+        "scanPasswordSubtitle": "أدخل كلمة المرور للوصول إلى خيارات الفحص والمسح",
+        "password": "كلمة المرور",
         "passwordIncorrect": "كلمة المرور غير صحيحة",
         "cancel": "إلغاء",
         "enter": "دخول",
+        "auditChoiceTitle": "اختر العملية",
+        "auditChoiceSubtitle": "اختر بين فحص النظام أو مسح كامل",
+        "deepAudit": "🔍 فحص النظام",
+        "purgeSystem": "☢️ مسح النظام",
+        "deletedManagersPurgeFailed": "تم المسح لكن أرشيف المحذوفين لم يُمسح (صلاحيات). انشر القواعد: firebase deploy --only firestore:rules",
         "autoNavigateToBilling": "الانتقال التلقائي إلى تبويب الفواتير",
         "subscriptionReportTitle": "تقرير اشتراك - {{name}}",
         "adoraSubscriptionReport": "🏨 تقرير اشتراك Adora",
         "managerCode": "كود المدير",
         "reportDate": "تاريخ التقرير",
         "subscriberInfo": "📋 معلومات المشترك",
-        "hotelName": "اسم الفندق",
+        "hotelName": "اسم البراند أو المجموعة",
         "managerName": "اسم المدير",
         "managerCodeLabel": "رمز المدير",
         "plan": "الخطة",
@@ -1391,6 +1403,7 @@
         "expenseVouchers": "سندات الصرف",
         "overdue": "متأخرات",
         "invoice": "فاتورة",
+        "invoices": "الفواتير",
         "activeLicense": "مشترك نشط",
         "suspendedLicense": "موقوف مؤقتاً",
         "expiredLicense": "منتهي الترخيص",
@@ -1424,7 +1437,8 @@
         "subscriptionFormMessage": "يرجى ملء البيانات التالية وسنتواصل معك قريباً",
         "auditCompleted": "✅ اكتمل الفحص بنجاح!",
         "updateCloudFirestorePermissions": "تحديث صلاحيات Cloud Firestore",
-        "fullSystemScanOrPurge": "فحص شامل أو مسح كامل للنظام",
+        "fullSystemScanOrPurge": "المسح النووي وإعادة وضع المصنع — إعدادات المالك فقط، باقي كل شيء يرجع أبيض",
+        "scanOrPurge": "المسح النووي وإعادة وضع المصنع",
         "freezeLicense": "تجميد الترخيص",
         "activateLicense": "تنشيط الترخيص",
         "renewLicenseYear": "تجديد الترخيص (سنة)",
@@ -1447,6 +1461,17 @@
         "generateRandomCode": "توليد كود عشوائي فريد (4 أرقام)",
         "printSubscriptionReport": "طباعة تقرير الاشتراك",
         "viewNotes": "عرض الملاحظات",
+        "brandName": "اسم البراند أو المجموعة",
+        "totalBranches": "عدد الفروع",
+        "lastActivity": "آخر نشاط",
+        "lastRequest": "آخر طلب",
+        "allBranches": "جميع الفروع",
+        "accountCreationDate": "تاريخ إنشاء الحساب",
+        "employeesCount": "عدد الموظفين",
+        "totalRequests": "إجمالي الطلبات",
+        "topDepartment": "أكثر الأقسام طلباً",
+        "managerLifecycle": "دورة حياة المدير",
+        "quickStatsDescription": "إجمالي الفروع، المستخدمين، الطلبات، والغرف",
         "printDetails": "طباعة التفاصيل",
         "contactResult": "نتيجة الاتصال",
         "selectRequestTypeAndNotes": "اختر نوع الطلب وأضف ملاحظات",
@@ -1663,8 +1688,112 @@
             "subtitleHighlight2": "رضا ضيوفك",
             "ctaButton": "إرسال طلب تجربة"
         },
+        "statistics": {
+            "title": "أدورا بالأرقام",
+            "subtitle": "إحصائيات حقيقية من الفنادق التي تستخدم أدورا",
+            "timeSaving": {
+                "value": "40%",
+                "label": "توفير في الوقت الإداري"
+            },
+            "guestSatisfaction": {
+                "value": "95%+",
+                "label": "معدل رضا الضيوف"
+            },
+            "responseTime": {
+                "value": "30 ثانية",
+                "label": "متوسط وقت الاستجابة"
+            },
+            "efficiency": {
+                "value": "60%",
+                "label": "زيادة في كفاءة الموظفين"
+            },
+            "cloudBased": {
+                "value": "100%",
+                "label": "نظام سحابي - بدون تثبيت"
+            }
+        },
+        "whyAdora": {
+            "title": "لماذا أدورا؟",
+            "subtitle": "ما يميز أدورا عن المنافسين",
+            "local": {
+                "title": "محلي 100%",
+                "desc": "أول نظام SaaS محلي مصمم خصيصاً للفنادق السعودية"
+            },
+            "noCommissions": {
+                "title": "بدون عمولات",
+                "desc": "اشترك واستخدم مباشرة - بدون رسوم خفية أو عمولات"
+            },
+            "support": {
+                "title": "دعم فني 24/7",
+                "desc": "دعم فني عربي متاح على مدار الساعة"
+            },
+            "training": {
+                "title": "تدريب مجاني",
+                "desc": "تدريب مجاني لجميع الموظفين مع دليل شامل"
+            },
+            "automaticOperations": "عمليات تلقائية",
+            "updates": {
+                "title": "تحديثات مستمرة",
+                "desc": "تحديثات مستمرة بدون تكلفة إضافية"
+            },
+            "integration": {
+                "title": "تكامل سلس",
+                "desc": "تكامل مع الأنظمة الموجودة بدون تعقيدات"
+            }
+        },
+        "beforeAfter": {
+            "title": "قبل أدورا → بعد أدورا",
+            "subtitle": "شاهد الفرق بنفسك",
+            "paperwork": {
+                "before": "ورق + Excel متفرقة",
+                "after": "نظام رقمي موحد"
+            },
+            "feedback": {
+                "before": "ردود فعل ضيوف ضائعة",
+                "after": "تقييمات فورية وتقارير"
+            },
+            "tracking": {
+                "before": "تتبع يدوي للمهام",
+                "after": "تتبع تلقائي ذكي"
+            },
+            "delays": {
+                "before": "تأخيرات غير ملحوظة",
+                "after": "تنبيهات فورية للتأخير"
+            },
+            "reports": {
+                "before": "تقارير شهرية يدوية",
+                "after": "تقارير لحظية تلقائية"
+            }
+        },
+        "testimonials": {
+            "title": "قالوا عن أدورا",
+            "subtitle": "تجارب حقيقية من الفنادق التي تستخدم أدورا",
+            "testimonial1": {
+                "text": "وفرنا 20 ساعة أسبوعياً في الإدارة بعد استخدام أدورا",
+                "author": "فندق 5 نجوم",
+                "location": "الرياض"
+            },
+            "testimonial2": {
+                "text": "رضا ضيوفنا ارتفع من 3.5 إلى 4.8 نجوم بعد تطبيق أدورا",
+                "author": "فندق 4 نجوم",
+                "location": "جدة"
+            },
+            "testimonial3": {
+                "text": "أصبحنا نتابع كل شيء لحظياً - نظام رائع وسهل الاستخدام",
+                "author": "فندق 3 نجوم",
+                "location": "مكة"
+            }
+        },
+        "trustIndicators": {
+            "title": "الثقة والالتزام",
+            "subtitle": "نحن ملتزمون بخدمتك",
+            "secure": "آمن 100%",
+            "local": "محلي 100%",
+            "support": "دعم فني 24/7",
+            "satisfaction": "رضا مضمون"
+        },
         "features": {
-            "title": "مميزات {adora}",
+            "title": "مميزات Adora",
             "subtitle": "نظام شامل لإدارة جميع جوانب الفندق بكفاءة عالية",
             "reception": {
                 "title": "إدارة الاستقبال المتكاملة 🏨",
