@@ -6,7 +6,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { getSafeFirestore } from '../services/firebase';
 import { Tenant, TenantInfo } from '../types/tenant';
 import { logger } from '../services/loggerService';
 
@@ -133,7 +133,13 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
 
             // Wait for auth, then fetch tenant doc
             await authPromise;
-            const tenantDoc = await getDoc(doc(db, 'tenants', id));
+            const safeDb = await getSafeFirestore();
+            if (!safeDb) {
+                logger.warn('⚠️ [TenantContext] Firestore not ready, skipping tenant load', undefined, 'TenantContext');
+                setIsLoading(false);
+                return;
+            }
+            const tenantDoc = await getDoc(doc(safeDb, 'tenants', id));
 
             if (tenantDoc.exists()) {
                 const data = tenantDoc.data();

@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { NavLink, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
     DoorOpen,
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
+import { useThrottledNavigate } from '../../hooks/useThrottledNavigate';
 import { useTenantBranches } from '../../hooks/useTenantData'; // ✅ Added for Branch Switcher
 import { useRequests } from '../../hooks/useRequests';
 import { subscribeToRooms } from '../../services/roomService';
@@ -105,7 +106,7 @@ import { SupportTicketModal } from '../../components/shared/SupportTicketModal';
 const OverviewPage: React.FC = () => {
     const { user, branchId, tenantId } = useAuth(); // ✅ Get IDs
     const isOwner = user?.role === 'owner';
-    const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const [rooms, setRooms] = useState<Room[]>([]);
     const [employees, setEmployees] = useState<User[]>([]);
@@ -119,15 +120,7 @@ const OverviewPage: React.FC = () => {
     const [showProcurement, setShowProcurement] = useState(false);
     const [showSupportTicket, setShowSupportTicket] = useState(false);
 
-    // ✅ OWNER: Redirect to owner dashboard (unified interface)
-    // NOTE: Removed redirect to /admin/multi-branch as it conflicts with AdminDashboard's redirect
-    // Owner should use /owner-dashboard directly
-    useEffect(() => {
-        if (isOwner) {
-            navigate('/owner-dashboard', { replace: true });
-            return;
-        }
-    }, [isOwner, navigate]);
+    // ✅ OWNER redirect handled by parent AdminDashboard (prevents duplicate navigate → throttling)
 
     useEffect(() => {
         // ✅ MANAGER ONLY: Load branch-specific data
@@ -293,6 +286,42 @@ const OverviewPage: React.FC = () => {
             error(t('admin.oracle.sendFailed') || 'فشل في إرسال التوصية');
         }
     };
+
+    // ✅ مدير بدون فرع محدد: عرض دعوة لاختيار فرع بدل صفحة فارغة
+    if (!isOwner && (!branchId || !tenantId)) {
+        return (
+            <div className="space-y-6 animate-in fade-in duration-300 overflow-x-hidden">
+                <div
+                    className="max-w-lg mx-auto mt-12 p-8 rounded-2xl text-center border shadow-lg"
+                    style={{
+                        background: 'linear-gradient(135deg, var(--theme-bg-secondary) 0%, var(--theme-bg-primary) 100%)',
+                        borderColor: 'var(--theme-border-primary)',
+                    }}
+                >
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 bg-primary-500/20">
+                        <Building2 className="w-10 h-10 text-primary-500" />
+                    </div>
+                    <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--theme-text-primary)' }}>
+                        اختر فرعاً للعمل عليه
+                    </h2>
+                    <p className="text-sm mb-6" style={{ color: 'var(--theme-text-secondary)' }}>
+                        لم يتم تحديد فرع حالياً. انتقل إلى إدارة الفروع واختر الفرع الذي تريد العمل عليه.
+                    </p>
+                    <NavLink
+                        to="/admin/branches"
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium text-white transition-all hover:opacity-90"
+                        style={{
+                            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 100%)',
+                            boxShadow: '0 4px 14px rgba(20,184,166,0.35)',
+                        }}
+                    >
+                        <Building2 className="w-5 h-5" />
+                        إدارة الفروع
+                    </NavLink>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 overflow-x-hidden">
@@ -694,10 +723,10 @@ const OverviewPage: React.FC = () => {
 ============================================================ */
 
 export const AdminDashboard: React.FC = () => {
-    // ✅ FIX: unified user reference
     const { user, logout, branchId, tenantId } = useAuth();
     const isOwner = user?.role === 'owner';
-    const navigate = useNavigate();
+    const navigate = useThrottledNavigate();
+    const location = useLocation();
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -712,18 +741,14 @@ export const AdminDashboard: React.FC = () => {
     }, []);
 
     // ✅ OWNER: Redirect to unified owner dashboard (no duplicate interface)
-    // ✅ CRITICAL FIX: Allow Owner to access /admin/support-tickets
+    // ✅ FIX: Guard to prevent redundant navigate (avoids throttling)
     useEffect(() => {
-        if (isOwner) {
-            const currentPath = window.location.pathname;
-            // ✅ Allow Owner to access support-tickets route
-            if (currentPath.includes('/admin/support-tickets')) {
-                return; // Don't redirect - Owner can access support tickets
-            }
-            // ✅ Redirect to owner dashboard for all other /admin/* routes
-            navigate('/owner-dashboard', { replace: true });
-        }
-    }, [isOwner, navigate]);
+        if (!isOwner) return;
+        const currentPath = location.pathname;
+        if (currentPath.includes('/admin/support-tickets')) return; // Owner allowed
+        if (currentPath.startsWith('/owner-dashboard')) return; // Already there
+        navigate('/owner-dashboard', { replace: true });
+    }, [isOwner, navigate, location.pathname]);
 
     // navItems moved to AdminSidebar component
 

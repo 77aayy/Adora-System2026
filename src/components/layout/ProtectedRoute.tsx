@@ -4,14 +4,14 @@
  * Adora Hotel Management System V2
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { AdoraLoader } from '../../components/common/AdoraLoader';
+import { AppInitLoader } from '../common/AdoraLoader';
 import { useAuth } from '../../context/AuthContext';
 import { BranchStatusGuard } from '../auth/BranchStatusGuard';
 import { HierarchyGuard } from '../auth/HierarchyGuard';
 import { OnboardingGuard } from '../auth/OnboardingGuard';
-import { isFirebaseConfigured } from '../../services/firebase';
+import { isFirebaseConfigured, hasFirebaseConfigAvailable } from '../../services/firebase';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -26,18 +26,32 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
     const { user, isAuthenticated, isLoading, authReady } = useAuth();
     const location = useLocation();
+    const [, forceUpdate] = useState(0);
 
-    // ✅ Show loading only if auth is not ready yet
-    // Once authReady is true, we can proceed immediately
+    // ✅ Re-render when Firebase init completes (config exists but init was async)
+    useEffect(() => {
+        if (!hasFirebaseConfigAvailable() || isFirebaseConfigured()) return;
+        const id = setInterval(() => {
+            if (isFirebaseConfigured()) {
+                forceUpdate(n => n + 1);
+            }
+        }, 150);
+        return () => clearInterval(id);
+    }, []);
+
+    // ✅ Show consistent init loader (no flash) when auth is not ready yet
     if (!authReady || isLoading) {
-        // ✅ Minimal loading - return null to let Suspense handle it
-        // This prevents multiple loading screens from appearing
-        return null;
+        return <AppInitLoader />;
     }
 
-    // 🔐 Firebase not configured -> redirect to setup
+    // 🔐 Firebase: only redirect to setup when NO config. If config exists (init in progress), show loading
+    // ✅ Prevents wizard flash on refresh (hasFirebaseConfigAvailable is sync)
     if (!isFirebaseConfigured()) {
-        return <Navigate to="/firebase-setup" replace />;
+        if (!hasFirebaseConfigAvailable()) {
+            return <Navigate to="/firebase-setup" replace />;
+        }
+        // Config exists, init in progress - show loader until Firebase is ready
+        return <AppInitLoader />;
     }
 
     // ✅ FIX: Handle session expiry gracefully

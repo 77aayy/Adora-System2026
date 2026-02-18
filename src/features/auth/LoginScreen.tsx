@@ -23,7 +23,7 @@ import {
   isBiometricSupported,
   hasPermanentlySkippedBiometric
 } from '../../services/biometricService';
-import { isFirebaseConfigured } from '../../services/firebase';
+import { hasFirebaseConfigAvailable } from '../../services/firebase';
 import { 
   PinDot, 
   KeypadButton, 
@@ -236,9 +236,10 @@ const LoginScreen: React.FC = () => {
     setMounted(true);
   }, []);
 
-  // 🔐 Check if Firebase is configured - redirect to setup if not
+  // 🔐 Check if Firebase config exists - redirect to setup only when NO config (env/localStorage)
+  // ✅ Avoid redirect during async init (prevents wizard flash on refresh)
   useEffect(() => {
-    if (!isFirebaseConfigured()) {
+    if (!hasFirebaseConfigAvailable()) {
       navigate('/firebase-setup', { replace: true });
     }
   }, [navigate]);

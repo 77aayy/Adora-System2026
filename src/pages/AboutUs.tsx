@@ -382,8 +382,8 @@ export const AboutUs: React.FC = () => {
 
     return (
         <div 
-            className={`fixed inset-0 ${isDark ? 'bg-slate-950' : 'bg-teal-50'}`}
-            style={{ transition: 'background-color 1.5s ease-in-out' }}
+            className={`fixed inset-0 overflow-y-auto overflow-x-hidden ${isDark ? 'bg-slate-950' : 'bg-teal-50'}`}
+            style={{ transition: 'background-color 1.5s ease-in-out', WebkitOverflowScrolling: 'touch' }}
         >
             {/* Premium Animated Background - Removed for unified experience */}
             

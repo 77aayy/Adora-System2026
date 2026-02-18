@@ -126,13 +126,11 @@ export const cachedFetch = async <T>(
 ): Promise<T> => {
     const { ttl = DEFAULT_TTL, forceRefresh = false, staleWhileRevalidate = true } = options;
     
-    // 1. Check in-flight requests first (deduplication)
-    if (!forceRefresh) {
-        const inFlight = getInFlightRequest<T>(key);
-        if (inFlight) return inFlight;
-    }
+    // 1. Check in-flight requests first (always coalesce to avoid duplicate fetches/CORS storms)
+    const inFlight = getInFlightRequest<T>(key);
+    if (inFlight) return inFlight;
     
-    // 2. Check cache
+    // 2. Check cache (skip if forceRefresh)
     if (!forceRefresh) {
         const cached = getCached<T>(key);
         if (cached !== null) {
@@ -146,9 +144,15 @@ export const cachedFetch = async <T>(
         }
     }
     
-    // 3. Fetch fresh data
-    const promise = fetcher();
+    // 3. Register in-flight BEFORE fetcher runs (prevents CORS/duplicate fetch storms)
+    let resolveOuter: (v: T) => void;
+    let rejectOuter: (e: unknown) => void;
+    const promise = new Promise<T>((resolve, reject) => {
+        resolveOuter = resolve;
+        rejectOuter = reject;
+    });
     setInFlightRequest(key, promise);
+    fetcher().then(resolveOuter!, rejectOuter!);
     
     try {
         const data = await promise;

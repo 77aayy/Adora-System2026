@@ -17,7 +17,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useThrottledNavigate } from '../../hooks/useThrottledNavigate';
 import { useTranslation } from 'react-i18next';
 import { Bed, CheckCircle, Lock, Loader2, AlertTriangle, Sparkles, Plus, X } from 'lucide-react';
 import { useTenant } from '../../context/TenantContext';
@@ -42,7 +42,7 @@ export const ApproveRoomTypes: React.FC = () => {
     const { tenantId } = useTenant();
     const { user } = useAuth();
     const { branches, loading: branchesLoading } = useTenantBranches();
-    const navigate = useNavigate();
+    const navigate = useThrottledNavigate();
 
     // ✅ State
     const [loading, setLoading] = useState(true);

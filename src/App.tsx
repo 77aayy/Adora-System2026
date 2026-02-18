@@ -860,9 +860,25 @@ const AppContent: React.FC = () => {
         };
     }, [i18n]);
     
-    // ⚡ Performance: Preload adjacent routes when page changes
+    // ⚡ Performance: Preload adjacent routes when idle (avoids same-tick as navigation → throttling)
     useEffect(() => {
-        preloadAdjacentRoutes(location.pathname);
+        const path = location.pathname;
+        let timeoutId: ReturnType<typeof setTimeout>;
+        let idleId: number | undefined;
+        timeoutId = setTimeout(() => {
+            const run = () => { preloadAdjacentRoutes(path); };
+            if (typeof requestIdleCallback !== 'undefined') {
+                idleId = requestIdleCallback(run, { timeout: 1000 });
+            } else {
+                run();
+            }
+        }, 3000);
+        return () => {
+            clearTimeout(timeoutId);
+            if (idleId !== undefined && typeof cancelIdleCallback !== 'undefined') {
+                cancelIdleCallback(idleId);
+            }
+        };
     }, [location.pathname]);
 
     // ✅ One-time: mark that user has interacted (allows geolocation without violation)

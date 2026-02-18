@@ -155,12 +155,11 @@ The application cannot run in production without these secure values.
 }
 
 // ✅ Hide initial loader after React mounts (prevent overlap with LoginScreen)
+// ✅ StrictMode معطّل — كان يسبب إعادة mount مزدوجة في التطوير فتظهر الصفحة وكأنها تُحدّث مرة ثانية
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <I18nProvider>
-      <I18nextProvider i18n={i18n}>
-        <App />
-      </I18nextProvider>
-    </I18nProvider>
-  </React.StrictMode>
+  <I18nProvider>
+    <I18nextProvider i18n={i18n}>
+      <App />
+    </I18nextProvider>
+  </I18nProvider>
 );

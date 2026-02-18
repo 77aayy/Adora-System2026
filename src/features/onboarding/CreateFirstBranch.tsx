@@ -19,7 +19,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useThrottledNavigate } from '../../hooks/useThrottledNavigate';
 import { useTranslation } from 'react-i18next';
 import { Building2, CheckCircle, Lock, Loader2, AlertTriangle, Sparkles, MapPin } from 'lucide-react';
 import { useTenant } from '../../context/TenantContext';
@@ -35,7 +35,7 @@ export const CreateFirstBranch: React.FC = () => {
     const { tenantId } = useTenant();
     const { user } = useAuth();
     const { branches, loading: branchesLoading } = useTenantBranches();
-    const navigate = useNavigate();
+    const navigate = useThrottledNavigate();
 
     // ✅ SaaS License Selection State
     const [availableCodes, setAvailableCodes] = useState<Array<{ code: string; name?: string; used: boolean }>>([]);

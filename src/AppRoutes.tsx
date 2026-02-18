@@ -9,17 +9,6 @@ import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { PageTransition } from './components/common/PageTransition';
 
-// ✅ حد أدنى للتحميل عند تغيير المسار عند تغيير المسار - بدون شاشة كاملة (أسرع استجابة)
-const LoadingSpinner = () => (
-    <div className="min-h-[40vh] flex items-center justify-center bg-transparent">
-        <div className="flex gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '120ms' }} />
-            <div className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '240ms' }} />
-        </div>
-    </div>
-);
-
 // Lazy-loaded Dashboards for better performance
 // ✅ OPTIMIZED: Named chunks for better caching and debugging
 import { lazyLoad } from './utils/lazyLoad';
@@ -64,18 +53,24 @@ const CreateFirstBranch = lazyLoad(() => import(/* webpackChunkName: "onboarding
 const ApproveRoomTypes = lazyLoad(() => import(/* webpackChunkName: "onboarding" */ './features/onboarding/ApproveRoomTypes').then(m => ({ default: m.ApproveRoomTypes })));
 
 // Core
+import { AppInitLoader } from './components/common/AdoraLoader';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { GuestPortalGate } from './components/layout/GuestPortalGate';
 import { useAuth } from './context/AuthContext';
 import { getDepartmentPath } from './services/userService';
 import { ReceptionProvider } from './context/ReceptionContext';
-import { isFirebaseConfigured } from './services/firebase';
+import { isFirebaseConfigured, hasFirebaseConfigAvailable } from './services/firebase';
 
 // ======================================================
-// Firebase Setup Guard — لا نُ mount المعالج إن كان Firebase مُعداً (منع صفحة شبح)
+// Firebase Setup Guard — لا نُ mount المعالج إن كان Firebase مُعداً أو config متوفر (منع صفحة شبح عند الـ refresh)
+// ✅ If config exists (env/localStorage) → redirect to login, avoid wizard flash during async init
 // ======================================================
 const FirebaseSetupGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (isFirebaseConfigured()) {
+        return <Navigate to="/login" replace />;
+    }
+    // ✅ Config available but init not done yet → redirect to login (no wizard flash on refresh)
+    if (hasFirebaseConfigAvailable()) {
         return <Navigate to="/login" replace />;
     }
     return <>{children}</>;
@@ -87,11 +82,9 @@ const FirebaseSetupGuard: React.FC<{ children: React.ReactNode }> = ({ children 
 const RootRedirect: React.FC = () => {
     const { user, isAuthenticated, isLoading, authReady } = useAuth();
 
-    // ✅ Show minimal loading only if auth is not ready yet
-    // Once authReady is true, we can redirect immediately
+    // ✅ Show consistent init loader (no flash) when auth is not ready yet
     if (!authReady || isLoading) {
-        // ✅ Minimal loading - no full screen loader to avoid UI jumps
-        return null; // Let Suspense handle loading
+        return <AppInitLoader />;
     }
 
     if (isAuthenticated && user) {
@@ -109,7 +102,7 @@ export const AppRoutes: React.FC = () => {
     const location = useLocation();
     
     return (
-        <Suspense fallback={<LoadingSpinner />}>
+        <Suspense fallback={<AppInitLoader />}>
             <PageTransition>
                 <Routes location={location}>
 

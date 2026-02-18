@@ -15,24 +15,24 @@ export const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
     const location = useLocation();
     const [isEntering, setIsEntering] = useState(true);
 
-    // ✅ صفحات الشاشة الكاملة (دخول، ضيف، معالج Firebase، إعداد): بدون أنيميشن + خلفية صلبة حتى لا تظهر "صفحة شبح" (مثل معالج إعداد Firebase) خلف صفحة الدخول
-    const isFullScreenRoute = location.pathname === '/login' || location.pathname.startsWith('/guest') || location.pathname === '/firebase-setup' || location.pathname === '/setup';
+    // ✅ صفحات الشاشة الكاملة + الجذر: بدون أنيميشن لتجنب الفلاش (opacity 0→1 يسبب وميض)
+    const isFullScreenRoute = location.pathname === '/' || location.pathname === '/login' || location.pathname.startsWith('/guest') || location.pathname === '/firebase-setup' || location.pathname === '/setup';
 
     useEffect(() => {
         if (isFullScreenRoute) return;
         setIsEntering(false);
-        const timer = setTimeout(() => setIsEntering(true), 10);
+        const timer = setTimeout(() => setIsEntering(true), 50);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return () => clearTimeout(timer);
     }, [location.pathname, isFullScreenRoute]);
 
-    // صفحات الشاشة الكاملة: طبقة معزولة ومن فوق أي محتوى سابق (لا صفحة شبح خلفها)
+    // صفحات الشاشة الكاملة: طبقة معزولة - خلفية موحدة مع الثيم لتجنب فلاش اللون
     if (isFullScreenRoute) {
         return (
             <div
                 key={location.pathname}
-                className="min-h-screen w-full opacity-100 bg-slate-950 relative z-[100] isolate"
-                style={{ contain: 'layout paint' }}
+                className="min-h-screen w-full opacity-100 relative z-[100] isolate"
+                style={{ contain: 'layout paint', background: 'var(--theme-bg-primary)' }}
             >
                 {children}
             </div>

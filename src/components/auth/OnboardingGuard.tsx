@@ -14,12 +14,15 @@
  * Adora Hotel Management System V3
  */
 
-import React, { useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { useTenantBranches } from '../../hooks/useTenantData';
+import { useThrottledNavigate } from '../../hooks/useThrottledNavigate';
 import { AdoraLoader } from '../common/AdoraLoader';
+
+const REDIRECT_SETTLE_MS = 350; // تأخير قبل التوجيه لتفادي الرعشة وتعدد الـ redirects
 
 interface OnboardingGuardProps {
     children: React.ReactNode;
@@ -30,6 +33,8 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
     const { user } = useAuth();
     const { branches, loading } = useTenantBranches();
     const location = useLocation();
+    const navigate = useThrottledNavigate();
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ✅ Bypass for Owner (system-owner has unlimited branches)
     if (user?.role === 'owner') {
@@ -51,30 +56,46 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
         return status !== 'deleted' && status !== 'inactive' && status !== 'scheduled_for_deletion';
     });
 
-    // 🛡️ SECURITY: If manager has 0 branches → force onboarding
     const hasNoBranches = activeBranches.length === 0;
     const isOnboardingRoute = location.pathname.startsWith('/onboarding');
     const isBranchManagementRoute = location.pathname.startsWith('/admin/branches');
 
-    // ✅ Allow access to branch management even with 0 branches (manager can create first branch there)
-    if (hasNoBranches && !isOnboardingRoute && !isBranchManagementRoute) {
-        // ✅ Redirect to onboarding (block access to all other routes except branch management)
-        return <Navigate to="/onboarding/create-first-branch" replace />;
-    }
-
-    // ✅ Check if manager has branches but no approved room types
-    if (activeBranches.length > 0 && !isOnboardingRoute) {
+    const needRedirectToOnboarding = hasNoBranches && !isOnboardingRoute && !isBranchManagementRoute;
+    const needRedirectToApprove = activeBranches.length > 0 && !isOnboardingRoute && (() => {
         const firstBranch = activeBranches[0];
         const approvedRoomTypes = (firstBranch as any).approvedRoomTypes;
-        const hasApprovedTypes = approvedRoomTypes && Array.isArray(approvedRoomTypes) && approvedRoomTypes.length > 0;
+        return !(approvedRoomTypes && Array.isArray(approvedRoomTypes) && approvedRoomTypes.length > 0);
+    })();
 
-        // ✅ If branch exists but no approved room types → force approval
-        if (!hasApprovedTypes) {
-            return <Navigate to="/onboarding/approve-room-types" replace />;
+    const redirectTarget = needRedirectToOnboarding
+        ? '/onboarding/create-first-branch'
+        : needRedirectToApprove
+            ? '/onboarding/approve-room-types'
+            : null;
+
+    // ✅ تأخير التوجيه حتى لا يحدث redirect متتابع (رعشة) عند تحديث branches
+    useEffect(() => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
         }
+        if (!redirectTarget) return;
+        timerRef.current = setTimeout(() => {
+            timerRef.current = null;
+            navigate(redirectTarget, { replace: true });
+        }, REDIRECT_SETTLE_MS);
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+        };
+    }, [redirectTarget, navigate]);
+
+    if (redirectTarget) {
+        return (
+            <div className="min-h-screen theme-page flex items-center justify-center">
+                <AdoraLoader size="lg" message={t('onboarding.guards.loadingMessage')} />
+            </div>
+        );
     }
 
-    // ✅ If manager has branches but is on onboarding route → allow (they can complete setup or cancel)
-    // ✅ If manager has >= 1 branch + approved types → allow access to normal routes
     return <>{children}</>;
 };

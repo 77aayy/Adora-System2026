@@ -463,10 +463,19 @@ export const clearFirebaseConfig = (): void => {
 };
 
 /**
- * Check if Firebase is configured and ready
+ * Check if Firebase is configured and ready (async init complete)
  */
 export const isFirebaseConfigured = (): boolean => {
     return isConfigured && db !== null;
+};
+
+/**
+ * ✅ Check if Firebase config is AVAILABLE (sync - from env or localStorage)
+ * Use this to avoid redirecting to setup wizard during async init.
+ * If config exists → we're either configured or initializing. Don't show wizard.
+ */
+export const hasFirebaseConfigAvailable = (): boolean => {
+    return getFirebaseConfig() !== null;
 };
 
 /**

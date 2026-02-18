@@ -70,6 +70,25 @@ export const AdoraLoader: React.FC<AdoraLoaderProps> = ({
 };
 
 /**
+ * ✅ شاشة تحميل موحدة للبداية — بدلاً من null لتجنب الفلاش عند الـ refresh
+ */
+export const AppInitLoader: React.FC = () => (
+    <div
+        className="min-h-screen w-full flex items-center justify-center"
+        style={{ background: 'var(--theme-bg-primary)' }}
+    >
+        <div className="flex flex-col items-center gap-4">
+            <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '120ms' }} />
+                <div className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: '240ms' }} />
+            </div>
+            <p className="text-sm text-slate-400 dark:text-slate-500 animate-pulse">جاري التحميل...</p>
+        </div>
+    </div>
+);
+
+/**
  * Compact inline loader for buttons and small spaces
  * ✅ Simplified version using Tailwind animations
  */

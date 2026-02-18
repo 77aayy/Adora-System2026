@@ -25,12 +25,12 @@
     --glass-blur: 0px; /* Disabled blur */
   }
 
-  /* تمرير الصفحة على html فقط — شريط التمرير ظاهر، لا تعارض */
+  /* ✅ شريط تمرير واحد: التمرير على body فقط — html لا يمرر لتجنب شريطين (خاصة داخل Simple Browser/Cursor) */
   html {
     @apply scroll-smooth;
     max-width: 100vw;
     overflow-x: hidden !important;
-    overflow-y: auto !important;
+    overflow-y: hidden !important;
     min-height: 100%;
     height: 100%;
     -webkit-overflow-scrolling: touch;
@@ -41,9 +41,10 @@
   }
   html[dir="rtl"] body,
   html[dir="ltr"] body {
-    overflow: visible !important;
     overflow-x: hidden !important;
+    overflow-y: auto !important;
     min-height: 100%;
+    -webkit-overflow-scrolling: touch;
   }
 
   #root {

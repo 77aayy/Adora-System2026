@@ -13,7 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { MapPin, Plus, LayoutDashboard } from 'lucide-react';
 import { AdoraLoader } from '../../components/common/AdoraLoader';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 export const HierarchyGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -48,13 +48,11 @@ export const HierarchyGuard: React.FC<{ children: React.ReactNode }> = ({ childr
     const isOperationalRoute = ['/reception', '/housekeeping', '/bellman', '/maintenance', '/procurement', '/coffeeshop'].some(route => location.pathname.startsWith(route));
     
     // ✅ OWNER: Only has access to management routes, NOT operational routes
+    // ✅ FIX: Use <Navigate> instead of navigate() during render (prevents throttling/cascade)
     if (user?.role === 'owner') {
         if (isOperationalRoute) {
-            // Owner trying to access operational route - redirect to owner dashboard
-            navigate('/owner-dashboard', { replace: true });
-            return null;
+            return <Navigate to="/owner-dashboard" replace />;
         }
-        // Owner has access to management routes
         return <>{children}</>;
     }
     

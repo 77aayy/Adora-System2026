@@ -90,16 +90,25 @@ export function startOverdueMonitoring(
             where('status', 'in', ['PENDING', 'CONFIRMED', 'IN_PROGRESS'])
         );
 
-        unsubscribe = onSnapshot(q, (snapshot) => {
-        pendingRequests = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-        }));
-
-        // Check immediately on update
-        checkOverdueRequests();
-    });
+        unsubscribe = onSnapshot(
+            q,
+            (snapshot) => {
+                pendingRequests = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    createdAt: doc.data().createdAt?.toDate() || new Date(),
+                }));
+                checkOverdueRequests();
+            },
+            (error: unknown) => {
+                // ✅ Handle permission-denied and other Firestore errors gracefully
+                const err = error as { code?: string; message?: string };
+                logger.warn('⏰ [OverdueAlert] Snapshot listener error:', err?.message ?? String(error), 'overdueAlertService');
+                if (err?.code === 'permission-denied') {
+                    stopOverdueMonitoring();
+                }
+            }
+        );
 
         // Start periodic checks
         checkInterval = setInterval(checkOverdueRequests, currentConfig.checkIntervalMs);
