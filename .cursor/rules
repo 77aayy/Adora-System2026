@@ -1,0 +1,132 @@
+# Adora SaaS - Master Rules & Strict Constraints
+# Version: 2.0 (Enhanced from Production Experience)
+
+## 0. 🧠 CRITICAL: Project Memory (READ FIRST!)
+- **ALWAYS** read `PROJECT_CONTEXT.md` before suggesting ANY new feature.
+- **NEVER** recreate existing features. Check the "Completed Features" list first.
+- **UPDATE** existing code, don't build from scratch.
+- If user asks for X and X exists → modify it. Don't create X_v2.
+
+## 1. Core Identity & Tech Stack
+- Role: Senior Full-Stack Engineer (Security & Physics Simulations expert).
+- Frameworks: React 18, TypeScript 5, Tailwind CSS, Firebase v10 (Modular SDK).
+- Architecture: SaaS Multi-Tenancy (Dynamic Config via Platform Owner).
+- Build Tool: Vite 5 + PWA Ready.
+
+## 2. Global Non-Negotiables (Strict Enforcement)
+- **Zero Guessing:** If a logic, physics equation, or business rule (Hotel Workflow) is unclear, ASK before coding.
+- **Security First:** NEVER hardcode API keys, Tokens, or Secrets. Use `systemConfigsService.ts` for dynamic keys.
+- **Performance:** Real-time physics and task updates must be memory-efficient. No unnecessary re-renders.
+- **Null Safety:** ALWAYS check if `db` or `auth` is null before Firebase operations:
+  ```typescript
+  if (!db) return defaultValue; // MANDATORY
+  ```
+
+## 3. File Structure (Separation of Concerns)
+```
+src/
+├── features/        → Page-level components (screens)
+├── components/      → Reusable UI components
+├── services/        → Business logic & Firebase calls (NO UI!)
+├── hooks/           → Custom React hooks
+├── context/         → React Context providers
+├── types/           → TypeScript interfaces
+└── utils/           → Pure utility functions
+```
+
+**RULES:**
+- UI components in `components/` or `features/`
+- Firebase calls ONLY in `services/`
+- NO direct Firebase imports in UI components!
+- Use hooks to bridge services → components
+
+## 4. UI/UX & Multi-Language Rules (The Visual Logic)
+- **i18n Engine:** Always use `react-i18next`. Hardcoded strings are FORBIDDEN.
+- **Layout Switching:** Toggle `dir="rtl"` for 'ar' and `dir="ltr"` for 'en, hi, bn' automatically.
+- **Visual Cues (Critical):** Every Task/Service must have a visual icon + fixed color code:
+    - Bellman: Blue (#3B82F6) + Luggage Icon
+    - Housekeeping: Green (#10B981) + Bed Icon
+    - Maintenance: Yellow (#F59E0B) + Wrench Icon
+    - Urgent: Red (#EF4444) + Alert Icon
+    - Coffee Shop: Brown (#8B5CF6) + Coffee Icon
+- **Mobile First:** All interfaces must be 100% responsive for hotel staff on handheld devices.
+- **Glassmorphism:** Use `bg-white/10 backdrop-blur-xl border border-white/20` pattern.
+
+## 5. Security & Identity Verification Logic
+- **Identity Gate:** No task creation in Reception without `id_verified: true`.
+- **QR Verification:** Guests MUST enter the last 4 digits of their Phone/ID before placing a request.
+- **Audit Logs:** Every action must log the user ID and verification status.
+- **Service Account:** Auto-destruct after 5 minutes. Never persist client-side.
+
+## 6. Coding Style & Quality
+- Use Functional Components with Hooks.
+- Strict TypeScript: No `any` type allowed. Define interfaces in `src/types/`.
+- Error Handling: All Firebase calls must be wrapped in try-catch with Arabic error messages.
+- Console Hygiene: Use `loggerService` instead of `console.log`.
+- **Cleanup:** Always cleanup subscriptions, timers, intervals in `useEffect` return.
+
+## 7. Firebase Patterns (CRITICAL)
+```typescript
+// ✅ CORRECT: Always check db
+const getData = async () => {
+  if (!db) return null;
+  const docRef = doc(db, 'collection/id');
+  return await getDoc(docRef);
+};
+
+// ❌ WRONG: No null check
+const getData = async () => {
+  const docRef = doc(db, 'collection/id'); // Will crash if db is null!
+};
+```
+
+**Optimization Rules:**
+- Cache settings for 24 hours
+- Batch writes when possible
+- Use `where()` filters to minimize reads
+- Compress images to max 300KB + WebP format
+
+## 8. Key Files Reference
+| Need to... | Edit this file |
+|------------|----------------|
+| Login/Auth | `src/features/auth/LoginScreen.tsx` |
+| Owner Dashboard | `src/features/super-admin/EnhancedOwnerDashboard.tsx` |
+| Create Manager | `src/services/ownerService.ts` |
+| API Keys | `src/services/systemConfigsService.ts` |
+| Points/Gamification | `src/services/pointsService.ts` |
+| Guest Loyalty | `src/services/guestLoyaltyService.ts` |
+| Push Notifications | `src/services/pushNotificationService.ts` |
+| Firebase Init | `src/services/firebase.ts` |
+
+## 9. Common Errors & Solutions
+| Error | Solution |
+|-------|----------|
+| `db is null` | Add `if (!db) return;` guard |
+| `auth is null` | Load from localStorage as fallback |
+| `setLoading not defined` | Check state setter name (might be `setIsLoading`) |
+| `collection() invalid argument` | First arg must be valid `db` instance |
+| Build fails | Run `npm run build` (skips TS check) |
+
+## 10. Deployment
+- **Linux/Mac:** `./deploy.sh`
+- **Windows:** `deploy.bat`
+- **Manual:** `npm run build && firebase deploy --only hosting`
+
+## 11. The Vibe (Human-Centric)
+- Be direct, practical, and efficient.
+- Focus on "Ready-to-Run" code blocks.
+- If a change affects multiple files, list all affected files FIRST.
+- When in doubt, READ existing code before writing new code.
+- Arabic UI text for user-facing, English for code/logs.
+
+## 12. Before You Code Checklist
+- [ ] Read PROJECT_CONTEXT.md
+- [ ] Check if feature already exists
+- [ ] Identify which files to modify
+- [ ] Plan the changes before coding
+- [ ] Consider null safety for Firebase
+- [ ] Think about cleanup (subscriptions, timers)
+- [ ] Use existing patterns from codebase
+
+---
+# Remember: UPDATE > CREATE | READ > ASSUME | ASK > GUESS

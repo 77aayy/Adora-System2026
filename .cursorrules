@@ -1,0 +1,43 @@
+---
+description: 
+alwaysApply: true
+---
+
+# ⚠️ HARD-CORE EXECUTION PROTOCOL (OVERRIDE)
+
+## طريقة التنفيذ الدقيق (Precise Execution — إلزامي قبل وبعد كل تعديل)
+
+**قبل أي تعديل كود:**
+1. اقرأ الدالة/الميثود **كاملة** + **ما لا يقل عن 30 سطر قبل وبعد** منطقة التعديل.
+2. تحقق من **scope** كل متغير مستخدم (معرّف داخل نفس البلوك أو مستورد).
+3. **UPDATE > CREATE**: عدّل الكود الموجود ولا تبني من الصفر إلا إذا طُلِب صراحة.
+
+**بعد كل تعديل (search_replace أو write):**
+4. شغّل **read_lints** على كل الملفات المعدّلة وانتظر النتيجة.
+5. اقرأ القطعة المعدّلة كاملة (20–30 سطر قبل وبعد) وتأكد من عدم بقاء كود مكسور أو أقواس ناقصة.
+6. **لا تقل "تم" أو "لا أخطاء"** إلا بعد تنفيذ (4) و(5) فعلياً — التأكيد بدون تشغيل read_lints = مخالفة.
+
+## PHASE 0: PRE-CODE REFLECTION (MANDATORY)
+Before any code output, you MUST internalize the existing file structure. 
+- ACTIVATE `read_file` for the target and all its hooks/services.
+- IF physics logic is involved: Write the mathematical formula in a comment FIRST to verify.
+
+## PHASE 1: THE "SANAIEEY" QUALITY GATE
+You are FORBIDDEN from sending code until you pass this internal checklist:
+1. **Scope Check**: Is every variable imported or defined in this exact block? (No ReferenceErrors).
+2. **Memory Check**: Did I clean up `useEffect` (timers/subs)? Is there a `useMemo` or `useCallback` missing for the physics loop?
+3. **Security Check**: Are there ANY strings that look like `key_`, `secret_`, or `token_`? [IF YES: MASK THEM].
+
+## PHASE 2: TERMINAL VALIDATION
+- You MUST run `read_lints` after every modification. 
+- If `read_lints` fails, you are NOT allowed to say "I've fixed it" until you show the clean lint output.
+
+## PHASE 3: THE "DONE" DEFINITION (STRICT)
+A response is TRASH and FAILED if:
+- It uses `// ... rest of code`. (Write the full functional block or nothing).
+- It ignores the `backdrop-blur-xl` or `#14b8a6` theme.
+- It suggests a 'Guess' for a physics constant.
+
+## الردود (Response Style)
+- **لا كلام فارغ:** لا تكرر "تم التحديث" ثم قوائم نقطية طويلة تشرح ما تم إلا إذا المستخدم طلب ملخصاً.
+- **إيجاز:** بعد تنفيذ المطلوب أجب بإيجاز (مثلاً: تم. / تم في X و Y.) دون إعادة تفاصيل الرولز أو الملفات إلا للضرورة.

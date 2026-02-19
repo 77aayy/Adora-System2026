@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0D9488" />
+    <meta name="description" content="Adora Hotel Management System - نظام إدارة الفنادق الذكي" />
+
+    <!-- ✅ Content Security Policy (CSP) for Security -->
+    <!-- Note: CSP headers are now managed via vercel.json for production -->
+    <!-- Note: Scripts from infird.com are blocked (likely browser extension) - this is intentional for security -->
+    <!-- CSP violation for infird.com is EXPECTED and SAFE - it's blocked intentionally -->
+    <!-- Development CSP (more permissive for hot reload) -->
+    <!-- Note: frame-ancestors is ignored in <meta> tag - use HTTP headers instead (vercel.json) -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://www.gstatic.com https://*.firebaseio.com https://*.googleapis.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' http://127.0.0.1:7621 https://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.cloudfunctions.net wss://*.firebaseio.com https://i.ibb.co https://imgbb.com https://api.imgbb.com https://www.google-analytics.com https://analytics.google.com; frame-src 'self' https://*.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;" />
+
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Adora" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/icon-192x192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet" />
+
+    <title>Adora | نظام إدارة الفنادق</title>
+
+    <!-- تمرير الصفحة: html حاوية التمرير الوحيدة — شريط التمرير يظهر من index.css (ثيم) -->
+    <style>
+        /* ✅ Root container for scrolling - Consistently handled with index.css */
+        html {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            min-height: 100vh !important;
+            scrollbar-gutter: stable;
+            -webkit-overflow-scrolling: touch;
+            transition: none !important;
+            /* Prevents background flicker on refresh */
+        }
+
+        body {
+            min-height: 100vh !important;
+            overflow: visible !important;
+            overflow-x: hidden !important;
+            margin: 0;
+        }
+
+        #root {
+            min-height: 100vh;
+            overflow: visible !important;
+        }
+    </style>
+
+    <!-- ✅ CRITICAL: Remove Black Frame from Toast Notifications -->
+    <style>
+        /* ✅ ULTRA AGGRESSIVE: Remove ANY black backdrop/frame from toast containers */
+        [class*="ToastContainer"],
+        [id*="toastContainer"],
+        div[class*="fixed"][class*="top"][class*="z-[9999]"],
+        div[class*="fixed"][class*="top-4"][class*="z-[9999]"],
+        div[class*="fixed"][class*="left-1/2"][class*="z-[9999]"] {
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            outline: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            background-color: transparent !important;
+            background-image: none !important;
+        }
+
+        /* ✅ Remove black frames from toast items */
+        div[class*="pointer-events-auto"][class*="rounded-xl"] {
+            margin: 0 !important;
+            outline: none !important;
+            -o-border-image: none !important;
+            border-image: none !important;
+        }
+
+        /* ✅ Remove any wrapper with black background */
+        div:has(> div[class*="pointer-events-auto"][class*="rounded-xl"]) {
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
+    </style>
+  <script type="module" crossorigin src="/assets/index-D3BreiuZ.js"></script>
+
+  <link rel="stylesheet" crossorigin href="/assets/components-BRkH8bAL.css">
+  <link rel="stylesheet" crossorigin href="/assets/index-BqpKFTao.css">
+<link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script>  <link rel="modulepreload" crossorigin href="/assets/vendor-core-D_hbTIBO.js">
+  <link rel="modulepreload" crossorigin href="/assets/app-core-C3urL5y9.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-firebase-CWdI6yjY.js">
+  <link rel="modulepreload" crossorigin href="/assets/vendor-export-BFapH6h_.js">
+  <link rel="modulepreload" crossorigin href="/assets/services-KJmycXHR.js">
+  <link rel="modulepreload" crossorigin href="/assets/components-CGOc1594.js">
+</head>
+
+<body class="font-cairo antialiased">
+    <div id="root"></div>
+
+    <!-- 📋 زر نسخ الأخطاء - Adora Theme -->
+    <script>
+        // ✅ Wait for DOM to be fully ready before executing
+        function initErrorButton() {
+            // إنشاء الأنماط
+            var style = document.createElement('style');
+            style.textContent = `
+            #copy-error-btn {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 2147483647;
+                padding: 12px 20px;
+                background: linear-gradient(135deg, #0D9488 0%, #0F766E 100%);
+                color: white;
+                border: none;
+                border-radius: 14px;
+                cursor: pointer;
+                font-family: 'Cairo', sans-serif;
+                font-size: 14px;
+                font-weight: 700;
+                box-shadow: 0 4px 20px rgba(13, 148, 136, 0.4), 0 0 0 1px rgba(255,255,255,0.1);
+                display: none;
+                backdrop-filter: blur(10px);
+                transition: all 0.3s ease;
+            }
+            #copy-error-btn:hover {
+                transform: translateY(-2px) scale(1.02);
+                box-shadow: 0 8px 30px rgba(13, 148, 136, 0.5);
+            }
+            #copy-error-btn:active {
+                transform: scale(0.98);
+            }
+            #copy-error-btn.copied {
+                background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            }
+        `;
+            // ✅ NULL SAFETY: Ensure document.head exists before appending
+            if (document.head) {
+                document.head.appendChild(style);
+            }
+
+            // إنشاء الزر
+            var btn = document.createElement('button');
+            btn.id = 'copy-error-btn';
+            btn.innerHTML = '📋 نسخ تفاصيل الخطأ';
+
+            // ✅ NULL SAFETY: Ensure document.body exists before appending
+            if (document.body) {
+                document.body.appendChild(btn);
+            } else {
+                // Wait for body to be ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', function () {
+                        if (document.body) {
+                            document.body.appendChild(btn);
+                        }
+                    });
+                }
+            }
+
+            btn.onclick = function () {
+                var errorText = '';
+                var overlay = document.querySelector('vite-error-overlay');
+                if (overlay && overlay.shadowRoot) {
+                    // ✅ Extract only essential error info (file path, line number, error type)
+                    var file = overlay.shadowRoot.querySelector('.file');
+                    var msg = overlay.shadowRoot.querySelector('.message-body');
+
+                    // Extract file path and line number from file element
+                    var fileText = file ? file.textContent : '';
+                    var fileMatch = fileText.match(/([A-Z]:[^:]+):(\d+):(\d+)/i) ||
+                        fileText.match(/([^:]+\.(tsx?|jsx?)):(\d+):(\d+)/i);
+
+                    // Extract main error type from message
+                    var msgText = msg ? msg.textContent : '';
+                    var mainError = msgText.match(/Expected corresponding JSX closing tag|Unexpected token|Cannot read|is not defined|Cannot find/i)?.[0] ||
+                        msgText.split('\n')[0].trim();
+
+                    // Build concise error (only what Cursor needs)
+                    if (fileMatch) {
+                        errorText = fileMatch[1] + ':' + fileMatch[2] + ':' + (fileMatch[3] || fileMatch[4]) + '\n' + mainError;
+                    } else if (fileText) {
+                        errorText = fileText + '\n' + mainError;
+                    } else {
+                        errorText = mainError || msgText.split('\n')[0].trim();
+                    }
+                }
+                if (!errorText) {
+                    errorText = document.body.innerText;
+                }
+
+                navigator.clipboard.writeText(errorText).then(function () {
+                    btn.innerHTML = '✅ تم النسخ بنجاح!';
+                    btn.classList.add('copied');
+                    setTimeout(function () {
+                        btn.innerHTML = '📋 نسخ تفاصيل الخطأ';
+                        btn.classList.remove('copied');
+                    }, 2500);
+                });
+            };
+
+            function checkError() {
+                var hasError = document.querySelector('vite-error-overlay');
+                if (btn) {
+                    btn.style.display = hasError ? 'block' : 'none';
+                }
+            }
+
+            setInterval(checkError, 300);
+        }
+
+        // ✅ Execute when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initErrorButton);
+        } else {
+            // DOM already ready
+            setTimeout(initErrorButton, 0);
+        }
+    </script>
+
+    <!-- ✅ Vite Overlay Customization - Premium Adora Theme -->
+    <script>
+        // ✅ SIMPLIFIED: Wait for DOMContentLoaded, then use MutationObserver ONLY
+        document.addEventListener('DOMContentLoaded', function () {
+            // ✅ CRITICAL: Wait for body to be available - use setTimeout to ensure DOM is ready
+            function setupObserver() {
+                var targetNode = document.body;
+
+                // ✅ COMPREHENSIVE NULL SAFETY: Multiple checks
+                if (!targetNode || typeof targetNode === 'undefined' || !(targetNode instanceof Node)) {
+                    // Retry after a short delay if body is not ready yet
+                    setTimeout(setupObserver, 100);
+                    return;
+                }
+
+                function injectOverlayStyles() {
+                    var overlay = document.querySelector('vite-error-overlay');
+                    if (!overlay) return;
+
+                    var shadowRoot = overlay.shadowRoot;
+                    if (!shadowRoot) return;
+
+                    // Skip if already styled
+                    if (shadowRoot.querySelector('style[data-adora-theme]')) return;
+
+                    // Get theme colors from CSS variables
+                    var root = document.documentElement;
+                    var getColor = function (v, fallback) {
+                        var val = getComputedStyle(root).getPropertyValue(v).trim();
+                        return val || fallback;
+                    };
+
+                    var bgSecondary = getColor('--theme-bg-secondary', '#ffffff');
+                    var bgTertiary = getColor('--theme-bg-tertiary', '#e2e8f0');
+                    var borderPrimary = getColor('--theme-border-primary', '#cbd5e1');
+                    var textPrimary = getColor('--theme-text-primary', '#1e293b');
+                    var textSecondary = getColor('--theme-text-secondary', '#475569');
+                    var textTertiary = getColor('--theme-text-tertiary', '#64748b');
+                    var primary600 = getColor('--theme-primary-600', '#0d9488');
+                    var primary700 = getColor('--theme-primary-700', '#0f766e');
+                    var accentRedDark = getColor('--theme-accent-red-dark', '#dc2626');
+                    var shadowCard = getColor('--theme-shadow-card', '0 4px 16px rgba(0, 0, 0, 0.15)');
+
+                    // Premium styling
+                    var style = document.createElement('style');
+                    style.setAttribute('data-adora-theme', 'true');
+                    style.textContent = `
+                        * {
+                            font-family: 'Cairo', 'Tajawal', sans-serif !important;
+                        }
+                        :host {
+                            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+                        }
+                        .overlay, .container, .wrapper, [class*="overlay"], div:not([class*="stack"]):not([class*="frame"]) {
+                            background: ${bgSecondary} !important;
+                            border: 1px solid ${borderPrimary} !important;
+                            border-radius: 24px !important;
+                            box-shadow: ${shadowCard} !important;
+                            color: ${textPrimary} !important;
+                            padding: 24px !important;
+                        }
+                        .message, .title, h1, h2, h3, [class*="title"] {
+                            color: ${accentRedDark} !important;
+                            font-weight: 600 !important;
+                        }
+                        .file, code, pre:not([class*="stack"]) {
+                            color: ${primary600} !important;
+                            font-weight: 500 !important;
+                        }
+                        .stack, .frame, pre[class*="stack"], [class*="stack"] {
+                            color: ${textTertiary} !important;
+                            background: ${bgTertiary} !important;
+                            border: 1px solid ${borderPrimary} !important;
+                            border-radius: 12px !important;
+                            padding: 12px !important;
+                            font-size: 11px !important;
+                        }
+                        button, .dismiss, .btn, [role="button"] {
+                            background: ${primary600} !important;
+                            border: none !important;
+                            border-radius: 12px !important;
+                            color: white !important;
+                            font-weight: 700 !important;
+                            padding: 10px 20px !important;
+                            transition: all 0.3s ease !important;
+                        }
+                        button:hover, .dismiss:hover, .btn:hover {
+                            background: ${primary700} !important;
+                            transform: translateY(-2px) !important;
+                        }
+                        p, span, .description {
+                            color: ${textSecondary} !important;
+                        }
+                    `;
+
+                    shadowRoot.insertBefore(style, shadowRoot.firstChild);
+                    console.log('✅ Adora theme applied to Vite overlay');
+                }
+
+                // ✅ OPTIMIZED: Use MutationObserver ONLY (removed setInterval and RAF to save CPU)
+                if (typeof MutationObserver !== 'undefined') {
+                    try {
+                        // ✅ FINAL CHECK: Ensure targetNode is valid Node before observing
+                        if (!targetNode || !(targetNode instanceof Node)) {
+                            console.warn('Cannot setup Vite overlay observer: targetNode is not a valid Node');
+                            return;
+                        }
+
+                        var observer = new MutationObserver(injectOverlayStyles);
+                        observer.observe(targetNode, { childList: true, subtree: true });
+
+                        // Initial injection in case overlay already exists
+                        injectOverlayStyles();
+
+                        // ✅ CRITICAL: Cleanup on page unload to prevent memory leaks
+                        window.addEventListener('beforeunload', function () {
+                            if (observer) {
+                                observer.disconnect();
+                            }
+                        });
+                    } catch (e) {
+                        console.warn('Failed to setup Vite overlay observer:', e);
+                    }
+                }
+            }
+
+            // Start setup with a small delay to ensure DOM is fully ready
+            setTimeout(setupObserver, 0);
+        });
+    </script>
+
+</body>
+
+</html>

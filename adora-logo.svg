@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 450" fill="none">
+  <!-- Main "A" Shape -->
+  <path d="M200 30 L280 200 L260 200 L240 160 L160 160 L140 200 L120 200 L200 30Z" fill="#14b8a6"/>
+  <path d="M200 80 L235 150 L165 150 L200 80Z" fill="white"/>
+  
+  <!-- Dot -->
+  <circle cx="295" cy="50" r="25" fill="#f59e0b"/>
+  
+  <!-- ADORA Text -->
+  <text x="200" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#14b8a6">ADORA</text>
+  
+  <!-- Arabic Text -->
+  <text x="200" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#14b8a6">منظومة إدارة الفنادق</text>
+  
+  <!-- English Subtitle -->
+  <text x="200" y="390" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#5eead4">Hotel Management System</text>
+</svg>

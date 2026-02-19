@@ -1,0 +1,56 @@
+{
+    "name": "Adora Hotel Management System",
+    "short_name": "Adora",
+    "description": "نظام إدارة الفنادق الذكي - Smart Hotel Management System",
+    "theme_color": "#0D9488",
+    "background_color": "#0f172a",
+    "display": "standalone",
+    "orientation": "portrait",
+    "start_url": "/",
+    "scope": "/",
+    "lang": "ar",
+    "dir": "rtl",
+    "icons": [
+        {
+            "src": "/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "categories": [
+        "business",
+        "productivity"
+    ],
+    "screenshots": [],
+    "shortcuts": [
+        {
+            "name": "Reception",
+            "short_name": "Reception",
+            "description": "Go to Reception Dashboard",
+            "url": "/reception",
+            "icons": [
+                {
+                    "src": "/icon-192x192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        },
+        {
+            "name": "Housekeeping",
+            "short_name": "Housekeeping",
+            "description": "Go to Housekeeping Dashboard",
+            "url": "/housekeeping",
+            "icons": [
+                {
+                    "src": "/icon-192x192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ]
+}
