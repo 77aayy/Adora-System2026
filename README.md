@@ -18,7 +18,7 @@
 - **Setup Instructions:** Follow [`docs/guides/STEP_BY_STEP_SETUP.md`](docs/guides/STEP_BY_STEP_SETUP.md)
 - **Database Schema:** Review [`docs/schemas/FIRESTORE_SCHEMA.md`](docs/schemas/FIRESTORE_SCHEMA.md)
 
----
+-----
 
 ## 📍 Project Navigation for Reviewers
 
